@@ -7,12 +7,18 @@ import StatusCodes._
 
 class MyServiceSpec extends Specification with Specs2RouteTest with MyService {
   def actorRefFactory = system
-  
+
   "MyService" should {
 
     "return a greeting for GET requests to the root path" in {
       Get() ~> myRoute ~> check {
-        responseAs[String] must contain("Say hello")
+        responseAs[String] must contain("DIT4C Gatehouse")
+      }
+    }
+
+    "return favicon for GET requests to /favicon.ico" in {
+      Get("/favicon.ico") ~> myRoute ~> check {
+        responseAs[Array[Byte]] must not beEmpty
       }
     }
 
