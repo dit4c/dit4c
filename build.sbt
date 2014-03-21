@@ -1,4 +1,4 @@
-organization  := "com.example"
+organization  := "dit4c.gatehouse"
 
 version       := "0.1"
 

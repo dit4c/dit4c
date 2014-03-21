@@ -1,4 +1,4 @@
-package com.example
+package dit4c.gatehouse
 
 import org.specs2.mutable.Specification
 import spray.testkit.Specs2RouteTest

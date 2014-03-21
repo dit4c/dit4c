@@ -1,4 +1,4 @@
-package com.example
+package dit4c.gatehouse
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
