@@ -17,8 +17,7 @@ libraryDependencies ++= {
     "io.spray"            %   "spray-testkit" % sprayV  % "test",
     "com.typesafe.akka"   %%  "akka-actor"    % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"  % akkaV   % "test",
-    "org.specs2"          %%  "specs2-core"   % "2.3.7" % "test",
-    "com.kpelykh"         %   "docker-java"   % "0.8.1"
+    "org.specs2"          %%  "specs2-core"   % "2.3.7" % "test"
   )
 }
 

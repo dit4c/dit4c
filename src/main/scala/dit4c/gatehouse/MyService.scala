@@ -7,7 +7,6 @@ import spray.routing._
 import spray.http._
 import spray.json._
 import MediaTypes._
-import com.kpelykh.docker.client.DockerClient
 import scala.collection.JavaConversions._
 
 // we don't implement our route structure directly in the service actor because
