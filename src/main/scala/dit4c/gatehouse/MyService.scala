@@ -28,23 +28,8 @@ class MyServiceActor extends Actor with MyService {
 // this trait defines our service behavior independently from the service actor
 trait MyService extends HttpService {
 
-  implicit class ProjectNameTester(str: String) {
-
-    // Same as domain name, but use of capitals is prohibited because container
-    // names are case-sensitive while host names should be case-insensitive.
-    def isValidProjectName = {
-      !str.isEmpty &&
-      str.length <= 63 &&
-      !str.startsWith("-") &&
-      !str.endsWith("-") &&
-      str.matches("[a-z0-9\\-]+")
-    }
-
-  }
-
-
   val myRoute =
-    logRequestResponse("") {
+    //logRequestResponse("") {
       path("") {
         get {
           respondWithMediaType(`text/html`) { // XML is marshalled to `text/xml` by default, so we simply override here
@@ -66,22 +51,6 @@ trait MyService extends HttpService {
           // serve up static content from a JAR resource
           getFromResource("dit4c/gatehouse/public/favicon.ico")
         }
-      } ~
-      path("projects") {
-        get {
-          detach() {
-            respondWithMediaType(`application/json`) {
-              complete {
-                import DefaultJsonProtocol._
-                val dockerClient = new DockerClient("http://localhost:4243");
-                val containers = dockerClient.listContainers(false, false)
-                containers.toSeq.map { container =>
-                  container.getNames.map(_.stripPrefix("/"))
-                }.flatten.filter(_.isValidProjectName).sorted.toJson.toString
-              }
-            }
-          }
-        }
       }
-    }
+    //}
 }
