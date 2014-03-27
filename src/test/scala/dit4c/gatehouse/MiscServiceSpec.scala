@@ -8,7 +8,7 @@ import StatusCodes._
 class MiscServiceSpec extends Specification with Specs2RouteTest with MiscService {
   def actorRefFactory = system
 
-  "MyService" should {
+  "MiscService" should {
 
     "return a greeting for GET requests to the root path" in {
       Get() ~> miscRoute ~> check {

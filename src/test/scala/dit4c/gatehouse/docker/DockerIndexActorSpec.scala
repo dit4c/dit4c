@@ -33,15 +33,15 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
       val index: ActorRef = system.actorOf(Props(classOf[DockerIndexActor], client))
 
       (index ask PortQuery("foo"))
-        .mapTo[Option[Int]] must beSome(43000)
+        .mapTo[PortReply] must equalTo(PortReply(Some(43000)))
         .await(retries = 2, timeout = 100.millis)
 
       (index ask PortQuery("bar"))
-        .mapTo[Option[Int]] must beSome(43001)
+        .mapTo[PortReply] must equalTo(PortReply(Some(43001)))
         .await(retries = 2, timeout = 100.millis)
 
       (index ask PortQuery("doesnotexist"))
-        .mapTo[Option[Int]] must beNone
+        .mapTo[PortReply] must equalTo(PortReply(None))
         .await(retries = 2, timeout = 100.millis)
 
       0 must_== 0

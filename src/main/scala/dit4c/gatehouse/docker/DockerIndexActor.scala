@@ -4,6 +4,7 @@ import scala.concurrent.duration._
 import akka.actor.Actor
 import scala.collection.immutable.Queue
 import akka.actor.ActorRef
+import akka.event.LoggingReceive
 
 class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   import context.dispatcher
@@ -38,9 +39,9 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
     clearQueue
     commonReceive orElse {
       case DelayedQuery(originalSender, PortQuery(containerName)) =>
-        originalSender ! index.get(containerName)
+        originalSender ! PortReply(index.get(containerName))
       case PortQuery(containerName) =>
-        sender ! index.get(containerName)
+        sender ! PortReply(index.get(containerName))
     }
   }
 
