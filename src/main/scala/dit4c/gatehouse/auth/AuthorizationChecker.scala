@@ -13,11 +13,12 @@ class AuthorizationChecker {
   def apply(containerName:String)(serializedJwt: String): AuthorizationFlag = {
     val jwt: JWT = parseJwt(serializedJwt)
     jwt.getJWTClaimsSet.getCustomClaim(CLAIM_NAME) match {
-      case list: java.util.List[String] =>
-        list.toList.toSet[String].contains(containerName)
+      case list: java.util.List[_] =>
+        val authorizedContainers =
+          list.asInstanceOf[java.util.List[String]].toList.toSet[String]
+        authorizedContainers.contains(containerName)
       case notAList: Object =>
         // Bad format
-        println(notAList)
         false
     }
   }
