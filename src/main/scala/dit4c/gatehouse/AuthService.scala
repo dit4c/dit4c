@@ -16,6 +16,7 @@ import spray.http.HttpHeaders.RawHeader
 import akka.event.Logging
 import scala.util.{Success, Failure}
 import akka.event.LoggingReceive
+import dit4c.gatehouse.auth.AuthorizationChecker
 
 class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) extends HttpService {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,22 +24,32 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) e
 
   implicit val timeout = Timeout(100.millis)
 
+  val AUTH_TOKEN_COOKIE = "dit4c-jwt"
+
+  val authorizationChecker = new AuthorizationChecker
+
   val route =
     logRequestResponse("") {
     path("auth") {
       get {
         host("""^(\w+)\.""".r) { containerName =>
-          onComplete(dockerIndex ask PortQuery(containerName)) {
-            case Success(PortReply(Some(port))) =>
-              respondWithHeader(RawHeader("X-Upstream-Port", s"$port")) {
-                complete(200, HttpEntity.Empty)
+          optionalCookie(AUTH_TOKEN_COOKIE) {
+            case Some(jwtCookie) if authorizationChecker(containerName)(jwtCookie.content) =>
+              onComplete(dockerIndex ask PortQuery(containerName)) {
+                case Success(PortReply(Some(port))) =>
+                  respondWithHeader(RawHeader("X-Upstream-Port", s"$port")) {
+                    complete(200, HttpEntity.Empty)
+                  }
+                case Success(PortReply(None)) =>
+                  complete(404, HttpEntity.Empty)
+                case Failure(e)  =>
+                  logRequestResponse("query error") {
+                    complete(500, HttpEntity.Empty)
+                  }
               }
-            case Success(PortReply(None)) =>
-              complete(404, HttpEntity.Empty)
-            case Failure(e)  =>
-              logRequestResponse("query error") {
-                complete(500, HttpEntity.Empty)
-              }
+            case _ =>
+              // Missing or invalid authorization cookie
+              complete(403, HttpEntity.Empty)
           }
         } ~
         respondWithStatus(400) {

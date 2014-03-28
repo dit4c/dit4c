@@ -3,6 +3,7 @@ package dit4c.gatehouse
 import org.specs2.mutable.Specification
 import spray.testkit.Specs2RouteTest
 import spray.http._
+import spray.http.HttpHeaders.Cookie
 import spray.json._
 import StatusCodes._
 import akka.actor._
@@ -14,6 +15,8 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
     AuthService(system, system.actorOf(Props[AuthServiceMockDockerIndexActor]))
   }
   import authService._
+
+  import auth.AuthorizationCheckerSpecTokens._
 
   "AuthService" should {
 
@@ -27,8 +30,40 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
         }
       }
 
-      "return 200 if Host is present and port is found" in {
-        Get("/auth") ~> addHeader("Host", "foo.example.com") ~> route ~> check {
+      "return 403 if Host is present and token is missing or malformed" in {
+        Get("/auth") ~>
+            addHeader("Host", "foo.example.com") ~>
+            route ~> check {
+          status must be(Forbidden)
+          entity must be(HttpEntity.Empty)
+          header("X-Upstream-Port") must beNone
+        }
+        Get("/auth") ~>
+            addHeader("Host", "foo.example.com") ~>
+            Cookie(HttpCookie("dit4c-jwt", malformedToken)) ~>
+            route ~> check {
+          status must be(Forbidden)
+          entity must be(HttpEntity.Empty)
+          header("X-Upstream-Port") must beNone
+        }
+      }
+
+      "return 403 if Host is present and token is invalid" in {
+        Get("/auth") ~>
+            addHeader("Host", "baz.example.com") ~>
+            Cookie(HttpCookie("dit4c-jwt", testToken)) ~>
+            route ~> check {
+          status must be(Forbidden)
+          entity must be(HttpEntity.Empty)
+          header("X-Upstream-Port") must beNone
+        }
+      }
+
+      "return 200 if Host is present, token is valid and port is found" in {
+        Get("/auth") ~>
+            addHeader("Host", "foo.example.com") ~>
+            Cookie(HttpCookie("dit4c-jwt", testToken)) ~>
+            route ~> check {
           status must be(OK)
           entity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beSome
@@ -36,16 +71,22 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
         }
       }
 
-      "return 404 if Host is present and port is not found" in {
-        Get("/auth") ~> addHeader("Host", "bar.example.com") ~> route ~> check {
+      "return 404 if Host is present, token is valid and port is not found" in {
+        Get("/auth") ~>
+            addHeader("Host", "bar.example.com") ~>
+            Cookie(HttpCookie("dit4c-jwt", testToken)) ~>
+            route ~> check {
           status must be(NotFound)
           entity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
       }
 
-      "return 500 if query fails" in {
-        Get("/auth") ~> addHeader("Host", "die.example.com") ~> route ~> check {
+      "return 500 if port query fails" in {
+        Get("/auth") ~>
+            addHeader("Host", "die.example.com") ~>
+            Cookie(HttpCookie("dit4c-jwt", testToken)) ~>
+            route ~> check {
           status must be(InternalServerError)
           entity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
