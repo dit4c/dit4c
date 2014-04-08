@@ -36,7 +36,8 @@ generateExecutable := {
   val outputFile = target.value / "executable" / s"${name.value}-${version.value}"
   // Based on https://coderwall.com/p/ssuaxa
   val payload = Resource.fromFile(oneJar.value)
-  val stubScript = Resource.fromFile(resourceDirectory.value / "exec_stub.sh")
+  val stubScript = Resource.fromFile(
+    (resourceDirectory in Compile).value / "exec_stub.sh")
   val output = Resource.fromFile(outputFile)
   // Delete any existing content, then write stub followed by payload
   output.truncate(0)
