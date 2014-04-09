@@ -21,15 +21,13 @@ class AuthActor(publicKeySource: File) extends Actor {
   }
 
   def doAuthCheck(jwt: String, containerName: String): AuthResponse =
-    if (signatureChecker(jwt)) {
-      if (authorizationChecker(jwt, containerName)) {
-        AccessGranted()
-      } else {
-        AccessDenied("Invalid authorization token.")
-      }
-    } else {
-      AccessDenied("Invalid authorization token.")
-    }
+    signatureChecker(jwt)
+      // If signature check passes, check authorization
+      .right.flatMap { _ => authorizationChecker(jwt, containerName) }
+      .fold(
+        reason => AccessDenied(reason),
+        _ => AccessGranted()
+      )
 
 }
 

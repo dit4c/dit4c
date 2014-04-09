@@ -30,7 +30,6 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
   val authorizationChecker = new AuthorizationChecker
 
   val route =
-    logRequestResponse("") {
     path("auth") {
       get {
         host("""^(\w+)\.""".r) { containerName =>
@@ -46,14 +45,20 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
                     case Success(PortReply(None)) =>
                       complete(404, HttpEntity.Empty)
                     case Failure(e)  =>
-                      logRequestResponse("query error") {
+                      logRequestResponse(s"query error: $e") {
                         complete(500, HttpEntity.Empty)
                       }
                   }
-                case Success(AccessDenied(_)) =>
-                  complete(403, HttpEntity.Empty)
-                case Failure(e)  =>
-                  logRequestResponse("query error") {
+                case Success(AccessDenied(reason)) =>
+                  logRequestResponse(reason) {
+                    complete(403, HttpEntity.Empty)
+                  }
+                case Success(unknown) =>
+                  logRequestResponse(s"unknown auth response: $unknown") {
+                    complete(500, HttpEntity.Empty)
+                  }
+                case Failure(e) =>
+                  logRequestResponse(s"query error: $e") {
                     complete(500, HttpEntity.Empty)
                   }
               }
@@ -67,7 +72,6 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
         }
       }
     }
-  }
 }
 
 object AuthService {

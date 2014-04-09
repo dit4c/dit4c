@@ -17,13 +17,13 @@ class SignatureCheckerSpec extends Specification {
     "should reject things that aren't tokens" in {
       import com.nimbusds.jose._
       val unsignedToken = "VGhlIHF1aWNrIGJyb3duIGZveA.anVtcGVkIG92ZXI"
-      checker(unsignedToken) must beFalse
+      checker(unsignedToken) must beLeft
     }
 
     "should reject unsigned tokens" in {
       import com.nimbusds.jose._
       val unsignedToken = new PlainObject(new Payload("Test payload")).serialize
-      checker(unsignedToken) must beFalse
+      checker(unsignedToken) must beLeft
     }
 
     "should accept tokens signed with the test key" in {
@@ -34,7 +34,7 @@ class SignatureCheckerSpec extends Specification {
         val signer = new RSASSASigner(key.toRSAPrivateKey)
         val token = new JWSObject(header, payload)
         token.sign(signer)
-        checker(token.serialize) must beTrue
+        checker(token.serialize) must beRight
       }
     }
 
@@ -51,7 +51,7 @@ class SignatureCheckerSpec extends Specification {
       val signature = new RSASSASigner(key).sign(header, payload.toBytes)
       val token = new JWSObject(header, payload)
       token.sign(signer)
-      checker(token.serialize) must beFalse
+      checker(token.serialize) must beLeft
     }
   }
 }

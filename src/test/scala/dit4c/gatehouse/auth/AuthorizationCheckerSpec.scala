@@ -11,13 +11,13 @@ class AuthorizationCheckerSpec extends Specification {
   "Authorization Checker" should {
 
     "return true only for containers authorized in the token" in {
-      checker("foo", testToken) must beTrue
-      checker("bar", testToken) must beTrue
-      checker("baz", testToken) must beFalse
+      checker("foo", testToken) must beRight
+      checker("bar", testToken) must beRight
+      checker("baz", testToken) must beLeft
     }
 
     "return false for malformed tokens" in {
-      checker("foo", malformedToken) must beFalse
+      checker("foo", malformedToken) must beLeft
     }
   }
 }

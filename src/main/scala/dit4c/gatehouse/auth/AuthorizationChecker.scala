@@ -6,20 +6,21 @@ import scala.collection.JavaConversions._
 
 class AuthorizationChecker {
 
-  type AuthorizationFlag = Boolean
-
   private val CLAIM_NAME = "http://dit4c.github.io/authorized_containers"
 
-  def apply(containerName:String, serializedJwt: String): AuthorizationFlag = {
+  def apply(containerName:String, serializedJwt: String): Either[String, Unit] = {
     val jwt: JWT = parseJwt(serializedJwt)
     jwt.getJWTClaimsSet.getCustomClaim(CLAIM_NAME) match {
       case list: java.util.List[_] =>
         val authorizedContainers =
           list.asInstanceOf[java.util.List[String]].toList.toSet[String]
-        authorizedContainers.contains(containerName)
+        if (authorizedContainers.contains(containerName))
+          Right()
+        else
+          Left("Container not present in authorization list")
       case notAList: Object =>
         // Bad format
-        false
+        Left(s"Malformed authorization list: $notAList")
     }
   }
 

@@ -18,20 +18,22 @@ class SignatureChecker(val publicKeys: Iterable[RSAPublicKey]) {
     }
   }
 
-  def apply(serializedJwt: String): Boolean =
+  def apply(serializedJwt: String): Either[String, Unit] =
     try {
       JWTParser.parse(serializedJwt) match {
         case jws: SignedJWT => apply(jws)
         case _ =>
-          logger.info(s"Not a JSON Web Signature: $serializedJwt")
-          false
+          Left(s"Not a JSON Web Signature: $serializedJwt")
       }
     } catch {
       case _: ParseException =>
-        logger.info(s"Invalid JSON Web Token: $serializedJwt")
-        false
+        Left(s"Invalid JSON Web Token: $serializedJwt")
     }
 
   // If any verifier succeeds, then they all have
-  def apply(jws: SignedJWT): Boolean = verifiers.exists(f => f(jws))
+  def apply(jws: SignedJWT): Either[String, Unit] =
+    if (verifiers.exists(f => f(jws)))
+      Right()
+    else
+      Left(s"Signature failed verification for all public keys: ${jws.serialize}")
 }
