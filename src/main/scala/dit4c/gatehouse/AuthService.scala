@@ -7,6 +7,7 @@ import spray.json._
 import MediaTypes._
 import akka.actor.ActorRef
 import akka.pattern.ask
+import dit4c.gatehouse.auth.AuthActor._
 import dit4c.gatehouse.docker.DockerIndexActor._
 import akka.util.Timeout
 import spray.util.pimpFuture
@@ -18,7 +19,7 @@ import scala.util.{Success, Failure}
 import akka.event.LoggingReceive
 import dit4c.gatehouse.auth.AuthorizationChecker
 
-class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) extends HttpService {
+class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, auth: ActorRef) extends HttpService {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
 
@@ -34,21 +35,30 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) e
       get {
         host("""^(\w+)\.""".r) { containerName =>
           optionalCookie(AUTH_TOKEN_COOKIE) {
-            case Some(jwtCookie) if authorizationChecker(containerName)(jwtCookie.content) =>
-              onComplete(dockerIndex ask PortQuery(containerName)) {
-                case Success(PortReply(Some(port))) =>
-                  respondWithHeader(RawHeader("X-Upstream-Port", s"$port")) {
-                    complete(200, HttpEntity.Empty)
+            case Some(jwtCookie) =>
+              onComplete(auth ask AuthCheck(jwtCookie.content, containerName)) {
+                case Success(AccessGranted) =>
+                  onComplete(dockerIndex ask PortQuery(containerName)) {
+                    case Success(PortReply(Some(port))) =>
+                      respondWithHeader(RawHeader("X-Upstream-Port", s"$port")) {
+                        complete(200, HttpEntity.Empty)
+                      }
+                    case Success(PortReply(None)) =>
+                      complete(404, HttpEntity.Empty)
+                    case Failure(e)  =>
+                      logRequestResponse("query error") {
+                        complete(500, HttpEntity.Empty)
+                      }
                   }
-                case Success(PortReply(None)) =>
-                  complete(404, HttpEntity.Empty)
+                case Success(AccessDenied(_)) =>
+                  complete(403, HttpEntity.Empty)
                 case Failure(e)  =>
                   logRequestResponse("query error") {
                     complete(500, HttpEntity.Empty)
                   }
               }
             case _ =>
-              // Missing or invalid authorization cookie
+              // Missing cookie
               complete(403, HttpEntity.Empty)
           }
         } ~
@@ -62,7 +72,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) e
 
 object AuthService {
 
-  def apply(actorRefFactory: ActorRefFactory, dockerIndex: ActorRef) =
-    new AuthService(actorRefFactory, dockerIndex)
+  def apply(actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, auth: ActorRef) =
+    new AuthService(actorRefFactory, dockerIndex, auth)
 
 }

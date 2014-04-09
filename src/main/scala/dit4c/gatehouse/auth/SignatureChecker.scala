@@ -6,11 +6,11 @@ import java.text.ParseException
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.JWTParser
 
-class SignatureChecker(val publicKeys: Set[RSAPublicKey]) {
+class SignatureChecker(val publicKeys: Iterable[RSAPublicKey]) {
 
   val logger = java.util.logging.Logger.getAnonymousLogger
 
-  val verifiers: Set[SignedJWT => Boolean] = publicKeys.map {k =>
+  val verifiers: Iterable[SignedJWT => Boolean] = publicKeys.map {k =>
     val impl = new RSASSAVerifier(k)
 
     (jws: SignedJWT) => {

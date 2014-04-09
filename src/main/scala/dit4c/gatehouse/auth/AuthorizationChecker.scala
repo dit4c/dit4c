@@ -10,7 +10,7 @@ class AuthorizationChecker {
 
   private val CLAIM_NAME = "http://dit4c.github.io/authorized_containers"
 
-  def apply(containerName:String)(serializedJwt: String): AuthorizationFlag = {
+  def apply(containerName:String, serializedJwt: String): AuthorizationFlag = {
     val jwt: JWT = parseJwt(serializedJwt)
     jwt.getJWTClaimsSet.getCustomClaim(CLAIM_NAME) match {
       case list: java.util.List[_] =>
