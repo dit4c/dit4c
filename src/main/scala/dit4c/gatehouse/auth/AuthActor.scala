@@ -41,9 +41,4 @@ object AuthActor {
   sealed trait AuthResponse
   case class AccessGranted() extends AuthResponse
   case class AccessDenied(reason: String) extends AuthResponse
-
-  object AuthResponse {
-    def apply(b: Boolean, reason: String): AuthResponse =
-      if (b) AccessGranted() else AccessDenied(reason)
-  }
 }
