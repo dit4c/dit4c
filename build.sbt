@@ -40,9 +40,13 @@ generateExecutable := {
     (resourceDirectory in Compile).value / "exec_stub.sh")
   val output = Resource.fromFile(outputFile)
   // Delete any existing content, then write stub followed by payload
-  output.truncate(0)
-  stubScript copyDataTo output
-  payload copyDataTo output
+  for {
+    processor <- output.outputProcessor
+    out = processor.asOutput
+  } {
+    out.write(stubScript.bytes)
+    out.write(payload.bytes)
+  }
   // Set as executable
   outputFile.setExecutable(true)
   // Return path
