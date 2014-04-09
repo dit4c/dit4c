@@ -8,12 +8,9 @@ import java.security.interfaces.RSAPrivateKey
 
 class SignatureCheckerSpec extends Specification {
 
-  val testKey = {
-    val content = scala.io.Source.fromInputStream(
-        getClass.getResourceAsStream("test_jwk.json")).mkString
-    RSAKey.parse(content)
-  }
-  val checker = new SignatureChecker(Set(testKey.toRSAPublicKey))
+  lazy val testKeys: Seq[RSAKey] = KeyLoader(
+        getClass.getResourceAsStream("test_jwk.json"))
+  lazy val checker = new SignatureChecker(testKeys.map(_.toRSAPublicKey).toSet)
 
   "Signature Checker" should {
 
@@ -33,10 +30,12 @@ class SignatureCheckerSpec extends Specification {
       import com.nimbusds.jose._
       val header = new JWSHeader(JWSAlgorithm.RS256)
       val payload = new Payload("Test payload")
-      val signer = new RSASSASigner(testKey.toRSAPrivateKey)
-      val token = new JWSObject(header, payload)
-      token.sign(signer)
-      checker(token.serialize) must beTrue
+      testKeys.map { key =>
+        val signer = new RSASSASigner(key.toRSAPrivateKey)
+        val token = new JWSObject(header, payload)
+        token.sign(signer)
+        checker(token.serialize) must beTrue
+      }
     }
 
     "should reject tokens signed with another key" in {
