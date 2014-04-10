@@ -48,7 +48,6 @@ class SignatureCheckerSpec extends Specification {
       val header = new JWSHeader(JWSAlgorithm.RS256)
       val payload = new Payload("Test payload")
       val signer = new RSASSASigner(key)
-      val signature = new RSASSASigner(key).sign(header, payload.toBytes)
       val token = new JWSObject(header, payload)
       token.sign(signer)
       checker(token.serialize) must beLeft

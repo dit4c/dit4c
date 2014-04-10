@@ -1,7 +1,8 @@
 package dit4c.gatehouse.auth
 
 import java.io.InputStream
-import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.{JWKSet, RSAKey}
+import scala.collection.JavaConversions._
 
 object KeyLoader {
 
@@ -9,11 +10,9 @@ object KeyLoader {
 
   def apply(input: InputStream): Seq[RSAKey] = {
     val content = scala.io.Source.fromInputStream(input).mkString
-    import spray.json._
-    import DefaultJsonProtocol._
-    JsonParser(content).convertTo[Seq[JsObject]].map { obj: JsObject =>
-      RSAKey.parse(obj.compactPrint)
-    }
+
+    val keySet = JWKSet.parse(content)
+    keySet.getKeys.map( _.asInstanceOf[RSAKey] )
   }
 
 }
