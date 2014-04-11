@@ -1,7 +1,25 @@
-@(message: String)
+@(containers: List[String], parentDomain: String)
+<!DOCTYPE html5>
+<html>
+	<head>
+    <title>Pick a container</title>
 
-@main("Welcome to Play") {
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" media="screen" href="@routes.Assets.at("stylesheets/main.css")">
 
-    @play20.welcome(message)
+    <link rel="shortcut icon" type="image/png" href="@routes.Assets.at("images/favicon.png")">
 
-}
+    <script src="@routes.Assets.at("javascripts/jquery-1.9.0.min.js")" type="text/javascript"></script>
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+	</head>
+  <body>
+  	<h1>Pick a container</h1>
+    <ul>
+    @for(container <- containers) {
+      <li>
+        <a href="//@container.@parentDomain/">@container</a>
+      </li>
+    }
+    </ul>
+  </body>
+</html>

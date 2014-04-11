@@ -17,3 +17,4 @@ activator-*.sbt
 /.target
 /bin
 /.cache
+/keys.json
