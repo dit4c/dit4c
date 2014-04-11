@@ -22,10 +22,17 @@ class Application extends Controller {
   }
 
   def login = Action { implicit request =>
-    val cookies = Cookie("dit4c-jwt", jwt(containers))
+    val cookies = Cookie("dit4c-jwt", jwt(containers),
+        domain=getCookieDomain)
     Redirect(request.headers.get("Referer").getOrElse("/"))
       .withCookies(cookies)
   }
+
+  def getCookieDomain(implicit request: RequestHeader): Option[String] =
+    if (request.host.matches(".+\\..+")) Some("."+request.host)
+    else None
+
+
 
   private def jwt(containers: List[String])(implicit request: RequestHeader) = {
     val privateKey = privateKeySet.getKeys.head
