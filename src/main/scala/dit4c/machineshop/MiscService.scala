@@ -1,4 +1,4 @@
-package dit4c.gatehouse
+package dit4c.machineshop
 
 import akka.actor.Actor
 
@@ -20,9 +20,9 @@ trait MiscService extends HttpService {
             complete {
               <html>
                 <body>
-                  <h1>DIT4C Gatehouse</h1>
+                  <h1>DIT4C MachineShop</h1>
                   <ul>
-                    <a href="auth">Auth Query</a>
+                    <li></li>
                   </ul>
                 </body>
               </html>
@@ -33,7 +33,7 @@ trait MiscService extends HttpService {
       path("favicon.ico") {
         get {
           // serve up static content from a JAR resource
-          getFromResource("dit4c/gatehouse/public/favicon.ico")
+          getFromResource("dit4c/machineshop/public/favicon.ico")
         }
       }
     //}

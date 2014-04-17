@@ -1,4 +1,4 @@
-package dit4c.gatehouse.docker
+package dit4c.machineshop.docker
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

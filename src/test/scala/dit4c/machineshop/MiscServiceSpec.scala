@@ -1,4 +1,4 @@
-package dit4c.gatehouse
+package dit4c.machineshop
 
 import org.specs2.mutable.Specification
 import spray.testkit.Specs2RouteTest
@@ -12,7 +12,7 @@ class MiscServiceSpec extends Specification with Specs2RouteTest with MiscServic
 
     "return a greeting for GET requests to the root path" in {
       Get() ~> miscRoute ~> check {
-        responseAs[String] must contain("DIT4C Gatehouse")
+        responseAs[String] must contain("DIT4C MachineShop")
       }
     }
 

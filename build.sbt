@@ -1,4 +1,4 @@
-organization  := "dit4c.gatehouse"
+organization  := "dit4c.machineshop"
 
 version       := "0.1"
 
