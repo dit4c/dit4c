@@ -9,15 +9,17 @@ object BetamaxUtils {
     val recorder = new Recorder
     val proxyServer = new ProxyServer(recorder)
     recorder.insertTape(tapeName)
-    try {
-      proxyServer.start()
-      // Handle Spray.IO nonProxyHosts check in scala.can.client.ProxySettings
-      // (essentially, you can't have nothing)
-      System.setProperty("http.nonProxyHosts", "1.1.1.1")
-      f
-    } finally {
-      recorder.ejectTape()
-      proxyServer.stop()
+    synchronized {
+      try {
+        proxyServer.start()
+        // Handle Spray.IO nonProxyHosts check in scala.can.client.ProxySettings
+        // (essentially, you can't have nothing)
+        System.setProperty("http.nonProxyHosts", "1.1.1.1")
+        f
+      } finally {
+        recorder.ejectTape()
+        proxyServer.stop()
+      }
     }
   }
 

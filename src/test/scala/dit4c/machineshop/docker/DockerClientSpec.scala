@@ -13,6 +13,7 @@ import spray.http.HttpResponse
 import spray.http.StatusCodes
 import spray.http.Uri
 import spray.util.pimpFuture
+import dit4c.machineshop.docker.models._
 
 class DockerClientSpec extends Specification {
 
@@ -21,11 +22,10 @@ class DockerClientSpec extends Specification {
 
   "DockerClient" should {
 
-    "parse container response correctly" in {
-      val client = new DockerClient(Uri("http://localhost:4243/"))
-      withTape("DockerClient.containerPorts") {
-        import DockerClient._
-        val response = client.containerPorts.await(2000)
+    "list containers" in {
+      withTape("DockerClient.listContainers") {
+        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val response = client.listContainers.await(2000)
         response must contain(DockerContainer(
             "6e6a24e5a6a5012b2ba868ef9868d2a5eadd6ed1f52feef480603909d3699e50",
             "test1"))
@@ -34,6 +34,18 @@ class DockerClientSpec extends Specification {
             "bar"))
       }
     }
+
+    "create new containers" in {
+      withTape("DockerClient.createContainer") {
+        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val response = client.createContainer("testnew").await(2000)
+        println(response)
+        response must_== DockerContainer(
+            "1667d4047620b5e2961e155add815ad54ba77a221b328ea14dacb8b44a55d36b",
+            "testnew")
+      }
+    }
+
   }
 }
 

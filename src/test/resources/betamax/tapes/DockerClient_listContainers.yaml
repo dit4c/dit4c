@@ -1,5 +1,5 @@
 !tape
-name: DockerClient.containerPorts
+name: DockerClient.listContainers
 interactions:
 - recorded: 2014-04-17T05:57:29.735Z
   request:
