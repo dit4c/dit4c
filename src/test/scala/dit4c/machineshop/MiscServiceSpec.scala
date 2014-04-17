@@ -4,9 +4,11 @@ import org.specs2.mutable.Specification
 import spray.testkit.Specs2RouteTest
 import spray.http._
 import StatusCodes._
+import spray.routing.HttpService
 
-class MiscServiceSpec extends Specification with Specs2RouteTest with MiscService {
+class MiscServiceSpec extends Specification with Specs2RouteTest with HttpService {
   def actorRefFactory = system
+  val miscRoute = MiscService(actorRefFactory).route
 
   "MiscService" should {
 

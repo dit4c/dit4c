@@ -18,7 +18,8 @@ libraryDependencies ++= {
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
     "org.specs2"          %%  "specs2-core"     % "2.3.7" % "test",
-    "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
+    "org.codehaus.groovy" %   "groovy-all"      % "1.8.8" % "compile",
+    "co.freeside"         %   "betamax"         % "1.1.2" % "test",
     "com.github.scopt"    %%  "scopt"           % "3.2.0"
   )
 }

@@ -11,6 +11,7 @@ import spray.json.RootJsonFormat
 import spray.json.JsObject
 
 class DockerClient(val baseUrl: spray.http.Uri) {
+  import DockerClient._
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val timeout: Timeout = Timeout(15.seconds)
@@ -27,45 +28,31 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
     import spray.httpx.ResponseTransformation._
 
-    val pipeline: HttpRequest => Future[Map[String, Int]] =
+    val pipeline: HttpRequest => Future[Set[DockerContainer]] =
       sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
 
     pipeline {
       import spray.httpx.RequestBuilding._
-      Get(baseUrl + "containers/json")
+      Get(baseUrl + "containers/json?all=1")
     }
 
   }
 
-  def parseJsonResponse: HttpResponse => Map[String, Int] = { (res: HttpResponse) =>
+  def parseJsonResponse: HttpResponse => Set[DockerContainer] = { (res: HttpResponse) =>
     import spray.json._
     import DefaultJsonProtocol._
 
     val objs = JsonParser(res.entity.asString).convertTo[Seq[JsObject]]
 
-    var pairs = objs.map { obj: JsObject =>
-      var Seq(namesWithSlashes, portArr) = obj.getFields("Names", "Ports")
+    objs.map { obj: JsObject =>
+      val Seq(jsId, namesWithSlashes) = obj.getFields("Id", "Names")
       // Get a single name without a slash
-      var name = namesWithSlashes.convertTo[List[String]] match {
+      val name: String = namesWithSlashes.convertTo[List[String]] match {
         case Seq(nameWithSlash: String) if nameWithSlash.startsWith("/") =>
           nameWithSlash.stripPrefix("/")
       }
-
-      def hasRightPort(portObj: JsObject) = {
-        val fields = portObj.fields
-        fields.contains("PrivatePort") &&
-        fields.contains("PublicPort") &&
-        fields("PrivatePort").convertTo[Int] == SERVICE_PORT
-      }
-
-      var port: Option[Int] = portArr.asInstanceOf[JsArray].elements collectFirst {
-        case jsObj: JsObject if hasRightPort(jsObj) =>
-          jsObj.fields("PublicPort").convertTo[Int]
-      }
-
-      port.map((name, _))
-    }
-    pairs.flatten.filter(_._1.isValidProjectName).toMap
+      DockerContainer(jsId.convertTo[String], name)
+    }.toSet
   }
 
   implicit class ProjectNameTester(str: String) {
@@ -84,3 +71,8 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
 }
 
+object DockerClient {
+
+  case class DockerContainer(id: String, val name: String)
+
+}
