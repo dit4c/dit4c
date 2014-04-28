@@ -7,7 +7,7 @@ import akka.util.Timeout
 import akka.event.Logging
 import spray.http._
 import spray.json._
-import dit4c.machineshop.docker.models.DockerContainer
+import dit4c.machineshop.docker.models._
 
 class DockerClient(val baseUrl: spray.http.Uri) {
 
@@ -22,67 +22,80 @@ class DockerClient(val baseUrl: spray.http.Uri) {
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
     spray.client.pipelining.sendReceive
 
-  def createContainer(name: String) = {
-    import spray.httpx.ResponseTransformation._
+  object containers {
 
-    def parseJsonResponse: HttpResponse => DockerContainer = { res =>
-      import spray.json._
-      import DefaultJsonProtocol._
+    def create(name: String) = {
+      import spray.httpx.ResponseTransformation._
 
-      val obj = JsonParser(res.entity.asString).convertTo[JsObject]
+      def parseJsonResponse: HttpResponse => DockerContainer = { res =>
+        import spray.json._
+        import DefaultJsonProtocol._
 
-      DockerContainer(obj.getFields("Id").head.convertTo[String], name)
+        val obj = JsonParser(res.entity.asString).convertTo[JsObject]
+
+        new DockerContainer(obj.getFields("Id").head.convertTo[String], name,
+            ContainerStatus.Stopped)
+      }
+
+      val pipeline: HttpRequest => Future[DockerContainer] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+
+      val createRequest =
+        JsObject(
+          "Tty" -> JsBoolean(true),
+          "Dns" -> JsNull,
+          "Image" -> JsString("dit4c/python"),
+          "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
+        )
+
+      pipeline {
+        import spray.httpx.RequestBuilding._
+        Post(baseUrl + s"containers/create?name=$name")
+          .withEntity(HttpEntity(createRequest.compactPrint))
+      }
     }
 
-    val pipeline: HttpRequest => Future[DockerContainer] =
-      sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+    def list = {
 
-    val createRequest =
-      JsObject(
-        "Tty" -> JsBoolean(true),
-        "Dns" -> JsNull,
-        "Image" -> JsString("dit4c/python"),
-        "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
-      )
+      import spray.httpx.ResponseTransformation._
 
-    pipeline {
-      import spray.httpx.RequestBuilding._
-      Post(baseUrl + s"containers/create?name=$name")
-        .withEntity(HttpEntity(createRequest.compactPrint))
-    }
-  }
+      def parseJsonResponse: HttpResponse => Set[DockerContainer] = { res =>
+        import spray.json._
+        import DefaultJsonProtocol._
 
-  def listContainers = {
-
-    import spray.httpx.ResponseTransformation._
-
-    def parseJsonResponse: HttpResponse => Set[DockerContainer] = { res =>
-      import spray.json._
-      import DefaultJsonProtocol._
-
-      JsonParser(res.entity.asString)
-        .convertTo[Seq[JsObject]]
-        .map { obj: JsObject =>
-          val Seq(jsId, namesWithSlashes) = obj.getFields("Id", "Names")
-          // Get a single name without a slash
-          val name: String = namesWithSlashes.convertTo[List[String]] match {
-            case Seq(nameWithSlash: String) if nameWithSlash.startsWith("/") =>
-              nameWithSlash.stripPrefix("/")
+        JsonParser(res.entity.asString)
+          .convertTo[Seq[JsObject]]
+          .map { obj: JsObject =>
+            val Seq(jsId, namesWithSlashes, jsStatus) =
+              obj.getFields("Id", "Names", "Status")
+            // Get a single name without a slash
+            val name: String = namesWithSlashes.convertTo[List[String]] match {
+              case Seq(nameWithSlash: String) if nameWithSlash.startsWith("/") =>
+                nameWithSlash.stripPrefix("/")
+            }
+            val status =
+              if (jsStatus.convertTo[String].matches("Up .*"))
+                ContainerStatus.Running
+              else
+                ContainerStatus.Stopped
+            new DockerContainer(jsId.convertTo[String], name, status)
           }
-          DockerContainer(jsId.convertTo[String], name)
-        }
-        .toSet
-    }
+          .toSet
+      }
 
-    val pipeline: HttpRequest => Future[Set[DockerContainer]] =
-      sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+      val pipeline: HttpRequest => Future[Set[DockerContainer]] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
 
-    pipeline {
-      import spray.httpx.RequestBuilding._
-      Get(baseUrl + "containers/json?all=1")
+      pipeline {
+        import spray.httpx.RequestBuilding._
+        Get(baseUrl + "containers/json?all=1")
+      }
+
     }
 
   }
+
+
 
   implicit class ProjectNameTester(str: String) {
     // Same as domain name, but use of capitals is prohibited because container
