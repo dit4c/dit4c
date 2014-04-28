@@ -33,7 +33,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
         val obj = JsonParser(res.entity.asString).convertTo[JsObject]
 
-        new DockerContainer(obj.getFields("Id").head.convertTo[String], name,
+        new ContainerImpl(obj.getFields("Id").head.convertTo[String], name,
             ContainerStatus.Stopped)
       }
 
@@ -82,7 +82,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
                 ContainerStatus.Running
               else
                 ContainerStatus.Stopped
-            new DockerContainer(jsId.convertTo[String], name, status)
+            new ContainerImpl(jsId.convertTo[String], name, status)
           }
           .filter(_.name.isValidProjectName)
       }
@@ -99,7 +99,37 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
   }
 
+  class ContainerImpl(val id: String, val name: String, val status: ContainerStatus) extends DockerContainer {
 
+    override def refresh = {
+
+      import spray.httpx.ResponseTransformation._
+
+      def parseJsonResponse: HttpResponse => DockerContainer = { res =>
+        import spray.json._
+        import DefaultJsonProtocol._
+
+        val obj = JsonParser(res.entity.asString).convertTo[JsObject]
+
+        val status =
+          if (obj.fields("State").asJsObject.fields("Running").convertTo[Boolean])
+            ContainerStatus.Running
+          else
+            ContainerStatus.Stopped
+        new ContainerImpl(id, name, status)
+      }
+
+      val pipeline: HttpRequest => Future[DockerContainer] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+
+      pipeline {
+        import spray.httpx.RequestBuilding._
+        Get(baseUrl + s"containers/$id/json")
+      }
+
+    }
+
+  }
 
   implicit class ProjectNameTester(str: String) {
     // Same as domain name, but use of capitals is prohibited because container

@@ -2,9 +2,7 @@ package dit4c.machineshop.docker
 
 import scala.concurrent.Future
 import scala.concurrent.Promise
-
 import org.specs2.mutable.Specification
-
 import akka.util.Timeout.intToTimeout
 import spray.http.ContentTypes
 import spray.http.HttpEntity
@@ -14,8 +12,12 @@ import spray.http.StatusCodes
 import spray.http.Uri
 import spray.util.pimpFuture
 import dit4c.machineshop.docker.models._
+import akka.util.Timeout
+import java.util.concurrent.TimeUnit
 
 class DockerClientSpec extends Specification {
+
+  implicit val timeout = new Timeout(2000, TimeUnit.MILLISECONDS)
 
   import spray.util.pimpFuture
   import dit4c.BetamaxUtils._
@@ -35,7 +37,7 @@ class DockerClientSpec extends Specification {
       "list" in {
         withTape("DockerClient.listContainers") {
           val client = new DockerClient(Uri("http://localhost:4243/"))
-          val containers = client.containers.list.await(2000)
+          val containers = client.containers.list.await
           containers must contain(allOf(
             haveId("6e6a24e5a6a5012b2ba868ef9868d2a5eadd6ed1f52feef480603909d3699e50")
               and haveName("test1")
@@ -48,17 +50,30 @@ class DockerClientSpec extends Specification {
       "create" in {
         withTape("DockerClient.createContainer") {
           val client = new DockerClient(Uri("http://localhost:4243/"))
-          val dc = client.containers.create("testnew").await(2000)
+          val dc = client.containers.create("testnew").await
           dc must (haveId("1667d4047620b5e2961e155add815ad54ba77a221b328ea14dacb8b44a55d36b")
             and haveName("testnew")
             and beStopped)
           // Check we can't pass invalid names
-          client.containers.create("test_new").await(2000) must
+          client.containers.create("test_new").await must
             throwA[IllegalArgumentException]
         }
       }
     }
 
+    "container" >> {
+      "refresh" >> {
+        withTape("DockerClient.container.refresh") {
+          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val dc = client.containers.create("testrefresh").await
+          val refreshed = dc.refresh.await
+          refreshed must (haveId(dc.id)
+              and haveName(dc.name)
+              and beStopped
+              and be(dc).not)
+        }
+      }
+    }
   }
 }
 
