@@ -52,6 +52,9 @@ class DockerClientSpec extends Specification {
           dc must (haveId("1667d4047620b5e2961e155add815ad54ba77a221b328ea14dacb8b44a55d36b")
             and haveName("testnew")
             and beStopped)
+          // Check we can't pass invalid names
+          client.containers.create("test_new").await(2000) must
+            throwA[IllegalArgumentException]
         }
       }
     }

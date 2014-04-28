@@ -1,6 +1,6 @@
 package dit4c.machineshop.docker
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, future}
 import scala.concurrent.duration._
 import akka.actor.ActorSystem
 import akka.util.Timeout
@@ -49,6 +49,10 @@ class DockerClient(val baseUrl: spray.http.Uri) {
         )
 
       pipeline {
+        if (!name.isValidProjectName) {
+          throw new IllegalArgumentException(
+              "Name must be a valid lower-case DNS label")
+        }
         import spray.httpx.RequestBuilding._
         Post(baseUrl + s"containers/create?name=$name")
           .withEntity(HttpEntity(createRequest.compactPrint))
@@ -80,6 +84,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
                 ContainerStatus.Stopped
             new DockerContainer(jsId.convertTo[String], name, status)
           }
+          .filter(_.name.isValidProjectName)
       }
 
       val pipeline: HttpRequest => Future[Seq[DockerContainer]] =
