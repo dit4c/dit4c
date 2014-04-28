@@ -24,7 +24,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
   object containers {
 
-    def create(name: String) = {
+    def create(name: String): Future[DockerContainer] = {
       import spray.httpx.ResponseTransformation._
 
       def parseJsonResponse: HttpResponse => DockerContainer = { res =>
@@ -55,11 +55,11 @@ class DockerClient(val baseUrl: spray.http.Uri) {
       }
     }
 
-    def list = {
+    def list: Future[Seq[DockerContainer]] = {
 
       import spray.httpx.ResponseTransformation._
 
-      def parseJsonResponse: HttpResponse => Set[DockerContainer] = { res =>
+      def parseJsonResponse: HttpResponse => Seq[DockerContainer] = { res =>
         import spray.json._
         import DefaultJsonProtocol._
 
@@ -80,10 +80,9 @@ class DockerClient(val baseUrl: spray.http.Uri) {
                 ContainerStatus.Stopped
             new DockerContainer(jsId.convertTo[String], name, status)
           }
-          .toSet
       }
 
-      val pipeline: HttpRequest => Future[Set[DockerContainer]] =
+      val pipeline: HttpRequest => Future[Seq[DockerContainer]] =
         sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
 
       pipeline {
