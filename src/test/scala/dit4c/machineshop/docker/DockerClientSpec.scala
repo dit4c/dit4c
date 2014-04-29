@@ -16,8 +16,8 @@ import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 
 class DockerClientSpec extends Specification {
-
-  implicit val timeout = new Timeout(2000, TimeUnit.MILLISECONDS)
+  import scala.concurrent.ExecutionContext.Implicits.global
+  implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
   import spray.util.pimpFuture
   import dit4c.BetamaxUtils._
@@ -81,6 +81,22 @@ class DockerClientSpec extends Specification {
           refreshed must (haveId(dc.id)
               and haveName(dc.name)
               and beRunning)
+        }
+      }
+      "stop" >> {
+        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val dc = withTape("DockerClient.container.stop-setup") {
+          val dc = client.containers.create("teststop").flatMap(_.start).await
+          dc must (haveId(dc.id)
+              and haveName(dc.name)
+              and beRunning)
+          dc
+        }
+        withTape("DockerClient.container.stop-run") {
+          val refreshed = dc.stop().await
+          refreshed must (haveId(dc.id)
+              and haveName(dc.name)
+              and beStopped)
         }
       }
     }

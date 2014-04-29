@@ -155,7 +155,28 @@ class DockerClient(val baseUrl: spray.http.Uri) {
       })
     }
 
-    override def stop = ???
+    override def stop(timeout: Duration) = {
+      import spray.httpx.ResponseTransformation._
+
+      def parseResponse: HttpResponse => Unit = { res =>
+        if (res.status == StatusCodes.NotFound) {
+          throw new Exception("Container does not exist")
+        }
+      }
+
+      val pipeline: HttpRequest => Future[Unit] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+
+      // Cannot have negative timeout
+      val t = Math.max(0, timeout.toSeconds)
+
+      pipeline({
+        import spray.httpx.RequestBuilding._
+        Post(baseUrl + s"containers/$id/stop?t=$t")
+      }).flatMap({
+        case _: Unit => this.refresh
+      })
+    }
 
   }
 
