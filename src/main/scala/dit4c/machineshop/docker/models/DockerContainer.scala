@@ -13,5 +13,7 @@ trait DockerContainer {
   lazy val isRunning = status == ContainerStatus.Running
 
   def refresh: Future[DockerContainer]
+  def start: Future[DockerContainer]
+  def stop: Future[DockerContainer]
 
 }

@@ -73,6 +73,16 @@ class DockerClientSpec extends Specification {
               and be(dc).not)
         }
       }
+      "start" >> {
+        withTape("DockerClient.container.start") {
+          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val dc = client.containers.create("teststart").await
+          val refreshed = dc.start.await
+          refreshed must (haveId(dc.id)
+              and haveName(dc.name)
+              and beRunning)
+        }
+      }
     }
   }
 }

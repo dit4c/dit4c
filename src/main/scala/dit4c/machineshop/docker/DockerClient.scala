@@ -129,6 +129,34 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
     }
 
+    override def start = {
+      import spray.httpx.ResponseTransformation._
+
+      def parseResponse: HttpResponse => Unit = { res =>
+        if (res.status == StatusCodes.NotFound) {
+          throw new Exception("Container does not exist")
+        }
+      }
+
+      val pipeline: HttpRequest => Future[Unit] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+
+      val createRequest =
+        JsObject(
+          "PublishAllPorts" -> JsBoolean(true)
+        )
+
+      pipeline({
+        import spray.httpx.RequestBuilding._
+        Post(baseUrl + s"containers/$id/start")
+          .withEntity(HttpEntity(createRequest.compactPrint))
+      }).flatMap({
+        case _: Unit => this.refresh
+      })
+    }
+
+    override def stop = ???
+
   }
 
   implicit class ProjectNameTester(str: String) {

@@ -24,6 +24,8 @@ libraryDependencies ++= {
   )
 }
 
+fork in test := true
+
 Revolver.settings
 
 seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
