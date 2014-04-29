@@ -1,7 +1,7 @@
 !tape
-name: DockerClient.createContainer
+name: DockerClient.containers.create
 interactions:
-- recorded: 2014-04-17T07:41:17.893Z
+- recorded: 2014-04-29T05:58:56.664Z
   request:
     method: POST
     uri: http://localhost:4243/containers/create?name=testnew
@@ -16,4 +16,4 @@ interactions:
     headers:
       Content-Type: application/json
     body: |
-      {"Id":"1667d4047620b5e2961e155add815ad54ba77a221b328ea14dacb8b44a55d36b","Warnings":null}
+      {"Id":"f1417bcbd7b181d3cc7d026cb055ec60ae5d6796febfbbcb4be93253a68ca638","Warnings":null}

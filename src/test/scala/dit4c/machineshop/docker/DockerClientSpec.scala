@@ -34,29 +34,25 @@ class DockerClientSpec extends Specification {
   "DockerClient" >> {
 
     "containers" >> {
-      "list" in {
-        withTape("DockerClient.listContainers") {
-          val client = new DockerClient(Uri("http://localhost:4243/"))
-          val containers = client.containers.list.await
-          containers must contain(allOf(
-            haveId("6e6a24e5a6a5012b2ba868ef9868d2a5eadd6ed1f52feef480603909d3699e50")
-              and haveName("test1")
-              and beRunning,
-            haveId("2d9616a27e09efd75117bb68857d77ab3c06dff6ec4e930610270bca10820ec2")
-              and haveName("bar")
-              and beStopped))
-        }
-      }
       "create" in {
-        withTape("DockerClient.createContainer") {
+        withTape("DockerClient.containers.create") {
           val client = new DockerClient(Uri("http://localhost:4243/"))
           val dc = client.containers.create("testnew").await
-          dc must (haveId("1667d4047620b5e2961e155add815ad54ba77a221b328ea14dacb8b44a55d36b")
-            and haveName("testnew")
-            and beStopped)
+          dc must (haveName("testnew") and beStopped)
           // Check we can't pass invalid names
           client.containers.create("test_new").await must
             throwA[IllegalArgumentException]
+        }
+      }
+      "list" in {
+        withTape("DockerClient.containers.list") {
+          val client = new DockerClient(Uri("http://localhost:4243/"))
+          client.containers.create("testlist-1").await
+          client.containers.create("testlist-2").flatMap(_.start).await
+          val containers = client.containers.list.await
+          containers must contain(allOf(
+            haveName("testlist-1") and beStopped,
+            haveName("testlist-2") and beRunning))
         }
       }
     }
