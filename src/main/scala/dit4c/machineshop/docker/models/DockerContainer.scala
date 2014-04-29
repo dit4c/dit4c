@@ -17,5 +17,6 @@ trait DockerContainer {
   def refresh: Future[DockerContainer]
   def start: Future[DockerContainer]
   def stop(timeout: Duration = DurationInt(1).second): Future[DockerContainer]
+  def delete: Future[Unit]
 
 }

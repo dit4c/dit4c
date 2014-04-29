@@ -14,6 +14,7 @@ import spray.util.pimpFuture
 import dit4c.machineshop.docker.models._
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
+import scalaz.IsEmpty
 
 class DockerClientSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -93,6 +94,20 @@ class DockerClientSpec extends Specification {
         refreshed must (haveId(dc.id)
             and haveName(dc.name)
             and beStopped)
+      }
+      "delete" >> {
+        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val dc = withTape("DockerClient.container.delete-setup") {
+          val dc = client.containers.create("testdelete").await
+          val cs = client.containers.list.await
+          cs must contain(haveId(dc.id))
+          dc
+        }
+        withTape("DockerClient.container.delete-run") {
+          dc.delete.await
+          val cs = client.containers.list.await
+          cs must not contain(haveId(dc.id))
+        }
       }
     }
   }

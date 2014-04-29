@@ -178,6 +178,24 @@ class DockerClient(val baseUrl: spray.http.Uri) {
       })
     }
 
+    override def delete = {
+      import spray.httpx.ResponseTransformation._
+
+      def parseResponse: HttpResponse => Unit = { res =>
+        if (res.status == StatusCodes.NotFound) {
+          throw new Exception("Container does not exist")
+        }
+      }
+
+      val pipeline: HttpRequest => Future[Unit] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+
+      pipeline({
+        import spray.httpx.RequestBuilding._
+        Delete(baseUrl + s"containers/$id?v=1")
+      })
+    }
+
   }
 
   implicit class ProjectNameTester(str: String) {
