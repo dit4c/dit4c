@@ -86,18 +86,17 @@ class DockerClientSpec extends Specification {
       "stop" >> {
         val client = new DockerClient(Uri("http://localhost:4243/"))
         val dc = withTape("DockerClient.container.stop-setup") {
-          val dc = client.containers.create("teststop").flatMap(_.start).await
-          dc must (haveId(dc.id)
-              and haveName(dc.name)
-              and beRunning)
-          dc
+          client.containers.create("teststop").flatMap(_.start).await
         }
-        withTape("DockerClient.container.stop-run") {
-          val refreshed = dc.stop().await
-          refreshed must (haveId(dc.id)
-              and haveName(dc.name)
-              and beStopped)
+        dc must (haveId(dc.id)
+            and haveName(dc.name)
+            and beRunning)
+        val refreshed = withTape("DockerClient.container.stop-run") {
+          dc.stop().await
         }
+        refreshed must (haveId(dc.id)
+            and haveName(dc.name)
+            and beStopped)
       }
     }
   }

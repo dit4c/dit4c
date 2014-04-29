@@ -13,7 +13,6 @@ interactions:
     status: 204
     headers:
       Content-Type: text/plain; charset=utf-8
-      Date: Tue, 29 Apr 2014 05:35:12 GMT
 - recorded: 2014-04-29T05:35:12.520Z
   request:
     method: GET
@@ -25,5 +24,4 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
-      Date: Tue, 29 Apr 2014 05:35:12 GMT
     body: '{"ID":"b4791c853f9de1912ab7f361f8dbfd1225b2606a8fdd8bb5bba601f107e45c09","Created":"2014-04-29T05:35:07.659305218Z","Path":"/usr/bin/supervisord","Args":["-c","/opt/supervisord.conf"],"Config":{"Hostname":"b4791c853f9d","Domainname":"","User":"","Memory":0,"MemorySwap":0,"CpuShares":0,"AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"PortSpecs":null,"ExposedPorts":{"22/tcp":{},"80/tcp":{}},"Tty":true,"OpenStdin":false,"StdinOnce":false,"Env":["HOME=/","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/usr/bin/supervisord","-c","/opt/supervisord.conf"],"Dns":null,"Image":"dit4c/python","Volumes":null,"VolumesFrom":"","WorkingDir":"","Entrypoint":null,"NetworkDisabled":false,"OnBuild":null},"State":{"Running":false,"Pid":0,"ExitCode":0,"StartedAt":"2014-04-29T05:35:08.832638003Z","FinishedAt":"2014-04-29T05:35:11.727257541Z","Ghost":false},"Image":"7df3afbf5f4411a7a28f81ab5d23a21bc0b24c05c5f035e27d86bb9728fd6747","NetworkSettings":{"IPAddress":"","IPPrefixLen":0,"Gateway":"","Bridge":"","PortMapping":null,"Ports":null},"ResolvConfPath":"/etc/resolv.conf","HostnamePath":"/var/lib/docker/containers/b4791c853f9de1912ab7f361f8dbfd1225b2606a8fdd8bb5bba601f107e45c09/hostname","HostsPath":"/var/lib/docker/containers/b4791c853f9de1912ab7f361f8dbfd1225b2606a8fdd8bb5bba601f107e45c09/hosts","Name":"/teststop","Driver":"devicemapper","ExecDriver":"native-0.1","Volumes":{},"VolumesRW":{},"HostConfig":{"Binds":null,"ContainerIDFile":"","LxcConf":null,"Privileged":false,"PortBindings":null,"Links":null,"PublishAllPorts":false}}'
