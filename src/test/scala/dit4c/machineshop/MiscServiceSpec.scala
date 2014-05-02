@@ -7,8 +7,8 @@ import StatusCodes._
 import spray.routing.HttpService
 
 class MiscServiceSpec extends Specification with Specs2RouteTest with HttpService {
-  def actorRefFactory = system
-  val miscRoute = MiscService(actorRefFactory).route
+  implicit def actorRefFactory = system
+  val miscRoute = MiscService().route
 
   "MiscService" should {
 

@@ -23,6 +23,8 @@ class DockerClientSpec extends Specification {
   import spray.util.pimpFuture
   import dit4c.BetamaxUtils._
 
+  def newDockerClient = new DockerClientImpl(Uri("http://localhost:4243/"))
+
   def haveId(id: String) =
     beTypedEqualTo(id) ^^ ((_:DockerContainer).id aka "ID")
 
@@ -37,7 +39,7 @@ class DockerClientSpec extends Specification {
     "containers" >> {
       "create" in {
         withTape("DockerClient.containers.create") {
-          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val client = newDockerClient
           val dc = client.containers.create("testnew").await
           dc must (haveName("testnew") and beStopped)
           // Check we can't pass invalid names
@@ -47,7 +49,7 @@ class DockerClientSpec extends Specification {
       }
       "list" in {
         withTape("DockerClient.containers.list") {
-          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val client = newDockerClient
           client.containers.create("testlist-1").await
           client.containers.create("testlist-2").flatMap(_.start).await
           val containers = client.containers.list.await
@@ -61,7 +63,7 @@ class DockerClientSpec extends Specification {
     "container" >> {
       "refresh" >> {
         withTape("DockerClient.container.refresh") {
-          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val client = newDockerClient
           val dc = client.containers.create("testrefresh").await
           val refreshed = dc.refresh.await
           refreshed must (haveId(dc.id)
@@ -72,7 +74,7 @@ class DockerClientSpec extends Specification {
       }
       "start" >> {
         withTape("DockerClient.container.start") {
-          val client = new DockerClient(Uri("http://localhost:4243/"))
+          val client = newDockerClient
           val dc = client.containers.create("teststart").await
           val refreshed = dc.start.await
           refreshed must (haveId(dc.id)
@@ -81,7 +83,7 @@ class DockerClientSpec extends Specification {
         }
       }
       "stop" >> {
-        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val client = newDockerClient
         val dc = withTape("DockerClient.container.stop-setup") {
           client.containers.create("teststop").flatMap(_.start).await
         }
@@ -96,7 +98,7 @@ class DockerClientSpec extends Specification {
             and beStopped)
       }
       "delete" >> {
-        val client = new DockerClient(Uri("http://localhost:4243/"))
+        val client = newDockerClient
         val dc = withTape("DockerClient.container.delete-setup") {
           val dc = client.containers.create("testdelete").await
           val cs = client.containers.list.await

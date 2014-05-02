@@ -41,6 +41,6 @@ class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
 
 object MiscService {
 
-  def apply(arf: ActorRefFactory) = new MiscService(arf)
+  def apply()(implicit actorRefFactory: ActorRefFactory) = new MiscService(actorRefFactory)
 
 }

@@ -24,7 +24,14 @@ libraryDependencies ++= {
   )
 }
 
-fork in test := true
+fork := true
+
+javaOptions += "-Dfoo=bar"
+
+// Set Jetty in Betamax to use java logging
+javaOptions += "-Dorg.eclipse.jetty.util.log.class=org.eclipse.jetty.util.log.JavaUtilLog"
+
+javaOptions += "-Djava.util.logging.config.file=logging.properties"
 
 Revolver.settings
 
