@@ -27,41 +27,72 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
 
   implicit val actorRefFactory = arf
 
+  def withContainer(name: String)(f: DockerContainer => RequestContext => Unit) =
+    onSuccess(client.containers.list) { containers =>
+      containers.find(c => c.name == name) match {
+        case Some(c) => f(c)
+        case None => complete(StatusCodes.NotFound)
+      }
+    }
+
   val route: RequestContext => Unit =
-    path("projects") {
-      get {
-        respondWithMediaType(`application/json`) {
+    pathPrefix("projects") {
+      pathEndOrSingleSlash {
+        get {
           onSuccess(client.containers.list) { containers =>
             complete {
               containers
             }
           }
         }
-      }
-    } ~
-    path("projects" / "new") {
-      post {
-        entity(as[NewProjectRequest]) { npr =>
-          respondWithMediaType(`application/json`) {
+      } ~
+      path("new") {
+        post {
+          entity(as[NewProjectRequest]) { npr =>
             onSuccess(client.containers.create(npr.name)) { container =>
-              complete(container)
+              respondWithStatus(StatusCodes.Created) {
+                complete(container)
+              }
             }
           }
         }
-      }
-    } ~
-    path("projects" / "\\w+".r) { (name: String) =>
-      get {
-        respondWithMediaType(`application/json`) {
-          onSuccess(client.containers.list) { containers =>
-            containers.find(c => c.name == name) match {
-              case Some(c) => complete(c)
-              case None => complete(StatusCodes.NotFound)
+      } ~
+      pathPrefix("\\w+".r) { (name: String) =>
+        pathEnd {
+          get {
+            withContainer(name) { container =>
+              complete(container)
+            }
+          } ~
+          delete {
+            withContainer(name) { container =>
+              onSuccess(container.delete) { Unit =>
+                complete(StatusCodes.NoContent)
+              }
+            }
+          }
+        } ~
+        path("start") {
+          post {
+            withContainer(name) { container =>
+              onSuccess(container.start) { container =>
+                complete(container)
+              }
+            }
+          }
+        } ~
+        path("stop") {
+          post {
+            withContainer(name) { container =>
+              onSuccess(container.stop()) { container =>
+                complete(container)
+              }
             }
           }
         }
       }
     }
+
 }
 
 object ApiService {
