@@ -13,11 +13,17 @@ import dit4c.machineshop.docker.models.DockerContainer
 import scala.util._
 import spray.httpx.marshalling.Marshaller
 import spray.httpx.marshalling.ToResponseMarshaller
+import spray.httpx.unmarshalling.Unmarshaller
+import spray.httpx.unmarshalling.FromRequestUnmarshaller
+import spray.httpx.SprayJsonSupport
+import spray.httpx.unmarshalling.UnmarshallerLifting
 
 class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService with RouteProvider {
 
   import scala.concurrent.ExecutionContext.Implicits.global
+  import ApiService.NewProjectRequest
   import ApiService.marshallers._
+  import ApiService.marshallers.newProjectRequestUnmarshaller
 
   implicit val actorRefFactory = arf
 
@@ -28,6 +34,17 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
           onSuccess(client.containers.list) { containers =>
             complete {
               containers
+            }
+          }
+        }
+      }
+    } ~
+    path("projects" / "new") {
+      post {
+        entity(as[NewProjectRequest]) { npr =>
+          respondWithMediaType(`application/json`) {
+            onSuccess(client.containers.create(npr.name)) { container =>
+              complete(container)
             }
           }
         }
@@ -49,25 +66,15 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
 
 object ApiService {
 
+  case class NewProjectRequest(val name: String)
+
   def apply(client: DockerClient)(implicit actorRefFactory: ActorRefFactory) =
     new ApiService(actorRefFactory, client)
 
-  object marshallers {
-    implicit val ContainerJsonMarshaller: ToResponseMarshaller[DockerContainer] =
-      Marshaller.of[DockerContainer](ContentTypes.`application/json`) { (value, contentType, ctx) =>
-        val text = jsonProtocol.ContainerWriter.write(value).compactPrint
-        ctx.marshalTo(HttpEntity(contentType, text))
-      }
+  object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
+    implicit val newProjectRequestReader = jsonFormat1(NewProjectRequest)
 
-    implicit val ContainersJsonMarshaller: ToResponseMarshaller[Seq[DockerContainer]] =
-      Marshaller.of[Seq[DockerContainer]](ContentTypes.`application/json`) { (value, contentType, ctx) =>
-        val text = jsonProtocol.ContainersWriter.write(value).compactPrint
-        ctx.marshalTo(HttpEntity(contentType, text))
-      }
-  }
-
-  object jsonProtocol extends DefaultJsonProtocol {
-    implicit object ContainerWriter extends RootJsonWriter[DockerContainer] {
+    implicit val containerWriter = new RootJsonWriter[DockerContainer] {
       def write(c: DockerContainer) = {
         JsObject(
           "name" -> JsString(c.name),
@@ -76,10 +83,20 @@ object ApiService {
       }
     }
 
-    implicit object ContainersWriter extends RootJsonWriter[Seq[DockerContainer]] {
+    implicit val containersWriter = new RootJsonWriter[Seq[DockerContainer]] {
       def write(cs: Seq[DockerContainer]) =
-        JsArray(cs.map(ContainerWriter.write(_)).toSeq: _*)
+        JsArray(cs.map(containerWriter.write(_)).toSeq: _*)
     }
+
+    implicit val newProjectRequestUnmarshaller: FromRequestUnmarshaller[NewProjectRequest] =
+      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newProjectRequestReader)))
+
+    implicit val containerJsonMarshaller: ToResponseMarshaller[DockerContainer] =
+      sprayJsonMarshaller(containerWriter)
+
+    implicit val containersJsonMarshaller: ToResponseMarshaller[Seq[DockerContainer]] =
+      sprayJsonMarshaller(containersWriter)
+
   }
 
 }

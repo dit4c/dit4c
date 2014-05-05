@@ -90,6 +90,20 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
     }
 
+    "create containers with POST requests to /projects/new" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      implicit val client = mockDockerClient
+      client.containers.list.await must beEmpty
+      val requestJson = JsObject("name" -> JsString("foobar"))
+      Post("/projects/new", requestJson) ~> route ~> check {
+        val json = JsonParser(responseAs[String]).convertTo[JsObject]
+        json.fields("name").convertTo[String] must_== "foobar"
+      }
+      client.containers.list.await must haveSize(1)
+    }
+
     "return a MethodNotAllowed error for DELETE requests to /projects" in {
       implicit val client = mockDockerClient
       Put("/projects") ~> sealRoute(route) ~> check {
