@@ -57,7 +57,7 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
           }
         }
       } ~
-      pathPrefix("\\w+".r) { (name: String) =>
+      pathPrefix("[a-z0-9\\-]+".r) { (name: String) =>
         pathEnd {
           get {
             withContainer(name) { container =>
@@ -66,8 +66,12 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
           } ~
           delete {
             withContainer(name) { container =>
-              onSuccess(container.delete) { Unit =>
-                complete(StatusCodes.NoContent)
+              onComplete(container.delete) {
+                case _: Success[Unit] => complete(StatusCodes.NoContent)
+                case Failure(e) =>
+                  respondWithStatus(StatusCodes.InternalServerError) {
+                    complete(e.getMessage)
+                  }
               }
             }
           }

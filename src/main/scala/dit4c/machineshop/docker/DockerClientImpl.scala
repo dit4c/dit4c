@@ -107,8 +107,13 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       import spray.httpx.ResponseTransformation._
 
       def parseResponse: HttpResponse => Unit = { res =>
-        if (res.status == StatusCodes.NotFound) {
-          throw new Exception("Container does not exist")
+        res.status match {
+          case StatusCodes.NotFound =>
+            throw new Exception("Container does not exist")
+          case StatusCodes.InternalServerError =>
+            throw new Exception(
+                "Deletion failed due to server error:\n\n"+res.entity.asString)
+          case _: StatusCode => Unit
         }
       }
 
