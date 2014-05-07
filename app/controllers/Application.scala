@@ -12,8 +12,20 @@ import java.io.{BufferedWriter, FileWriter, File, FileNotFoundException}
 import play.api.libs.json.Json
 import scala.collection.JavaConversions._
 import java.util.Calendar
+import com.nimbusds.jwt.JWTParser
+import scala.util.Try
+import services.jwt._
 
 class Application extends Controller {
+
+  val callbackValidators: Seq[JWTValidator] = {
+    val appConfig = Play.current.configuration
+    appConfig.getStringList("callback_signature_keys").map { config =>
+      config.toSeq.map { key =>
+        new services.jwt.JWSVerifier(key)
+      }
+    }.getOrElse(Seq())
+  }
 
   val containers = (1 to 9).map(i => s"test$i").toList
 
@@ -28,11 +40,30 @@ class Application extends Controller {
       .withCookies(cookies)
   }
 
+  def callback = Action { implicit request =>
+    request.body.asFormUrlEncoded.flatMap { form =>
+      // Extract assertion
+      form.get("assertion").flatMap(_.headOption)
+    }.flatMap { potentialToken =>
+      // Convert to JWT
+      Try(JWTParser.parse(potentialToken)).toOption
+    }.map { token =>
+      // Check JWT validates
+      callbackValidators.map(_(token)).flatten.headOption match {
+        // Validated by one of them
+        case Some(payload) =>
+          Ok(payload)
+        // Failed validation from all
+        case None =>
+          Forbidden
+      }
+    }.getOrElse(BadRequest)
+  }
+
+
   def getCookieDomain(implicit request: RequestHeader): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
-
-
 
   private def jwt(containers: List[String])(implicit request: RequestHeader) = {
     val privateKey = privateKeySet.getKeys.head
