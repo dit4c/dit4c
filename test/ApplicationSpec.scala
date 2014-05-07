@@ -29,7 +29,7 @@ class ApplicationSpec extends Specification {
 
     "callback" in new WithApplication(FakeApplication(
         additionalConfiguration = Map(
-          "callback_signature_keys" -> Seq("testkey")
+          "callback_signature_keys.fakekey" -> "testkey"
         ))) {
       def base = FakeRequest(POST, "/auth/callback")
 

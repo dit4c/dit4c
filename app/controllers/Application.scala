@@ -20,9 +20,9 @@ class Application extends Controller {
 
   val callbackValidators: Seq[JWTValidator] = {
     val appConfig = Play.current.configuration
-    appConfig.getStringList("callback_signature_keys").map { config =>
-      config.toSeq.map { key =>
-        new services.jwt.JWSVerifier(key)
+    appConfig.getObject("callback_signature_keys").map { config =>
+      config.values.toSeq.map(_.unwrapped.toString).map { sigKey =>
+        new services.jwt.JWSVerifier(sigKey)
       }
     }.getOrElse(Seq())
   }
