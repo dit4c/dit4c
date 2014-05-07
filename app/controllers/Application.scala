@@ -27,6 +27,9 @@ class Application extends Controller {
     }.getOrElse(Seq())
   }
 
+  lazy val rapidAAFUrl =
+    Play.current.configuration.getString("rapid-aaf-url").get
+
   val containers = (1 to 9).map(i => s"test$i").toList
 
   def index = Action { request =>
@@ -34,10 +37,9 @@ class Application extends Controller {
   }
 
   def login = Action { implicit request =>
-    val cookies = Cookie("dit4c-jwt", jwt(containers),
-        domain=getCookieDomain)
-    Redirect(request.headers.get("Referer").getOrElse("/"))
-      .withCookies(cookies)
+    val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
+    Ok(views.html.login(rapidAAFUrl))
+      .withSession("redirect-on-callback" -> targetAfterLogin)
   }
 
   def callback = Action { implicit request =>
@@ -52,14 +54,16 @@ class Application extends Controller {
       callbackValidators.map(_(token)).flatten.headOption match {
         // Validated by one of them
         case Some(payload) =>
-          Ok(payload)
+          val cookies = Cookie("dit4c-jwt",
+              jwt(containers), domain=getCookieDomain)
+          val url = request.session.get("redirect-on-callback").getOrElse("/")
+          Redirect(url).withCookies(cookies)
         // Failed validation from all
         case None =>
           Forbidden
       }
     }.getOrElse(BadRequest)
   }
-
 
   def getCookieDomain(implicit request: RequestHeader): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
