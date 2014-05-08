@@ -1,0 +1,2 @@
+1001:providers.InjectorPlugin
+10001:providers.db.CouchDbPlugin

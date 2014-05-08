@@ -1,4 +1,4 @@
-@(title: String)(body: Html)
+@(title: String)(content: Html)
 <!DOCTYPE html5>
 <html>
   <head>
@@ -13,6 +13,15 @@
     <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
   </head>
   <body>
-    @body
+    <nav class="navbar navbar-inverse navbar-static-top" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="/">DIT4C</a>
+        </div>
+      </div>
+    </nav>
+    <div class="container">
+      @content
+    </div>
   </body>
 </html>

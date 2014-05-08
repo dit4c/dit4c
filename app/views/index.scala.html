@@ -1,16 +1,14 @@
 @(containers: List[String], parentDomain: String)
 
 @main("Pick a container") {
-	<div class="container">
-    <div class="col-xs-12">
-    	<h1>Pick a container</h1>
-      <ul>
-      @for(container <- containers) {
-        <li>
-          <a href="//@container.@parentDomain/">@container</a>
-        </li>
-      }
-      </ul>
-    </div>
+  <div class="col-xs-12">
+  	<h1>Pick a container</h1>
+    <ul>
+    @for(container <- containers) {
+      <li>
+        <a href="//@container.@parentDomain/">@container</a>
+      </li>
+    }
+    </ul>
   </div>
 }
