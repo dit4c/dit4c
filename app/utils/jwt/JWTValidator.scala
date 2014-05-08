@@ -1,4 +1,4 @@
-package services.jwt
+package utils.jwt
 
 import com.nimbusds.jwt.JWT
 

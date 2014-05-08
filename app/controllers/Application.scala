@@ -14,21 +14,11 @@ import scala.collection.JavaConversions._
 import java.util.Calendar
 import com.nimbusds.jwt.JWTParser
 import scala.util.Try
-import services.jwt._
+import utils.jwt._
+import providers.auth._
+import com.google.inject.Inject
 
-class Application extends Controller {
-
-  val callbackValidators: Seq[JWTValidator] = {
-    val appConfig = Play.current.configuration
-    appConfig.getObject("callback_signature_keys").map { config =>
-      config.values.toSeq.map(_.unwrapped.toString).map { sigKey =>
-        new services.jwt.JWSVerifier(sigKey)
-      }
-    }.getOrElse(Seq())
-  }
-
-  lazy val rapidAAFUrl =
-    Play.current.configuration.getString("rapid-aaf-url").get
+class Application @Inject() (authProvider: AuthProvider) extends Controller {
 
   val containers = (1 to 9).map(i => s"test$i").toList
 
@@ -38,33 +28,23 @@ class Application extends Controller {
 
   def login = Action { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
-    Ok(views.html.login(rapidAAFUrl))
+    Ok(views.html.login(authProvider.loginButton))
       .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
   }
 
   def callback = Action { implicit request =>
-    request.body.asFormUrlEncoded.flatMap { form =>
-      // Extract assertion
-      form.get("assertion").flatMap(_.headOption)
-    }.flatMap { potentialToken =>
-      // Convert to JWT
-      Try(JWTParser.parse(potentialToken)).toOption
-    }.map { token =>
-      // Check JWT validates
-      callbackValidators.map(_(token)).flatten.headOption match {
-        // Validated by one of them
-        case Some(payload) =>
-          val cookies = Cookie("dit4c-jwt",
-              jwt(containers), domain=getCookieDomain)
-          val url = request.session.get("redirect-on-callback").getOrElse("/")
-          Redirect(url)
-            .withCookies(cookies)
-            .withSession(session - "redirect-on-callback")
-        // Failed validation from all
-        case None =>
-          Forbidden
-      }
-    }.getOrElse(BadRequest)
+    import CallbackResult.{Success, Failure, Invalid}
+    authProvider.callbackHandler(request) match {
+      case Success(identity) =>
+        val cookies = Cookie("dit4c-jwt",
+            jwt(containers), domain=getCookieDomain)
+        val url = request.session.get("redirect-on-callback").getOrElse("/")
+        Redirect(url)
+          .withCookies(cookies)
+          .withSession(session - "redirect-on-callback")
+      case Failure(msg) => Forbidden(msg)
+      case Invalid => BadRequest
+    }
   }
 
   def getCookieDomain(implicit request: RequestHeader): Option[String] =

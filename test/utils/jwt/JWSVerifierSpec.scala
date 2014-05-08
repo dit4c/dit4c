@@ -1,14 +1,19 @@
-package services.jwt
+package utils.jwt
 
 import org.specs2.mutable._
 import org.specs2.runner._
 import org.junit.runner._
+
 import play.api.test._
 import play.api.test.Helpers._
+
 import com.nimbusds.jwt._
 import com.nimbusds.jose._
+
 import scala.util.Random
+
 import com.nimbusds.jose.crypto._
+
 import org.specs2.specification.Fixture
 import org.specs2.execute.AsResult
 

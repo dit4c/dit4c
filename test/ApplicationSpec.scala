@@ -29,7 +29,11 @@ class ApplicationSpec extends Specification {
 
     "callback" in new WithApplication(FakeApplication(
         additionalConfiguration = Map(
-          "callback_signature_keys.fakekey" -> "testkey"
+            "rapidaaf" -> Map(
+                "id"   -> "RapidAAF",
+                "url"  -> "http://example.test/",
+                "key"  -> "testkey"
+            )
         ))) {
       def base = FakeRequest(POST, "/auth/callback")
 
@@ -49,7 +53,25 @@ class ApplicationSpec extends Specification {
       val goodAssertion = {
         import com.nimbusds.jose._
         import com.nimbusds.jose.crypto._
-        val content = "{}"
+        val content =
+          """|{
+             |  "iss": "https://rapid.aaf.edu.au",
+             |  "iat": 1397181481,
+             |  "jti": "2bdmqlYf2Pmtyu_d4TT7MZ9xtcc44q9A",
+             |  "nbf": 1397181421,
+             |  "exp": 1397181601,
+             |  "typ": "authnresponse",
+             |  "aud": "https://example.test/",
+             |  "https://aaf.edu.au/attributes": {
+             |    "cn": "Tom Atkins",
+             |    "mail": "t.atkins@fictional.edu.au",
+             |    "displayname": "Mr Tom Atkins",
+             |    "givenname": "Tom",
+             |    "surname": "Atkins",
+             |    "edupersonscopedaffiliation": "staff@fictional.edu.au",
+             |    "edupersonprincipalname": "tatkin4@fictional.edu.au"
+             |  }
+             |}""".stripMargin
         val jwsObject = new JWSObject(
             new JWSHeader(JWSAlgorithm.HS512), new Payload(content))
         // Sign with altered key
