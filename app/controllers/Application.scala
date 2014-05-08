@@ -39,7 +39,7 @@ class Application extends Controller {
   def login = Action { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
     Ok(views.html.login(rapidAAFUrl))
-      .withSession("redirect-on-callback" -> targetAfterLogin)
+      .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
   }
 
   def callback = Action { implicit request =>
@@ -57,7 +57,9 @@ class Application extends Controller {
           val cookies = Cookie("dit4c-jwt",
               jwt(containers), domain=getCookieDomain)
           val url = request.session.get("redirect-on-callback").getOrElse("/")
-          Redirect(url).withCookies(cookies)
+          Redirect(url)
+            .withCookies(cookies)
+            .withSession(session - "redirect-on-callback")
         // Failed validation from all
         case None =>
           Forbidden

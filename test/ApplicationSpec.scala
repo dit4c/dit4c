@@ -56,11 +56,13 @@ class ApplicationSpec extends Specification {
         jwsObject.sign(new MACSigner("testkey"))
         jwsObject.serialize
       }
-      val res = route(base.withBody(AnyContentAsFormUrlEncoded(
-          Map("assertion" -> Seq(goodAssertion))))).get
+      val res = route(base
+          .withBody(AnyContentAsFormUrlEncoded(
+              Map("assertion" -> Seq(goodAssertion))))
+          .withSession("redirect-on-callback" -> "http://example.test/")).get
       status(res) must not equalTo(400)
       status(res) must not equalTo(403)
-      pending
+      redirectLocation(res) must beSome("http://example.test/")
     }
 
   }
