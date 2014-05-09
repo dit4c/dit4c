@@ -1,41 +1,29 @@
 package providers.db
 
-import gnieh.sohva.async.CouchClient
 import com.google.inject.Provider
 import play.api.Plugin
-import gnieh.sohva.testing.CouchInstance
 import java.io.File
 import java.util.UUID
+import akka.actor.ActorSystem
+import akka.util.Timeout
 
-class CouchDbPlugin(app: play.api.Application) extends Plugin with Provider[CouchClient] {
+class CouchDbPlugin(app: play.api.Application) extends Plugin {
 
-  lazy val serverInstance: Option[CouchInstance] =
-    if (app.configuration.getBoolean("couchdb.testing").getOrElse(false)) {
-      Some(new CouchInstance(
-          new File("/tmp/couchtest-"+UUID.randomUUID.toString), false, true))
-    } else {
-      None
-    }
+  implicit def system: ActorSystem = play.api.libs.concurrent.Akka.system(app)
 
-  lazy val client: CouchClient =
-    serverInstance.map { server =>
-      // TODO: Get couch client connected to server instance
-      ???
-    }.getOrElse(new CouchClient)
+  implicit val timeout: Timeout = Timeout(5000)
 
-  override def get = client
+  lazy val log = play.api.Logger
+
+  lazy val serverInstance: EphemeralCouchDbInstance =
+    new EphemeralCouchDbInstance
 
   override def onStart {
-    serverInstance.foreach(_.start)
+    serverInstance
   }
 
   override def onStop {
-    try {
-      client.shutdown
-    } catch {
-      case _: IllegalStateException => // Don't care
-    }
-    serverInstance.foreach(_.stop)
+    serverInstance.shutdown
   }
 
 }

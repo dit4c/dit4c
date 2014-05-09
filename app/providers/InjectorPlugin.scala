@@ -6,7 +6,6 @@ import com.google.inject.AbstractModule
 import com.google.inject.Guice
 import com.google.inject.Injector
 
-import gnieh.sohva.async.CouchClient
 import play.api.Plugin
 import play.api.templates.Html
 import providers.auth.AuthProvider
@@ -46,9 +45,6 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
 
         def configure {
           bind(classOf[AuthProvider]).toInstance(authProvider)
-          bind(classOf[CouchClient]).toProvider(
-            app.plugin(classOf[CouchDbPlugin]).get
-          )
         }
       })
     )

@@ -12,9 +12,11 @@ import play.api.test.Helpers._
 @RunWith(classOf[JUnitRunner])
 class IntegrationSpec extends Specification {
 
+  import testing.TestUtils.fakeApp
+
   "Application" should {
 
-    "work from within a browser" in new WithBrowser {
+    "work from within a browser" in new WithBrowser(app = fakeApp) {
 
       browser.goTo("http://localhost:" + port)
 

@@ -13,13 +13,15 @@ import play.api.mvc._
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends Specification {
 
+  import testing.TestUtils.fakeApp
+
   "Application" should {
 
-    "send 404 on a bad request" in new WithApplication{
+    "send 404 on a bad request" in new WithApplication(fakeApp) {
       route(FakeRequest(GET, "/boum")) must beNone
     }
 
-    "render the index page" in new WithApplication{
+    "render the index page" in new WithApplication(fakeApp) {
       val home = route(FakeRequest(GET, "/")).get
 
       status(home) must equalTo(OK)
@@ -27,14 +29,7 @@ class ApplicationSpec extends Specification {
       contentAsString(home) must contain ("Pick a container")
     }
 
-    "callback" in new WithApplication(FakeApplication(
-        additionalConfiguration = Map(
-            "rapidaaf" -> Map(
-                "id"   -> "RapidAAF",
-                "url"  -> "http://example.test/",
-                "key"  -> "testkey"
-            )
-        ))) {
+    "callback" in new WithApplication(fakeApp) {
       def base = FakeRequest(POST, "/auth/callback")
 
       val badRequests = Seq(

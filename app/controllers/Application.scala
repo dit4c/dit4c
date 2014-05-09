@@ -17,6 +17,7 @@ import scala.util.Try
 import utils.jwt._
 import providers.auth._
 import com.google.inject.Inject
+import gnieh.sohva.async.CouchClient
 
 class Application @Inject() (authProvider: AuthProvider) extends Controller {
 
