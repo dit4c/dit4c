@@ -1,5 +1,4 @@
 package providers.db
-package providers.auth
 
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification

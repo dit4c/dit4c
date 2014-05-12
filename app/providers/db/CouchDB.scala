@@ -9,7 +9,9 @@ object CouchDB {
 
   abstract class Instance(implicit ec: ExecutionContext) {
 
-    protected def url: java.net.URL
+    implicit private val instance = this
+
+    def url: java.net.URL
 
     object databases {
 
@@ -38,9 +40,23 @@ object CouchDB {
       def apply() = list
       def apply(name: String) = get(name)
     }
+
+    def newID = {
+      val holder = WS.url(s"${url}_uuids")
+      holder.get.map { response =>
+        val uuids: Seq[String] = (response.json \ "uuids")
+          .asInstanceOf[JsArray].value.map(_.as[String])
+        uuids.head
+      }
+    }
+
   }
 
-  class Database(val name: String)(implicit ec: ExecutionContext) {
+  class Database(val name: String)(implicit ec: ExecutionContext, instance: CouchDB.Instance) {
+
+    val baseURL = new java.net.URL(s"${instance.url}$name")
+
+    def newID: Future[String] = instance.newID
 
   }
 

@@ -17,8 +17,12 @@ import scala.util.Try
 import utils.jwt._
 import providers.auth._
 import com.google.inject.Inject
+import providers.db.CouchDB
 
-class Application @Inject() (authProvider: AuthProvider) extends Controller {
+class Application @Inject() (
+    authProvider: AuthProvider,
+    db: CouchDB.Database)
+    extends Controller {
 
   val containers = (1 to 9).map(i => s"test$i").toList
 
