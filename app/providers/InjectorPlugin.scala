@@ -1,5 +1,8 @@
 package providers
 
+import scala.concurrent.Await
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
 import com.google.inject.AbstractModule
@@ -12,9 +15,12 @@ import providers.auth.AuthProvider
 import providers.auth.CallbackResult
 import providers.auth.RapidAAFAuthProvider
 import providers.auth.RapidAAFAuthProviderConfig
+import providers.db.CouchDB
 import providers.db.CouchDBPlugin
 
 class InjectorPlugin(app: play.api.Application) extends Plugin {
+
+  implicit val ec = play.api.libs.concurrent.Execution.defaultContext
 
   var injector: Option[Injector] = None
 
@@ -43,8 +49,21 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
           }
         }
 
+        val dbName = "dit4c-highcommand"
+
+        lazy val dbServerInstance = app.plugin[CouchDBPlugin].get.get
+
+        // Make sure a database exists
+        lazy val database = Await.result(
+          dbServerInstance.databases(dbName).flatMap {
+            case Some(db) => Future.successful(db)
+            case None => dbServerInstance.databases.create(dbName)
+          },
+          1.minute)
+
         def configure {
           bind(classOf[AuthProvider]).toInstance(authProvider)
+          bind(classOf[CouchDB.Database]).toInstance(database)
         }
       })
     )

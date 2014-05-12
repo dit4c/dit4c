@@ -25,16 +25,10 @@ class CouchDBPlugin(app: play.api.Application) extends Plugin with Provider[Couc
       new PersistentCouchDBInstance("./db", 40000)
     }
 
-  val dbName = "dit4c-highcommand"
-
   def get = serverInstance
 
   override def onStart {
-    // Make sure a database exists
-    serverInstance.databases(dbName).flatMap {
-      case Some(db) => Future.successful(db)
-      case None => serverInstance.databases.create(dbName)
-    }
+    serverInstance // Ensure DB is initialized before app start
   }
 
   override def onStop {

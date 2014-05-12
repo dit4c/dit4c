@@ -5,6 +5,7 @@ import java.nio.file._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.net.URL
+import java.nio.charset.Charset
 
 abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext) extends CouchDB.Instance {
 
@@ -37,7 +38,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext) extends Cou
     import scala.sys.process.Process
     val process = (Process(s"couchdb -a $configFile") #> NullOutputStream).run
     Await.ready(uriFileCreated(baseDir), 60.seconds)
-    (process, new URL(Files.readAllLines(uriFile).get(0)))
+    (process, new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
   }
 
   protected def createDirIfMissing(dir: Path): Path = {
