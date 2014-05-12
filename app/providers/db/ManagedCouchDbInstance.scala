@@ -6,15 +6,12 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.net.URL
 
-abstract class ManagedCouchDbInstance(implicit ec: ExecutionContext) extends CouchDbInstance {
+abstract class ManagedCouchDbInstance(implicit ec: ExecutionContext) extends CouchDb.Instance {
 
   def baseDir: Path
   def desiredPort: Int = 0
 
   val (process, url) = startProcess
-
-  def host = url.getHost
-  def port = url.getPort
 
   def shutdown {
     process.destroy
