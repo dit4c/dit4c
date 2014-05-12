@@ -9,7 +9,7 @@ import akka.util.Timeout
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-class CouchDbPlugin(app: play.api.Application) extends Plugin with Provider[CouchDb.Instance] {
+class CouchDBPlugin(app: play.api.Application) extends Plugin with Provider[CouchDB.Instance] {
 
   implicit def ec: ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
   implicit def system: ActorSystem = play.api.libs.concurrent.Akka.system(app)
@@ -18,11 +18,11 @@ class CouchDbPlugin(app: play.api.Application) extends Plugin with Provider[Couc
 
   lazy val log = play.api.Logger
 
-  lazy val serverInstance: ManagedCouchDbInstance =
+  lazy val serverInstance: ManagedCouchDBInstance =
     if (app.configuration.getBoolean("couchdb.testing").getOrElse(false)) {
-      new EphemeralCouchDbInstance
+      new EphemeralCouchDBInstance
     } else {
-      new PersistentCouchDbInstance("./db", 40000)
+      new PersistentCouchDBInstance("./db", 40000)
     }
 
   val dbName = "dit4c-highcommand"

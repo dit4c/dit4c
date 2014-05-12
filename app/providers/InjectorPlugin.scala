@@ -12,7 +12,7 @@ import providers.auth.AuthProvider
 import providers.auth.CallbackResult
 import providers.auth.RapidAAFAuthProvider
 import providers.auth.RapidAAFAuthProviderConfig
-import providers.db.CouchDbPlugin
+import providers.db.CouchDBPlugin
 
 class InjectorPlugin(app: play.api.Application) extends Plugin {
 

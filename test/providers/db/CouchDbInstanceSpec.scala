@@ -13,7 +13,7 @@ class CouchDbInstanceSpec extends PlaySpecification {
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
 
-  def createNewInstance = new EphemeralCouchDbInstance
+  def createNewInstance = new EphemeralCouchDBInstance
 
   "CouchDbInstance" should {
 

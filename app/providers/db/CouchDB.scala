@@ -5,7 +5,7 @@ import play.api.libs.ws.WS
 import play.api.mvc.Results.EmptyContent
 import play.api.libs.json._
 
-object CouchDb {
+object CouchDB {
 
   abstract class Instance(implicit ec: ExecutionContext) {
 

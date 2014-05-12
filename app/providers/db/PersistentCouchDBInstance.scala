@@ -3,10 +3,10 @@ package providers.db
 import scala.concurrent.ExecutionContext
 import java.nio.file.{Files,Paths}
 
-class PersistentCouchDbInstance(
+class PersistentCouchDBInstance(
     dir: String,
     specifiedPort: Int)(implicit ec: ExecutionContext)
-  extends ManagedCouchDbInstance {
+  extends ManagedCouchDBInstance {
 
 
   def log = play.api.Logger

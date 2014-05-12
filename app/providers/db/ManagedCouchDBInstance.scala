@@ -6,7 +6,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.net.URL
 
-abstract class ManagedCouchDbInstance(implicit ec: ExecutionContext) extends CouchDb.Instance {
+abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext) extends CouchDB.Instance {
 
   def baseDir: Path
   def desiredPort: Int = 0
