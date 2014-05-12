@@ -18,3 +18,4 @@ activator-*.sbt
 /bin
 /.cache
 /keys.json
+/db/

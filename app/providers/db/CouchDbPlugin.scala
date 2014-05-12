@@ -17,8 +17,12 @@ class CouchDbPlugin(app: play.api.Application) extends Plugin {
 
   lazy val log = play.api.Logger
 
-  lazy val serverInstance: EphemeralCouchDbInstance =
-    new EphemeralCouchDbInstance
+  lazy val serverInstance: ManagedCouchDbInstance =
+    if (app.configuration.getBoolean("couchdb.testing").getOrElse(false)) {
+      new EphemeralCouchDbInstance
+    } else {
+      new PersistentCouchDbInstance("./db", 40000)
+    }
 
   override def onStart {
     serverInstance // Make sure server initializes at app start
