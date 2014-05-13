@@ -18,11 +18,16 @@ import utils.jwt._
 import providers.auth._
 import com.google.inject.Inject
 import providers.db.CouchDB
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 class Application @Inject() (
     authProvider: AuthProvider,
     db: CouchDB.Database)
     extends Controller {
+
+  implicit def ec: ExecutionContext =
+    play.api.libs.concurrent.Execution.defaultContext
 
   val containers = (1 to 9).map(i => s"test$i").toList
 
@@ -36,24 +41,33 @@ class Application @Inject() (
       .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
   }
 
-  def callback = Action { implicit request =>
+  def callback = Action.async { implicit request =>
     import CallbackResult.{Success, Failure, Invalid}
+    import Future.successful
     authProvider.callbackHandler(request) match {
       case Success(identity) =>
-        val cookies = Cookie("dit4c-jwt",
-            jwt(containers), domain=getCookieDomain)
-        val url = request.session.get("redirect-on-callback").getOrElse("/")
-        Redirect(url)
-          .withCookies(cookies)
-          .withSession(session - "redirect-on-callback")
-      case Failure(msg) => Forbidden(msg)
-      case Invalid => BadRequest
+        userDao.findWith(identity).flatMap {
+          case Some(user) => successful(user)
+          case None => userDao.createWith(identity)
+        }.map { user =>
+          val cookies = Cookie("dit4c-jwt",
+              jwt(containers), domain=getCookieDomain)
+          val url = request.session.get("redirect-on-callback").getOrElse("/")
+          Redirect(url)
+            .withCookies(cookies)
+            .withSession(session - "redirect-on-callback" +
+                ("userId" -> user._id))
+        }
+      case Failure(msg) => successful(Forbidden(msg))
+      case Invalid => successful(BadRequest)
     }
   }
 
   def getCookieDomain(implicit request: RequestHeader): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
+
+  private lazy val userDao = new models.UserDAO(db)
 
   private def jwt(containers: List[String])(implicit request: RequestHeader) = {
     val privateKey = privateKeySet.getKeys.head

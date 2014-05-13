@@ -8,7 +8,6 @@ class PersistentCouchDBInstance(
     specifiedPort: Int)(implicit ec: ExecutionContext)
   extends ManagedCouchDBInstance {
 
-
   def log = play.api.Logger
 
   override lazy val baseDir = createDirIfMissing(Paths.get(dir))

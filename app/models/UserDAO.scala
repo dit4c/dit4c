@@ -6,6 +6,7 @@ import providers.auth.Identity
 import scala.concurrent.ExecutionContext
 import play.api.libs.json._
 import scala.concurrent.Future
+import play.api.templates.JavaScript
 
 class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
   import play.api.libs.functional.syntax._
@@ -23,6 +24,34 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
     }
   }
 
+  def findWith(identity: Identity): Future[Option[User]] = {
+    val tempViewBody =
+      Json.obj(
+        "map" -> models.views.js.user_findWith_map(identity.uniqueId)
+      )
+    WS.url(s"${db.baseURL}/_temp_view").post(tempViewBody).map { response =>
+      (response.json \ "rows" \\ "value").headOption.flatMap { v =>
+        Json.fromJson[User](v) match {
+          case JsSuccess(user, _) => Some(user)
+          case _ => None
+        }
+      }
+    }
+  }
+
+  def get(id: String): Future[Option[User]] =
+    WS.url(s"${db.baseURL}/$id").get.map { response =>
+      (response.status match {
+        case 200 => Some(response.json)
+        case _ => None
+      }).flatMap { json =>
+        Json.fromJson[User](json) match {
+          case JsSuccess(user, _) => Some(user)
+          case _ => None
+        }
+      }
+    }
+
   implicit val userReads: Reads[User] = (
     (__ \ "_id").read[String] and
     (__ \ "identities").read[Seq[String]]
@@ -36,7 +65,9 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
     _.as[JsObject] ++ Json.obj( "type" -> "User" )
   }
 
-
+  implicit val javascriptWrites: Writes[JavaScript] = new Writes[JavaScript] {
+    override def writes(js: JavaScript) = JsString(js.body)
+  }
 
 }
 
