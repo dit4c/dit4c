@@ -4,11 +4,9 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.Try
-
 import com.google.inject.AbstractModule
 import com.google.inject.Guice
 import com.google.inject.Injector
-
 import play.api.Plugin
 import play.api.templates.Html
 import providers.auth.AuthProvider
@@ -17,6 +15,7 @@ import providers.auth.RapidAAFAuthProvider
 import providers.auth.RapidAAFAuthProviderConfig
 import providers.db.CouchDB
 import providers.db.CouchDBPlugin
+import providers.auth.Identity
 
 class InjectorPlugin(app: play.api.Application) extends Plugin {
 
@@ -38,14 +37,31 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
             new RapidAAFAuthProvider(config)
           }).toOption
         }.getOrElse {
-          new AuthProvider {
-            val errorMsg = "AuthProvider not configured"
-            override def callbackHandler = { _ =>
-              CallbackResult.Failure(errorMsg)
+          if (appConfig.getBoolean("dummyauth").getOrElse(false)) {
+            new AuthProvider {
+              val errorMsg = "AuthProvider not configured"
+              override def callbackHandler = { _ =>
+                CallbackResult.Success(new Identity {
+                  override val uniqueId = "dummy:anonymous"
+                })
+              }
+              override def loginButton = Html(
+                s"""|<form class="form-inline" action="/auth/callback" method="post">
+                    |  <button class="btn btn-primary" type="submit">Login</button>
+                    |</form>
+                    |""".stripMargin
+              )
             }
-            override def loginButton = Html(
-              s"""<div class="alert alert-danger">$errorMsg</div>"""
-            )
+          } else {
+            new AuthProvider {
+              val errorMsg = "AuthProvider not configured"
+              override def callbackHandler = { _ =>
+                CallbackResult.Failure(errorMsg)
+              }
+              override def loginButton = Html(
+                s"""<div class="alert alert-danger">$errorMsg</div>"""
+              )
+            }
           }
         }
 

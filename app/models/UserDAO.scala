@@ -8,10 +8,11 @@ import play.api.libs.json._
 import scala.concurrent.Future
 import play.api.templates.JavaScript
 
-class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
+class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
+  extends DAOUtils {
   import play.api.libs.functional.syntax._
 
-  def createWith(identity: Identity): Future[User] = {
+  def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
       val user = User(id, Seq(identity.uniqueId))
       val data = Json.toJson(user)
@@ -22,21 +23,20 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
         }
       }
     }
-  }
 
   def findWith(identity: Identity): Future[Option[User]] = {
-    val tempViewBody =
-      Json.obj(
-        "map" -> models.views.js.user_findWith_map(identity.uniqueId)
-      )
-    WS.url(s"${db.baseURL}/_temp_view").post(tempViewBody).map { response =>
-      (response.json \ "rows" \\ "value").headOption.flatMap { v =>
-        Json.fromJson[User](v) match {
-          case JsSuccess(user, _) => Some(user)
-          case _ => None
+    val tempView =
+      TemporaryView(models.views.js.User_findWith_map(identity.uniqueId))
+    WS.url(s"${db.baseURL}/_temp_view")
+      .post(Json.toJson(tempView))
+      .map { response =>
+        (response.json \ "rows" \\ "value").headOption.flatMap { v =>
+          Json.fromJson[User](v) match {
+            case JsSuccess(user, _) => Some(user)
+            case _ => None
+          }
         }
       }
-    }
   }
 
   def get(id: String): Future[Option[User]] =
@@ -63,10 +63,6 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext) {
   )(unlift(User.unapply)).transform {
     // We need a type for searching
     _.as[JsObject] ++ Json.obj( "type" -> "User" )
-  }
-
-  implicit val javascriptWrites: Writes[JavaScript] = new Writes[JavaScript] {
-    override def writes(js: JavaScript) = JsString(js.body)
   }
 
 }

@@ -29,10 +29,10 @@ class Application @Inject() (
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
 
-  val containers = (1 to 9).map(i => s"test$i").toList
-
-  def index = Action { request =>
-    Ok(views.html.index(containers, request.host))
+  def index = Action.async { request =>
+    containers.map { cs =>
+      Ok(views.html.index(cs, request.host))
+    }
   }
 
   def login = Action { implicit request =>
@@ -49,7 +49,9 @@ class Application @Inject() (
         userDao.findWith(identity).flatMap {
           case Some(user) => successful(user)
           case None => userDao.createWith(identity)
-        }.map { user =>
+        }.flatMap { user =>
+          containers.map((user, _))
+        }.map { case (user, containers) =>
           val cookies = Cookie("dit4c-jwt",
               jwt(containers), domain=getCookieDomain)
           val url = request.session.get("redirect-on-callback").getOrElse("/")
@@ -68,6 +70,15 @@ class Application @Inject() (
     else None
 
   private lazy val userDao = new models.UserDAO(db)
+  private lazy val computeNodeDao = new models.ComputeNodeDAO(db)
+
+  protected def containers: Future[List[String]] =
+    computeNodeDao.list.flatMap { nodes =>
+      Future.sequence(nodes.map(_.projects))
+    }.map(_.flatten.toList.sorted).map { cs =>
+      Logger.info("Compute Nodes: "+cs)
+      cs
+    }
 
   private def jwt(containers: List[String])(implicit request: RequestHeader) = {
     val privateKey = privateKeySet.getKeys.head
