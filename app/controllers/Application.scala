@@ -76,7 +76,7 @@ class Application @Inject() (
     computeNodeDao.list.flatMap { nodes =>
       Future.sequence(nodes.map(_.projects))
     }.map(_.flatten.toList.sorted).map { cs =>
-      Logger.info("Compute Nodes: "+cs)
+      Logger.debug("Compute Nodes: "+cs)
       cs
     }
 

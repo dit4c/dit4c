@@ -26,7 +26,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   def findWith(identity: Identity): Future[Option[User]] = {
     val tempView =
-      TemporaryView(models.views.js.User_findWith_map(identity.uniqueId))
+      TemporaryView(views.js.models.User_findWith_map(identity.uniqueId))
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>

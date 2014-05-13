@@ -21,7 +21,7 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
     }
 
   def list: Future[Seq[ComputeNode]] = {
-    val tempView = TemporaryView(models.views.js.ComputeNode_list_map())
+    val tempView = TemporaryView(views.js.models.ComputeNode_list_map())
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
