@@ -52,14 +52,21 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       }
     }
 
+  implicit val userProjectsFormat: Format[User.Projects] = (
+      (__ \ "owned").format[Seq[String]] and
+      (__ \ "shared").format[Seq[String]]
+    )(User.Projects.apply, unlift(User.Projects.unapply))
+
   implicit val userReads: Reads[User] = (
     (__ \ "_id").read[String] and
-    (__ \ "identities").read[Seq[String]]
-  )(User)
+    (__ \ "identities").read[Seq[String]] and
+    (__ \ "projects").read[User.Projects]
+  )(User.apply _)
 
   implicit val userWrites: Writes[User] = (
     (__ \ "_id").write[String] and
-    (__ \ "identities").write[Seq[String]]
+    (__ \ "identities").write[Seq[String]] and
+    (__ \ "projects").write[User.Projects]
   )(unlift(User.unapply)).transform {
     // We need a type for searching
     _.as[JsObject] ++ Json.obj( "type" -> "User" )
@@ -68,4 +75,11 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 }
 
 
-case class User(val _id: String, val identities: Seq[String])
+case class User(
+    val _id: String,
+    val identities: Seq[String],
+    val projects: User.Projects = User.Projects());
+
+object User {
+  case class Projects(owned: Seq[String] = Seq(), shared: Seq[String] = Seq())
+}

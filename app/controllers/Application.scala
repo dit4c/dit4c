@@ -75,7 +75,7 @@ class Application @Inject() (
   protected def containers: Future[List[String]] =
     computeNodeDao.list.flatMap { nodes =>
       Future.sequence(nodes.map(_.projects))
-    }.map(_.flatten.toList.sorted).map { cs =>
+    }.map(_.flatten.map(_.name).toList.sorted).map { cs =>
       Logger.debug("Compute Nodes: "+cs)
       cs
     }

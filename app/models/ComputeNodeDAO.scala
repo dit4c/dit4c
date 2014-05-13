@@ -52,10 +52,17 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 }
 
 case class ComputeNode(_id: String, name: String, url: String) {
+  import play.api.libs.functional.syntax._
 
-  def projects(implicit ec: ExecutionContext): Future[Seq[String]] =
+  def projects(implicit ec: ExecutionContext): Future[Seq[Project]] =
     WS.url(s"${url}projects").get().map { response =>
-      (response.json \\ "name").map(_.as[String])
+      response.json.asInstanceOf[JsArray].value.map(_.as[Project])
     }
 
+  implicit val projectReads: Reads[Project] = (
+    (__ \ "name").read[String] and
+    (__ \ "active").read[Boolean]
+  )(Project)
+
+  case class Project(name: String, active: Boolean)
 }
