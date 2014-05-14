@@ -31,7 +31,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       .post(Json.toJson(tempView))
       .map { response =>
         (response.json \ "rows" \\ "value").headOption.flatMap { v =>
-          Json.fromJson[User](v) match {
+          Json.fromJson[User](v)(userReads3) match {
             case JsSuccess(user, _) => Some(user)
             case _ => None
           }
@@ -57,11 +57,19 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       (__ \ "shared").format[Seq[String]]
     )(User.Projects.apply, unlift(User.Projects.unapply))
 
-  implicit val userReads: Reads[User] = (
+
+  val userReads2: Reads[User] = (
+    (__ \ "_id").read[String] and
+    (__ \ "identities").read[Seq[String]]
+  )((_id: String, identities: Seq[String]) => User(_id, identities))
+
+  val userReads3: Reads[User] = (
     (__ \ "_id").read[String] and
     (__ \ "identities").read[Seq[String]] and
     (__ \ "projects").read[User.Projects]
   )(User.apply _)
+
+  implicit val userReads: Reads[User] = userReads3 or userReads2
 
   implicit val userWrites: Writes[User] = (
     (__ \ "_id").write[String] and
@@ -70,6 +78,16 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
   )(unlift(User.unapply)).transform {
     // We need a type for searching
     _.as[JsObject] ++ Json.obj( "type" -> "User" )
+  }
+
+  implicit class ReadCombiner[A](r1: Reads[A]) {
+    def or(r2: Reads[A]) = new Reads[A] {
+      override def reads(json: JsValue) =
+        r1.reads(json) match {
+          case result: JsSuccess[A] => result
+          case _: JsError => r2.reads(json)
+        }
+    }
   }
 
 }
