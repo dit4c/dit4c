@@ -54,6 +54,8 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvi
         val providerUserId = attrs.get("edupersonprincipalname").get
         JsSuccess(new Identity {
           val uniqueId = s"${config.id}:${providerUserId}"
+          val emailAddress = attrs.get("mail").get
+          val name = attrs.get("cn").get
         })
       case _ =>
         JsError(Nil)

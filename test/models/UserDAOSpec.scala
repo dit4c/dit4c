@@ -10,6 +10,7 @@ import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
 import play.api.libs.ws.WS
 import providers.db.CouchDB
+import java.util.Collections.EmptySet
 
 @RunWith(classOf[JUnitRunner])
 class UserDAOSpec extends PlaySpecification {
@@ -26,12 +27,17 @@ class UserDAOSpec extends PlaySpecification {
     "create a user from an identity" in withDB { db =>
       val dao = new UserDAO(db)
       val user = await(dao.createWith(MockIdentity("foo:bar")))
+      user.name must beNone
+      user.email must beNone
       user.identities must contain("foo:bar")
       // Check database has data
       val couchResponse = await(WS.url(s"${db.baseURL}/${user._id}").get)
       couchResponse.status must_== 200
       (couchResponse.json \ "_id").as[String] must_== user._id
       (couchResponse.json \ "identities").as[Seq[String]] must_== user.identities
+      // Stored as sets, but should exist as lists
+      (couchResponse.json \ "projects" \ "owned").as[Seq[String]] must_== Nil
+      (couchResponse.json \ "projects" \ "shared").as[Seq[String]] must_== Nil
     }
 
     "lookup using identity" in withDB { db =>

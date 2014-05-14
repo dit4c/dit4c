@@ -1,6 +1,6 @@
-@(containers: List[String], parentDomain: String)
+@(containers: List[String], parentDomain: String, user: models.User)
 
-@main("Pick a container") {
+@main("Pick a container", Some(user)) {
   <div class="col-xs-12">
   	<h1>Pick a container</h1>
     <ul>

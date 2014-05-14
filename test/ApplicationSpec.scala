@@ -21,12 +21,10 @@ class ApplicationSpec extends Specification {
       route(FakeRequest(GET, "/boum")) must beNone
     }
 
-    "render the index page" in new WithApplication(fakeApp) {
+    "redirect index page to login" in new WithApplication(fakeApp) {
       val home = route(FakeRequest(GET, "/")).get
 
-      status(home) must equalTo(OK)
-      contentType(home) must beSome.which(_ == "text/html")
-      contentAsString(home) must contain ("Pick a container")
+      redirectLocation(home) must beSome("/login")
     }
 
     "callback" in new WithApplication(fakeApp) {

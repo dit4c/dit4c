@@ -20,6 +20,8 @@ import com.google.inject.Inject
 import providers.db.CouchDB
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import play.mvc.Http.RequestHeader
+import models._
 
 class Application @Inject() (
     authProvider: AuthProvider,
@@ -29,9 +31,12 @@ class Application @Inject() (
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
 
-  def index = Action.async { request =>
-    containers.map { cs =>
-      Ok(views.html.index(cs, request.host))
+  def index = Action.async { implicit request =>
+    fetchContainers.flatMap( cs => fetchUser.map((cs, _)) ).map {
+      case (containers, Some(user)) =>
+        Ok(views.html.index(containers, request.host, user))
+      case (containers, None) =>
+        Redirect(routes.Application.login)
     }
   }
 
@@ -50,7 +55,7 @@ class Application @Inject() (
           case Some(user) => successful(user)
           case None => userDao.createWith(identity)
         }.flatMap { user =>
-          containers.map((user, _))
+          fetchContainers.map((user, _))
         }.map { case (user, containers) =>
           val cookies = Cookie("dit4c-jwt",
               jwt(containers), domain=getCookieDomain)
@@ -65,14 +70,14 @@ class Application @Inject() (
     }
   }
 
-  def getCookieDomain(implicit request: RequestHeader): Option[String] =
+  def getCookieDomain(implicit request: Request[_]): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
 
-  private lazy val userDao = new models.UserDAO(db)
-  private lazy val computeNodeDao = new models.ComputeNodeDAO(db)
+  private lazy val userDao = new UserDAO(db)
+  private lazy val computeNodeDao = new ComputeNodeDAO(db)
 
-  protected def containers: Future[List[String]] =
+  protected def fetchContainers: Future[List[String]] =
     computeNodeDao.list.flatMap { nodes =>
       Future.sequence(nodes.map(_.projects))
     }.map(_.flatten.map(_.name).toList.sorted).map { cs =>
@@ -80,7 +85,12 @@ class Application @Inject() (
       cs
     }
 
-  private def jwt(containers: List[String])(implicit request: RequestHeader) = {
+  protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =
+    request.session.get("userId")
+      .map(userDao.get) // Get user if userId exists
+      .getOrElse(Future.successful(None))
+
+  private def jwt(containers: List[String])(implicit request: Request[_]) = {
     val privateKey = privateKeySet.getKeys.head
       .asInstanceOf[RSAKey].toRSAPrivateKey
     val tokenString = {
@@ -135,6 +145,5 @@ class Application @Inject() (
     }
     keySet
   }
-
 
 }

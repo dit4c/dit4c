@@ -2,7 +2,7 @@ package models
 
 import providers.db.CouchDB
 import play.api.libs.ws.WS
-import providers.auth.Identity
+import providers.auth._
 import scala.concurrent.ExecutionContext
 import play.api.libs.json._
 import scala.concurrent.Future
@@ -14,7 +14,15 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
-      val user = User(id, Seq(identity.uniqueId))
+      val name =
+        if (identity.isInstanceOf[NamedIdentity]) {
+          Some(identity.asInstanceOf[NamedIdentity].name)
+        } else None
+      val email =
+        if (identity.isInstanceOf[EmailIdentity]) {
+          Some(identity.asInstanceOf[EmailIdentity].emailAddress)
+        } else None
+      val user = User(id, name, email, Seq(identity.uniqueId))
       val data = Json.toJson(user)
       val holder = WS.url(s"${db.baseURL}/$id")
       holder.put(data).map { response =>
@@ -53,26 +61,33 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
     }
 
   implicit val userProjectsFormat: Format[User.Projects] = (
-      (__ \ "owned").format[Seq[String]] and
-      (__ \ "shared").format[Seq[String]]
+      (__ \ "owned").format[Set[String]] and
+      (__ \ "shared").format[Set[String]]
     )(User.Projects.apply, unlift(User.Projects.unapply))
 
 
   val userReads2: Reads[User] = (
     (__ \ "_id").read[String] and
+    (__ \ "name").read[Option[String]] and
+    (__ \ "email").read[Option[String]] and
     (__ \ "identities").read[Seq[String]]
-  )((_id: String, identities: Seq[String]) => User(_id, identities))
+  )((_1, _2, _3, _4) => User(_1, _2, _3, _4))
 
   val userReads3: Reads[User] = (
     (__ \ "_id").read[String] and
+    (__ \ "name").read[Option[String]] and
+    (__ \ "email").read[Option[String]] and
     (__ \ "identities").read[Seq[String]] and
     (__ \ "projects").read[User.Projects]
   )(User.apply _)
 
+  // Older Users may not have projects, so use a fallback
   implicit val userReads: Reads[User] = userReads3 or userReads2
 
   implicit val userWrites: Writes[User] = (
     (__ \ "_id").write[String] and
+    (__ \ "name").write[Option[String]] and
+    (__ \ "email").write[Option[String]] and
     (__ \ "identities").write[Seq[String]] and
     (__ \ "projects").write[User.Projects]
   )(unlift(User.unapply)).transform {
@@ -95,9 +110,13 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
 case class User(
     val _id: String,
+    val name: Option[String],
+    val email: Option[String],
     val identities: Seq[String],
     val projects: User.Projects = User.Projects());
 
 object User {
-  case class Projects(owned: Seq[String] = Seq(), shared: Seq[String] = Seq())
+  case class Projects(
+      owned: Set[String] = Set(),
+      shared: Set[String] = Set())
 }

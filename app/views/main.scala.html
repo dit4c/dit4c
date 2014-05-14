@@ -1,4 +1,4 @@
-@(title: String)(content: Html)
+@(title: String, user: Option[models.User] = None)(content: Html)
 <!DOCTYPE html5>
 <html>
   <head>
@@ -18,6 +18,14 @@
         <div class="navbar-header">
           <a class="navbar-brand" href="/">DIT4C</a>
         </div>
+        @user match {
+          case Some(user) => {
+            <p class="navbar-text navbar-right">@user._id</p>
+          }
+          case None => {
+            <p class="navbar-text navbar-right">Not logged in</p>
+          }
+        }
       </div>
     </nav>
     <div class="container">
