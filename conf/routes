@@ -8,4 +8,7 @@ GET     /login                      @controllers.Application.login
 POST    /auth/callback              @controllers.Application.callback
 
 # Map static resources from the /public folder to the /assets URL path
+GET     /favicon.ico                controllers.Assets.at(path="/public", file="images/favicon.ico")
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
+GET     /webjars/*file              controllers.WebJarAssets.at(file)
+#GET     /require.js                 controllers.WebJarAssets.requirejs
