@@ -11,6 +11,7 @@ import play.api.templates.JavaScript
 class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
+  import play.api.libs.json.Reads._
 
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
@@ -31,12 +32,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
-        (response.json \ "rows" \\ "value").headOption.flatMap { v =>
-          Json.fromJson[User](v)(userReads3) match {
-            case JsSuccess(user, _) => Some(user)
-            case _ => None
-          }
-        }
+        (response.json \ "rows" \\ "value").headOption.flatMap(fromJson[User])
       }
   }
 
@@ -45,41 +41,27 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       (response.status match {
         case 200 => Some(response.json)
         case _ => None
-      }).flatMap { json =>
-        Json.fromJson[User](json) match {
-          case JsSuccess(user, _) => Some(user)
-          case _ => None
-        }
-      }
+      }).flatMap(fromJson[User])
     }
+
 
   implicit val userProjectsFormat: Format[User.Projects] = (
       (__ \ "owned").format[Set[String]] and
       (__ \ "shared").format[Set[String]]
     )(User.Projects.apply, unlift(User.Projects.unapply))
 
-  val userReads2: Reads[User] = (
+  implicit val userReads: Reads[User] = (
     (__ \ "_id").read[String] and
-    (__ \ "name").read[Option[String]] and
-    (__ \ "email").read[Option[String]] and
-    (__ \ "identities").read[Seq[String]]
-  )((_1, _2, _3, _4) => User(_1, _2, _3, _4))
-
-  val userReads3: Reads[User] = (
-    (__ \ "_id").read[String] and
-    (__ \ "name").read[Option[String]] and
-    (__ \ "email").read[Option[String]] and
+    (__ \ "name").readNullable[String] and
+    (__ \ "email").readNullable[String] and
     (__ \ "identities").read[Seq[String]] and
     (__ \ "projects").read[User.Projects]
   )(User.apply _)
 
-  // Older Users may not have projects, so use a fallback
-  implicit val userReads: Reads[User] = userReads3 or userReads2
-
   implicit val userWrites: Writes[User] = (
     (__ \ "_id").write[String] and
-    (__ \ "name").write[Option[String]] and
-    (__ \ "email").write[Option[String]] and
+    (__ \ "name").writeNullable[String] and
+    (__ \ "email").writeNullable[String] and
     (__ \ "identities").write[Seq[String]] and
     (__ \ "projects").write[User.Projects]
   )(unlift(User.unapply)).withTypeAttribute("User")

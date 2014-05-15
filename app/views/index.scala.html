@@ -1,14 +1,22 @@
 @(containers: List[String], parentDomain: String, user: models.User)
 
 @main("Pick a container", Some(user)) {
-  <div class="col-xs-12">
-  	<h1>Pick a container</h1>
-    <ul>
-    @for(container <- containers) {
-      <li>
-        <a href="//@container.@parentDomain/">@container</a>
-      </li>
-    }
-    </ul>
+  <div class="jumbotron" style="background-color: #e0675f">
+    <div class="container">
+    	<h1>DIT4C</h1>
+      <p>...</p>
+    </div>
+  </div>
+  <div class="container">
+    <div class="col-xs-12">
+    	<h1>Pick a container</h1>
+      <ul>
+      @for(container <- containers) {
+        <li>
+          <a href="//@container.@parentDomain/">@container</a>
+        </li>
+      }
+      </ul>
+    </div>
   </div>
 }

@@ -25,12 +25,7 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
-        (response.json \ "rows" \\ "value").flatMap { v =>
-          Json.fromJson[ComputeNode](v) match {
-            case JsSuccess(node, _) => Some(node)
-            case _ => None
-          }
-        }
+        (response.json \ "rows" \\ "value").flatMap(fromJson[ComputeNode])
       }
   }
 

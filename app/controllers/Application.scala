@@ -40,10 +40,12 @@ class Application @Inject() (
     }
   }
 
-  def login = Action { implicit request =>
+  def login = Action.async { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
-    Ok(views.html.login(authProvider.loginButton))
-      .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
+    fetchUser.map { optionalUser =>
+      Ok(views.html.login(authProvider.loginButton, optionalUser))
+        .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
+    }
   }
 
   def callback = Action.async { implicit request =>

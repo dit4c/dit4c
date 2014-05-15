@@ -1,6 +1,8 @@
-@(loginButton: Html)
-@main("Login") {
-  <div class="col-xs-12">
-    @loginButton
+@(loginButton: Html, optionalUser: Option[models.User])
+@main("Login", optionalUser) {
+  <div class="container">
+    <div class="col-xs-12">
+      @loginButton
+    </div>
   </div>
 }
