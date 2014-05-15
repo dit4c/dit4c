@@ -1,4 +1,4 @@
-@(title: String, user: Option[models.User] = None)(content: Html)
+@(title: String)(content: Html)
 <!DOCTYPE html5>
 <html>
   <head>
@@ -24,16 +24,14 @@
         <div class="navbar-header">
           <a class="navbar-brand" href="/">DIT4C</a>
         </div>
-        @user match {
-          case Some(user) => {
+        {{#if id}}
             <p class="navbar-text navbar-right">
-              <span title="@user._id">@user.name.getOrElse("Unknown")</span>
+              <span title="{{id}}">{{#if name}}{{name}}{{/if}}{{#unless name}}Unknown{{/unless}}</span>
             </p>
-          }
-          case None => {
+        {{/if}}
+        {{#unless id}}
             <p class="navbar-text navbar-right">Not logged in</p>
-          }
-        }
+        {{/unless}}
       </div>
     </nav>
     @content

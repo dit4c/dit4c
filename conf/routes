@@ -7,6 +7,8 @@ GET     /                           @controllers.Application.index
 GET     /login                      @controllers.Application.login
 POST    /auth/callback              @controllers.Application.callback
 
+GET     /users/current              @controllers.Application.currentUser
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /favicon.ico                controllers.Assets.at(path="/public", file="images/favicon.ico")
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
