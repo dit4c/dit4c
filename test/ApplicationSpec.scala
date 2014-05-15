@@ -1,9 +1,12 @@
+import akka.util.Timeout
 import org.specs2.mutable._
 import org.specs2.runner._
+import org.specs2.time.NoTimeConversions
 import org.junit.runner._
 import play.api.test._
 import play.api.test.Helpers._
 import play.api.mvc._
+import scala.concurrent.duration._
 
 /**
  * Add your spec here.
@@ -11,7 +14,9 @@ import play.api.mvc._
  * For more information, consult the wiki.
  */
 @RunWith(classOf[JUnitRunner])
-class ApplicationSpec extends Specification {
+class ApplicationSpec extends PlaySpecification with NoTimeConversions {
+
+  override implicit def defaultAwaitTimeout: Timeout = 60.seconds
 
   import testing.TestUtils.fakeApp
 
