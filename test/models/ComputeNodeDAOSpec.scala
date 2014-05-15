@@ -31,6 +31,7 @@ class ComputeNodeDAOSpec extends PlaySpecification {
       // Check database has data
       val couchResponse = await(WS.url(s"${db.baseURL}/${node._id}").get)
       couchResponse.status must_== 200
+      (couchResponse.json \ "type").as[String] must_== "ComputeNode"
       (couchResponse.json \ "_id").as[String] must_== node._id
       (couchResponse.json \ "name").as[String] must_== node.name
       (couchResponse.json \ "url").as[String] must_== node.url
@@ -44,7 +45,5 @@ class ComputeNodeDAOSpec extends PlaySpecification {
     }
 
   }
-
-  case class MockIdentity(uniqueId: String) extends Identity
 
 }

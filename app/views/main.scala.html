@@ -20,7 +20,9 @@
         </div>
         @user match {
           case Some(user) => {
-            <p class="navbar-text navbar-right">@user._id</p>
+            <p class="navbar-text navbar-right">
+              <span title="@user._id">@user.name.getOrElse("Unknown")</span>
+            </p>
           }
           case None => {
             <p class="navbar-text navbar-right">Not logged in</p>

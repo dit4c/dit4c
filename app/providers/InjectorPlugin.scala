@@ -43,6 +43,8 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
               override def callbackHandler = { _ =>
                 CallbackResult.Success(new Identity {
                   override val uniqueId = "dummy:anonymous"
+                  override val name = None
+                  override val emailAddress = None
                 })
               }
               override def loginButton = Html(

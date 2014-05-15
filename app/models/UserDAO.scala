@@ -14,15 +14,8 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
-      val name =
-        if (identity.isInstanceOf[NamedIdentity]) {
-          Some(identity.asInstanceOf[NamedIdentity].name)
-        } else None
-      val email =
-        if (identity.isInstanceOf[EmailIdentity]) {
-          Some(identity.asInstanceOf[EmailIdentity].emailAddress)
-        } else None
-      val user = User(id, name, email, Seq(identity.uniqueId))
+      val user =
+        User(id, identity.name, identity.emailAddress, Seq(identity.uniqueId))
       val data = Json.toJson(user)
       val holder = WS.url(s"${db.baseURL}/$id")
       holder.put(data).map { response =>
@@ -65,7 +58,6 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       (__ \ "shared").format[Set[String]]
     )(User.Projects.apply, unlift(User.Projects.unapply))
 
-
   val userReads2: Reads[User] = (
     (__ \ "_id").read[String] and
     (__ \ "name").read[Option[String]] and
@@ -90,10 +82,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
     (__ \ "email").write[Option[String]] and
     (__ \ "identities").write[Seq[String]] and
     (__ \ "projects").write[User.Projects]
-  )(unlift(User.unapply)).transform {
-    // We need a type for searching
-    _.as[JsObject] ++ Json.obj( "type" -> "User" )
-  }
+  )(unlift(User.unapply)).withTypeAttribute("User")
 
   implicit class ReadCombiner[A](r1: Reads[A]) {
     def or(r2: Reads[A]) = new Reads[A] {

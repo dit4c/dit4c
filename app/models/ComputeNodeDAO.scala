@@ -34,20 +34,12 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
       }
   }
 
-  implicit val computeNodeReads: Reads[ComputeNode] = (
-    (__ \ "_id").read[String] and
-    (__ \ "name").read[String] and
-    (__ \ "url").read[String]
-  )(ComputeNode)
-
-  implicit val computeNodeWrites: Writes[ComputeNode] = (
-    (__ \ "_id").write[String] and
-    (__ \ "name").write[String] and
-    (__ \ "url").write[String]
-  )(unlift(ComputeNode.unapply)).transform {
-    // We need a type for searching
-    _.as[JsObject] ++ Json.obj( "type" -> "ComputeNode" )
-  }
+  implicit val computeNodeFormat: Format[ComputeNode] = (
+    (__ \ "_id").format[String] and
+    (__ \ "name").format[String] and
+    (__ \ "url").format[String]
+  )(ComputeNode.apply _, unlift(ComputeNode.unapply))
+    .withTypeAttribute("ComputeNode")
 
 }
 
