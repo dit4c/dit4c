@@ -25,12 +25,15 @@
           <a class="navbar-brand" href="/">DIT4C</a>
         </div>
         {{#if id}}
-            <p class="navbar-text navbar-right">
-              <span title="{{id}}">{{#if name}}{{name}}{{/if}}{{#unless name}}Unknown{{/unless}}</span>
-            </p>
+        <p class="navbar-text navbar-right">
+          <span {{bind-attr title=id}}>
+          {{#if name}}{{name}}{{/if}}
+          {{#unless name}}Unknown{{/unless}}
+          </span>
+        </p>
         {{/if}}
         {{#unless id}}
-            <p class="navbar-text navbar-right">Not logged in</p>
+        <p class="navbar-text navbar-right">Not logged in</p>
         {{/unless}}
       </div>
     </nav>

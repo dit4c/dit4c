@@ -34,8 +34,7 @@ class UserControllerSpec extends PlaySpecification {
       val controller = injector.getInstance(classOf[UserController])
 
       val withoutLogin = controller.currentUser(FakeRequest())
-      status(withoutLogin) must_== 200
-      contentAsJson(withoutLogin) must_== Json.obj()
+      status(withoutLogin) must_== 404
 
       val user = {
         val dao = new UserDAO(injector.getInstance(classOf[CouchDB.Database]))

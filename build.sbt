@@ -22,4 +22,21 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 
 resolvers += "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/"
 
-play.Project.playScalaSettings
+
+// Clojure compiler options to handle Ember.js, from:
+// http://stackoverflow.com/questions/22137767/playframework-requirejs-javascript-files-not-being-optimized
+val closureOptions = {
+  import com.google.javascript.jscomp._
+  val root = new java.io.File(".")
+  val opts = new CompilerOptions()
+  opts.closurePass = true
+  opts.setProcessCommonJSModules(true)
+  opts.setCommonJSModulePathPrefix(root.getCanonicalPath + "/app/assets/javascripts/")
+  opts.setLanguageIn(CompilerOptions.LanguageMode.ECMASCRIPT5_STRICT)
+  CompilationLevel.WHITESPACE_ONLY.setOptionsForCompilationLevel(opts)
+  opts
+}
+
+closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
+
+play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)

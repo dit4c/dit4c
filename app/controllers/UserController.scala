@@ -26,9 +26,7 @@ class UserController @Inject() (db: CouchDB.Database) extends Controller {
         )
         Ok(json)
       case None =>
-        //NotFound
-        // TODO: Fix this so 404 can be handled
-        Ok(Json.obj())
+        NotFound
     }
   }
 
