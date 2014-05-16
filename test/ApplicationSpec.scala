@@ -7,6 +7,13 @@ import play.api.test._
 import play.api.test.Helpers._
 import play.api.mvc._
 import scala.concurrent.duration._
+import akka.util.Timeout.durationToTimeout
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.crypto.MACSigner
+import testing.TestUtils.fakeApp
 
 /**
  * Add your spec here.

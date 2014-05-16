@@ -40,23 +40,6 @@ class Application @Inject() (
     }
   }
 
-  def currentUser = Action.async { implicit request =>
-    fetchUser.map {
-      case Some(user) =>
-        val json = Json.obj(
-          "id"    -> user._id,
-          "name"  -> user.name,
-          "email" -> user.email
-        )
-        Ok(json)
-      case None =>
-        //NotFound
-        // TODO: Fix this so 404 can be handled
-        Ok(Json.obj())
-
-    }
-  }
-
   def login = Action.async { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
     fetchUser.map { optionalUser =>
