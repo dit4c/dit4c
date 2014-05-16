@@ -47,7 +47,8 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
                   override val emailAddress = None
                 })
               }
-              override def loginButton = Html(
+              override def loginURL = ??? // Should never be called
+              override def loginButton = _ => Html(
                 s"""|<form class="form-inline" action="/auth/callback" method="post">
                     |  <button class="btn btn-primary" type="submit">Login</button>
                     |</form>
@@ -60,7 +61,8 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
               override def callbackHandler = { _ =>
                 CallbackResult.Failure(errorMsg)
               }
-              override def loginButton = Html(
+              override def loginURL = ???
+              override def loginButton = _ => Html(
                 s"""<div class="alert alert-danger">$errorMsg</div>"""
               )
             }

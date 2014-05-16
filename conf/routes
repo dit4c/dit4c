@@ -2,9 +2,7 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
-# Home page
-GET     /                           @controllers.Application.index
-GET     /login                      @controllers.Application.login
+GET     /login/redirect             @controllers.Application.login
 POST    /auth/callback              @controllers.Application.callback
 
 GET     /users/current              @controllers.UserController.currentUser
@@ -14,3 +12,7 @@ GET     /favicon.ico                controllers.Assets.at(path="/public", file="
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
 GET     /webjars/*file              controllers.WebJarAssets.at(file)
 #GET     /require.js                 controllers.WebJarAssets.requirejs
+
+# Home page
+GET     /                           @controllers.Application.main(path="")
+GET     /login                      @controllers.Application.main(path="login")

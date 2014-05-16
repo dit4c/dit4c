@@ -27,16 +27,31 @@ class ApplicationSpec extends PlaySpecification with NoTimeConversions {
 
   import testing.TestUtils.fakeApp
 
-  "Application" should {
+  "Application" >> {
+
+    "client-side app manages" >> {
+
+      "index" >> {
+        val call = controllers.routes.Application.main("")
+        call.method must_== "GET"
+        call.url must_== "/"
+      }
+
+      "login" >> {
+        val call = controllers.routes.Application.main("login")
+        call.method must_== "GET"
+        call.url must_== "/login"
+      }
+    }
 
     "send 404 on a bad request" in new WithApplication(fakeApp) {
       route(FakeRequest(GET, "/boum")) must beNone
     }
 
-    "redirect index page to login" in new WithApplication(fakeApp) {
+    "index page to Ember app" in new WithApplication(fakeApp) {
       val home = route(FakeRequest(GET, "/")).get
 
-      redirectLocation(home) must beSome("/login")
+      status(home) must_== 200
     }
 
     "callback" in new WithApplication(fakeApp) {

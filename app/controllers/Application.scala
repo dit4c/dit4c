@@ -31,21 +31,14 @@ class Application @Inject() (
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
 
-  def index = Action.async { implicit request =>
-    fetchContainers.flatMap( cs => fetchUser.map((cs, _)) ).map {
-      case (containers, Some(_)) =>
-        Ok(views.html.index(containers, request.host))
-      case (containers, None) =>
-        Redirect(routes.Application.login)
-    }
+  def main(path: String) = Action { implicit request =>
+    Ok(views.html.main(authProvider.loginButton))
   }
 
-  def login = Action.async { implicit request =>
+  def login = Action { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
-    fetchUser.map { optionalUser =>
-      Ok(views.html.login(authProvider.loginButton))
-        .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
-    }
+    Redirect(authProvider.loginURL)
+      .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
   }
 
   def callback = Action.async { implicit request =>

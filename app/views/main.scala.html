@@ -1,8 +1,8 @@
-@(title: String)(content: Html)
+@(loginButton: String => Html)
 <!DOCTYPE html5>
 <html>
   <head>
-    <title>@title</title>
+    <title>DIT4C</title>
 
     <link href="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.css"))" rel="stylesheet">
     <link rel="stylesheet" media="screen" href="@routes.Assets.at("stylesheets/main.css")">
@@ -18,12 +18,18 @@
     <script src="@routes.WebJarAssets.at(WebJarAssets.locate("ember-data.js"))"></script>
   </head>
   <body>
-    <script type="text/x-handlebars" data-template-name="app">
+    <script type="text/x-handlebars">
+    {{render navbar}}
+    {{outlet}}
+    </script>
+    
+    <script type="text/x-handlebars" data-template-name="navbar">
     <nav class="navbar navbar-static-top" role="navigation">
       <div class="container-fluid">
         <div class="navbar-header">
           <a class="navbar-brand" href="/">DIT4C</a>
         </div>
+      {{#with user}}
         {{#if id}}
         <p class="navbar-text navbar-right">
           <span {{bind-attr title=id}}>
@@ -31,14 +37,28 @@
           {{#unless name}}Unknown{{/unless}}
           </span>
         </p>
+        {{else}}
+        <p class="navbar-text navbar-right">
+        {{#link-to 'login'}}Not logged in{{/link-to}}
+        </p>
         {{/if}}
-        {{#unless id}}
-        <p class="navbar-text navbar-right">Not logged in</p>
-        {{/unless}}
+      {{/with}}
       </div>
     </nav>
-    @content
     </script>
+    
+    <script type="text/x-handlebars" data-template-name="index">
+    <div class="container-fluid">
+      Index page
+    </div>
+    </script>
+    
+    <script type="text/x-handlebars" data-template-name="login">
+    <div class="container-fluid">
+      @loginButton("/login/redirect")
+    </div>
+    </script>
+    
 
     <!-- ... Ember.js and other javascript dependencies ... -->
     <script src="@routes.Assets.at("javascripts/application.js")"></script>

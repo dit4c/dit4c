@@ -8,7 +8,9 @@ trait AuthProvider {
 
   def callbackHandler: Request[AnyContent] => CallbackResult
 
-  def loginButton: Html
+  def loginURL: String
+
+  def loginButton: String => Html
 
 }
 
