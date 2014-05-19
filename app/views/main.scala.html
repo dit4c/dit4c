@@ -24,43 +24,53 @@
     </script>
     
     <script type="text/x-handlebars" data-template-name="navbar">
-    <nav class="navbar navbar-static-top" role="navigation">
-      <div class="container-fluid">
+    <nav class="navbar navbar-fixed-top" role="navigation">
+      <div class="container">
         <div class="navbar-header">
-          <a class="navbar-brand" href="/">DIT4C</a>
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          {{#link-to 'index' class="navbar-brand"}}DIT4C{{/link-to}}
         </div>
-      {{#with user}}
-        {{#if id}}
-        <ul class="nav navbar-nav navbar-right">
-          <li class="dropdown">
-            <a href="#" class="dropdown-toggle" data-toggle="dropdown" {{bind-attr title=id}}>
-              {{#if name}}{{name}}{{/if}}
-              {{#unless name}}Unknown{{/unless}}
-              <b class="caret"></b>
-            </a>
-            <ul class="dropdown-menu">
-              <li><button class="btn btn-link" {{action 'logout'}}>Logout</button></li>
-            </ul>
-          </li>
-        </ul>
-        {{else}}
-        <p class="navbar-text navbar-right">
-        {{#link-to 'login'}}Not logged in{{/link-to}}
-        </p>
-        {{/if}}
-      {{/with}}
+        <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+        {{#with user}}
+          {{#if id}}
+          <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown" {{bind-attr title=id}}>
+                {{#if name}}{{name}}{{/if}}
+                {{#unless name}}Unknown{{/unless}}
+                <b class="caret"></b>
+              </a>
+              <ul class="dropdown-menu">
+                <li><button class="btn btn-link" {{action 'logout'}}>Logout</button></li>
+              </ul>
+            </li>
+          </ul>
+          {{else}}
+          <p class="navbar-text navbar-right">
+          {{#link-to 'login'}}Not logged in{{/link-to}}
+          </p>
+          {{/if}}
+        {{/with}}
+        </div>
       </div>
     </nav>
     </script>
     
     <script type="text/x-handlebars" data-template-name="index">
-    <div class="container-fluid">
-      Index page
+    <div id="home-jumbo" class="jumbotron">
+      <div class="container">
+        <img class="center-block" src="assets/images/DIT4C_logo_white.png"/>
+      </div>
     </div>
     </script>
     
     <script type="text/x-handlebars" data-template-name="login">
-    <div class="container-fluid">
+    <div class="container">
       @loginButton("/login/redirect")
     </div>
     </script>
