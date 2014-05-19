@@ -44,12 +44,10 @@ case class ComputeNode(_id: String, name: String, url: String) {
 
   object projects {
 
-    def create(name: String)(implicit ec: ExecutionContext): Future[Project] = {
-      val json = Json.obj("name" -> name)
-      WS.url(s"${url}projects/new").post(json).map { response =>
-        response.json.as[Project]
-      }
-    }
+    def create(name: String)(implicit ec: ExecutionContext): Future[Project] =
+      WS.url(s"${url}projects/new")
+        .post(Json.obj("name" -> name))
+        .map(_.json.as[Project])
 
     def list(implicit ec: ExecutionContext): Future[Seq[Project]] =
       WS.url(s"${url}projects").get().map { response =>
@@ -66,14 +64,14 @@ case class ComputeNode(_id: String, name: String, url: String) {
   case class Project(name: String, active: Boolean) {
 
     def start(implicit ec: ExecutionContext): Future[Project] =
-      WS.url(s"${url}projects/$name/start").post(EmptyContent()).map { response =>
-        response.json.as[Project]
-      }
+      WS.url(s"${url}projects/$name/start")
+        .post(EmptyContent())
+        .map(_.json.as[Project])
 
     def stop(implicit ec: ExecutionContext): Future[Project] =
-      WS.url(s"${url}projects/$name/stop").post(EmptyContent()).map { response =>
-        response.json.as[Project]
-      }
+      WS.url(s"${url}projects/$name/stop")
+        .post(EmptyContent())
+        .map(_.json.as[Project])
 
   }
 }
