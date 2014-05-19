@@ -82,6 +82,9 @@
     <script type="text/x-handlebars" data-template-name="projects">
     <div class="container">
       <h1>Projects</h1>
+
+      {{input type="text" id="new-project" placeholder="New project name?" 
+              value=newProjectName action="createProject"}}
       <ul>
       {{#each}}
         <li>
@@ -96,5 +99,7 @@
     <script src="@routes.Assets.at("javascripts/application.js")"></script>
     <script src="@routes.Assets.at("javascripts/router.js")"></script>
     <script src="@routes.Assets.at("javascripts/models/project.js")"></script>
+    <script src="@routes.Assets.at("javascripts/controllers/navbar_controller.js")"></script>
+    <script src="@routes.Assets.at("javascripts/controllers/project_controller.js")"></script>
   </body>
 </html>

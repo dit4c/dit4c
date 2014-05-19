@@ -18,3 +18,4 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /projects                   @controllers.ProjectController.index
+POST    /projects                   @controllers.ProjectController.create

@@ -23,6 +23,13 @@ class ProjectController @Inject() (
     }
   }
 
+  def create = Action.async { implicit request =>
+    computeNodeDao.list.map { _ =>
+      // TODO: implement
+      NoContent
+    }
+  }
+
   def list = Action.async { implicit request =>
     computeNodeDao.list.flatMap { nodes =>
       Future.sequence(nodes.map(_.projects))
