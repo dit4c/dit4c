@@ -20,5 +20,13 @@ App.NavbarController = Ember.ArrayController.extend({
         resolve({});
       });
     })
-  })
+  }),
+  actions: {
+    logout: function() {
+      var user = this.user;
+      $.getJSON('/logout').then(function() {
+        user.set("content", null);
+      });
+    }
+  }
 });

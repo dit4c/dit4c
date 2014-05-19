@@ -19,7 +19,7 @@
   </head>
   <body>
     <script type="text/x-handlebars">
-    {{render navbar}}
+    {{render "navbar"}}
     {{outlet}}
     </script>
     
@@ -31,12 +31,18 @@
         </div>
       {{#with user}}
         {{#if id}}
-        <p class="navbar-text navbar-right">
-          <span {{bind-attr title=id}}>
-          {{#if name}}{{name}}{{/if}}
-          {{#unless name}}Unknown{{/unless}}
-          </span>
-        </p>
+        <ul class="nav navbar-nav navbar-right">
+          <li class="dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown" {{bind-attr title=id}}>
+              {{#if name}}{{name}}{{/if}}
+              {{#unless name}}Unknown{{/unless}}
+              <b class="caret"></b>
+            </a>
+            <ul class="dropdown-menu">
+              <li><button class="btn btn-link" {{action 'logout'}}>Logout</button></li>
+            </ul>
+          </li>
+        </ul>
         {{else}}
         <p class="navbar-text navbar-right">
         {{#link-to 'login'}}Not logged in{{/link-to}}

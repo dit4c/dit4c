@@ -2,8 +2,9 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
-GET     /login/redirect             @controllers.Application.login
-POST    /auth/callback              @controllers.Application.callback
+GET     /login/redirect             @controllers.AuthController.login
+GET     /logout                     @controllers.AuthController.logout
+POST    /auth/callback              @controllers.AuthController.callback
 
 GET     /users/current              @controllers.UserController.currentUser
 
