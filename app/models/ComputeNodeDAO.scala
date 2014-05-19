@@ -41,10 +41,21 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 case class ComputeNode(_id: String, name: String, url: String) {
   import play.api.libs.functional.syntax._
 
-  def projects(implicit ec: ExecutionContext): Future[Seq[Project]] =
-    WS.url(s"${url}projects").get().map { response =>
-      response.json.asInstanceOf[JsArray].value.map(_.as[Project])
+  object projects {
+
+    def create(name: String)(implicit ec: ExecutionContext): Future[Project] = {
+      val json = Json.obj("name" -> name)
+      WS.url(s"${url}projects/new").post(json).map { response =>
+        response.json.as[Project]
+      }
     }
+
+    def list(implicit ec: ExecutionContext): Future[Seq[Project]] =
+      WS.url(s"${url}projects").get().map { response =>
+        response.json.asInstanceOf[JsArray].value.map(_.as[Project])
+      }
+
+  }
 
   implicit val projectReads: Reads[Project] = (
     (__ \ "name").read[String] and

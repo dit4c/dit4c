@@ -77,7 +77,7 @@ class AuthController @Inject() (
 
   protected def fetchContainers: Future[List[String]] =
     computeNodeDao.list.flatMap { nodes =>
-      Future.sequence(nodes.map(_.projects))
+      Future.sequence(nodes.map(_.projects.list))
     }.map(_.flatten.map(_.name).toList.sorted).map { cs =>
       Logger.debug("Compute Nodes: "+cs)
       cs
