@@ -11,10 +11,8 @@ import play.api.libs.json._
 import play.api.mvc._
 import providers.db.CouchDB
 
-class UserController @Inject() (db: CouchDB.Database) extends Controller {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+class UserController @Inject() (val db: CouchDB.Database)
+    extends Controller with Utils {
 
   def currentUser = Action.async { implicit request =>
     fetchUser.map {
@@ -29,12 +27,5 @@ class UserController @Inject() (db: CouchDB.Database) extends Controller {
         NotFound
     }
   }
-
-  private lazy val userDao = new UserDAO(db)
-
-  protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =
-    request.session.get("userId")
-      .map(userDao.get) // Get user if userId exists
-      .getOrElse(Future.successful(None))
 
 }

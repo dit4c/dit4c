@@ -25,11 +25,8 @@ import models._
 
 class AuthController @Inject() (
     authProvider: AuthProvider,
-    db: CouchDB.Database)
-    extends Controller {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+    val db: CouchDB.Database)
+    extends Controller with Utils {
 
   def login = Action { implicit request =>
     val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
@@ -53,95 +50,15 @@ class AuthController @Inject() (
           case Some(user) => successful(user)
           case None => userDao.createWith(identity)
         }.flatMap { user =>
-          fetchContainers.map((user, _))
-        }.map { case (user, containers) =>
-          val cookies = Cookie("dit4c-jwt",
-              jwt(containers), domain=getCookieDomain)
           val url = request.session.get("redirect-on-callback").getOrElse("/")
           Redirect(url)
-            .withCookies(cookies)
             .withSession(session - "redirect-on-callback" +
                 ("userId" -> user._id))
+            .withUpdatedJwt
         }
       case Failure(msg) => successful(Forbidden(msg))
       case Invalid => successful(BadRequest)
     }
   }
-
-  def getCookieDomain(implicit request: Request[_]): Option[String] =
-    if (request.host.matches(".+\\..+")) Some("."+request.host)
-    else None
-
-  private lazy val userDao = new UserDAO(db)
-  private lazy val computeNodeDao = new ComputeNodeDAO(db)
-
-  protected def fetchContainers: Future[List[String]] =
-    computeNodeDao.list.flatMap { nodes =>
-      Future.sequence(nodes.map(_.projects.list))
-    }.map(_.flatten.map(_.name).toList.sorted).map { cs =>
-      Logger.debug("Compute Nodes: "+cs)
-      cs
-    }
-
-  protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =
-    request.session.get("userId")
-      .map(userDao.get) // Get user if userId exists
-      .getOrElse(Future.successful(None))
-
-  private def jwt(containers: List[String])(implicit request: Request[_]) = {
-    val privateKey = privateKeySet.getKeys.head
-      .asInstanceOf[RSAKey].toRSAPrivateKey
-    val tokenString = {
-      val json = Json.obj(
-          "iis" -> request.host,
-          "iat" -> System.currentTimeMillis / 1000,
-          "http://dit4c.github.io/authorized_containers" -> containers
-        )
-      json.toString
-    }
-    val header = new JWSHeader(JWSAlgorithm.RS256)
-    val payload = new Payload(tokenString)
-    val signer = new RSASSASigner(privateKey)
-    val token = new JWSObject(header, payload)
-    token.sign(signer)
-    token.serialize
-  }
-
-  private def privateKeySet: JWKSet = {
-    try {
-      val content = Source.fromFile(privateKeysFile).mkString
-      JWKSet.parse(content)
-    } catch {
-      case _: FileNotFoundException => createNewPrivateKeySet(privateKeysFile)
-    }
-  }
-
-  private lazy val privateKeysFile = {
-    val keyPath = Play.current.configuration
-      .getString("keys.path").getOrElse("keys.json")
-    new File(keyPath)
-  }
-
-  private def createNewPrivateKeySet(keyFile: File): JWKSet = {
-    val keyLength = 4096 // Current recommended as of 2014
-    val generator = KeyPairGenerator.getInstance("RSA")
-    generator.initialize(keyLength)
-    val kp = generator.generateKeyPair
-    val pub = kp.getPublic.asInstanceOf[RSAPublicKey]
-    val priv = kp.getPrivate.asInstanceOf[RSAPrivateKey]
-    val k = new RSAKey(pub, priv, Use.SIGNATURE, JWSAlgorithm.parse("RSA"),
-        s"RSA key ($keyLength bit)", null, null, null)
-    val keySet = new JWKSet(k);
-    {
-      val w = new BufferedWriter(new FileWriter(keyFile))
-      // We need to explicitly state we want private keys too
-      val serializedJson = keySet.toJSONObject(false).toString
-      // Parse and unparse so we can pretty print for legibility
-      w.write(Json.prettyPrint(Json.parse(serializedJson)))
-      w.close
-    }
-    keySet
-  }
-
 
 }

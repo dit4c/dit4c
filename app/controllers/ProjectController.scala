@@ -10,11 +10,8 @@ import models._
 import scala.concurrent.Future
 
 class ProjectController @Inject() (
-    db: CouchDB.Database,
-    mainController: Application) extends Controller {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+    val db: CouchDB.Database,
+    mainController: Application) extends Controller with Utils {
 
   def index = Action.async { implicit request =>
     render.async {
@@ -27,18 +24,20 @@ class ProjectController @Inject() (
     request.body.asJson.map { json =>
       val name: String = (json \ "project" \ "name").as[String]
       val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
-      for {
-        nodes <- computeNodeDao.list
-        node = nodes.head
-        p <- node.projects.create(name)
-        project <- if (shouldBeActive) p.start else Future.successful(p)
-      } yield {
-        Created(Json.obj(
-          "id" -> project.name,
-          "name" -> project.name,
-          "active" -> project.active
-        ))
-      }
+      val response: Future[SimpleResult] =
+        for {
+          nodes <- computeNodeDao.list
+          node = nodes.head
+          p <- node.projects.create(name)
+          project <- if (shouldBeActive) p.start else Future.successful(p)
+        } yield {
+          Created(Json.obj(
+            "id" -> project.name,
+            "name" -> project.name,
+            "active" -> project.active
+          ))
+        }
+      response.flatMap(_.withUpdatedJwt)
     }.getOrElse(Future.successful(BadRequest))
   }
 
@@ -57,7 +56,5 @@ class ProjectController @Inject() (
       Ok(json)
     }
   }
-
-  private lazy val computeNodeDao = new ComputeNodeDAO(db)
 
 }
