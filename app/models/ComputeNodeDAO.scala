@@ -5,6 +5,7 @@ import providers.db.CouchDB
 import scala.concurrent.Future
 import play.api.libs.ws.WS
 import play.api.libs.json._
+import play.api.mvc.Results.EmptyContent
 
 class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
   extends DAOUtils {
@@ -62,5 +63,17 @@ case class ComputeNode(_id: String, name: String, url: String) {
     (__ \ "active").read[Boolean]
   )(Project)
 
-  case class Project(name: String, active: Boolean)
+  case class Project(name: String, active: Boolean) {
+
+    def start(implicit ec: ExecutionContext): Future[Project] =
+      WS.url(s"${url}projects/$name/start").post(EmptyContent()).map { response =>
+        response.json.as[Project]
+      }
+
+    def stop(implicit ec: ExecutionContext): Future[Project] =
+      WS.url(s"${url}projects/$name/stop").post(EmptyContent()).map { response =>
+        response.json.as[Project]
+      }
+
+  }
 }

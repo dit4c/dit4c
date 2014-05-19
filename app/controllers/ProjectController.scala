@@ -26,10 +26,12 @@ class ProjectController @Inject() (
   def create = Action.async { implicit request =>
     request.body.asJson.map { json =>
       val name: String = (json \ "project" \ "name").as[String]
+      val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
       for {
         nodes <- computeNodeDao.list
         node = nodes.head
-        project <- node.projects.create(name)
+        p <- node.projects.create(name)
+        project <- if (shouldBeActive) p.start else Future.successful(p)
       } yield {
         Created(Json.obj(
           "id" -> project.name,

@@ -8,7 +8,7 @@ App.ProjectsController = Ember.ArrayController.extend({
       // Create the new Project model
       var project = this.store.createRecord('project', {
         'name': name,
-        'active': false
+        'active': true
       });
 
       // Clear the "New Project" text field

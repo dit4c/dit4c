@@ -83,15 +83,24 @@
     <div class="container">
       <h1>Projects</h1>
 
-      {{input type="text" id="new-project" placeholder="New project name?" 
-              value=newProjectName action="createProject"}}
-      <ul>
-      {{#each}}
-        <li>
-          <a {{bind-attr href=rootUrl}}>{{name}}</a>
-        </li>
-      {{/each}}
-      </ul>
+      <table class="table">
+        <thead>
+          <tr><th>Project Name</th><th>Active?</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{input type="text" id="new-project"
+              placeholder="New project name?" 
+              value=newProjectName action="createProject"}}</td>
+          </tr>
+          {{#each}}
+          <tr>
+            <td><a {{bind-attr href=rootUrl}}>{{name}}</a></td>
+            <td>{{active}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
     </div>
     </script>
 
