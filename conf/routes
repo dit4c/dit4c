@@ -17,4 +17,4 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 # Home page
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
-GET     /projects                   @controllers.Application.main(path="projects")
+GET     /projects                   @controllers.ProjectController.index

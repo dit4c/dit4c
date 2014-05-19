@@ -7,8 +7,7 @@ import providers.auth.AuthProvider
 import providers.db.CouchDB
 
 class Application @Inject() (
-    authProvider: AuthProvider,
-    db: CouchDB.Database)
+    authProvider: AuthProvider)
     extends Controller {
 
   def main(path: String) = Action { implicit request =>

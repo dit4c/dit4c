@@ -12,6 +12,12 @@ App.IndexRoute = Ember.Route.extend({
   }
 });
 
+App.ProjectsRoute = Ember.Route.extend({
+  model: function() {
+    return this.store.find('project');
+  }
+});
+
 App.NavbarController = Ember.ArrayController.extend({
   user: DS.PromiseObject.create({
     promise: new Promise(function(resolve, reject) {
