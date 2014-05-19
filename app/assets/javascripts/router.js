@@ -3,6 +3,7 @@ App.Router.reopen({
 });
 App.Router.map(function() {
   this.resource('login', { path: '/login' });
+  this.resource('projects', { path: '/projects' });
 });
 
 App.IndexRoute = Ember.Route.extend({
@@ -23,9 +24,11 @@ App.NavbarController = Ember.ArrayController.extend({
   }),
   actions: {
     logout: function() {
+      var controller = this;
       var user = this.user;
-      $.getJSON('/logout').then(function() {
+      $.post('/logout').then(function() {
         user.set("content", null);
+        controller.transitionToRoute('index');
       });
     }
   }

@@ -22,7 +22,7 @@
     {{render "navbar"}}
     {{outlet}}
     </script>
-    
+
     <script type="text/x-handlebars" data-template-name="navbar">
     <nav class="navbar navbar-fixed-top" role="navigation">
       <div class="container">
@@ -38,6 +38,9 @@
         <div class="collapse navbar-collapse" id="bs-navbar-collapse">
         {{#with user}}
           {{#if id}}
+          <ul class="nav navbar-nav">
+            <li>{{#link-to 'projects'}}Projects{{/link-to}}</li>
+          </ul>
           <ul class="nav navbar-nav navbar-right">
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" {{bind-attr title=id}}>
@@ -60,7 +63,7 @@
       </div>
     </nav>
     </script>
-    
+
     <script type="text/x-handlebars" data-template-name="index">
     <div id="home-jumbo" class="jumbotron">
       <div class="container">
@@ -68,13 +71,19 @@
       </div>
     </div>
     </script>
-    
+
     <script type="text/x-handlebars" data-template-name="login">
     <div class="container">
+      <h1>Authenticate your identity</h1>
       @loginButton("/login/redirect")
     </div>
     </script>
-    
+
+    <script type="text/x-handlebars" data-template-name="projects">
+    <div class="container">
+      <h1>Projects</h1>
+    </div>
+    </script>
 
     <!-- ... Ember.js and other javascript dependencies ... -->
     <script src="@routes.Assets.at("javascripts/application.js")"></script>

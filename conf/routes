@@ -3,7 +3,7 @@
 # ~~~~
 
 GET     /login/redirect             @controllers.AuthController.login
-GET     /logout                     @controllers.AuthController.logout
+POST    /logout                     @controllers.AuthController.logout
 POST    /auth/callback              @controllers.AuthController.callback
 
 GET     /users/current              @controllers.UserController.currentUser
@@ -17,3 +17,4 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 # Home page
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
+GET     /projects                   @controllers.Application.main(path="projects")
