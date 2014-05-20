@@ -151,6 +151,8 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       val createRequest =
         JsObject(
           "Tty" -> JsBoolean(true),
+          "AttachStdout" -> JsBoolean(true),
+          "AttachStderr" -> JsBoolean(true),
           "Dns" -> JsNull,
           "Image" -> JsString("dit4c/python"),
           "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
