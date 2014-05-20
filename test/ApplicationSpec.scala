@@ -100,11 +100,10 @@ class ApplicationSpec extends PlaySpecification with NoTimeConversions {
       }
       val res = route(base
           .withBody(AnyContentAsFormUrlEncoded(
-              Map("assertion" -> Seq(goodAssertion))))
-          .withSession("redirect-on-callback" -> "http://example.test/")).get
+              Map("assertion" -> Seq(goodAssertion))))).get
       status(res) must not equalTo(400)
       status(res) must not equalTo(403)
-      redirectLocation(res) must beSome("http://example.test/")
+      redirectLocation(res) must beSome("/login")
     }
 
   }
