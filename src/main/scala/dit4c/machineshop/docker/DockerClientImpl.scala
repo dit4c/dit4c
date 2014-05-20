@@ -6,6 +6,7 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import akka.event.Logging
 import spray.http._
+import spray.http.ContentTypes._
 import spray.json._
 import dit4c.machineshop.docker.models._
 
@@ -68,13 +69,14 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
       val createRequest =
         JsObject(
+          "PortBindings" -> JsObject(),
           "PublishAllPorts" -> JsBoolean(true)
         )
 
       pipeline({
         import spray.httpx.RequestBuilding._
         Post(baseUrl + s"containers/$id/start")
-          .withEntity(HttpEntity(createRequest.compactPrint))
+          .withEntity(HttpEntity(`application/json`, createRequest.compactPrint))
       }).flatMap({
         case _: Unit => this.refresh
       })
