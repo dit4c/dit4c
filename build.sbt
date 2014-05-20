@@ -10,6 +10,7 @@ libraryDependencies ++= Seq(
   "org.webjars" %% "webjars-play" % "2.2.2" exclude("org.scala-lang", "scala-library"),
   // jQuery
   "org.webjars" % "jquery" % "1.11.1",
+  "org.webjars" % "jquery-cookie" % "1.4.0",
   // Bootstrap
   "org.webjars" % "bootstrap" % "3.1.1-1",
   // Ember.js

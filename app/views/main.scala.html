@@ -11,6 +11,7 @@
 
     <!-- jQuery -->
     <script type="text/javascript" src="@routes.WebJarAssets.at(WebJarAssets.locate("jquery.min.js"))"></script>
+    <script type="text/javascript" src="@routes.WebJarAssets.at(WebJarAssets.locate("jquery.cookie.js"))"></script>
     <script src="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.min.js"))"></script>
     <!-- Ember.js and dependencies -->
     <script src="@routes.WebJarAssets.at(WebJarAssets.locate("handlebars.js"))"></script>
@@ -89,9 +90,22 @@
         </thead>
         <tbody>
           <tr>
-            <td>{{input type="text" id="new-project"
-              placeholder="New project name?" 
-              value=newProjectName action="createProject"}}</td>
+            <td colspan="2">
+              <form class="form-inline" {{action "createProject" on="submit"}}>
+              {{input type="text" class="form-control"
+                      placeholder="New project name?"
+                      value=name}}
+              <div class="checkbox">
+                <label>
+                Active?
+                {{input type="checkbox" checked=active}}
+                </label>
+              </div>
+              <button type="submit" class="btn btn-primary">
+              Create
+              </button>
+              </form>
+            </td>
           </tr>
           {{#each}}
           <tr>

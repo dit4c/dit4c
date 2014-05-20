@@ -29,9 +29,7 @@ class AuthController @Inject() (
     extends Controller with Utils {
 
   def login = Action { implicit request =>
-    val targetAfterLogin = request.headers.get("Referer").getOrElse("/")
     Redirect(authProvider.loginURL)
-      .withSession(session + ("redirect-on-callback" -> targetAfterLogin))
   }
 
   def logout = Action { implicit request =>
@@ -50,10 +48,8 @@ class AuthController @Inject() (
           case Some(user) => successful(user)
           case None => userDao.createWith(identity)
         }.flatMap { user =>
-          val url = request.session.get("redirect-on-callback").getOrElse("/")
-          Redirect(url)
-            .withSession(session - "redirect-on-callback" +
-                ("userId" -> user._id))
+          Redirect(routes.Application.main("login").url)
+            .withSession(session + ("userId" -> user._id))
             .withUpdatedJwt
         }
       case Failure(msg) => successful(Forbidden(msg))
