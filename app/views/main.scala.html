@@ -107,10 +107,20 @@
               </form>
             </td>
           </tr>
-          {{#each}}
+          {{#each model}}
           <tr>
             <td><a {{bind-attr href=rootUrl}}>{{name}}</a></td>
-            <td>{{active}}</td>
+            <td>
+              <div class="btn-group">
+              {{#if active}}
+                <button class="btn btn-primary disabled active" role="button">On</button>
+                <button class="btn btn-default" {{action "stopProject" id}}>Off</button>
+              {{else}}
+                <button class="btn btn-default" {{action "startProject" id}}>On</button>
+                <button class="btn btn-primary disabled active" role="button">Off</button>
+              {{/if}}
+              </div>
+            </td>
           </tr>
           {{/each}}
         </tbody>

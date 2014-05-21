@@ -6,6 +6,7 @@ import scala.concurrent.Future
 import play.api.libs.ws.WS
 import play.api.libs.json._
 import play.api.mvc.Results.EmptyContent
+import scala.util.Try
 
 class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
   extends DAOUtils {
@@ -48,6 +49,11 @@ case class ComputeNode(_id: String, name: String, url: String) {
       WS.url(s"${url}projects/new")
         .post(Json.obj("name" -> name))
         .map(_.json.as[Project])
+
+    def get(name: String)(implicit ec: ExecutionContext): Future[Option[Project]] =
+      WS.url(s"${url}projects/$name")
+        .get()
+        .map(r => Try(r.json.as[Project]).toOption)
 
     def list(implicit ec: ExecutionContext): Future[Seq[Project]] =
       WS.url(s"${url}projects").get().map { response =>

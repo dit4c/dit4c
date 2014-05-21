@@ -17,6 +17,16 @@ App.ProjectsController = Ember.ArrayController.extend({
 
       // Save the new model
       project.save();
+    },
+    startProject: function(projectId) {
+      var project = this.store.getById('project', projectId);
+      project.set('active', true);
+      project.save();
+    },
+    stopProject: function(projectId) {
+      var project = this.store.getById('project', projectId);
+      project.set('active', false);
+      project.save();
     }
   }
 });

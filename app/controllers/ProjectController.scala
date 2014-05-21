@@ -32,9 +32,11 @@ class ProjectController @Inject() (
           project <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
-            "id" -> project.name,
-            "name" -> project.name,
-            "active" -> project.active
+            "project" -> Json.obj(
+              "id" -> project.name,
+              "name" -> project.name,
+              "active" -> project.active
+            )
           ))
         }
       response.flatMap(_.withUpdatedJwt)
@@ -55,6 +57,36 @@ class ProjectController @Inject() (
         }))
       Ok(json)
     }
+  }
+
+  def update(id: String) = Action.async { implicit request =>
+    request.body.asJson.map { json =>
+      val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
+      computeNodeDao.list.flatMap { nodes =>
+        Future.sequence(nodes.map(_.projects.get(id)))
+      }.map(_.flatten.headOption).flatMap {
+        case Some(project) if project.active != shouldBeActive =>
+          val action = if (shouldBeActive) project.start else project.stop
+          action.map { updatedProject =>
+            Ok(Json.obj(
+              "project" -> Json.obj(
+                "id" -> updatedProject.name,
+                "name" -> updatedProject.name,
+                "active" -> updatedProject.active
+              )
+            ))
+          }
+        case Some(project) =>
+          Future.successful(Ok(Json.obj(
+            "project" -> Json.obj(
+              "id" -> project.name,
+              "name" -> project.name,
+              "active" -> project.active
+            )
+          )))
+        case None => Future.successful(NotFound)
+      }
+    }.getOrElse(Future.successful(BadRequest))
   }
 
 }
