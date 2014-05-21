@@ -20,3 +20,4 @@ GET     /login                      @controllers.Application.main(path="login")
 GET     /projects                   @controllers.ProjectController.index
 POST    /projects                   @controllers.ProjectController.create
 PUT     /projects/:id               @controllers.ProjectController.update(id)
+DELETE  /projects/:id               @controllers.ProjectController.delete(id)

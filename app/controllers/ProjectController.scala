@@ -89,4 +89,14 @@ class ProjectController @Inject() (
     }.getOrElse(Future.successful(BadRequest))
   }
 
+  def delete(id: String) = Action.async { implicit request =>
+    computeNodeDao.list.flatMap { nodes =>
+      Future.sequence(nodes.map(_.projects.get(id)))
+    }.map(_.flatten.headOption).flatMap {
+      case Some(project) =>
+        project.delete.map { _ => NoContent }
+      case None => Future.successful(NotFound)
+    }
+  }
+
 }

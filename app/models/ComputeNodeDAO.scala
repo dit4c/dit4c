@@ -79,5 +79,16 @@ case class ComputeNode(_id: String, name: String, url: String) {
         .post(EmptyContent())
         .map(_.json.as[Project])
 
+    def delete(implicit ec: ExecutionContext): Future[Unit] =
+      stop.flatMap { _ =>
+        WS.url(s"${url}projects/$name")
+          .delete()
+          .flatMap { response =>
+            if (response.status == 204) Future.successful()
+            else Future.failed(
+                new Exception(s"Deletion failed: ${response.status}"))
+          }
+      }
+
   }
 }
