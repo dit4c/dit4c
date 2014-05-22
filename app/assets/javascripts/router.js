@@ -14,14 +14,32 @@ App.IndexRoute = Ember.Route.extend({
 
 App.LoginRoute = Ember.Route.extend({
   setupController: function(controller, model) {
-    var referrerCookie = $.cookie('login_referrer');
-    if (!referrerCookie) {
-      var referrer = document.referrer;
-      if (referrer && window.location.href != referrer) {
-        console.log("Setting login referrer to "+referrer)
-        $.cookie('login_referrer', referrer);
+    this.controllerFor('navbar').user.then(function(obj) {
+      var referrerCookie = $.cookie('login_referrer');
+      // Check if we have a logged-in user
+      if (obj == null) {
+        // Handle login landing
+        if (!referrerCookie) {
+          var referrer = document.referrer;
+          if (referrer && window.location.href != referrer) {
+            console.log("Setting login referrer to "+referrer)
+            $.cookie('login_referrer', referrer);
+          }
+        }
+      } else {
+        // Handle login return
+        var referrerCookie = $.cookie('login_referrer');
+        if (referrerCookie && window.location.href != referrerCookie) {
+          $.removeCookie('login_referrer');
+          console.log("Redirecting to "+referrerCookie)
+          window.location.href = referrerCookie;
+        } else {
+          controller.transitionToRoute('projects');
+        }
       }
-    }
+    }, function(reason) {
+      console.log(reason);
+    });
   }
 })
 

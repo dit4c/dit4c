@@ -38,6 +38,10 @@ trait Utils {
       response.withCookies(
           Cookie("dit4c-jwt", jwt(cs), domain=getCookieDomain))
     }
+    def withClearedJwt: Future[SimpleResult] = Future.successful {
+      response.withCookies(
+          Cookie("dit4c-jwt", "", domain=getCookieDomain))
+    }
   }
 
   protected def getCookieDomain(implicit request: Request[_]): Option[String] =

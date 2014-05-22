@@ -32,11 +32,11 @@ class AuthController @Inject() (
     Redirect(authProvider.loginURL)
   }
 
-  def logout = Action { implicit request =>
+  def logout = Action.async { implicit request =>
     render {
       case Accepts.Html() => Redirect(routes.Application.main("").url)
       case Accepts.Json() => NoContent
-    }.withSession(session - "userId")
+    }.withSession(session - "userId").withClearedJwt
   }
 
   def callback = Action.async { implicit request =>
