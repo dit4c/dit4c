@@ -69,7 +69,6 @@ class ProjectController @Inject() (
   }
 
   def update(id: String) = Action.async { implicit request =>
-
     request.body.asJson.map { json =>
       val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
       projectDao.get(id)
@@ -108,13 +107,21 @@ class ProjectController @Inject() (
   }
 
   def delete(id: String) = Action.async { implicit request =>
-    computeNodeDao.list.flatMap { nodes =>
-      Future.sequence(nodes.map(_.projects.get(id)))
-    }.map(_.flatten.headOption).flatMap {
-      case Some(project) =>
-        project.delete.map { _ => NoContent }
-      case None => Future.successful(NotFound)
-    }
+    projectDao.get(id)
+      .flatMap[SimpleResult] {
+        case None =>
+          Future.successful(NotFound)
+        case Some(project) =>
+          futureComputeNodeProjectMap.flatMap { cnpm =>
+            cnpm.get(project.name) match {
+              case None =>
+                // TODO: Improve this handling
+                Future.successful(NotFound)
+              case Some(cnp) =>
+                project.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
+            }
+          }
+      }
   }
 
   def futureComputeNodeProjectMap =
