@@ -55,8 +55,8 @@ class UserControllerSpec extends PlaySpecification {
         case Some(s) => s
         case None => failure("ETag must be sent with user record")
       }
-      val ifMatchResponse =
-        controller.get(user.id)(FakeRequest().withHeaders("If-None-Match" -> etag))
+      val ifMatchResponse = controller.get(user.id)(
+          FakeRequest().withHeaders("If-None-Match" -> etag))
       status(ifMatchResponse) must_== 304
     }
 

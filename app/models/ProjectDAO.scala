@@ -29,6 +29,15 @@ class ProjectDAO(protected val db: CouchDB.Database)
       }).flatMap(fromJson[Project])
     }
 
+  def list: Future[Seq[Project]] = {
+    val tempView = TemporaryView(views.js.models.Project_list_map())
+    WS.url(s"${db.baseURL}/_temp_view")
+      .post(Json.toJson(tempView))
+      .map { response =>
+        (response.json \ "rows" \\ "value").flatMap(fromJson[Project])
+      }
+  }
+
   implicit val projectFormat: Format[Project] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and

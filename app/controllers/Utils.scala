@@ -31,6 +31,7 @@ trait Utils {
   protected def db: CouchDB.Database
 
   protected lazy val computeNodeDao = new ComputeNodeDAO(db)
+  protected lazy val projectDao = new ProjectDAO(db)
   protected lazy val userDao = new UserDAO(db)
 
   implicit class JwtHelper(response: SimpleResult)(implicit request: Request[_]) {

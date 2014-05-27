@@ -33,12 +33,12 @@ class ProjectDAOSpec extends PlaySpecification {
         project.name must be(project.name)
         project.description must be(project.description)
         // Check database has data
-        val couchResponse = await(WS.url(s"${db.baseURL}/${project.id}").get)
-        couchResponse.status must_== 200
-        (couchResponse.json \ "type").as[String] must_== "Project"
-        (couchResponse.json \ "_id").as[String] must_== project.id
-        (couchResponse.json \ "name").as[String] must_== project.name
-        (couchResponse.json \ "description").as[String] must_== project.description
+        val cr = await(WS.url(s"${db.baseURL}/${project.id}").get)
+        cr.status must_== 200
+        (cr.json \ "type").as[String] must_== "Project"
+        (cr.json \ "_id").as[String] must_== project.id
+        (cr.json \ "name").as[String] must_== project.name
+        (cr.json \ "description").as[String] must_== project.description
       }
       done
     }

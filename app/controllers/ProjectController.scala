@@ -22,20 +22,24 @@ class ProjectController @Inject() (
 
   def create = Action.async { implicit request =>
     request.body.asJson.map { json =>
-      val name: String = (json \ "project" \ "name").as[String]
-      val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
+      val name = (json \ "project" \ "name").as[String]
+      val description = (json \ "project" \ "description").as[Option[String]]
+        .getOrElse("")
+      val shouldBeActive = (json \ "project" \ "active").as[Boolean]
       val response: Future[SimpleResult] =
         for {
+          project <- projectDao.create(name, description)
           nodes <- computeNodeDao.list
           node = nodes.head
           p <- node.projects.create(name)
-          project <- if (shouldBeActive) p.start else Future.successful(p)
+          cnProject <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
             "project" -> Json.obj(
-              "id" -> project.name,
+              "id" -> project.id,
               "name" -> project.name,
-              "active" -> project.active
+              "description" -> project.description,
+              "active" -> cnProject.active
             )
           ))
         }
@@ -44,15 +48,20 @@ class ProjectController @Inject() (
   }
 
   def list = Action.async { implicit request =>
-    computeNodeDao.list.flatMap { nodes =>
-      Future.sequence(nodes.map(_.projects.list))
-    }.map(_.flatten.toList.sortBy(_.name)).map { projects =>
+    for {
+      projects <- projectDao.list
+      cnpm <- futureComputeNodeProjectMap
+      projectPairs = projects.map { project =>
+        (project, cnpm(project.name))
+      }
+    } yield {
       val json = Json.obj(
-        "project" -> JsArray(projects.map { project =>
+        "project" -> JsArray(projectPairs.map { case (p, cnp) =>
           Json.obj(
-            "id" -> project.name,
-            "name" -> project.name,
-            "active" -> project.active
+            "id" -> p.id,
+            "name" -> p.name,
+            "description" -> p.description,
+            "active" -> cnp.active
           )
         }))
       Ok(json)
@@ -60,32 +69,41 @@ class ProjectController @Inject() (
   }
 
   def update(id: String) = Action.async { implicit request =>
+
     request.body.asJson.map { json =>
       val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
-      computeNodeDao.list.flatMap { nodes =>
-        Future.sequence(nodes.map(_.projects.get(id)))
-      }.map(_.flatten.headOption).flatMap {
-        case Some(project) if project.active != shouldBeActive =>
-          val action = if (shouldBeActive) project.start else project.stop
-          action.map { updatedProject =>
-            Ok(Json.obj(
-              "project" -> Json.obj(
-                "id" -> updatedProject.name,
-                "name" -> updatedProject.name,
-                "active" -> updatedProject.active
-              )
-            ))
-          }
-        case Some(project) =>
-          Future.successful(Ok(Json.obj(
-            "project" -> Json.obj(
-              "id" -> project.name,
-              "name" -> project.name,
-              "active" -> project.active
-            )
-          )))
-        case None => Future.successful(NotFound)
-      }
+      projectDao.get(id)
+        .flatMap[SimpleResult] {
+          case None =>
+            Future.successful(NotFound)
+          case Some(project) =>
+            futureComputeNodeProjectMap.flatMap { cnpm =>
+              cnpm.get(project.name) match {
+                case None =>
+                  // TODO: Improve this handling
+                  Future.successful(NotFound)
+                case Some(cnp) =>
+                  val action =
+                    if (cnp.active != shouldBeActive)
+                      if (shouldBeActive)
+                        cnp.start
+                      else
+                        cnp.stop
+                    else
+                      Future.successful(cnp)
+                  action.map { updatedCnp =>
+                    Ok(Json.obj(
+                      "project" -> Json.obj(
+                        "id" -> project.id,
+                        "name" -> project.name,
+                        "description" -> project.description,
+                        "active" -> updatedCnp.active
+                      )
+                    ))
+                  }
+              }
+            }
+        }
     }.getOrElse(Future.successful(BadRequest))
   }
 
@@ -98,5 +116,11 @@ class ProjectController @Inject() (
       case None => Future.successful(NotFound)
     }
   }
+
+  def futureComputeNodeProjectMap =
+      computeNodeDao.list
+        .flatMap(nodes => Future.sequence(nodes.map(_.projects.list)))
+        .map(_.flatten.toList.sortBy(_.name))
+        .map(_.map(cnp => (cnp.name -> cnp)).toMap)
 
 }
