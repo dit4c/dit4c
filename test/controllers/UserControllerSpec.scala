@@ -30,7 +30,37 @@ class UserControllerSpec extends PlaySpecification {
 
   "UserController" should {
 
-    "provides JSON of current user" in new WithApplication(fakeApp) {
+    "provide JSON for users" in new WithApplication(fakeApp) {
+      val controller = injector.getInstance(classOf[UserController])
+
+      val withoutLogin = controller.currentUser(FakeRequest())
+      status(withoutLogin) must_== 404
+
+      val user = {
+        val dao = new UserDAO(injector.getInstance(classOf[CouchDB.Database]))
+        await(dao.createWith(new Identity() {
+          def uniqueId = "test:testuser"
+          def name = Some("Test User")
+          def emailAddress = Some("user@example.test")
+        }))
+      }
+      val response = controller.get(user.id)(FakeRequest())
+      status(response) must_== 200
+      contentAsJson(response) must_== Json.obj(
+        "id" -> user.id,
+        "name" -> user.name.get,
+        "email" -> user.email.get
+      )
+      val etag = header("ETag", response) match {
+        case Some(s) => s
+        case None => failure("ETag must be sent with user record")
+      }
+      val ifMatchResponse =
+        controller.get(user.id)(FakeRequest().withHeaders("If-None-Match" -> etag))
+      status(ifMatchResponse) must_== 304
+    }
+
+    "provide redirect to current user" in new WithApplication(fakeApp) {
       val controller = injector.getInstance(classOf[UserController])
 
       val withoutLogin = controller.currentUser(FakeRequest())
@@ -46,12 +76,9 @@ class UserControllerSpec extends PlaySpecification {
       }
       val withLogin = controller.currentUser(
           FakeRequest().withSession("userId" -> user.id))
-      status(withLogin) must_== 200
-      contentAsJson(withLogin) must_== Json.obj(
-        "id" -> user.id,
-        "name" -> user.name.get,
-        "email" -> user.email.get
-      )
+      status(withLogin) must_== 303
+      redirectLocation(withLogin) must beSome(s"/users/${user.id}")
+      header("Cache-Control", withLogin) must beSome("private, must-revalidate")
     }
 
   }
