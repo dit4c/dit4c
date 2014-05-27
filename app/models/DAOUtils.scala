@@ -5,9 +5,16 @@ import play.api.templates.JavaScript
 import play.api.http.Writeable
 import play.api.http.ContentTypes
 import play.api.Logger
+import scala.concurrent.Future
+import providers.db.CouchDB
+import play.api.libs.ws._
+import scala.concurrent.ExecutionContext
 
 trait DAOUtils {
   import play.api.libs.functional.syntax._
+
+  implicit protected def ec: ExecutionContext
+  protected def db: CouchDB.Database
 
   protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]) : Option[A] =
     Json.fromJson[A](json)(reads) match {
@@ -40,6 +47,19 @@ trait DAOUtils {
 
   implicit val javascriptWrites: Writes[JavaScript] = new Writes[JavaScript] {
     override def writes(js: JavaScript) = JsString(js.body)
+  }
+
+  object utils {
+    def delete(id: String, rev: String): Future[Unit] = {
+      WS.url(s"${db.baseURL}/$id")
+        .withHeaders("If-Match" -> rev)
+        .delete
+        .map { response =>
+          if (response.status == 200) Unit
+          else throw new Exception(
+              s"Unexpected return code for DELETE: ${response.status}")
+        }
+    }
   }
 
 }

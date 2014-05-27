@@ -18,7 +18,7 @@ class UserController @Inject() (val db: CouchDB.Database)
     fetchUser.map {
       case Some(user) =>
         val json = Json.obj(
-          "id"    -> user._id,
+          "id"    -> user.id,
           "name"  -> user.name,
           "email" -> user.email
         )

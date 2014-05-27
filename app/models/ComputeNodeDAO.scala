@@ -8,13 +8,14 @@ import play.api.libs.json._
 import play.api.mvc.Results.EmptyContent
 import scala.util.Try
 
-class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
+class ComputeNodeDAO(protected val db: CouchDB.Database)
+  (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
 
   def create(name: String, url: String): Future[ComputeNode] =
     db.newID.flatMap { id =>
-      val node = ComputeNode(id, name, url)
+      val node = ComputeNode(id, None, name, url)
       WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).map { response =>
         response.status match {
           case 201 => node
@@ -33,6 +34,7 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   implicit val computeNodeFormat: Format[ComputeNode] = (
     (__ \ "_id").format[String] and
+    (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
     (__ \ "url").format[String]
   )(ComputeNode.apply _, unlift(ComputeNode.unapply))
@@ -40,7 +42,7 @@ class ComputeNodeDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
 }
 
-case class ComputeNode(_id: String, name: String, url: String) {
+case class ComputeNode(id: String, _rev: Option[String], name: String, url: String) {
   import play.api.libs.functional.syntax._
 
   object projects {

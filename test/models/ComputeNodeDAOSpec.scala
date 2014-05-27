@@ -29,10 +29,10 @@ class ComputeNodeDAOSpec extends PlaySpecification {
       node.name must_== "Local"
       node.url must_== "http://localhost:8080/"
       // Check database has data
-      val couchResponse = await(WS.url(s"${db.baseURL}/${node._id}").get)
+      val couchResponse = await(WS.url(s"${db.baseURL}/${node.id}").get)
       couchResponse.status must_== 200
       (couchResponse.json \ "type").as[String] must_== "ComputeNode"
-      (couchResponse.json \ "_id").as[String] must_== node._id
+      (couchResponse.json \ "_id").as[String] must_== node.id
       (couchResponse.json \ "name").as[String] must_== node.name
       (couchResponse.json \ "url").as[String] must_== node.url
     }
@@ -41,7 +41,7 @@ class ComputeNodeDAOSpec extends PlaySpecification {
       val dao = new ComputeNodeDAO(db)
       await(dao.list) must beEmpty
       val node = await(dao.create("Local", "http://localhost:8080/"))
-      await(dao.list) must contain(node)
+      await(dao.list) must haveSize(1)
     }
 
   }

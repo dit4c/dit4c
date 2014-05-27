@@ -45,10 +45,10 @@ class UserControllerSpec extends PlaySpecification {
         }))
       }
       val withLogin = controller.currentUser(
-          FakeRequest().withSession("userId" -> user._id))
+          FakeRequest().withSession("userId" -> user.id))
       status(withLogin) must_== 200
       contentAsJson(withLogin) must_== Json.obj(
-        "id" -> user._id,
+        "id" -> user.id,
         "name" -> user.name.get,
         "email" -> user.email.get
       )

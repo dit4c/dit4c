@@ -49,7 +49,7 @@ class AuthController @Inject() (
           case None => userDao.createWith(identity)
         }.flatMap { user =>
           Redirect(routes.Application.main("login").url)
-            .withSession(session + ("userId" -> user._id))
+            .withSession(session + ("userId" -> user.id))
             .withUpdatedJwt
         }
       case Failure(msg) => successful(Forbidden(msg))

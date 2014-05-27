@@ -8,7 +8,8 @@ import play.api.libs.json._
 import scala.concurrent.Future
 import play.api.templates.JavaScript
 
-class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
+class UserDAO(protected val db: CouchDB.Database)
+  (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
@@ -16,7 +17,8 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
       val user =
-        User(id, identity.name, identity.emailAddress, Seq(identity.uniqueId))
+        User(id, None,
+            identity.name, identity.emailAddress, Seq(identity.uniqueId))
       val data = Json.toJson(user)
       val holder = WS.url(s"${db.baseURL}/$id")
       holder.put(data).map { response =>
@@ -52,6 +54,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   implicit val userReads: Reads[User] = (
     (__ \ "_id").read[String] and
+    (__ \ "_rev").readNullable[String] and
     (__ \ "name").readNullable[String] and
     (__ \ "email").readNullable[String] and
     (__ \ "identities").read[Seq[String]] and
@@ -60,6 +63,7 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
   implicit val userWrites: Writes[User] = (
     (__ \ "_id").write[String] and
+    (__ \ "_rev").writeNullable[String] and
     (__ \ "name").writeNullable[String] and
     (__ \ "email").writeNullable[String] and
     (__ \ "identities").write[Seq[String]] and
@@ -80,7 +84,8 @@ class UserDAO(db: CouchDB.Database)(implicit ec: ExecutionContext)
 
 
 case class User(
-    val _id: String,
+    val id: String,
+    val _rev: Option[String],
     val name: Option[String],
     val email: Option[String],
     val identities: Seq[String],
