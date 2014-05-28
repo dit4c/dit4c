@@ -17,7 +17,7 @@ class UserDAO(protected val db: CouchDB.Database)
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>
       val user =
-        User(id, None,
+        UserImpl(id, None,
             identity.name, identity.emailAddress, Seq(identity.uniqueId))
       val data = Json.toJson(user)
       val holder = WS.url(s"${db.baseURL}/$id")
@@ -34,7 +34,9 @@ class UserDAO(protected val db: CouchDB.Database)
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
-        (response.json \ "rows" \\ "value").headOption.flatMap(fromJson[User])
+        (response.json \ "rows" \\ "value")
+          .headOption
+          .flatMap(fromJson[UserImpl])
       }
   }
 
@@ -43,7 +45,7 @@ class UserDAO(protected val db: CouchDB.Database)
       (response.status match {
         case 200 => Some(response.json)
         case _ => None
-      }).flatMap(fromJson[User])
+      }).flatMap(fromJson[UserImpl])
     }
 
 
@@ -52,23 +54,15 @@ class UserDAO(protected val db: CouchDB.Database)
       (__ \ "shared").format[Set[String]]
     )(User.Projects.apply, unlift(User.Projects.unapply))
 
-  implicit val userReads: Reads[User] = (
-    (__ \ "_id").read[String] and
-    (__ \ "_rev").readNullable[String] and
-    (__ \ "name").readNullable[String] and
-    (__ \ "email").readNullable[String] and
-    (__ \ "identities").read[Seq[String]] and
-    (__ \ "projects").read[User.Projects]
-  )(User.apply _)
-
-  implicit val userWrites: Writes[User] = (
-    (__ \ "_id").write[String] and
-    (__ \ "_rev").writeNullable[String] and
-    (__ \ "name").writeNullable[String] and
-    (__ \ "email").writeNullable[String] and
-    (__ \ "identities").write[Seq[String]] and
-    (__ \ "projects").write[User.Projects]
-  )(unlift(User.unapply)).withTypeAttribute("User")
+  implicit val userFormat: Format[UserImpl] = (
+    (__ \ "_id").format[String] and
+    (__ \ "_rev").formatNullable[String] and
+    (__ \ "name").formatNullable[String] and
+    (__ \ "email").formatNullable[String] and
+    (__ \ "identities").format[Seq[String]] and
+    (__ \ "projects").format[User.Projects]
+  )(UserImpl.apply _, unlift(UserImpl.unapply))
+    .withTypeAttribute("User")
 
   implicit class ReadCombiner[A](r1: Reads[A]) {
     def or(r2: Reads[A]) = new Reads[A] {
@@ -80,16 +74,25 @@ class UserDAO(protected val db: CouchDB.Database)
     }
   }
 
-}
-
-
-case class User(
+  case class UserImpl(
     val id: String,
     val _rev: Option[String],
     val name: Option[String],
     val email: Option[String],
     val identities: Seq[String],
-    val projects: User.Projects = User.Projects());
+    val projects: User.Projects = User.Projects()) extends User
+
+}
+
+
+trait User {
+  def id: String
+  def _rev: Option[String]
+  def name: Option[String]
+  def email: Option[String]
+  def identities: Seq[String]
+  def projects: User.Projects
+}
 
 object User {
   case class Projects(
