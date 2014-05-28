@@ -13,7 +13,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
 
   def create(name: String, description: String): Future[Project] =
     db.newID.flatMap { id =>
-      val node = Project(id, None, name, description)
+      val node = ProjectImpl(id, None, name, description)
       WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).flatMap { response =>
         response.status match {
           case 201 => get(id).map(_.get)
@@ -26,7 +26,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
       (response.status match {
         case 200 => Some(response.json)
         case _ => None
-      }).flatMap(fromJson[Project])
+      }).flatMap(fromJson[ProjectImpl])
     }
 
   def list: Future[Seq[Project]] = {
@@ -34,22 +34,38 @@ class ProjectDAO(protected val db: CouchDB.Database)
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[Project])
+        (response.json \ "rows" \\ "value").flatMap(fromJson[ProjectImpl])
       }
   }
 
-  implicit val projectFormat: Format[Project] = (
+  implicit val projectFormat: Format[ProjectImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
     (__ \ "description").format[String]
-  )(Project.apply _, unlift(Project.unapply))
+  )(ProjectImpl.apply _, unlift(ProjectImpl.unapply))
     .withTypeAttribute("Project")
 
-  case class Project(id: String, _rev: Option[String], name: String, description: String) {
 
-    def delete: Future[Unit] = utils.delete(id, _rev.get)
+  case class ProjectImpl(
+      id: String,
+      _rev: Option[String],
+      name: String,
+      description: String) extends Project {
+
+    override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
   }
+
+}
+
+trait Project {
+
+  def id: String
+  def _rev: Option[String]
+  def name: String
+  def description: String
+
+  def delete: Future[Unit]
 
 }

@@ -11,7 +11,19 @@ import scala.concurrent.Future
 
 class ProjectController @Inject() (
     val db: CouchDB.Database,
+    cnpHelper: ComputeNodeProjectHelper,
     mainController: Application) extends Controller with Utils {
+
+  implicit class CNPHelper(cnp: ComputeNode.Project) {
+    def makeActive(shouldBeActive: Boolean): Future[ComputeNode.Project] =
+      if (cnp.active != shouldBeActive)
+        if (shouldBeActive)
+          cnp.start
+        else
+          cnp.stop
+      else
+        Future.successful(cnp)
+  }
 
   def index = Action.async { implicit request =>
     render.async {
@@ -29,9 +41,7 @@ class ProjectController @Inject() (
       val response: Future[SimpleResult] =
         for {
           project <- projectDao.create(name, description)
-          nodes <- computeNodeDao.list
-          node = nodes.head
-          p <- node.projects.create(name)
+          p <- cnpHelper.creator(project)
           cnProject <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
@@ -48,15 +58,9 @@ class ProjectController @Inject() (
   }
 
   def list = Action.async { implicit request =>
-    for {
-      projects <- projectDao.list
-      cnpm <- futureComputeNodeProjectMap
-      projectPairs = projects.map { project =>
-        (project, cnpm(project.name))
-      }
-    } yield {
+    projectPairs.map { pairs =>
       val json = Json.obj(
-        "project" -> JsArray(projectPairs.map { case (p, cnp) =>
+        "project" -> JsArray(pairs.map { case (p, cnp) =>
           Json.obj(
             "id" -> p.id,
             "name" -> p.name,
@@ -76,31 +80,21 @@ class ProjectController @Inject() (
           case None =>
             Future.successful(NotFound)
           case Some(project) =>
-            futureComputeNodeProjectMap.flatMap { cnpm =>
-              cnpm.get(project.name) match {
-                case None =>
-                  // TODO: Improve this handling
-                  Future.successful(NotFound)
-                case Some(cnp) =>
-                  val action =
-                    if (cnp.active != shouldBeActive)
-                      if (shouldBeActive)
-                        cnp.start
-                      else
-                        cnp.stop
-                    else
-                      Future.successful(cnp)
-                  action.map { updatedCnp =>
-                    Ok(Json.obj(
-                      "project" -> Json.obj(
-                        "id" -> project.id,
-                        "name" -> project.name,
-                        "description" -> project.description,
-                        "active" -> updatedCnp.active
-                      )
-                    ))
-                  }
-              }
+            cnpHelper.resolver(project).flatMap {
+              case None =>
+                // TODO: Improve this handling
+                Future.successful(NotFound)
+              case Some(cnp) =>
+                cnp.makeActive(shouldBeActive).map { updatedCnp =>
+                  Ok(Json.obj(
+                    "project" -> Json.obj(
+                      "id" -> project.id,
+                      "name" -> project.name,
+                      "description" -> project.description,
+                      "active" -> updatedCnp.active
+                    )
+                  ))
+                }
             }
         }
     }.getOrElse(Future.successful(BadRequest))
@@ -112,22 +106,30 @@ class ProjectController @Inject() (
         case None =>
           Future.successful(NotFound)
         case Some(project) =>
-          futureComputeNodeProjectMap.flatMap { cnpm =>
-            cnpm.get(project.name) match {
-              case None =>
-                // TODO: Improve this handling
-                Future.successful(NotFound)
-              case Some(cnp) =>
-                project.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
-            }
+          cnpHelper.resolver(project).flatMap {
+            case None =>
+              // TODO: Improve this handling
+              Future.successful(NotFound)
+            case Some(cnp) =>
+              project.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
           }
       }
   }
 
-  def futureComputeNodeProjectMap =
-      computeNodeDao.list
-        .flatMap(nodes => Future.sequence(nodes.map(_.projects.list)))
-        .map(_.flatten.toList.sortBy(_.name))
-        .map(_.map(cnp => (cnp.name -> cnp)).toMap)
+  private def projectPairs: Future[Seq[(Project, ComputeNode.Project)]] = {
+    projectDao.list.flatMap { projects =>
+      val r = cnpHelper.resolver // Use a single resolver instance
+      Future.sequence(
+        // For each project do a lookup with the resolver
+        projects.map(r)
+      ).map { results =>
+        // Zip together project with result, then remove projects with missing
+        // compute node projects.
+        projects.zip(results).flatMap { pair =>
+          pair._2.map(pair._1 -> _)
+        }
+      }
+    }
+  }
 
 }

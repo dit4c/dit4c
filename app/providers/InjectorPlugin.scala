@@ -16,6 +16,9 @@ import providers.auth.RapidAAFAuthProviderConfig
 import providers.db.CouchDB
 import providers.db.CouchDBPlugin
 import providers.auth.Identity
+import scala.concurrent.ExecutionContext
+import models.ComputeNodeProjectHelper
+import models.ComputeNodeProjectHelperImpl
 
 class InjectorPlugin(app: play.api.Application) extends Plugin {
 
@@ -84,6 +87,10 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
         def configure {
           bind(classOf[AuthProvider]).toInstance(authProvider)
           bind(classOf[CouchDB.Database]).toInstance(database)
+          bind(classOf[ExecutionContext]).toInstance(
+              play.api.libs.concurrent.Execution.defaultContext)
+          bind(classOf[ComputeNodeProjectHelper])
+            .to(classOf[ComputeNodeProjectHelperImpl])
         }
       })
     )

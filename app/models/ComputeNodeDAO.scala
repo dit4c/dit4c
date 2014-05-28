@@ -1,5 +1,6 @@
 package models
 
+import com.google.inject.Inject
 import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
 import scala.concurrent.Future
@@ -8,7 +9,7 @@ import play.api.libs.json._
 import play.api.mvc.Results.EmptyContent
 import scala.util.Try
 
-class ComputeNodeDAO(protected val db: CouchDB.Database)
+class ComputeNodeDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
@@ -42,46 +43,43 @@ class ComputeNodeDAO(protected val db: CouchDB.Database)
 
 }
 
-case class ComputeNode(id: String, _rev: Option[String], name: String, url: String) {
+case class ComputeNode(id: String, _rev: Option[String], name: String, url: String)(implicit ec: ExecutionContext) {
   import play.api.libs.functional.syntax._
+
+  import ComputeNode.Project
 
   object projects {
 
-    def create(name: String)(implicit ec: ExecutionContext): Future[Project] =
+    def create(name: String): Future[Project] =
       WS.url(s"${url}projects/new")
         .post(Json.obj("name" -> name))
         .map(_.json.as[Project])
 
-    def get(name: String)(implicit ec: ExecutionContext): Future[Option[Project]] =
+    def get(name: String): Future[Option[Project]] =
       WS.url(s"${url}projects/$name")
         .get()
         .map(r => Try(r.json.as[Project]).toOption)
 
-    def list(implicit ec: ExecutionContext): Future[Seq[Project]] =
+    def list: Future[Seq[Project]] =
       WS.url(s"${url}projects").get().map { response =>
         response.json.asInstanceOf[JsArray].value.map(_.as[Project])
       }
 
   }
 
-  implicit val projectReads: Reads[Project] = (
-    (__ \ "name").read[String] and
-    (__ \ "active").read[Boolean]
-  )(Project)
+  class ProjectImpl(val name: String, val active: Boolean)(implicit ec: ExecutionContext) extends Project {
 
-  case class Project(name: String, active: Boolean) {
-
-    def start(implicit ec: ExecutionContext): Future[Project] =
+    override def start: Future[Project] =
       WS.url(s"${url}projects/$name/start")
         .post(EmptyContent())
         .map(_.json.as[Project])
 
-    def stop(implicit ec: ExecutionContext): Future[Project] =
+    override def stop: Future[Project] =
       WS.url(s"${url}projects/$name/stop")
         .post(EmptyContent())
         .map(_.json.as[Project])
 
-    def delete(implicit ec: ExecutionContext): Future[Unit] =
+    override def delete: Future[Unit] =
       stop.flatMap { _ =>
         WS.url(s"${url}projects/$name")
           .delete()
@@ -93,4 +91,20 @@ case class ComputeNode(id: String, _rev: Option[String], name: String, url: Stri
       }
 
   }
+
+  implicit val projectReads: Reads[Project] = (
+    (__ \ "name").read[String] and
+    (__ \ "active").read[Boolean]
+  )((new ProjectImpl(_,_)))
 }
+
+object ComputeNode {
+  trait Project {
+    def name: String
+    def active: Boolean
+    def start: Future[Project]
+    def stop: Future[Project]
+    def delete: Future[Unit]
+  }
+}
+
