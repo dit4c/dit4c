@@ -36,7 +36,7 @@ class AuthController @Inject() (
     render {
       case Accepts.Html() => Redirect(routes.Application.main("").url)
       case Accepts.Json() => NoContent
-    }.withSession(session - "userId").withClearedJwt
+    }.withNewSession.withClearedJwt
   }
 
   def callback = Action.async { implicit request =>

@@ -21,10 +21,7 @@ import providers.InjectorPlugin
  * For more information, consult the wiki.
  */
 @RunWith(classOf[JUnitRunner])
-class UserControllerSpec extends PlaySpecification {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+class UserControllerSpec extends PlaySpecification with SpecUtils {
 
   import testing.TestUtils.fakeApp
 
@@ -36,27 +33,25 @@ class UserControllerSpec extends PlaySpecification {
       val withoutLogin = controller.currentUser(FakeRequest())
       status(withoutLogin) must_== 404
 
-      val user = {
-        val dao = new UserDAO(injector.getInstance(classOf[CouchDB.Database]))
-        await(dao.createWith(new Identity() {
-          def uniqueId = "test:testuser"
-          def name = Some("Test User")
-          def emailAddress = Some("user@example.test")
-        }))
-      }
-      val response = controller.get(user.id)(FakeRequest())
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db, new Identity() {
+        def uniqueId = "test:testuser"
+        def name = Some("Test User")
+        def emailAddress = Some("user@example.test")
+      })
+      val response = controller.get(session.user.id)(session.newRequest)
       status(response) must_== 200
       contentAsJson(response) must_== Json.obj(
-        "id" -> user.id,
-        "name" -> user.name.get,
-        "email" -> user.email.get
+        "id" -> session.user.id,
+        "name" -> session.user.name.get,
+        "email" -> session.user.email.get
       )
       val etag = header("ETag", response) match {
         case Some(s) => s
         case None => failure("ETag must be sent with user record")
       }
-      val ifMatchResponse = controller.get(user.id)(
-          FakeRequest().withHeaders("If-None-Match" -> etag))
+      val ifMatchResponse = controller.get(session.user.id)(
+          session.newRequest.withHeaders("If-None-Match" -> etag))
       status(ifMatchResponse) must_== 304
     }
 

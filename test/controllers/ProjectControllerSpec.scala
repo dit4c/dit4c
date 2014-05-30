@@ -15,6 +15,7 @@ import play.api.test.WithApplication
 import play.api.Play
 import providers.InjectorPlugin
 import scala.concurrent.Future
+import play.api.mvc.AnyContentAsEmpty
 
 /**
  * Add your spec here.
@@ -22,10 +23,7 @@ import scala.concurrent.Future
  * For more information, consult the wiki.
  */
 @RunWith(classOf[JUnitRunner])
-class ProjectControllerSpec extends PlaySpecification {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+class ProjectControllerSpec extends PlaySpecification with SpecUtils {
 
   import testing.TestUtils.fakeApp
 
@@ -33,6 +31,7 @@ class ProjectControllerSpec extends PlaySpecification {
 
     "provide JSON list of projects" in new WithApplication(fakeApp) {
       val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
       val controller = new ProjectController(
           db,
           new ComputeNodeProjectHelper {
@@ -45,7 +44,7 @@ class ProjectControllerSpec extends PlaySpecification {
           },
           injector.getInstance(classOf[Application]))
       val projectDao = new ProjectDAO(db)
-      val emptyResponse = controller.list(FakeRequest())
+      val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       (contentAsJson(emptyResponse) \ "project") must_== JsArray()
       val projects = await(Future.sequence(Seq(
@@ -53,7 +52,7 @@ class ProjectControllerSpec extends PlaySpecification {
         projectDao.create("name2", "desc2"),
         projectDao.create("name3", "desc3")
       )))
-      val threeResponse = controller.list(FakeRequest())
+      val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
       val jsObjs = (contentAsJson(threeResponse) \ "project").as[Seq[JsObject]]
       jsObjs must haveSize(3)

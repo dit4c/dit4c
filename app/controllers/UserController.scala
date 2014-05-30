@@ -15,7 +15,7 @@ class UserController @Inject() (val db: CouchDB.Database)
     extends Controller with Utils {
 
 
-  def get(id: String) = Action.async { implicit request =>
+  def get(id: String) = Authenticated.async { implicit request =>
     val etag = request.headers.get("If-None-Match")
     userDao.get(id).map {
       case Some(user) if etag == user._rev =>

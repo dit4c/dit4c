@@ -23,7 +23,7 @@ import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
 import models._
 
-trait Utils {
+trait Utils extends Results {
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
@@ -42,6 +42,23 @@ trait Utils {
     def withClearedJwt: Future[SimpleResult] = Future.successful {
       response.withCookies(
           Cookie("dit4c-jwt", "", domain=getCookieDomain))
+    }
+  }
+
+  class AuthenticatedRequest[A](val user: User, request: Request[A])
+    extends WrappedRequest[A](request)
+
+  object Authenticated extends ActionBuilder[AuthenticatedRequest] {
+    override def invokeBlock[A](
+        request: Request[A],
+        block: (AuthenticatedRequest[A]) => Future[SimpleResult]
+        ): Future[SimpleResult] = {
+      fetchUser(request).flatMap { possibleUser =>
+        possibleUser match {
+          case Some(user) => block(new AuthenticatedRequest(user, request))
+          case None => Future.successful(Forbidden)
+        }
+      }
     }
   }
 

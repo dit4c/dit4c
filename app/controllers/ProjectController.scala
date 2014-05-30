@@ -32,7 +32,7 @@ class ProjectController @Inject() (
     }
   }
 
-  def create = Action.async { implicit request =>
+  def create = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
       val name = (json \ "project" \ "name").as[String]
       val description = (json \ "project" \ "description").as[Option[String]]
@@ -57,7 +57,7 @@ class ProjectController @Inject() (
     }.getOrElse(Future.successful(BadRequest))
   }
 
-  def list = Action.async { implicit request =>
+  def list = Authenticated.async { implicit request =>
     projectPairs.map { pairs =>
       val json = Json.obj(
         "project" -> JsArray(pairs.map { case (p, cnp) =>
@@ -72,7 +72,7 @@ class ProjectController @Inject() (
     }
   }
 
-  def update(id: String) = Action.async { implicit request =>
+  def update(id: String) = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
       val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
       projectDao.get(id)
@@ -100,7 +100,7 @@ class ProjectController @Inject() (
     }.getOrElse(Future.successful(BadRequest))
   }
 
-  def delete(id: String) = Action.async { implicit request =>
+  def delete(id: String) = Authenticated.async { implicit request =>
     projectDao.get(id)
       .flatMap[SimpleResult] {
         case None =>
