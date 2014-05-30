@@ -48,19 +48,12 @@ class UserDAO(protected val db: CouchDB.Database)
       }).flatMap(fromJson[UserImpl])
     }
 
-
-  implicit val userProjectsFormat: Format[User.Projects] = (
-      (__ \ "owned").format[Set[String]] and
-      (__ \ "shared").format[Set[String]]
-    )(User.Projects.apply, unlift(User.Projects.unapply))
-
   implicit val userFormat: Format[UserImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").formatNullable[String] and
     (__ \ "email").formatNullable[String] and
-    (__ \ "identities").format[Seq[String]] and
-    (__ \ "projects").format[User.Projects]
+    (__ \ "identities").format[Seq[String]]
   )(UserImpl.apply _, unlift(UserImpl.unapply))
     .withTypeAttribute("User")
 
@@ -79,11 +72,9 @@ class UserDAO(protected val db: CouchDB.Database)
     val _rev: Option[String],
     val name: Option[String],
     val email: Option[String],
-    val identities: Seq[String],
-    val projects: User.Projects = User.Projects()) extends User
+    val identities: Seq[String]) extends User
 
 }
-
 
 trait User {
   def id: String
@@ -91,11 +82,4 @@ trait User {
   def name: Option[String]
   def email: Option[String]
   def identities: Seq[String]
-  def projects: User.Projects
-}
-
-object User {
-  case class Projects(
-      owned: Set[String] = Set(),
-      shared: Set[String] = Set())
 }

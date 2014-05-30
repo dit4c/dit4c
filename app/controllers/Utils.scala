@@ -35,14 +35,16 @@ trait Utils extends Results {
   protected lazy val userDao = new UserDAO(db)
 
   implicit class JwtHelper(response: SimpleResult)(implicit request: Request[_]) {
-    def withUpdatedJwt: Future[SimpleResult] = fetchContainers.map { cs =>
-      response.withCookies(
-          Cookie("dit4c-jwt", jwt(cs), domain=getCookieDomain))
-    }
-    def withClearedJwt: Future[SimpleResult] = Future.successful {
-      response.withCookies(
-          Cookie("dit4c-jwt", "", domain=getCookieDomain))
-    }
+    def withUpdatedJwt(user: User): Future[SimpleResult] =
+      userProjects(user).map { projects =>
+        response.withCookies(Cookie("dit4c-jwt",
+            jwt(projects.map(_.name)), domain=getCookieDomain))
+      }
+    def withClearedJwt: Future[SimpleResult] =
+      Future.successful {
+        response.withCookies(
+            Cookie("dit4c-jwt", "", domain=getCookieDomain))
+      }
   }
 
   class AuthenticatedRequest[A](val user: User, request: Request[A])
@@ -66,12 +68,9 @@ trait Utils extends Results {
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
 
-  protected def fetchContainers: Future[List[String]] =
-    computeNodeDao.list.flatMap { nodes =>
-      Future.sequence(nodes.map(_.projects.list))
-    }.map(_.flatten.map(_.name).toList.sorted).map { cs =>
-      Logger.debug("Compute Nodes: "+cs)
-      cs
+  protected def userProjects(user: User): Future[Seq[Project]] =
+    projectDao.list.map { projects =>
+      projects.filter(_.ownerIDs.contains(user.id))
     }
 
   protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =
@@ -79,7 +78,7 @@ trait Utils extends Results {
       .map(userDao.get) // Get user if userId exists
       .getOrElse(Future.successful(None))
 
-    private def jwt(containers: List[String])(implicit request: Request[_]) = {
+  private def jwt(containers: Seq[String])(implicit request: Request[_]) = {
     val privateKey = privateKeySet.getKeys.head
       .asInstanceOf[RSAKey].toRSAPrivateKey
     val tokenString = {

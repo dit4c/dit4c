@@ -43,9 +43,6 @@ class UserDAOSpec extends PlaySpecification {
         (couchResponse.json \ "name").as[Option[String]] must_== user.name
         (couchResponse.json \ "email").as[Option[String]] must_== user.email
         (couchResponse.json \ "identities").as[Seq[String]] must_== user.identities
-        // Stored as sets, but should exist as lists
-        (couchResponse.json \ "projects" \ "owned").as[Seq[String]] must_== Nil
-        (couchResponse.json \ "projects" \ "shared").as[Seq[String]] must_== Nil
       }
       done
     }

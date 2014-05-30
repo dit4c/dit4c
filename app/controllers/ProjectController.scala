@@ -40,7 +40,7 @@ class ProjectController @Inject() (
       val shouldBeActive = (json \ "project" \ "active").as[Boolean]
       val response: Future[SimpleResult] =
         for {
-          project <- projectDao.create(name, description)
+          project <- projectDao.create(request.user, name, description)
           p <- cnpHelper.creator(project)
           cnProject <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
@@ -53,12 +53,13 @@ class ProjectController @Inject() (
             )
           ))
         }
-      response.flatMap(_.withUpdatedJwt)
+      response.flatMap(_.withUpdatedJwt(request.user))
     }.getOrElse(Future.successful(BadRequest))
   }
 
   def list = Authenticated.async { implicit request =>
     projectPairs.map { pairs =>
+      val user = request.user
       val json = Json.obj(
         "project" -> JsArray(pairs.map { case (p, cnp) =>
           Json.obj(
@@ -116,16 +117,18 @@ class ProjectController @Inject() (
       }
   }
 
-  private def projectPairs: Future[Seq[(Project, ComputeNode.Project)]] = {
+  private def projectPairs(implicit request: AuthenticatedRequest[_]):
+      Future[Seq[(Project, ComputeNode.Project)]] = {
     projectDao.list.flatMap { projects =>
+      val userProjects = projects.filter(_.ownerIDs.contains(request.user.id))
       val r = cnpHelper.resolver // Use a single resolver instance
       Future.sequence(
         // For each project do a lookup with the resolver
-        projects.map(r)
+        userProjects.map(r)
       ).map { results =>
         // Zip together project with result, then remove projects with missing
         // compute node projects.
-        projects.zip(results).flatMap { pair =>
+        userProjects.zip(results).flatMap { pair =>
           pair._2.map(pair._1 -> _)
         }
       }

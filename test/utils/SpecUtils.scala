@@ -1,4 +1,4 @@
-package controllers
+package utils
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext

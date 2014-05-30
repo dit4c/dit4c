@@ -50,7 +50,7 @@ class AuthController @Inject() (
         }.flatMap { user =>
           Redirect(routes.Application.main("login").url)
             .withSession(session + ("userId" -> user.id))
-            .withUpdatedJwt
+            .withUpdatedJwt(user)
         }
       case Failure(msg) => successful(Forbidden(msg))
       case Invalid => successful(BadRequest)

@@ -14,6 +14,7 @@ import providers.auth.Identity
 import play.api.test.WithApplication
 import play.api.Play
 import providers.InjectorPlugin
+import utils.SpecUtils
 
 /**
  * Add your spec here.

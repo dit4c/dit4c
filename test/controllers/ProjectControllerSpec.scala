@@ -16,6 +16,7 @@ import play.api.Play
 import providers.InjectorPlugin
 import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
+import utils.SpecUtils
 
 /**
  * Add your spec here.
@@ -48,9 +49,9 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       status(emptyResponse) must_== 200
       (contentAsJson(emptyResponse) \ "project") must_== JsArray()
       val projects = await(Future.sequence(Seq(
-        projectDao.create("name1", "desc1"),
-        projectDao.create("name2", "desc2"),
-        projectDao.create("name3", "desc3")
+        projectDao.create(session.user, "name1", "desc1"),
+        projectDao.create(session.user, "name2", "desc2"),
+        projectDao.create(session.user, "name3", "desc3")
       )))
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
