@@ -16,8 +16,9 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, future}
 import scala.concurrent.Await
 import akka.util.Timeout
+import play.api.Application
 
-class EphemeralCouchDBInstance(implicit ec: ExecutionContext) extends ManagedCouchDBInstance {
+class EphemeralCouchDBInstance(implicit ec: ExecutionContext, app: Application) extends ManagedCouchDBInstance {
 
   override lazy val baseDir = Files.createTempDirectory("couchdb-")
 

@@ -10,20 +10,15 @@ import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
 import play.api.libs.ws.WS
 import providers.db.CouchDB
+import play.api.test.WithApplication
+import utils.SpecUtils
 
 @RunWith(classOf[JUnitRunner])
-class ComputeNodeDAOSpec extends PlaySpecification {
-
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
-
-  lazy val serverInstance = new EphemeralCouchDBInstance
-  def withDB[A](f: CouchDB.Database => A): A =
-    f(await(serverInstance.databases.create("db-"+UUID.randomUUID.toString)))
+class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
 
   "ComputeNodeDAO" should {
 
-    "create a compute node" in withDB { db =>
+    "create a compute node" in new WithApplication(fakeApp) {
       val dao = new ComputeNodeDAO(db)
       val node = await(dao.create("Local", "http://localhost:8080/"))
       node.name must_== "Local"
@@ -37,7 +32,7 @@ class ComputeNodeDAOSpec extends PlaySpecification {
       (couchResponse.json \ "url").as[String] must_== node.url
     }
 
-    "list all compute nodes" in withDB { db =>
+    "list all compute nodes" in new WithApplication(fakeApp) {
       val dao = new ComputeNodeDAO(db)
       await(dao.list) must beEmpty
       val node = await(dao.create("Local", "http://localhost:8080/"))

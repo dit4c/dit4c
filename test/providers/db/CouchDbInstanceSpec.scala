@@ -4,24 +4,28 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.concurrent.ExecutionContext
-import play.api.test.PlaySpecification
+import play.api.Application
+import play.api.test._
 
 @RunWith(classOf[JUnitRunner])
 class CouchDbInstanceSpec extends PlaySpecification {
+  
+  import testing.TestUtils.fakeApp
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
 
-  def createNewInstance = new EphemeralCouchDBInstance
+  def createNewInstance(implicit app: Application) =
+    new EphemeralCouchDBInstance()(ec, app)
 
   "CouchDbInstance" should {
 
-    "get databases" in {
+    "get databases" in new WithApplication(fakeApp) {
       val instance = createNewInstance
       await(instance.databases("_users")) must beSome
     }
 
-    "create databases" in {
+    "create databases" in new WithApplication(fakeApp) {
       val instance = createNewInstance
       await(instance.databases("test")) must beNone
       val db = await(instance.databases.create("test"))
@@ -29,7 +33,7 @@ class CouchDbInstanceSpec extends PlaySpecification {
       await(instance.databases("test")) must beSome
     }
 
-    "list databases" in {
+    "list databases" in new WithApplication(fakeApp) {
       val instance = createNewInstance
       await(instance.databases.list).find(_.name == "_users") must beSome
       await(instance.databases.list).find(_.name == "test") must beNone

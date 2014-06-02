@@ -13,6 +13,7 @@ class UserDAO(protected val db: CouchDB.Database)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
+  import play.api.Play.current
 
   def createWith(identity: Identity): Future[User] =
     db.newID.flatMap { id =>

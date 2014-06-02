@@ -2,12 +2,17 @@ name := "dit4c-highcommand"
 
 version := "0.1-SNAPSHOT"
 
+lazy val root = (project in file(".")).enablePlugins(PlayScala)
+
+scalaVersion := "2.11.1"
+
 libraryDependencies ++= Seq(
   cache,
+  ws,
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
   // WebJars for client-side dependencies
-  "org.webjars" %% "webjars-play" % "2.2.2" exclude("org.scala-lang", "scala-library"),
+  "org.webjars" %% "webjars-play" % "2.3.0",
   // jQuery
   "org.webjars" % "jquery" % "1.11.1",
   "org.webjars" % "jquery-cookie" % "1.4.0",
@@ -38,6 +43,6 @@ val closureOptions = {
   opts
 }
 
-closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
+//closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
 
-play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)
+//play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)

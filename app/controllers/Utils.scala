@@ -34,13 +34,13 @@ trait Utils extends Results {
   protected lazy val projectDao = new ProjectDAO(db)
   protected lazy val userDao = new UserDAO(db)
 
-  implicit class JwtHelper(response: SimpleResult)(implicit request: Request[_]) {
-    def withUpdatedJwt(user: User): Future[SimpleResult] =
+  implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
+    def withUpdatedJwt(user: User): Future[Result] =
       userProjects(user).map { projects =>
         response.withCookies(Cookie("dit4c-jwt",
             jwt(projects.map(_.name)), domain=getCookieDomain))
       }
-    def withClearedJwt: Future[SimpleResult] =
+    def withClearedJwt: Future[Result] =
       Future.successful {
         response.withCookies(
             Cookie("dit4c-jwt", "", domain=getCookieDomain))
@@ -53,8 +53,8 @@ trait Utils extends Results {
   object Authenticated extends ActionBuilder[AuthenticatedRequest] {
     override def invokeBlock[A](
         request: Request[A],
-        block: (AuthenticatedRequest[A]) => Future[SimpleResult]
-        ): Future[SimpleResult] = {
+        block: (AuthenticatedRequest[A]) => Future[Result]
+        ): Future[Result] = {
       fetchUser(request).flatMap { possibleUser =>
         possibleUser match {
           case Some(user) => block(new AuthenticatedRequest(user, request))

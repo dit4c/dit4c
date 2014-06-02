@@ -6,7 +6,7 @@ import play.api.mvc.AnyContent
 import scala.util.Try
 import com.nimbusds.jwt.JWTParser
 import play.api.libs.json._
-import play.api.templates.Html
+import play.twirl.api.Html
 
 class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvider {
 

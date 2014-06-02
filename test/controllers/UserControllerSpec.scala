@@ -24,8 +24,6 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class UserControllerSpec extends PlaySpecification with SpecUtils {
 
-  import testing.TestUtils.fakeApp
-
   "UserController" should {
 
     "provide JSON for users" in new WithApplication(fakeApp) {
@@ -47,9 +45,9 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
         "name" -> session.user.name.get,
         "email" -> session.user.email.get
       )
-      val etag = header("ETag", response) match {
+      val etag: String = header("ETag", response) match {
         case Some(s) => s
-        case None => failure("ETag must be sent with user record")
+        case None => failure("ETag must be sent with user record"); ""
       }
       val ifMatchResponse = controller.get(session.user.id)(
           session.newRequest.withHeaders("If-None-Match" -> etag))
@@ -78,9 +76,5 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
     }
 
   }
-
-  def injector(implicit app: play.api.Application) =
-    Play.current.plugin(classOf[InjectorPlugin]).get.injector.get
-
 
 }

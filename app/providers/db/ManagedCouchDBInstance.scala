@@ -6,8 +6,9 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.net.URL
 import java.nio.charset.Charset
+import play.api.Application
 
-abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext) extends CouchDB.Instance {
+abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Application) extends CouchDB.Instance {
 
   def baseDir: Path
   def desiredPort: Int = 0
@@ -48,7 +49,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext) extends Cou
     dir
   }
 
-  protected def uriFileCreated(baseDir: Path): Future[Path] = future {
+  protected def uriFileCreated(baseDir: Path): Future[Path] = Future {
     import java.nio.file._
     import java.nio.file.StandardWatchEventKinds._
     import scala.collection.JavaConversions._

@@ -8,7 +8,7 @@ import com.google.inject.AbstractModule
 import com.google.inject.Guice
 import com.google.inject.Injector
 import play.api.Plugin
-import play.api.templates.Html
+import play.twirl.api.Html
 import providers.auth.AuthProvider
 import providers.auth.CallbackResult
 import providers.auth.RapidAAFAuthProvider

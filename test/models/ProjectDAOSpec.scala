@@ -11,17 +11,16 @@ import play.api.libs.ws.WS
 import providers.db.CouchDB
 import java.util.Collections.EmptySet
 import utils.SpecUtils
+import play.api.test.WithApplication
 
 @RunWith(classOf[JUnitRunner])
 class ProjectDAOSpec extends PlaySpecification with SpecUtils {
 
-  lazy val serverInstance = new EphemeralCouchDBInstance
-  def withDB[A](f: CouchDB.Database => A): A =
-    f(await(serverInstance.databases.create("db-"+UUID.randomUUID.toString)))
+  import testing.TestUtils.fakeApp
 
   "ProjectDAO" should {
 
-    "create a project from a name and description" in withDB { db =>
+    "create a project from a name and description" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val dao = new ProjectDAO(db)
       Seq(
@@ -42,7 +41,7 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
       done
     }
 
-    "get by ID" in withDB { db =>
+    "get by ID" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val dao = new ProjectDAO(db)
       val project = await(dao.create(
@@ -50,7 +49,7 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.get(project.id)) must beSome
     }
 
-    "delete projects" in withDB { db =>
+    "delete projects" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       def getId(id: String) = await(WS.url(s"${db.baseURL}/$id").get)
       val dao = new ProjectDAO(db)

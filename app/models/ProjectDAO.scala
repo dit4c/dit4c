@@ -10,6 +10,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
+  import play.api.Play.current
 
   def create(user: User, name: String, description: String): Future[Project] =
     list.flatMap { projects =>

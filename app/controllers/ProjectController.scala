@@ -38,7 +38,7 @@ class ProjectController @Inject() (
       val description = (json \ "project" \ "description").as[Option[String]]
         .getOrElse("")
       val shouldBeActive = (json \ "project" \ "active").as[Boolean]
-      val response: Future[SimpleResult] =
+      val response: Future[Result] =
         for {
           project <- projectDao.create(request.user, name, description)
           p <- cnpHelper.creator(project)
@@ -77,7 +77,7 @@ class ProjectController @Inject() (
     request.body.asJson.map { json =>
       val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
       projectDao.get(id)
-        .flatMap[SimpleResult] {
+        .flatMap[Result] {
           case None =>
             Future.successful(NotFound)
           case Some(project) =>
@@ -103,7 +103,7 @@ class ProjectController @Inject() (
 
   def delete(id: String) = Authenticated.async { implicit request =>
     projectDao.get(id)
-      .flatMap[SimpleResult] {
+      .flatMap[Result] {
         case None =>
           Future.successful(NotFound)
         case Some(project) =>

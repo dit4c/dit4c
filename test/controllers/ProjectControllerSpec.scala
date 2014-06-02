@@ -25,8 +25,7 @@ import utils.SpecUtils
  */
 @RunWith(classOf[JUnitRunner])
 class ProjectControllerSpec extends PlaySpecification with SpecUtils {
-
-  import testing.TestUtils.fakeApp
+  import play.api.Play.current
 
   "ProjectController" should {
 
@@ -48,11 +47,11 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       (contentAsJson(emptyResponse) \ "project") must_== JsArray()
-      val projects = await(Future.sequence(Seq(
-        projectDao.create(session.user, "name1", "desc1"),
-        projectDao.create(session.user, "name2", "desc2"),
-        projectDao.create(session.user, "name3", "desc3")
-      )))
+      val projects = Seq(
+        await(projectDao.create(session.user, "name1", "desc1")),
+        await(projectDao.create(session.user, "name2", "desc2")),
+        await(projectDao.create(session.user, "name3", "desc3"))
+      )
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
       val jsObjs = (contentAsJson(threeResponse) \ "project").as[Seq[JsObject]]
@@ -67,13 +66,10 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
 
   }
 
-  def injector(implicit app: play.api.Application) =
-    Play.current.plugin(classOf[InjectorPlugin]).get.injector.get
-
   case class MockCNP(val name: String, val active: Boolean)
     extends ComputeNode.Project {
     import Future.successful
-    override def delete = successful()
+    override def delete = successful[Unit](Unit)
     override def start = successful(MockCNP(name, true))
     override def stop = successful(MockCNP(name, false))
   }

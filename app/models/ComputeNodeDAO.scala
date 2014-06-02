@@ -13,6 +13,7 @@ class ComputeNodeDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
+  import play.api.Play.current
 
   def create(name: String, url: String): Future[ComputeNode] =
     db.newID.flatMap { id =>
@@ -45,6 +46,7 @@ class ComputeNodeDAO @Inject() (protected val db: CouchDB.Database)
 
 case class ComputeNode(id: String, _rev: Option[String], name: String, url: String)(implicit ec: ExecutionContext) {
   import play.api.libs.functional.syntax._
+  import play.api.Play.current
 
   import ComputeNode.Project
 
@@ -84,7 +86,7 @@ case class ComputeNode(id: String, _rev: Option[String], name: String, url: Stri
         WS.url(s"${url}projects/$name")
           .delete()
           .flatMap { response =>
-            if (response.status == 204) Future.successful()
+            if (response.status == 204) Future.successful[Unit](Unit)
             else Future.failed(
                 new Exception(s"Deletion failed: ${response.status}"))
           }

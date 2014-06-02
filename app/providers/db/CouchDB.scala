@@ -1,13 +1,14 @@
 package providers.db
 
 import scala.concurrent.{ExecutionContext, Future, future}
+import play.api.Application
 import play.api.libs.ws.WS
 import play.api.mvc.Results.EmptyContent
 import play.api.libs.json._
 
 object CouchDB {
 
-  abstract class Instance(implicit ec: ExecutionContext) {
+  abstract class Instance(implicit ec: ExecutionContext, app: Application) {
 
     implicit private val instance = this
 

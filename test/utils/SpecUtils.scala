@@ -3,32 +3,40 @@ package utils
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
-
 import models.UserDAO
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.FakeRequest
 import providers.auth.Identity
 import providers.db.CouchDB
+import org.specs2.matcher.ConcurrentExecutionContext
+import providers.InjectorPlugin
 
-trait SpecUtils {
+trait SpecUtils extends ConcurrentExecutionContext {
 
-  implicit def ec: ExecutionContext =
-    play.api.libs.concurrent.Execution.defaultContext
+  def fakeApp = testing.TestUtils.fakeApp
 
-  object MockIdentity extends Identity {
-    override val uniqueId = "testing:test-user"
-    override val name = Some("Test User")
-    override val emailAddress = None
-  }
+  case class MockIdentity(
+      uniqueId: String,
+      name: Option[String],
+      emailAddress: Option[String]) extends Identity
 
-  class UserSession(db: CouchDB.Database, identity: Identity = MockIdentity) {
+  private val mockIdentity =
+    MockIdentity("testing:test-user", Some("Test User"), None)
+
+  class UserSession(db: CouchDB.Database, identity: Identity = mockIdentity) {
     val user = Await.result(
-        (new UserDAO(db)).createWith(identity),
-        Duration(20, "seconds"))
+      (new UserDAO(db)).createWith(identity),
+      Duration(20, "seconds"))
 
     def newRequest: FakeRequest[AnyContentAsEmpty.type] = {
       FakeRequest().withSession("userId" -> user.id)
     }
   }
+
+  def db(implicit app: play.api.Application) =
+    injector.getInstance(classOf[CouchDB.Database])
+
+  def injector(implicit app: play.api.Application) =
+    app.plugin(classOf[InjectorPlugin]).get.injector.get
 
 }

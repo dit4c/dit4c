@@ -1,10 +1,10 @@
 package models
 
 import play.api.libs.json._
-import play.api.templates.JavaScript
 import play.api.http.Writeable
 import play.api.http.ContentTypes
 import play.api.Logger
+import play.twirl.api.JavaScript
 import scala.concurrent.Future
 import providers.db.CouchDB
 import play.api.libs.ws._
@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext
 
 trait DAOUtils {
   import play.api.libs.functional.syntax._
+  import play.api.Play.current
 
   implicit protected def ec: ExecutionContext
   protected def db: CouchDB.Database

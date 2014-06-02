@@ -2,7 +2,7 @@ package providers.auth
 
 import play.api.mvc.Request
 import play.api.mvc.AnyContent
-import play.api.templates.Html
+import play.twirl.api.Html
 
 trait AuthProvider {
 
