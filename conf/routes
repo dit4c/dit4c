@@ -19,6 +19,7 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /projects                   @controllers.ProjectController.index
+GET     /projects/checkNew          @controllers.ProjectController.checkNewName(name: String)
 POST    /projects                   @controllers.ProjectController.create
 PUT     /projects/:id               @controllers.ProjectController.update(id)
 DELETE  /projects/:id               @controllers.ProjectController.delete(id)

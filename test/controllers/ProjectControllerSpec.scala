@@ -32,17 +32,7 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
     "provide JSON list of projects" in new WithApplication(fakeApp) {
       val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
-      val controller = new ProjectController(
-          db,
-          new ComputeNodeProjectHelper {
-            override def creator = { project =>
-              Future.successful(MockCNP(project.name, false))
-            }
-            override def resolver = { project =>
-              Future.successful(Some(MockCNP(project.name, false)))
-            }
-          },
-          injector.getInstance(classOf[Application]))
+      val controller = getMockedController
       val projectDao = new ProjectDAO(db)
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
@@ -62,6 +52,51 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
         (json \ "description").as[String] must_== project.description
         (json \ "active").as[Boolean] must beFalse
       }
+    }
+
+    "check names for new projects" in new WithApplication(fakeApp) {
+      val session = new UserSession(db)
+      val controller = getMockedController;
+      // Check with valid name
+      {
+        val response = controller.checkNewName("test")(session.newRequest)
+        status(response) must_== 200
+        (contentAsJson(response) \ "valid").as[Boolean] must beTrue
+      }
+      // Check with invalid, but unused names
+      Seq("", "a"*64, "not_valid", "-prefix", "suffix-", "1337").foreach { n =>
+        val response = controller.checkNewName(n)(session.newRequest)
+        status(response) must_== 200
+        val json = contentAsJson(response)
+        (json \ "valid").as[Boolean] must beFalse
+        (json \ "reason").as[String] must not beEmpty
+      }
+      // Check with a used name
+      val projectDao = new ProjectDAO(db)
+      await(projectDao.create(session.user, "test", ""));
+      {
+        val response = controller.checkNewName("test")(session.newRequest)
+        status(response) must_== 200
+        val json = contentAsJson(response)
+        (json \ "valid").as[Boolean] must beFalse
+        (json \ "reason").as[String] must beMatching(".*exists.*")
+      }
+      done
+    }
+
+    def getMockedController = {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      new ProjectController(
+          db,
+          new ComputeNodeProjectHelper {
+            override def creator = { project =>
+              Future.successful(MockCNP(project.name, false))
+            }
+            override def resolver = { project =>
+              Future.successful(Some(MockCNP(project.name, false)))
+            }
+          },
+          injector.getInstance(classOf[Application]))
     }
 
   }

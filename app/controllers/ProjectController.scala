@@ -117,6 +117,47 @@ class ProjectController @Inject() (
       }
   }
 
+  def checkNewName(name: String) = Authenticated.async { implicit request =>
+    projectDao.list.map { projects =>
+      if (projects.exists(p => p.name == name)) {
+        Ok(Json.obj(
+          "valid" -> false,
+          "reason" -> "A project with that name already exists."
+        ))
+      } else {
+        validateProjectName(name) match {
+          case Right(_: Unit) =>
+            Ok(Json.obj(
+              "valid" -> true
+            ))
+          case Left(reason) =>
+            Ok(Json.obj(
+              "valid" -> false,
+              "reason" -> reason
+            ))
+        }
+      }
+    }
+  }
+
+  def validateProjectName(name: String): Either[String, Unit] = {
+    val c = ValidityCheck
+    Seq(
+      // Test and failure message
+      c(_.length > 0,   "Name must be specified."),
+      c(_.length <= 63, "Name must not be longer than 63 characters."),
+      c(_.matches("""[a-z0-9\-]+"""),
+          "Only lowercase letters, numbers and dashes are allowed."),
+      c(!_.startsWith("-"),   "Names must not start with a dash."),
+      c(!_.endsWith("-"),     "Names must not end with a dash."),
+      c(!_.matches("[0-9]+"), "Names cannot only contain numbers.")
+    ).find(!_.expr(name)).map(_.msg).toLeft(Right(Unit))
+  }
+
+  private case class ValidityCheck(
+      val expr: String => Boolean,
+      val msg: String)
+
   private def projectPairs(implicit request: AuthenticatedRequest[_]):
       Future[Seq[(Project, ComputeNode.Project)]] = {
     projectDao.list.flatMap { projects =>
