@@ -92,9 +92,14 @@
           <tr>
             <td colspan="3">
               <form class="form-inline" {{action "create" on="submit"}}>
-              {{input type="text" class="form-control"
+              <div class="form-group has-feedback">
+              {{view App.NewProjectName
+                      type="text"
+                      class="form-control"
                       placeholder="New project name?"
                       value=name}}
+              <span class="glyphicon form-control-feedback"></span>
+              </div>
               <div class="checkbox">
                 <label>
                 Active?
@@ -109,7 +114,13 @@
           </tr>
           {{#each}}
           <tr>
-            <td><a {{bind-attr href=rootUrl}}>{{name}}</a></td>
+            <td>
+              {{#if active}}
+                <a {{bind-attr href=rootUrl}}>{{name}}</a>
+              {{else}}
+                {{name}}
+              {{/if}}
+            </td>
             <td>
               <div class="btn-group">
               {{#if active}}
@@ -137,5 +148,6 @@
     <script src="@routes.Assets.at("javascripts/models/project.js")"></script>
     <script src="@routes.Assets.at("javascripts/controllers/navbar_controller.js")"></script>
     <script src="@routes.Assets.at("javascripts/controllers/project_controller.js")"></script>
+    <script src="@routes.Assets.at("javascripts/views/new_project_name.js")"></script>
   </body>
 </html>
