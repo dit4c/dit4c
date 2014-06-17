@@ -13,4 +13,9 @@ class Application @Inject() (
   def main(path: String) = Action { implicit request =>
     Ok(views.html.main(authProvider.loginButton))
   }
+
+  def waiting = Action { implicit request =>
+    Ok(views.html.waiting()).withHeaders("max-age" -> "3600")
+  }
+
 }

@@ -23,3 +23,5 @@ GET     /projects/checkNew          @controllers.ProjectController.checkNewName(
 POST    /projects                   @controllers.ProjectController.create
 PUT     /projects/:id               @controllers.ProjectController.update(id)
 DELETE  /projects/:id               @controllers.ProjectController.delete(id)
+
+GET     /waiting                    @controllers.Application.waiting
