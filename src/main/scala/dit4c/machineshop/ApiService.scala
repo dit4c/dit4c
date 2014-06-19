@@ -18,7 +18,9 @@ import spray.httpx.unmarshalling.FromRequestUnmarshaller
 import spray.httpx.SprayJsonSupport
 import spray.httpx.unmarshalling.UnmarshallerLifting
 
-class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService with RouteProvider {
+class ApiService(
+    arf: ActorRefFactory,
+    client: DockerClient) extends HttpService with RouteProvider {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import ApiService.NewProjectRequest
@@ -49,7 +51,7 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
       path("new") {
         post {
           entity(as[NewProjectRequest]) { npr =>
-            onSuccess(client.containers.create(npr.name)) { container =>
+            onSuccess(client.containers.create(npr.name, npr.image)) { container =>
               respondWithStatus(StatusCodes.Created) {
                 complete(container)
               }
@@ -101,13 +103,13 @@ class ApiService(arf: ActorRefFactory, client: DockerClient) extends HttpService
 
 object ApiService {
 
-  case class NewProjectRequest(val name: String)
+  case class NewProjectRequest(val name: String, val image: String)
 
   def apply(client: DockerClient)(implicit actorRefFactory: ActorRefFactory) =
     new ApiService(actorRefFactory, client)
 
   object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
-    implicit val newProjectRequestReader = jsonFormat1(NewProjectRequest)
+    implicit val newProjectRequestReader = jsonFormat2(NewProjectRequest)
 
     implicit val containerWriter = new RootJsonWriter[DockerContainer] {
       def write(c: DockerContainer) = {

@@ -34,24 +34,26 @@ class DockerClientSpec extends Specification {
   def beRunning = beTrue ^^ ((_: DockerContainer).isRunning aka "is running")
   def beStopped = beRunning.not
 
+  val image = "dit4c/python"
+
   "DockerClient" >> {
 
     "containers" >> {
       "create" in {
         withTape("DockerClient.containers.create") {
           val client = newDockerClient
-          val dc = client.containers.create("testnew").await
+          val dc = client.containers.create("testnew", image).await
           dc must (haveName("testnew") and beStopped)
           // Check we can't pass invalid names
-          client.containers.create("test_new").await must
+          client.containers.create("test_new", image).await must
             throwA[IllegalArgumentException]
         }
       }
       "list" in {
         withTape("DockerClient.containers.list") {
           val client = newDockerClient
-          client.containers.create("testlist-1").await
-          client.containers.create("testlist-2").flatMap(_.start).await
+          client.containers.create("testlist-1", image).await
+          client.containers.create("testlist-2", image).flatMap(_.start).await
           val containers = client.containers.list.await
           containers must contain(allOf(
             haveName("testlist-1") and beStopped,
@@ -64,7 +66,7 @@ class DockerClientSpec extends Specification {
       "refresh" >> {
         withTape("DockerClient.container.refresh") {
           val client = newDockerClient
-          val dc = client.containers.create("testrefresh").await
+          val dc = client.containers.create("testrefresh", image).await
           val refreshed = dc.refresh.await
           refreshed must (haveId(dc.id)
               and haveName(dc.name)
@@ -75,7 +77,7 @@ class DockerClientSpec extends Specification {
       "start" >> {
         withTape("DockerClient.container.start") {
           val client = newDockerClient
-          val dc = client.containers.create("teststart").await
+          val dc = client.containers.create("teststart", image).await
           val refreshed = dc.start.await
           refreshed must (haveId(dc.id)
               and haveName(dc.name)
@@ -85,7 +87,7 @@ class DockerClientSpec extends Specification {
       "stop" >> {
         val client = newDockerClient
         val dc = withTape("DockerClient.container.stop-setup") {
-          client.containers.create("teststop").flatMap(_.start).await
+          client.containers.create("teststop", image).flatMap(_.start).await
         }
         dc must (haveId(dc.id)
             and haveName(dc.name)
@@ -100,7 +102,7 @@ class DockerClientSpec extends Specification {
       "delete" >> {
         val client = newDockerClient
         val dc = withTape("DockerClient.container.delete-setup") {
-          val dc = client.containers.create("testdelete").await
+          val dc = client.containers.create("testdelete", image).await
           val cs = client.containers.list.await
           cs must contain(haveId(dc.id))
           dc

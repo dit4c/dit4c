@@ -19,22 +19,24 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
   import spray.util.pimpFuture
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
-
   def mockDockerClient = new DockerClient {
     var containerList: Seq[DockerContainer] = Nil
 
     case class MockDockerContainer(
         val id: String,
         val name: String,
+        val image: String,
         val status: ContainerStatus = ContainerStatus.Stopped) extends DockerContainer {
       override def refresh = Future.successful({
         containerList.find(_.name == name).get
       })
       override def start = Future.successful({
-        updateList(new MockDockerContainer(id, name, ContainerStatus.Running))
+        updateList(
+            new MockDockerContainer(id, name, image, ContainerStatus.Running))
       })
       override def stop(timeout: Duration) = Future.successful({
-        updateList(new MockDockerContainer(id, name, ContainerStatus.Stopped))
+        updateList(
+            new MockDockerContainer(id, name, image, ContainerStatus.Stopped))
       })
       override def delete = Future.successful({
         containerList = containerList.filterNot(_ == this)
@@ -46,9 +48,9 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
     }
 
     override val containers = new DockerContainers {
-      override def create(name: String) = Future.successful({
+      override def create(name: String, image: DockerImage) = Future.successful({
         val newContainer =
-          new MockDockerContainer(UUID.randomUUID.toString, name)
+          new MockDockerContainer(UUID.randomUUID.toString, name, image)
         containerList = containerList ++ Seq(newContainer)
         newContainer
       })
@@ -56,6 +58,8 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       override def list = Future.successful(containerList)
     }
   }
+
+  val image = "dit4c/python"
 
   def route(implicit client: DockerClient) = ApiService(client).route
 
@@ -71,7 +75,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         json must beAnInstanceOf[JsArray]
         json.asInstanceOf[JsArray].elements must beEmpty
       }
-      client.containers.create("foobar").await
+      client.containers.create("foobar", image).await
       Get("/projects") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String])
@@ -89,7 +93,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       Get("/projects/foobar") ~> route ~> check {
         status must_== StatusCodes.NotFound
       }
-      client.containers.create("foobar").await
+      client.containers.create("foobar", image).await
       Get("/projects/foobar") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
@@ -103,7 +107,9 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       client.containers.list.await must beEmpty
-      val requestJson = JsObject("name" -> JsString("foobar"))
+      val requestJson = JsObject(
+          "name" -> JsString("foobar"),
+          "image" -> JsString(image))
       Post("/projects/new", requestJson) ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
@@ -117,7 +123,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
-      val dc = client.containers.create("foobar").await
+      val dc = client.containers.create("foobar", image).await
       client.containers.list.await must haveSize(1)
       Delete("/projects/foobar") ~> route ~> check {
         status must_== StatusCodes.NoContent
@@ -130,7 +136,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
-      val dc = client.containers.create("foobar").await
+      val dc = client.containers.create("foobar", image).await
       dc.isRunning must beFalse
       Post("/projects/foobar/start") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
@@ -144,7 +150,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
-      val dc = client.containers.create("foobar").flatMap(_.start).await
+      val dc = client.containers.create("foobar", image).flatMap(_.start).await
       dc.isRunning must beTrue;
       Post("/projects/foobar/stop") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`

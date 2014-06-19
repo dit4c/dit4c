@@ -132,7 +132,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
   object ContainersImpl extends DockerContainers {
 
-    override def create(name: String) = {
+    override def create(name: String, image: DockerImage) = {
       import spray.httpx.ResponseTransformation._
 
       def parseJsonResponse: HttpResponse => DockerContainer = { res =>
@@ -154,7 +154,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
           "AttachStdout" -> JsBoolean(true),
           "AttachStderr" -> JsBoolean(true),
           "Dns" -> JsNull,
-          "Image" -> JsString("dit4c/python"),
+          "Image" -> JsString(image),
           "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
         )
 
