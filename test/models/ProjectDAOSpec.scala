@@ -18,6 +18,8 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
 
   import testing.TestUtils.fakeApp
 
+  val dummyImage = "testimage"
+
   "ProjectDAO" should {
 
     "create a project from a name and description" in new WithApplication(fakeApp) {
@@ -27,7 +29,7 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
         ("test1", ""),
         ("test2", "A test description.")
       ).foreach { case (name, desc) =>
-        val project = await(dao.create(session.user, name, desc))
+        val project = await(dao.create(session.user, name, desc, dummyImage))
         project.name must be(project.name)
         project.description must be(project.description)
         // Check database has data
@@ -45,7 +47,7 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db)
       val dao = new ProjectDAO(db)
       val project = await(dao.create(
-          session.user, "test1", "A test description."))
+          session.user, "test1", "A test description.", dummyImage))
       await(dao.get(project.id)) must beSome
     }
 
@@ -54,7 +56,7 @@ class ProjectDAOSpec extends PlaySpecification with SpecUtils {
       def getId(id: String) = await(WS.url(s"${db.baseURL}/$id").get)
       val dao = new ProjectDAO(db)
       val project = await(dao.create(
-          session.user, "test1", "A test description."))
+          session.user, "test1", "A test description.", dummyImage))
       getId(project.id).status must_== 200
       await(project.delete)
       getId(project.id).status must_== 404

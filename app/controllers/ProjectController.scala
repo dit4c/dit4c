@@ -37,10 +37,11 @@ class ProjectController @Inject() (
       val name = (json \ "project" \ "name").as[String]
       val description = (json \ "project" \ "description").as[Option[String]]
         .getOrElse("")
+      val image = "dit4c/python"
       val shouldBeActive = (json \ "project" \ "active").as[Boolean]
       val response: Future[Result] =
         for {
-          project <- projectDao.create(request.user, name, description)
+          project <- projectDao.create(request.user, name, description, image)
           p <- cnpHelper.creator(project)
           cnProject <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
@@ -49,6 +50,7 @@ class ProjectController @Inject() (
               "id" -> project.id,
               "name" -> project.name,
               "description" -> project.description,
+              "image" -> project.image,
               "active" -> cnProject.active
             )
           ))

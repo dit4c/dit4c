@@ -18,7 +18,7 @@ class ComputeNodeProjectHelperImpl @Inject() (dao: ComputeNodeDAO)
     for {
       nodes <- dao.list
       node = nodes.head
-      p <- node.projects.create(project.name)
+      p <- node.projects.create(project.name, project.image)
     } yield p
   }
 

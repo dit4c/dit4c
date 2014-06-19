@@ -52,9 +52,9 @@ case class ComputeNode(id: String, _rev: Option[String], name: String, url: Stri
 
   object projects {
 
-    def create(name: String): Future[Project] =
+    def create(name: String, image: String): Future[Project] =
       WS.url(s"${url}projects/new")
-        .post(Json.obj("name" -> name))
+        .post(Json.obj("name" -> name, "image" -> image))
         .map(_.json.as[Project])
 
     def get(name: String): Future[Option[Project]] =

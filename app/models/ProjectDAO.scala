@@ -12,13 +12,17 @@ class ProjectDAO(protected val db: CouchDB.Database)
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
-  def create(user: User, name: String, description: String): Future[Project] =
+  def create(
+      user: User,
+      name: String,
+      description: String,
+      image: String): Future[Project] =
     list.flatMap { projects =>
       if (projects.exists(_.name == name)) {
         throw new Exception("Project with that name already exists.")
       }
       db.newID.flatMap { id =>
-        val node = ProjectImpl(id, None, name, description, Set(user.id))
+        val node = ProjectImpl(id, None, name, description, image, Set(user.id))
         WS.url(s"${db.baseURL}/$id")
           .put(Json.toJson(node))
           .flatMap { response =>
@@ -51,6 +55,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
     (__ \ "description").format[String] and
+    (__ \ "image").format[String] and
     (__ \ "ownerIDs").format[Set[String]]
   )(ProjectImpl.apply _, unlift(ProjectImpl.unapply))
     .withTypeAttribute("Project")
@@ -61,6 +66,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
       _rev: Option[String],
       name: String,
       description: String,
+      image: String,
       ownerIDs: Set[String]) extends Project {
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
@@ -75,6 +81,7 @@ trait Project {
   def _rev: Option[String]
   def name: String
   def description: String
+  def image: String
   def ownerIDs: Set[String]
 
   def delete: Future[Unit]

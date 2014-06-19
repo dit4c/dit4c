@@ -26,6 +26,8 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class ProjectControllerSpec extends PlaySpecification with SpecUtils {
   import play.api.Play.current
+  
+  val testImage = "dit4c/python"
 
   "ProjectController" should {
 
@@ -38,9 +40,9 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       status(emptyResponse) must_== 200
       (contentAsJson(emptyResponse) \ "project") must_== JsArray()
       val projects = Seq(
-        await(projectDao.create(session.user, "name1", "desc1")),
-        await(projectDao.create(session.user, "name2", "desc2")),
-        await(projectDao.create(session.user, "name3", "desc3"))
+        await(projectDao.create(session.user, "name1", "desc1", testImage)),
+        await(projectDao.create(session.user, "name2", "desc2", testImage)),
+        await(projectDao.create(session.user, "name3", "desc3", testImage))
       )
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
@@ -73,7 +75,7 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       }
       // Check with a used name
       val projectDao = new ProjectDAO(db)
-      await(projectDao.create(session.user, "test", ""));
+      await(projectDao.create(session.user, "test", "", testImage));
       {
         val response = controller.checkNewName("test")(session.newRequest)
         status(response) must_== 200
