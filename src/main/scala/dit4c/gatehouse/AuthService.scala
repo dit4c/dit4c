@@ -32,7 +32,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
   val route =
     path("auth") {
       get {
-        host("""^(\w+)\.""".r) { containerName =>
+        host("""^([\w\-]+)\.""".r) { containerName =>
           optionalCookie(AUTH_TOKEN_COOKIE) {
             case Some(jwtCookie) =>
               onComplete(auth ask AuthCheck(jwtCookie.content, containerName)) {

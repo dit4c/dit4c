@@ -26,9 +26,12 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
 
       "return 400 if subdomain label is not present" in {
         Get("/auth") ~> addHeader("Host", "localhost") ~> route ~> check {
-          HttpRequest()
           status must be(BadRequest)
           responseAs[String] must beMatching(".*Host header.*".r)
+        }
+        // Check dashed domain labels work
+        Get("/auth") ~> addHeader("Host", "a-b.test") ~> route ~> check {
+          status must not be(BadRequest)
         }
       }
 
