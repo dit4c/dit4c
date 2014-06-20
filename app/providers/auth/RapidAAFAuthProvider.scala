@@ -53,7 +53,7 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvi
     def reads(json: JsValue): JsResult[Identity] = json match {
       case obj: JsObject =>
         val attrs = obj.fieldSet.map(p => (p._1, p._2.as[String])).toMap
-        val providerUserId = attrs.get("edupersonprincipalname").get
+        val providerUserId = attrs.get("edupersontargetedid").get
         JsSuccess(new Identity {
           val uniqueId = s"${config.id}:${providerUserId}"
           val emailAddress = attrs.get("mail")

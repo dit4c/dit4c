@@ -88,8 +88,8 @@ class ApplicationSpec extends PlaySpecification with NoTimeConversions {
              |    "displayname": "Mr Tom Atkins",
              |    "givenname": "Tom",
              |    "surname": "Atkins",
-             |    "edupersonscopedaffiliation": "staff@fictional.edu.au",
-             |    "edupersonprincipalname": "tatkin4@fictional.edu.au"
+             |    "edupersontargetedid": "https://rapid.aaf.edu.au!http://example.test!YnDRIDYdzevtpdas",
+             |    "edupersonscopedaffiliation": "staff@fictional.edu.au"
              |  }
              |}""".stripMargin
         val jwsObject = new JWSObject(
