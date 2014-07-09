@@ -27,4 +27,4 @@ App.NewProjectName = Ember.TextField.extend({
         }
       });
   }
-})
+});

@@ -5,7 +5,7 @@ App.ProjectsController = Ember.ArrayController.extend({
   ],
   actions: {
     create: function() {
-      var active = this.get('active') == true;
+      var active = this.get('active') === true;
       // Get the project name set by the "New Project" text field
       var name = this.get('name');
       if (!name.trim()) { return; }
