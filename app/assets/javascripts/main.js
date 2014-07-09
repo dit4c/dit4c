@@ -1,5 +1,5 @@
-(function(exports){
-
-  exports.doingNothing = true;
-
-})(typeof exports === 'undefined' ? this : exports);
+define([], function() {
+  return {
+    doNothing: true
+  };
+});

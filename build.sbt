@@ -78,6 +78,8 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
   pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
+MochaKeys.requires += "./setup.js"
+
 //closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
 
 //play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)
