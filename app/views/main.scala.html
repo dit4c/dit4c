@@ -1,8 +1,11 @@
 @(loginButton: String => Html)
+
+@import helpers.AppVersion
+
 <!DOCTYPE html5>
 <html>
   <head>
-    <title>DIT4C</title>
+    <title>DIT4C @AppVersion</title>
 
     <link href="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.css"))" rel="stylesheet">
     <link rel="stylesheet" media="screen" href="@routes.Assets.at("stylesheets/main.css")">
@@ -34,7 +37,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          {{#link-to 'index' class="navbar-brand"}}DIT4C{{/link-to}}
+          {{#link-to 'index' class="navbar-brand"}}DIT4C @{AppVersion}{{/link-to}}
         </div>
         <div class="collapse navbar-collapse" id="bs-navbar-collapse">
         {{#with user}}

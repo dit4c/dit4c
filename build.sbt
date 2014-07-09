@@ -1,3 +1,6 @@
+import sbtrelease._
+import ReleaseStateTransformations._
+
 name := "dit4c-highcommand"
 
 version := "0.1-SNAPSHOT"
@@ -28,6 +31,23 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 
 resolvers += "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/"
 
+version <<= version in ThisBuild
+
+// Produce scala object that knows the app version
+sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirectory) map { (dir, v, cacheDir) =>
+  val cache =
+    FileFunction.cached(cacheDir / "version", inStyle = FilesInfo.hash, outStyle = FilesInfo.hash) { in: Set[File] =>
+      val file = in.toSeq.head
+      val content =
+        s"""|package helpers
+            |object AppVersion { 
+            |  override def toString = "$v"
+            |}""".stripMargin
+      IO.write(file, content);
+      Set(file)
+    }
+  cache(Set( dir / "helpers" / "AppVersion.scala" )).toSeq
+}
 
 // Clojure compiler options to handle Ember.js, from:
 // http://stackoverflow.com/questions/22137767/playframework-requirejs-javascript-files-not-being-optimized
@@ -42,6 +62,21 @@ val closureOptions = {
   CompilationLevel.WHITESPACE_ONLY.setOptionsForCompilationLevel(opts)
   opts
 }
+
+releaseSettings
+
+ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,              // : ReleaseStep
+  inquireVersions,                        // : ReleaseStep
+  runClean,                               // : ReleaseStep
+  runTest,                                // : ReleaseStep
+  setReleaseVersion,                      // : ReleaseStep
+  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
+  tagRelease,                             // : ReleaseStep
+  setNextVersion,                         // : ReleaseStep
+  commitNextVersion,                      // : ReleaseStep
+  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
+)
 
 //closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
 
