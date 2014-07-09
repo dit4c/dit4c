@@ -37,7 +37,7 @@ class ProjectController @Inject() (
       val name = (json \ "project" \ "name").as[String]
       val description = (json \ "project" \ "description").as[Option[String]]
         .getOrElse("")
-      val image = "dit4c/python"
+      val image = (json \ "project" \ "image").as[String]
       val shouldBeActive = (json \ "project" \ "active").as[Boolean]
       val response: Future[Result] =
         for {

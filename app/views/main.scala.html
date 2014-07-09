@@ -100,9 +100,15 @@
                       value=name}}
               <span class="glyphicon form-control-feedback"></span>
               </div>
+              {{view Ember.Select
+                     class="form-control"
+                     content=images
+                     optionValuePath="content.id"
+                     optionLabelPath="content.name"
+                     value=image}}
               <div class="checkbox">
                 <label>
-                Active?
+                Start?
                 {{input type="checkbox" checked=active}}
                 </label>
               </div>
