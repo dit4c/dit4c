@@ -17,6 +17,15 @@ addSbtPlugin("com.github.gseitz" % "sbt-release" % "0.8.3")
 // sbt-web plugins //
 /////////////////////
 
+// * CoffeeScript
+addSbtPlugin("com.typesafe.sbt" % "sbt-coffeescript" % "1.0.0")
+
+// * Digest
+addSbtPlugin("com.typesafe.sbt" % "sbt-digest" % "1.0.0")
+
+// * Gzip
+addSbtPlugin("com.typesafe.sbt" % "sbt-gzip" % "1.0.0")
+
 // * Less
 addSbtPlugin("com.typesafe.sbt" % "sbt-less" % "1.0.0")
 

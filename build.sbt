@@ -80,6 +80,8 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
 
 MochaKeys.requires += "./setup.js"
 
+pipelineStages := Seq(rjs, digest, gzip)
+
 //closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
 
 //play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)
