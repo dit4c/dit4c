@@ -8,7 +8,14 @@ define(['./app'], (app) ->
     
     $routeProvider.when('/login',
       templateUrl: 'login.html'
-      controller: 'LoginCtrl'
+      controller: 'LoginCtrl',
+      resolve: {
+        notLoggedIn: (AuthSrv, $location) ->
+          AuthSrv.updateUser().then((user) ->
+            if user
+              $location.path('/projects').replace()
+          )
+      }
     )
     
     $routeProvider.when('/logout',
