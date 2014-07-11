@@ -13,7 +13,6 @@ GET     /users/:id                  @controllers.UserController.get(id)
 GET     /favicon.ico                controllers.Assets.at(path="/public", file="images/favicon.ico")
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
 GET     /webjars/*file              controllers.WebJarAssets.at(file)
-#GET     /require.js                 controllers.WebJarAssets.requirejs
 
 # Home page
 GET     /                           @controllers.Application.main(path="")

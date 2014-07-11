@@ -12,22 +12,15 @@
 
     <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
 
-    <!-- jQuery -->
-    <script type="text/javascript" src="@routes.WebJarAssets.at(WebJarAssets.locate("jquery.min.js"))"></script>
-    <script type="text/javascript" src="@routes.WebJarAssets.at(WebJarAssets.locate("jquery.cookie.js"))"></script>
-    <script src="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.min.js"))"></script>
-    <!-- Ember.js and dependencies -->
-    <script src="@routes.WebJarAssets.at(WebJarAssets.locate("handlebars.js"))"></script>
-    <script src="@routes.WebJarAssets.at(WebJarAssets.locate("ember.js"))"></script>
-    <script src="@routes.WebJarAssets.at(WebJarAssets.locate("ember-data.js"))"></script>
-  </head>
-  <body>
-    <script type="text/x-handlebars">
-    {{render "navbar"}}
-    {{outlet}}
+    <script>
+    // Enhance RequireJS to handle WebJARs
+    @Html(org.webjars.RequireJS.getSetupJavaScript("/webjars/"))
     </script>
+  </head>
+  <body ng-controller="ApplicationCtrl">
+    <div data-ng-view></div>
 
-    <script type="text/x-handlebars" data-template-name="navbar">
+    <script type="text/ng-template" id="navbar.html">
     <nav class="navbar navbar-fixed-top" role="navigation">
       <div class="container">
         <div class="navbar-header">
@@ -37,38 +30,36 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          {{#link-to 'index' class="navbar-brand"}}DIT4C @{AppVersion}{{/link-to}}
+          <a href="/" class="navbar-brand">DIT4C @{AppVersion}</a>
         </div>
         <div class="collapse navbar-collapse" id="bs-navbar-collapse">
-        {{#with user}}
-          {{#if id}}
-          <ul class="nav navbar-nav">
-            <li>{{#link-to 'projects'}}Projects{{/link-to}}</li>
-          </ul>
-          <ul class="nav navbar-nav navbar-right">
-            <li class="dropdown">
-              <a href="#" class="dropdown-toggle" data-toggle="dropdown" {{bind-attr title=id}}>
-                {{#if name}}{{name}}{{/if}}
-                {{#unless name}}Unknown{{/unless}}
-                <b class="caret"></b>
-              </a>
-              <ul class="dropdown-menu dropdown-menu-right" role="menu">
-                <li><a href="#" {{action 'logout'}}>Logout</a></li>
-              </ul>
-            </li>
-          </ul>
-          {{else}}
-          <p class="navbar-text navbar-right">
-          {{#link-to 'login'}}Not logged in{{/link-to}}
+          <div ng-if="currentUser">
+            <ul class="nav navbar-nav">
+              <li><a href="/projects">Projects</a></li>
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" title="{{currentUser.id}}">
+                  <span ng-if="currentUser.name">{{currentUser.name}}</span>
+                  <span ng-if="!currentUser.name">Unknown</span>
+                  <b class="caret"></b>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-right" role="menu">
+                  <li><a href="/logout">Logout</a></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <p ng-if="!currentUser" class="navbar-text navbar-right">
+            <a href="/login">Not logged in</a>
           </p>
-          {{/if}}
-        {{/with}}
         </div>
       </div>
     </nav>
     </script>
 
-    <script type="text/x-handlebars" data-template-name="index">
+    <script type="text/ng-template" id="index.html">
+    <div ng-include src="'navbar.html'"></div>
     <div id="home-jumbo" class="jumbotron">
       <div class="container">
         <img class="center-block" src="assets/images/DIT4C_logo_white.png"/>
@@ -76,14 +67,16 @@
     </div>
     </script>
 
-    <script type="text/x-handlebars" data-template-name="login">
+    <script type="text/ng-template" id="login.html">
+    <div ng-include src="'navbar.html'"></div>
     <div class="container">
       <h1>Authenticate your identity</h1>
       @loginButton("/login/redirect")
     </div>
     </script>
 
-    <script type="text/x-handlebars" data-template-name="projects">
+    <script type="text/ng-template" id="projects.html">
+    <div ng-include src="'navbar.html'"></div>
     <div class="container">
       <h1>Projects</h1>
 
@@ -151,12 +144,20 @@
     </div>
     </script>
 
-    <!-- ... Ember.js and other javascript dependencies ... -->
-    <script src="@routes.Assets.versioned("javascripts/application.js")"></script>
-    <script src="@routes.Assets.versioned("javascripts/router.js")"></script>
-    <script src="@routes.Assets.versioned("javascripts/models/project.js")"></script>
-    <script src="@routes.Assets.versioned("javascripts/controllers/navbar_controller.js")"></script>
-    <script src="@routes.Assets.versioned("javascripts/controllers/project_controller.js")"></script>
-    <script src="@routes.Assets.versioned("javascripts/views/new_project_name.js")"></script>
+    <script type="text/ng-template" id="notfound.html">
+    <div id="home-jumbo" class="jumbotron">
+      <div class="container">
+        <h1>
+        Not Found
+        </h1>
+        <p>
+          It's not here, whatever it is...
+        </p>
+      </div>
+    </div>
+    </script>
+
+    <script data-main="@routes.Assets.versioned("javascripts/main.js")"
+            src="@routes.WebJarAssets.at(WebJarAssets.locate("require.min.js"))"></script>
   </body>
 </html>

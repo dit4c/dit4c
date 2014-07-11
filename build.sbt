@@ -14,15 +14,12 @@ libraryDependencies ++= Seq(
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
-  // jQuery
-  "org.webjars" % "jquery" % "1.11.1",
-  "org.webjars" % "jquery-cookie" % "1.4.0",
+  // AngularJS
+  "org.webjars" % "angular-ui-bootstrap" % "0.11.0-2",
   // Bootstrap
-  "org.webjars" % "bootstrap" % "3.1.1-1",
-  // Ember.js
-  "org.webjars" % "handlebars" % "1.3.0",
-  "org.webjars" % "emberjs" % "1.5.0",
-  "org.webjars" % "emberjs-data" % "1.0.0-beta.4"
+  "org.webjars" % "bootstrap" % "3.2.0",
+  // domReady
+  "org.webjars" % "requirejs-domready" % "2.0.1-1"
 )
 
 resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
