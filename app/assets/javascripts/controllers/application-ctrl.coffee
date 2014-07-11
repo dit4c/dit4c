@@ -1,12 +1,13 @@
 define(['./module'], (controllers) ->
   'use strict'
   
-  controllers.controller('ApplicationCtrl', ['$scope', 'AuthSrv', ($scope, AuthSrv) ->
+  ctrl = controllers.controller('ApplicationCtrl', ['$scope', 'AuthSrv', ($scope, AuthSrv) ->
+    
     $scope.currentUser = null
     
-    AuthSrv.updateUser().then (currentUser) ->
-      $scope.currentUser = currentUser
+    $scope.$on 'updateCurrentUser', (event, value) ->
+      $scope.currentUser = value
     
-    this
+    AuthSrv.updateUser()
   ])
 )

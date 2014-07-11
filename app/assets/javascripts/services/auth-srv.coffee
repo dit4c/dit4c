@@ -1,5 +1,5 @@
 define(['./module', './session'], (ng) ->
-  ng.factory('AuthSrv', ['$http', 'Session', ($http, Session) ->
+  ng.factory('AuthSrv', ['$rootScope', '$http', 'Session', ($rootScope, $http, Session) ->
     authService = {}
     
     authService.updateUser = () ->
@@ -8,7 +8,10 @@ define(['./module', './session'], (ng) ->
         .then (response) ->
           Session.login(response.data)
         .catch(() -> Session.logout())
-        .finally(() -> Session.user)
+        .finally(() -> 
+          $rootScope.$broadcast('updateCurrentUser', Session.user)
+          Session.user
+        )
     
     authService.logout = () ->
       $http
