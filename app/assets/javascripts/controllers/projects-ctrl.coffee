@@ -2,9 +2,17 @@ define(['./module'], (controllers) ->
   'use strict'
   
   controllers.controller('ProjectsCtrl', ($scope, $route, $http, $location) ->
+    $scope.images = [
+      { value: "dit4c/ipython", label: "iPython" },
+      { value: "dit4c/rstudio", label: "RStudio" }
+    ]
+    
     $scope.projects = $route.current.locals.projects
     
-    $scope.newProject = { name: "", active: false }
+    $scope.newProject =
+      name: "",
+      image: $scope.images[0].value
+      active: false
     
     $scope.rootUrl = (name) ->
       "//"+name+"."+$location.host()
