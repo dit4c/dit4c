@@ -85,40 +85,32 @@
           <tr><th>Project Name</th><th>Active?</th><th></th></tr>
         </thead>
         <tbody>
-          <!--
           <tr>
             <td colspan="3">
-              <form class="form-inline" {{action "create" on="submit"}}>
-              <div class="form-group has-feedback">
-              {{view App.NewProjectName
-                      type="text"
-                      class="form-control"
-                      placeholder="New project name?"
-                      value=name}}
-              <span class="glyphicon form-control-feedback"></span>
-              </div>
-              {{view Ember.Select
-                     class="form-control"
-                     content=images
-                     optionValuePath="content.id"
-                     optionLabelPath="content.name"
-                     value=image}}
-              <div class="checkbox">
-                <label>
-                Start?
-                {{input type="checkbox" checked=active}}
-                </label>
-              </div>
-              <button type="submit" class="btn btn-primary">
-              Create
-              </button>
+              <form class="form-inline">
+                <div class="form-group has-feedback">
+                  <input type="text" class="form-control" ng-model="newProject.name"/>
+                  <span class="glyphicon form-control-feedback"></span>
+                </div>
+                <select class="form-control" required="true" ng-model="newProject.image">
+                  <option value="dit4c/ipython">iPython</option>
+                  <option value="dit4c/rstudio">RStudion</option>
+                </select>
+                <div class="checkbox">
+                  <label>
+                    Start?
+                    <input type="checkbox" ng-model="newProject.active"/>
+                  </label>
+                </div>
+                <button class="btn btn-primary" ng-click="create()">
+                  Create
+                </button>
               </form>
             </td>
           </tr>
-          -->
-          <tr ng-repeat="project in projects">
+          <tr ng-repeat="project in projects | orderBy:'name'">
             <td>
-              <a ng-if="project.active" href="{{project.rootUrl}}"
+              <a ng-if="project.active" href="{{rootUrl(project.name)}}"
                  target="_blank">{{project.name}}</a>
               <span ng-if="!project.active">{{project.name}}</span>
             </td>
@@ -131,9 +123,7 @@
               </div>
             </td>
             <td>
-              <!--
-              <button class="btn btn-danger" {{action "delete" id}}>Delete</button>
-              -->
+              <button class="btn btn-danger" ng-click="delete(project.id)">Delete</button>
             </td>
           </tr>
         </tbody>
