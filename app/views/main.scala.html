@@ -88,9 +88,15 @@
           <tr>
             <td colspan="3">
               <form class="form-inline">
-                <div class="form-group has-feedback">
-                  <input type="text" class="form-control" ng-model="newProject.name"/>
-                  <span class="glyphicon form-control-feedback"></span>
+                <div class="form-group has-feedback"
+                     ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
+                     title="{{nameCheck.reason}}">
+                  <input type="text" class="form-control"
+                    ng-model="newProject.name"
+                    ng-change="checkName(newProject.name)"
+                    />
+                  <span class="glyphicon form-control-feedback"
+                    ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
                 </div>
                 <select class="form-control" ng-model="newProject.image"
                   ng-options="image.value as image.label for image in images"></select>

@@ -21,7 +21,6 @@ define(['./module'], (controllers) ->
       $http
         .post('/projects', $scope.newProject)
         .then (response) ->
-          console.log(response)
           $scope.newProject.name = ""
           $scope.projects.push(response.data)
     
@@ -42,7 +41,6 @@ define(['./module'], (controllers) ->
       $http
         .get('/projects')
         .then (response) ->
-          console.log(response.data)
           $scope.projects.length = 0
           response.data.forEach (project) ->
             $scope.projects.push(project)
@@ -51,6 +49,17 @@ define(['./module'], (controllers) ->
       $http
         .delete("/projects/"+id)
         .then refreshProjects
+    
+    $scope.checkName = (name) ->
+      if (name == "")
+        $scope.nameCheck = {}
+      else
+        $http
+          .get('/projects/checkNew?name='+name)
+          .then (response) ->
+            $scope.nameCheck = response.data
+            console.log($scope.nameCheck)
+    
       
   )
 )
