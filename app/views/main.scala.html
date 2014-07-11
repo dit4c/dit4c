@@ -85,6 +85,7 @@
           <tr><th>Project Name</th><th>Active?</th><th></th></tr>
         </thead>
         <tbody>
+          <!--
           <tr>
             <td colspan="3">
               <form class="form-inline" {{action "create" on="submit"}}>
@@ -114,31 +115,27 @@
               </form>
             </td>
           </tr>
-          {{#each}}
-          <tr>
+          -->
+          <tr ng-repeat="project in projects">
             <td>
-              {{#if active}}
-                <a {{bind-attr href=rootUrl}} target="_blank">{{name}}</a>
-              {{else}}
-                {{name}}
-              {{/if}}
+              <a ng-if="project.active" href="{{project.rootUrl}}"
+                 target="_blank">{{project.name}}</a>
+              <span ng-if="!project.active">{{project.name}}</span>
             </td>
             <td>
               <div class="btn-group">
-              {{#if active}}
-                <button class="btn btn-primary disabled active" role="button">On</button>
-                <button class="btn btn-default" {{action "stop" id}}>Off</button>
-              {{else}}
-                <button class="btn btn-default" {{action "start" id}}>On</button>
-                <button class="btn btn-primary disabled active" role="button">Off</button>
-              {{/if}}
+                <button ng-if="project.active" class="btn btn-primary disabled active" role="button">On</button>
+                <button ng-if="project.active" class="btn btn-default" ng-click="turnOff(project.id)">Off</button>
+                <button ng-if="!project.active" class="btn btn-default" ng-click="turnOn(project.id)">On</button>
+                <button ng-if="!project.active" class="btn btn-primary disabled active" role="button">Off</button>
               </div>
             </td>
             <td>
+              <!--
               <button class="btn btn-danger" {{action "delete" id}}>Delete</button>
+              -->
             </td>
           </tr>
-          {{/each}}
         </tbody>
       </table>
     </div>

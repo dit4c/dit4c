@@ -38,7 +38,7 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       val projectDao = new ProjectDAO(db)
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
-      (contentAsJson(emptyResponse) \ "project") must_== JsArray()
+      contentAsJson(emptyResponse) must_== JsArray()
       val projects = Seq(
         await(projectDao.create(session.user, "name1", "desc1", testImage)),
         await(projectDao.create(session.user, "name2", "desc2", testImage)),
@@ -46,7 +46,7 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
       )
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
-      val jsObjs = (contentAsJson(threeResponse) \ "project").as[Seq[JsObject]]
+      val jsObjs = contentAsJson(threeResponse).as[Seq[JsObject]]
       jsObjs must haveSize(3)
       projects.zip(jsObjs).foreach { case (project, json) =>
         (json \ "id").as[String] must_== project.id

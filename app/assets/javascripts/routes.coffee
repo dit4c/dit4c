@@ -28,7 +28,13 @@ define(['./app'], (app) ->
     
     $routeProvider.when('/projects',
       templateUrl: 'projects.html'
-      controller: 'ProjectsCtrl'
+      controller: 'ProjectsCtrl',
+      resolve:
+        projects: ($http) ->
+          $http
+            .get('/projects')
+            .then (response) ->
+              response.data
     )
     
     $routeProvider.when('/notfound',

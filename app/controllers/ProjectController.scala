@@ -34,11 +34,11 @@ class ProjectController @Inject() (
 
   def create = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
-      val name = (json \ "project" \ "name").as[String]
-      val description = (json \ "project" \ "description").as[Option[String]]
+      val name = (json \ "name").as[String]
+      val description = (json \ "description").as[Option[String]]
         .getOrElse("")
-      val image = (json \ "project" \ "image").as[String]
-      val shouldBeActive = (json \ "project" \ "active").as[Boolean]
+      val image = (json \ "image").as[String]
+      val shouldBeActive = (json \ "active").as[Boolean]
       val response: Future[Result] =
         for {
           project <- projectDao.create(request.user, name, description, image)
@@ -46,13 +46,11 @@ class ProjectController @Inject() (
           cnProject <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
-            "project" -> Json.obj(
-              "id" -> project.id,
-              "name" -> project.name,
-              "description" -> project.description,
-              "image" -> project.image,
-              "active" -> cnProject.active
-            )
+            "id" -> project.id,
+            "name" -> project.name,
+            "description" -> project.description,
+            "image" -> project.image,
+            "active" -> cnProject.active
           ))
         }
       response.flatMap(_.withUpdatedJwt(request.user))
@@ -62,22 +60,21 @@ class ProjectController @Inject() (
   def list = Authenticated.async { implicit request =>
     projectPairs.map { pairs =>
       val user = request.user
-      val json = Json.obj(
-        "project" -> JsArray(pairs.map { case (p, cnp) =>
+      val json = JsArray(pairs.map { case (p, cnp) =>
           Json.obj(
             "id" -> p.id,
             "name" -> p.name,
             "description" -> p.description,
             "active" -> cnp.active
           )
-        }))
+        })
       Ok(json)
     }
   }
 
   def update(id: String) = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
-      val shouldBeActive: Boolean = (json \ "project" \ "active").as[Boolean]
+      val shouldBeActive: Boolean = (json \ "active").as[Boolean]
       projectDao.get(id)
         .flatMap[Result] {
           case None =>
@@ -90,12 +87,10 @@ class ProjectController @Inject() (
               case Some(cnp) =>
                 cnp.makeActive(shouldBeActive).map { updatedCnp =>
                   Ok(Json.obj(
-                    "project" -> Json.obj(
-                      "id" -> project.id,
-                      "name" -> project.name,
-                      "description" -> project.description,
-                      "active" -> updatedCnp.active
-                    )
+                    "id" -> project.id,
+                    "name" -> project.name,
+                    "description" -> project.description,
+                    "active" -> updatedCnp.active
                   ))
                 }
             }
