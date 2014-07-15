@@ -12,9 +12,8 @@ module.exports = function (config) {
     },
     autoWatch: true,
     frameworks: ['mocha', 'requirejs', 'sinon-chai'],
-    browsers: ['Chrome', 'PhantomJS'],
+    browsers: ['PhantomJS'],
     plugins: [
-      'karma-chrome-launcher',
       'karma-coffee-preprocessor',
       'karma-junit-reporter',
       'karma-mocha',
