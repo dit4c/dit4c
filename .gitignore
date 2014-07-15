@@ -19,4 +19,4 @@ activator-*.sbt
 /.cache
 /keys.json
 /db/
-/node_modules/
+/karma/node_modules/

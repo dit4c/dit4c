@@ -1,4 +1,5 @@
 {
+  "description": "Karma.js testing",
   "repository": {
     "type": "git",
     "url": "git://github.com/dit4c/dit4c-highcommand.git"
@@ -7,7 +8,7 @@
     "karma": "*",
     "karma-chrome-launcher": "*",
     "karma-coffee-preprocessor": "*",
-    "karma-junit-reporter": "*",
+    "karma-mocha-reporter": "*",
     "karma-mocha": "*",
     "karma-phantomjs-launcher": "*",
     "karma-requirejs": "*",

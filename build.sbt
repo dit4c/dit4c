@@ -73,8 +73,6 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
   pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
-MochaKeys.requires ++= Seq("./setup.js")
-
 pipelineStages := Seq(rjs, digest, gzip)
 
 //closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")

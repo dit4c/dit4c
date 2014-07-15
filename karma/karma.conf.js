@@ -13,17 +13,14 @@ module.exports = function (config) {
     autoWatch: true,
     frameworks: ['mocha', 'requirejs', 'sinon-chai'],
     browsers: ['PhantomJS'],
+    reporters: ['mocha'],
     plugins: [
       'karma-coffee-preprocessor',
-      'karma-junit-reporter',
       'karma-mocha',
+      'karma-mocha-reporter',
       'karma-phantomjs-launcher',
       'karma-requirejs',
       'karma-sinon-chai'
-    ],
-    junitReporter: {
-      outputFile: 'test_out/unit.xml',
-      suite: 'unit'
-    }
+    ]
   });
 };

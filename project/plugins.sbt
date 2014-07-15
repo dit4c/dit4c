@@ -32,8 +32,5 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-less" % "1.0.0")
 // * JsHint
 addSbtPlugin("com.typesafe.sbt" % "sbt-jshint" % "1.0.1")
 
-// * Mocha
-addSbtPlugin("com.typesafe.sbt" % "sbt-mocha" % "1.0.0")
-
 // * RequireJS
 addSbtPlugin("com.typesafe.sbt" % "sbt-rjs" % "1.0.3")
