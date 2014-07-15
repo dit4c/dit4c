@@ -3,7 +3,7 @@ import ReleaseStateTransformations._
 
 name := "dit4c-highcommand"
 
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
+lazy val root = (project in file(".")).enablePlugins(PlayScala).enablePlugins(SbtWeb)
 
 scalaVersion := "2.11.1"
 
@@ -73,7 +73,7 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
   pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
 )
 
-MochaKeys.requires += "./setup.js"
+MochaKeys.requires ++= Seq("./setup.js")
 
 pipelineStages := Seq(rjs, digest, gzip)
 

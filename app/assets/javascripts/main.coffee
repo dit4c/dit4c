@@ -1,5 +1,1 @@
-require(['bootstrap', './bootstrap-app'], (ng) ->
-  {
-    doNothing: true
-  }
-)
+define(['bootstrap', './bootstrap-app'], (ng) -> )

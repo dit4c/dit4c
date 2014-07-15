@@ -1,0 +1,15 @@
+{
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dit4c/dit4c-highcommand.git"
+  },
+  "dependencies": {
+    "karma": "*",
+    "karma-chrome-launcher": "*",
+    "karma-coffee-preprocessor": "*",
+    "karma-junit-reporter": "*",
+    "karma-mocha": "*",
+    "karma-phantomjs-launcher": "*",
+    "karma-requirejs": "*"
+  }
+}
