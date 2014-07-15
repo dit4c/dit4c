@@ -10,6 +10,7 @@
     "karma-junit-reporter": "*",
     "karma-mocha": "*",
     "karma-phantomjs-launcher": "*",
-    "karma-requirejs": "*"
+    "karma-requirejs": "*",
+    "karma-sinon-chai": "*"
   }
 }

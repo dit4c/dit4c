@@ -1,7 +1,7 @@
-var allTestFiles = [];
 var allRequireFiles = [];
-var TEST_REGEXP = /(spec|test)\.js$/i;
+var allTestFiles = [];
 var REQUIRE_REGEXP = /webjars-requirejs\.js$/;
+var TEST_REGEXP = /(spec|test)\.js$/i;
 
 var webjars = {};
 webjars.path = function(webjar, file) {
@@ -22,8 +22,6 @@ Object.keys(window.__karma__.files).forEach(function(file) {
     allRequireFiles.push(pathToModule(file));
   }
 });
-
-console.log(allRequireFiles.concat(allTestFiles));
 
 require.config({
   // Karma serves files under /base, which is the basePath from your config file

@@ -11,7 +11,7 @@ module.exports = function (config) {
       '**/*.coffee': ['coffee']
     },
     autoWatch: true,
-    frameworks: ['mocha', 'requirejs'],
+    frameworks: ['mocha', 'requirejs', 'sinon-chai'],
     browsers: ['Chrome', 'PhantomJS'],
     plugins: [
       'karma-chrome-launcher',
@@ -19,7 +19,8 @@ module.exports = function (config) {
       'karma-junit-reporter',
       'karma-mocha',
       'karma-phantomjs-launcher',
-      'karma-requirejs'
+      'karma-requirejs',
+      'karma-sinon-chai'
     ],
     junitReporter: {
       outputFile: 'test_out/unit.xml',

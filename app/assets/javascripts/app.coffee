@@ -16,7 +16,7 @@ define([
   ])
   
   app.config(['$locationProvider', ($locationProvider) ->
-    console.log("Configuring $location to HTML5 mode.")
+    # Configuring $location to HTML5 mode
     $locationProvider.html5Mode(true).hashPrefix('!')
   ])
   
