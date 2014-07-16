@@ -1,1 +1,1 @@
-define(['bootstrap', './bootstrap-app'], (ng) -> )
+requirejs(['bootstrap', './bootstrap-app'], (ng) -> )
