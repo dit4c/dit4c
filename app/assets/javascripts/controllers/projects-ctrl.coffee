@@ -3,8 +3,9 @@ define(['./module'], (controllers) ->
   
   controllers.controller('ProjectsCtrl', ($scope, $route, $http, $location) ->
     $scope.images = [
-      { value: "dit4c/ipython", label: "iPython" },
-      { value: "dit4c/rstudio", label: "RStudio" }
+      { value: "dit4c/project-base", label: "Base" },
+      { value: "dit4c/project-ipython", label: "iPython" },
+      { value: "dit4c/project-rstudio", label: "RStudio" }
     ]
     
     $scope.projects = $route.current.locals.projects
@@ -58,7 +59,6 @@ define(['./module'], (controllers) ->
           .get('/projects/checkNew?name='+name)
           .then (response) ->
             $scope.nameCheck = response.data
-            console.log($scope.nameCheck)
     
       
   )
