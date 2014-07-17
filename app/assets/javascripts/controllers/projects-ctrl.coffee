@@ -3,9 +3,9 @@ define(['./module'], (controllers) ->
   
   controllers.controller('ProjectsCtrl', ($scope, $route, $http, $location) ->
     $scope.images = [
-      { value: "dit4c/project-base", label: "Base" },
-      { value: "dit4c/project-ipython", label: "iPython" },
-      { value: "dit4c/project-rstudio", label: "RStudio" }
+      { value: "dit4c/dit4c-container-base", label: "Base" },
+      { value: "dit4c/dit4c-container-ipython", label: "iPython" },
+      { value: "dit4c/dit4c-container-rstudio", label: "RStudio" }
     ]
     
     $scope.projects = $route.current.locals.projects
