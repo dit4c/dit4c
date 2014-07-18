@@ -29,7 +29,7 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvi
   override val loginURL = config.url.toString
 
   override val loginButton = (url: String) => Html(
-    s"""|<a href="$url">
+    s"""|<a target="_self" href="$url">
         |  <img class="img-responsive center-block" alt="Login with AAF"
         |       src="https://rapid.aaf.edu.au/aaf_service_866x193.png"/>
         |</a>
