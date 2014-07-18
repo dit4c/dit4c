@@ -23,9 +23,9 @@ class ApiService(
     client: DockerClient) extends HttpService with RouteProvider {
 
   import scala.concurrent.ExecutionContext.Implicits.global
-  import ApiService.NewProjectRequest
+  import ApiService.NewContainerRequest
   import ApiService.marshallers._
-  import ApiService.marshallers.newProjectRequestUnmarshaller
+  import ApiService.marshallers.newContainerRequestUnmarshaller
 
   implicit val actorRefFactory = arf
 
@@ -38,7 +38,7 @@ class ApiService(
     }
 
   val route: RequestContext => Unit =
-    pathPrefix("projects") {
+    pathPrefix("containers") {
       pathEndOrSingleSlash {
         get {
           onSuccess(client.containers.list) { containers =>
@@ -50,7 +50,7 @@ class ApiService(
       } ~
       path("new") {
         post {
-          entity(as[NewProjectRequest]) { npr =>
+          entity(as[NewContainerRequest]) { npr =>
             onSuccess(client.containers.create(npr.name, npr.image)) { container =>
               respondWithStatus(StatusCodes.Created) {
                 complete(container)
@@ -103,13 +103,13 @@ class ApiService(
 
 object ApiService {
 
-  case class NewProjectRequest(val name: String, val image: String)
+  case class NewContainerRequest(val name: String, val image: String)
 
   def apply(client: DockerClient)(implicit actorRefFactory: ActorRefFactory) =
     new ApiService(actorRefFactory, client)
 
   object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
-    implicit val newProjectRequestReader = jsonFormat2(NewProjectRequest)
+    implicit val newContainerRequestReader = jsonFormat2(NewContainerRequest)
 
     implicit val containerWriter = new RootJsonWriter[DockerContainer] {
       def write(c: DockerContainer) = {
@@ -125,8 +125,8 @@ object ApiService {
         JsArray(cs.map(containerWriter.write(_)).toSeq: _*)
     }
 
-    implicit val newProjectRequestUnmarshaller: FromRequestUnmarshaller[NewProjectRequest] =
-      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newProjectRequestReader)))
+    implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
+      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader)))
 
     implicit val containerJsonMarshaller: ToResponseMarshaller[DockerContainer] =
       sprayJsonMarshaller(containerWriter)

@@ -160,7 +160,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
         )
 
       pipeline {
-        if (!name.isValidProjectName) {
+        if (!name.isValidContainerName) {
           throw new IllegalArgumentException(
               "Name must be a valid lower-case DNS label")
         }
@@ -195,7 +195,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
                 ContainerStatus.Stopped
             new ContainerImpl(jsId.convertTo[String], name, status)
           }
-          .filter(_.name.isValidProjectName)
+          .filter(_.name.isValidContainerName)
       }
 
       val pipeline: HttpRequest => Future[Seq[DockerContainer]] =
@@ -210,10 +210,10 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
   }
 
-  implicit class ProjectNameTester(str: String) {
+  implicit class ContainerNameTester(str: String) {
     // Same as domain name, but use of capitals is prohibited because container
     // names are case-sensitive while host names should be case-insensitive.
-    def isValidProjectName = {
+    def isValidContainerName = {
       !str.isEmpty &&
       str.length <= 63 &&
       !str.startsWith("-") &&

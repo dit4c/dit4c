@@ -1,10 +1,10 @@
 !tape
 name: DockerClient.container.delete-run
 interactions:
-- recorded: 2014-04-29T06:34:40.849Z
+- recorded: 2014-07-18T00:35:01.257Z
   request:
     method: DELETE
-    uri: http://localhost:4243/containers/498c5d4ac594a74f63f1c753f6f981c11d007b51ad7a30da611b4d40ae84db57?v=1
+    uri: http://localhost:4243/containers/2d923bc0717f78acefdcd41a5b2c7641328fab5f7b40fa2bb094220195993546?v=1
     headers:
       Host: localhost:4243
       User-Agent: spray-can/1.3.1
@@ -12,7 +12,9 @@ interactions:
     status: 204
     headers:
       Content-Type: text/plain; charset=utf-8
-- recorded: 2014-04-29T06:34:40.884Z
+      Date: Fri, 18 Jul 2014 00:35:01 GMT
+      Server: nginx/1.5.12
+- recorded: 2014-07-18T00:35:01.266Z
   request:
     method: GET
     uri: http://localhost:4243/containers/json?all=1
@@ -23,9 +25,13 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
+      Date: Fri, 18 Jul 2014 00:35:01 GMT
+      Server: nginx/1.5.12
     body: |-
-      [{"Command":"/usr/bin/supervisord -c /opt/supervisord.conf","Created":1398751135,"Id":"f1417bcbd7b181d3cc7d026cb055ec60ae5d6796febfbbcb4be93253a68ca638","Image":"dit4c/python:latest","Names":["/testnew"],"Ports":[],"Status":"Exit 0"}
-      ,{"Command":"/usr/bin/supervisord -c /opt/supervisord.conf","Created":1398751132,"Id":"fd24c319c328de9de04fbef7f2e227a4b9e7b2ef76af8e635017199c182bde87","Image":"dit4c/python:latest","Names":["/testlist-2"],"Ports":[{"PublicPort":80,"Type":"tcp"},{"PublicPort":22,"Type":"tcp"}],"Status":"Up 35 minutes"}
-      ,{"Command":"/usr/bin/supervisord -c /opt/supervisord.conf","Created":1398751130,"Id":"56ca0c8a2181dabef81381848283958564789a2cafe45d641809e4ce718ef492","Image":"dit4c/python:latest","Names":["/testlist-1"],"Ports":[],"Status":"Exit 0"}
-      ,{"Command":"/usr/bin/supervisord -c /opt/supervisord.conf","Created":1398749707,"Id":"b4791c853f9de1912ab7f361f8dbfd1225b2606a8fdd8bb5bba601f107e45c09","Image":"dit4c/python:latest","Names":["/teststop"],"Ports":[],"Status":"Exit 0"}
+      [{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643696,"Id":"5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testlist-2"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49155,"Type":"tcp"}],"Status":"Up 3 seconds"}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643693,"Id":"055d76e7153a33669d2972ba2ae7e291ac12cc55de645031a646105c24b4dac5","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testlist-1"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643691,"Id":"dc07b60033a16b31fb7c79a9a7d36df4e453444afc53d3ba2defa059ab1f4fba","Image":"dit4c/dit4c-container-ipython:latest","Names":["/teststop"],"Ports":[],"Status":"Exited (-1) 1 seconds ago"}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643690,"Id":"ad690ddd32312bba685749057c6ebb5d0d374ce6f09e8611d7b3435101c83699","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testrefresh"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643685,"Id":"f5d7b3f95fb0b0732368d3960bde1ca2a9c257cb63fdbaa2c4452b4ff3e6c377","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testnew"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643682,"Id":"f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce","Image":"dit4c/dit4c-container-ipython:latest","Names":["/teststart"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49153,"Type":"tcp"}],"Status":"Up 17 seconds"}
       ]

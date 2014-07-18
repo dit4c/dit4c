@@ -59,24 +59,24 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
     }
   }
 
-  val image = "dit4c/python"
+  val image = "dit4c/dit4c-container-ipython"
 
   def route(implicit client: DockerClient) = ApiService(client).route
 
   "ApiService" should {
 
-    "return all containers for GET requests to /projects" in {
+    "return all containers for GET requests to /containers" in {
       import spray.json._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
-      Get("/projects") ~> route ~> check {
+      Get("/containers") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String])
         json must beAnInstanceOf[JsArray]
         json.asInstanceOf[JsArray].elements must beEmpty
       }
       client.containers.create("foobar", image).await
-      Get("/projects") ~> route ~> check {
+      Get("/containers") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String])
         json must beAnInstanceOf[JsArray]
@@ -86,22 +86,22 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
     }
 
-    "return containers for GET requests to /projects/:name" in {
+    "return containers for GET requests to /containers/:name" in {
       import spray.json._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
-      Get("/projects/foobar") ~> route ~> check {
+      Get("/containers/foobar") ~> route ~> check {
         status must_== StatusCodes.NotFound
       }
       client.containers.create("foobar", image).await
-      Get("/projects/foobar") ~> route ~> check {
+      Get("/containers/foobar") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
         json.fields("name").convertTo[String] must_== "foobar"
       }
     }
 
-    "create containers with POST requests to /projects/new" in {
+    "create containers with POST requests to /containers/new" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
@@ -110,7 +110,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       val requestJson = JsObject(
           "name" -> JsString("foobar"),
           "image" -> JsString(image))
-      Post("/projects/new", requestJson) ~> route ~> check {
+      Post("/containers/new", requestJson) ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
         json.fields("name").convertTo[String] must_== "foobar"
@@ -118,50 +118,50 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       client.containers.list.await must haveSize(1)
     }
 
-    "delete containers with DELETE requests to /projects/:name" in {
+    "delete containers with DELETE requests to /containers/:name" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).await
       client.containers.list.await must haveSize(1)
-      Delete("/projects/foobar") ~> route ~> check {
+      Delete("/containers/foobar") ~> route ~> check {
         status must_== StatusCodes.NoContent
       }
       client.containers.list.await must beEmpty
     }
 
-    "start containers with POST requests to /projects/:name/start" in {
+    "start containers with POST requests to /containers/:name/start" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).await
       dc.isRunning must beFalse
-      Post("/projects/foobar/start") ~> route ~> check {
+      Post("/containers/foobar/start") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         responseAs[JsObject].fields("active") must_== JsBoolean(true)
       }
       dc.refresh.await.isRunning must_== true
     }
 
-    "stop containers with POST requests to /projects/:name/stop" in {
+    "stop containers with POST requests to /containers/:name/stop" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).flatMap(_.start).await
       dc.isRunning must beTrue;
-      Post("/projects/foobar/stop") ~> route ~> check {
+      Post("/containers/foobar/stop") ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         responseAs[JsObject].fields("active") must_== JsBoolean(false)
       }
       dc.refresh.await.isRunning must_== false
     }
 
-    "return a MethodNotAllowed error for DELETE requests to /projects" in {
+    "return a MethodNotAllowed error for DELETE requests to /containers" in {
       implicit val client = mockDockerClient
-      Put("/projects") ~> sealRoute(route) ~> check {
+      Put("/containers") ~> sealRoute(route) ~> check {
         status === MethodNotAllowed
         responseAs[String] === "HTTP method not allowed, supported methods: GET"
       }

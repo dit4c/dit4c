@@ -34,7 +34,7 @@ class DockerClientSpec extends Specification {
   def beRunning = beTrue ^^ ((_: DockerContainer).isRunning aka "is running")
   def beStopped = beRunning.not
 
-  val image = "dit4c/python"
+  val image = "dit4c/dit4c-container-ipython"
 
   "DockerClient" >> {
 
