@@ -65,14 +65,14 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
       port.map((name, _))
     }
-    pairs.flatten.filter(_._1.isValidProjectName).toMap
+    pairs.flatten.filter(_._1.isValidContainerName).toMap
   }
 
-  implicit class ProjectNameTester(str: String) {
+  implicit class ContainerNameTester(str: String) {
 
     // Same as domain name, but use of capitals is prohibited because container
     // names are case-sensitive while host names should be case-insensitive.
-    def isValidProjectName = {
+    def isValidContainerName = {
       !str.isEmpty &&
       str.length <= 63 &&
       !str.startsWith("-") &&
