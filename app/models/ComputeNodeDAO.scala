@@ -48,42 +48,42 @@ case class ComputeNode(id: String, _rev: Option[String], name: String, url: Stri
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
-  import ComputeNode.Project
+  import ComputeNode.Container
 
-  object projects {
+  object containers {
 
-    def create(name: String, image: String): Future[Project] =
-      WS.url(s"${url}projects/new")
+    def create(name: String, image: String): Future[Container] =
+      WS.url(s"${url}containers/new")
         .post(Json.obj("name" -> name, "image" -> image))
-        .map(_.json.as[Project])
+        .map(_.json.as[Container])
 
-    def get(name: String): Future[Option[Project]] =
-      WS.url(s"${url}projects/$name")
+    def get(name: String): Future[Option[Container]] =
+      WS.url(s"${url}containers/$name")
         .get()
-        .map(r => Try(r.json.as[Project]).toOption)
+        .map(r => Try(r.json.as[Container]).toOption)
 
-    def list: Future[Seq[Project]] =
-      WS.url(s"${url}projects").get().map { response =>
-        response.json.asInstanceOf[JsArray].value.map(_.as[Project])
+    def list: Future[Seq[Container]] =
+      WS.url(s"${url}containers").get().map { response =>
+        response.json.asInstanceOf[JsArray].value.map(_.as[Container])
       }
 
   }
 
-  class ProjectImpl(val name: String, val active: Boolean)(implicit ec: ExecutionContext) extends Project {
+  class ContainerImpl(val name: String, val active: Boolean)(implicit ec: ExecutionContext) extends Container {
 
-    override def start: Future[Project] =
-      WS.url(s"${url}projects/$name/start")
+    override def start: Future[Container] =
+      WS.url(s"${url}containers/$name/start")
         .post(EmptyContent())
-        .map(_.json.as[Project])
+        .map(_.json.as[Container])
 
-    override def stop: Future[Project] =
-      WS.url(s"${url}projects/$name/stop")
+    override def stop: Future[Container] =
+      WS.url(s"${url}containers/$name/stop")
         .post(EmptyContent())
-        .map(_.json.as[Project])
+        .map(_.json.as[Container])
 
     override def delete: Future[Unit] =
       stop.flatMap { _ =>
-        WS.url(s"${url}projects/$name")
+        WS.url(s"${url}containers/$name")
           .delete()
           .flatMap { response =>
             if (response.status == 204) Future.successful[Unit](Unit)
@@ -94,18 +94,18 @@ case class ComputeNode(id: String, _rev: Option[String], name: String, url: Stri
 
   }
 
-  implicit val projectReads: Reads[Project] = (
+  implicit val containerReads: Reads[Container] = (
     (__ \ "name").read[String] and
     (__ \ "active").read[Boolean]
-  )((new ProjectImpl(_,_)))
+  )((new ContainerImpl(_,_)))
 }
 
 object ComputeNode {
-  trait Project {
+  trait Container {
     def name: String
     def active: Boolean
-    def start: Future[Project]
-    def stop: Future[Project]
+    def start: Future[Container]
+    def stop: Future[Container]
     def delete: Future[Unit]
   }
 }

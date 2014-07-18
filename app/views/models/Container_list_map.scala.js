@@ -1,7 +1,7 @@
 @()
 
 function(doc) {
-  if (doc.type == "Project") {
+  if (doc.type == "Container") {
     emit(null, doc);
   }
 }

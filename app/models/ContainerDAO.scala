@@ -6,7 +6,7 @@ import providers.db.CouchDB
 import play.api.libs.ws._
 import play.api.libs.json._
 
-class ProjectDAO(protected val db: CouchDB.Database)
+class ContainerDAO(protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
@@ -16,13 +16,13 @@ class ProjectDAO(protected val db: CouchDB.Database)
       user: User,
       name: String,
       description: String,
-      image: String): Future[Project] =
+      image: String): Future[Container] =
     list.flatMap { projects =>
       if (projects.exists(_.name == name)) {
-        throw new Exception("Project with that name already exists.")
+        throw new Exception("Container with that name already exists.")
       }
       db.newID.flatMap { id =>
-        val node = ProjectImpl(id, None, name, description, image, Set(user.id))
+        val node = ContainerImpl(id, None, name, description, image, Set(user.id))
         WS.url(s"${db.baseURL}/$id")
           .put(Json.toJson(node))
           .flatMap { response =>
@@ -33,41 +33,41 @@ class ProjectDAO(protected val db: CouchDB.Database)
       }
     }
 
-  def get(id: String): Future[Option[Project]] =
+  def get(id: String): Future[Option[Container]] =
     WS.url(s"${db.baseURL}/$id").get.map { response =>
       (response.status match {
         case 200 => Some(response.json)
         case _ => None
-      }).flatMap(fromJson[ProjectImpl])
+      }).flatMap(fromJson[ContainerImpl])
     }
 
-  def list: Future[Seq[Project]] = {
-    val tempView = TemporaryView(views.js.models.Project_list_map())
+  def list: Future[Seq[Container]] = {
+    val tempView = TemporaryView(views.js.models.Container_list_map())
     WS.url(s"${db.baseURL}/_temp_view")
       .post(Json.toJson(tempView))
       .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[ProjectImpl])
+        (response.json \ "rows" \\ "value").flatMap(fromJson[ContainerImpl])
       }
   }
 
-  implicit val projectFormat: Format[ProjectImpl] = (
+  implicit val projectFormat: Format[ContainerImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
     (__ \ "description").format[String] and
     (__ \ "image").format[String] and
     (__ \ "ownerIDs").format[Set[String]]
-  )(ProjectImpl.apply _, unlift(ProjectImpl.unapply))
-    .withTypeAttribute("Project")
+  )(ContainerImpl.apply _, unlift(ContainerImpl.unapply))
+    .withTypeAttribute("Container")
 
 
-  case class ProjectImpl(
+  case class ContainerImpl(
       id: String,
       _rev: Option[String],
       name: String,
       description: String,
       image: String,
-      ownerIDs: Set[String]) extends Project {
+      ownerIDs: Set[String]) extends Container {
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
@@ -75,7 +75,7 @@ class ProjectDAO(protected val db: CouchDB.Database)
 
 }
 
-trait Project {
+trait Container {
 
   def id: String
   def _rev: Option[String]

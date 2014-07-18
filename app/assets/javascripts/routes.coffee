@@ -13,7 +13,7 @@ define(['./app'], (app) ->
         notLoggedIn: (AuthSrv, $location) ->
           AuthSrv.updateUser().then((user) ->
             if user
-              $location.path('/projects').replace()
+              $location.path('/containers').replace()
           )
       }
     )
@@ -26,13 +26,13 @@ define(['./app'], (app) ->
       }
     )
     
-    $routeProvider.when('/projects',
-      templateUrl: 'projects.html'
-      controller: 'ProjectsCtrl',
+    $routeProvider.when('/containers',
+      templateUrl: 'containers.html'
+      controller: 'ContainersCtrl',
       resolve:
-        projects: ($http) ->
+        containers: ($http) ->
           $http
-            .get('/projects')
+            .get('/containers')
             .then (response) ->
               response.data
     )

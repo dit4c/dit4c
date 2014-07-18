@@ -31,14 +31,14 @@ trait Utils extends Results {
   protected def db: CouchDB.Database
 
   protected lazy val computeNodeDao = new ComputeNodeDAO(db)
-  protected lazy val projectDao = new ProjectDAO(db)
+  protected lazy val containerDao = new ContainerDAO(db)
   protected lazy val userDao = new UserDAO(db)
 
   implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
     def withUpdatedJwt(user: User): Future[Result] =
-      userProjects(user).map { projects =>
+      userContainers(user).map { containers =>
         response.withCookies(Cookie("dit4c-jwt",
-            jwt(projects.map(_.name)), domain=getCookieDomain))
+            jwt(containers.map(_.name)), domain=getCookieDomain))
       }
     def withClearedJwt: Future[Result] =
       Future.successful {
@@ -68,9 +68,9 @@ trait Utils extends Results {
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
 
-  protected def userProjects(user: User): Future[Seq[Project]] =
-    projectDao.list.map { projects =>
-      projects.filter(_.ownerIDs.contains(user.id))
+  protected def userContainers(user: User): Future[Seq[Container]] =
+    containerDao.list.map { containers =>
+      containers.filter(_.ownerIDs.contains(user.id))
     }
 
   protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =

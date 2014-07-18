@@ -1,16 +1,16 @@
 define(['./module'], (controllers) ->
   'use strict'
   
-  controllers.controller('ProjectsCtrl', ($scope, $route, $http, $location) ->
+  controllers.controller('ContainersCtrl', ($scope, $route, $http, $location) ->
     $scope.images = [
       { value: "dit4c/dit4c-container-base", label: "Base" },
       { value: "dit4c/dit4c-container-ipython", label: "iPython" },
       { value: "dit4c/dit4c-container-rstudio", label: "RStudio" }
     ]
     
-    $scope.projects = $route.current.locals.projects
+    $scope.containers = $route.current.locals.containers
     
-    $scope.newProject =
+    $scope.newContainer =
       name: "",
       image: $scope.images[0].value
       active: false
@@ -20,43 +20,43 @@ define(['./module'], (controllers) ->
     
     $scope.create = () ->
       $http
-        .post('/projects', $scope.newProject)
+        .post('/containers', $scope.newContainer)
         .then (response) ->
-          $scope.newProject.name = ""
-          $scope.projects.push(response.data)
+          $scope.newContainer.name = ""
+          $scope.containers.push(response.data)
     
-    projectById = (id) ->
-      $scope.projects.filter((project) -> project.id == id)[0]
+    containerById = (id) ->
+      $scope.containers.filter((container) -> container.id == id)[0]
     
     updateActiveFn = (active) -> (id) ->
-      project = projectById(id)
-      project.active = active
+      container = containerById(id)
+      container.active = active
       $http
-        .put("/projects/"+id, project)
-        .then (response) -> project.active = response.data.active
+        .put("/containers/"+id, container)
+        .then (response) -> container.active = response.data.active
     
     $scope.turnOn = updateActiveFn(true)
     $scope.turnOff = updateActiveFn(false)
     
-    refreshProjects = () ->
+    refreshContainers = () ->
       $http
-        .get('/projects')
+        .get('/containers')
         .then (response) ->
-          $scope.projects.length = 0
-          response.data.forEach (project) ->
-            $scope.projects.push(project)
+          $scope.containers.length = 0
+          response.data.forEach (container) ->
+            $scope.containers.push(container)
     
     $scope.delete = (id) ->
       $http
-        .delete("/projects/"+id)
-        .then refreshProjects
+        .delete("/containers/"+id)
+        .then refreshContainers
     
     $scope.checkName = (name) ->
       if (name == "")
         $scope.nameCheck = {}
       else
         $http
-          .get('/projects/checkNew?name='+name)
+          .get('/containers/checkNew?name='+name)
           .then (response) ->
             $scope.nameCheck = response.data
     

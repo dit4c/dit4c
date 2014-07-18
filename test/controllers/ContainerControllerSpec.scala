@@ -24,39 +24,39 @@ import utils.SpecUtils
  * For more information, consult the wiki.
  */
 @RunWith(classOf[JUnitRunner])
-class ProjectControllerSpec extends PlaySpecification with SpecUtils {
+class ContainerControllerSpec extends PlaySpecification with SpecUtils {
   import play.api.Play.current
   
-  val testImage = "dit4c/python"
+  val testImage = "dit4c/dit4c-container-ipython"
 
-  "ProjectController" should {
+  "ContainerController" should {
 
-    "provide JSON list of projects" in new WithApplication(fakeApp) {
+    "provide JSON list of containers" in new WithApplication(fakeApp) {
       val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
       val controller = getMockedController
-      val projectDao = new ProjectDAO(db)
+      val containerDao = new ContainerDAO(db)
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
-      val projects = Seq(
-        await(projectDao.create(session.user, "name1", "desc1", testImage)),
-        await(projectDao.create(session.user, "name2", "desc2", testImage)),
-        await(projectDao.create(session.user, "name3", "desc3", testImage))
+      val containers = Seq(
+        await(containerDao.create(session.user, "name1", "desc1", testImage)),
+        await(containerDao.create(session.user, "name2", "desc2", testImage)),
+        await(containerDao.create(session.user, "name3", "desc3", testImage))
       )
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
       val jsObjs = contentAsJson(threeResponse).as[Seq[JsObject]]
       jsObjs must haveSize(3)
-      projects.zip(jsObjs).foreach { case (project, json) =>
-        (json \ "id").as[String] must_== project.id
-        (json \ "name").as[String] must_== project.name
-        (json \ "description").as[String] must_== project.description
+      containers.zip(jsObjs).foreach { case (container, json) =>
+        (json \ "id").as[String] must_== container.id
+        (json \ "name").as[String] must_== container.name
+        (json \ "description").as[String] must_== container.description
         (json \ "active").as[Boolean] must beFalse
       }
     }
 
-    "check names for new projects" in new WithApplication(fakeApp) {
+    "check names for new containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val controller = getMockedController;
       // Check with valid name
@@ -74,8 +74,8 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
         (json \ "reason").as[String] must not beEmpty
       }
       // Check with a used name
-      val projectDao = new ProjectDAO(db)
-      await(projectDao.create(session.user, "test", "", testImage));
+      val containerDao = new ContainerDAO(db)
+      await(containerDao.create(session.user, "test", "", testImage));
       {
         val response = controller.checkNewName("test")(session.newRequest)
         status(response) must_== 200
@@ -88,14 +88,14 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
 
     def getMockedController = {
       val db = injector.getInstance(classOf[CouchDB.Database])
-      new ProjectController(
+      new ContainerController(
           db,
-          new ComputeNodeProjectHelper {
-            override def creator = { project =>
-              Future.successful(MockCNP(project.name, false))
+          new ComputeNodeContainerHelper {
+            override def creator = { container =>
+              Future.successful(MockCNC(container.name, false))
             }
-            override def resolver = { project =>
-              Future.successful(Some(MockCNP(project.name, false)))
+            override def resolver = { container =>
+              Future.successful(Some(MockCNC(container.name, false)))
             }
           },
           injector.getInstance(classOf[Application]))
@@ -103,11 +103,11 @@ class ProjectControllerSpec extends PlaySpecification with SpecUtils {
 
   }
 
-  case class MockCNP(val name: String, val active: Boolean)
-    extends ComputeNode.Project {
+  case class MockCNC(val name: String, val active: Boolean)
+    extends ComputeNode.Container {
     import Future.successful
     override def delete = successful[Unit](Unit)
-    override def start = successful(MockCNP(name, true))
-    override def stop = successful(MockCNP(name, false))
+    override def start = successful(MockCNC(name, true))
+    override def stop = successful(MockCNC(name, false))
   }
 }

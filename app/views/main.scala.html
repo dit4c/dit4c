@@ -35,7 +35,7 @@
         <div class="collapse navbar-collapse" id="bs-navbar-collapse">
           <div ng-if="currentUser">
             <ul class="nav navbar-nav">
-              <li><a href="/projects">Projects</a></li>
+              <li><a href="/containers">Containers</a></li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
               <li class="dropdown">
@@ -75,14 +75,14 @@
     </div>
     </script>
 
-    <script type="text/ng-template" id="projects.html">
+    <script type="text/ng-template" id="containers.html">
     <div ng-include src="'navbar.html'"></div>
     <div class="container">
-      <h1>Projects</h1>
+      <h1>Containers</h1>
 
       <table class="table">
         <thead>
-          <tr><th>Project Name</th><th>Active?</th><th></th></tr>
+          <tr><th>Container Name</th><th>Active?</th><th></th></tr>
         </thead>
         <tbody>
           <tr>
@@ -92,18 +92,18 @@
                      ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
                      title="{{nameCheck.reason}}">
                   <input type="text" class="form-control"
-                    ng-model="newProject.name"
-                    ng-change="checkName(newProject.name)"
+                    ng-model="newContainer.name"
+                    ng-change="checkName(newContainer.name)"
                     />
                   <span class="glyphicon form-control-feedback"
                     ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
                 </div>
-                <select class="form-control" ng-model="newProject.image"
+                <select class="form-control" ng-model="newContainer.image"
                   ng-options="image.value as image.label for image in images"></select>
                 <div class="checkbox">
                   <label>
                     Start?
-                    <input type="checkbox" ng-model="newProject.active"/>
+                    <input type="checkbox" ng-model="newContainer.active"/>
                   </label>
                 </div>
                 <button class="btn btn-primary" ng-click="create()">
@@ -112,22 +112,22 @@
               </form>
             </td>
           </tr>
-          <tr ng-repeat="project in projects | orderBy:'name'">
+          <tr ng-repeat="container in containers | orderBy:'name'">
             <td>
-              <a ng-if="project.active" href="{{rootUrl(project.name)}}"
-                 target="_blank">{{project.name}}</a>
-              <span ng-if="!project.active">{{project.name}}</span>
+              <a ng-if="container.active" href="{{rootUrl(container.name)}}"
+                 target="_blank">{{container.name}}</a>
+              <span ng-if="!container.active">{{container.name}}</span>
             </td>
             <td>
               <div class="btn-group">
-                <button ng-if="project.active" class="btn btn-primary disabled active" role="button">On</button>
-                <button ng-if="project.active" class="btn btn-default" ng-click="turnOff(project.id)">Off</button>
-                <button ng-if="!project.active" class="btn btn-default" ng-click="turnOn(project.id)">On</button>
-                <button ng-if="!project.active" class="btn btn-primary disabled active" role="button">Off</button>
+                <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
+                <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
+                <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
+                <button ng-if="!container.active" class="btn btn-primary disabled active" role="button">Off</button>
               </div>
             </td>
             <td>
-              <button class="btn btn-danger" ng-click="delete(project.id)">Delete</button>
+              <button class="btn btn-danger" ng-click="delete(container.id)">Delete</button>
             </td>
           </tr>
         </tbody>

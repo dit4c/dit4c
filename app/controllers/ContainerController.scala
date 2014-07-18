@@ -9,13 +9,13 @@ import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
 
-class ProjectController @Inject() (
+class ContainerController @Inject() (
     val db: CouchDB.Database,
-    cnpHelper: ComputeNodeProjectHelper,
+    cnpHelper: ComputeNodeContainerHelper,
     mainController: Application) extends Controller with Utils {
 
-  implicit class CNPHelper(cnp: ComputeNode.Project) {
-    def makeActive(shouldBeActive: Boolean): Future[ComputeNode.Project] =
+  implicit class CNCHelper(cnp: ComputeNode.Container) {
+    def makeActive(shouldBeActive: Boolean): Future[ComputeNode.Container] =
       if (cnp.active != shouldBeActive)
         if (shouldBeActive)
           cnp.start
@@ -27,7 +27,7 @@ class ProjectController @Inject() (
 
   def index = Action.async { implicit request =>
     render.async {
-      case Accepts.Html() => mainController.main("projects")(request)
+      case Accepts.Html() => mainController.main("containers")(request)
       case Accepts.Json() => list(request)
     }
   }
@@ -41,16 +41,16 @@ class ProjectController @Inject() (
       val shouldBeActive = (json \ "active").as[Boolean]
       val response: Future[Result] =
         for {
-          project <- projectDao.create(request.user, name, description, image)
-          p <- cnpHelper.creator(project)
-          cnProject <- if (shouldBeActive) p.start else Future.successful(p)
+          container <- containerDao.create(request.user, name, description, image)
+          p <- cnpHelper.creator(container)
+          cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
-            "id" -> project.id,
-            "name" -> project.name,
-            "description" -> project.description,
-            "image" -> project.image,
-            "active" -> cnProject.active
+            "id" -> container.id,
+            "name" -> container.name,
+            "description" -> container.description,
+            "image" -> container.image,
+            "active" -> cnContainer.active
           ))
         }
       response.flatMap(_.withUpdatedJwt(request.user))
@@ -58,14 +58,14 @@ class ProjectController @Inject() (
   }
 
   def list = Authenticated.async { implicit request =>
-    projectPairs.map { pairs =>
+    containerPairs.map { pairs =>
       val user = request.user
-      val json = JsArray(pairs.map { case (p, cnp) =>
+      val json = JsArray(pairs.map { case (c, cnc) =>
           Json.obj(
-            "id" -> p.id,
-            "name" -> p.name,
-            "description" -> p.description,
-            "active" -> cnp.active
+            "id" -> c.id,
+            "name" -> c.name,
+            "description" -> c.description,
+            "active" -> cnc.active
           )
         })
       Ok(json)
@@ -75,21 +75,21 @@ class ProjectController @Inject() (
   def update(id: String) = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
       val shouldBeActive: Boolean = (json \ "active").as[Boolean]
-      projectDao.get(id)
+      containerDao.get(id)
         .flatMap[Result] {
           case None =>
             Future.successful(NotFound)
-          case Some(project) =>
-            cnpHelper.resolver(project).flatMap {
+          case Some(container) =>
+            cnpHelper.resolver(container).flatMap {
               case None =>
                 // TODO: Improve this handling
                 Future.successful(NotFound)
               case Some(cnp) =>
                 cnp.makeActive(shouldBeActive).map { updatedCnp =>
                   Ok(Json.obj(
-                    "id" -> project.id,
-                    "name" -> project.name,
-                    "description" -> project.description,
+                    "id" -> container.id,
+                    "name" -> container.name,
+                    "description" -> container.description,
                     "active" -> updatedCnp.active
                   ))
                 }
@@ -99,30 +99,30 @@ class ProjectController @Inject() (
   }
 
   def delete(id: String) = Authenticated.async { implicit request =>
-    projectDao.get(id)
+    containerDao.get(id)
       .flatMap[Result] {
         case None =>
           Future.successful(NotFound)
-        case Some(project) =>
-          cnpHelper.resolver(project).flatMap {
+        case Some(container) =>
+          cnpHelper.resolver(container).flatMap {
             case None =>
               // TODO: Improve this handling
               Future.successful(NotFound)
             case Some(cnp) =>
-              project.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
+              container.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
           }
       }
   }
 
   def checkNewName(name: String) = Authenticated.async { implicit request =>
-    projectDao.list.map { projects =>
-      if (projects.exists(p => p.name == name)) {
+    containerDao.list.map { containers =>
+      if (containers.exists(p => p.name == name)) {
         Ok(Json.obj(
           "valid" -> false,
-          "reason" -> "A project with that name already exists."
+          "reason" -> "A container with that name already exists."
         ))
       } else {
-        validateProjectName(name) match {
+        validateContainerName(name) match {
           case Right(_: Unit) =>
             Ok(Json.obj(
               "valid" -> true
@@ -137,7 +137,7 @@ class ProjectController @Inject() (
     }
   }
 
-  def validateProjectName(name: String): Either[String, Unit] = {
+  def validateContainerName(name: String): Either[String, Unit] = {
     val c = ValidityCheck
     Seq(
       // Test and failure message
@@ -155,18 +155,18 @@ class ProjectController @Inject() (
       val expr: String => Boolean,
       val msg: String)
 
-  private def projectPairs(implicit request: AuthenticatedRequest[_]):
-      Future[Seq[(Project, ComputeNode.Project)]] = {
-    projectDao.list.flatMap { projects =>
-      val userProjects = projects.filter(_.ownerIDs.contains(request.user.id))
+  private def containerPairs(implicit request: AuthenticatedRequest[_]):
+      Future[Seq[(Container, ComputeNode.Container)]] = {
+    containerDao.list.flatMap { containers =>
+      val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
       val r = cnpHelper.resolver // Use a single resolver instance
       Future.sequence(
-        // For each project do a lookup with the resolver
-        userProjects.map(r)
+        // For each container do a lookup with the resolver
+        userContainers.map(r)
       ).map { results =>
-        // Zip together project with result, then remove projects with missing
-        // compute node projects.
-        userProjects.zip(results).flatMap { pair =>
+        // Zip together container with result, then remove containers with missing
+        // compute node containers.
+        userContainers.zip(results).flatMap { pair =>
           pair._2.map(pair._1 -> _)
         }
       }
