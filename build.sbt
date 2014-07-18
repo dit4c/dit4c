@@ -1,3 +1,6 @@
+import sbtrelease._
+import ReleaseStateTransformations._
+
 organization  := "dit4c.machineshop"
 
 version       := "0.1"
@@ -62,3 +65,18 @@ generateExecutable := {
   // Return path
   outputFile.getAbsolutePath
 }
+
+releaseSettings
+
+ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,              // : ReleaseStep
+  inquireVersions,                        // : ReleaseStep
+  runClean,                               // : ReleaseStep
+  runTest,                                // : ReleaseStep
+  setReleaseVersion,                      // : ReleaseStep
+  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
+  tagRelease,                             // : ReleaseStep
+  setNextVersion,                         // : ReleaseStep
+  commitNextVersion,                      // : ReleaseStep
+  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
+)
