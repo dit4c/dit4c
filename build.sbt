@@ -3,8 +3,6 @@ import ReleaseStateTransformations._
 
 organization  := "dit4c.machineshop"
 
-version       := "0.1"
-
 scalaVersion  := "2.10.4"
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
