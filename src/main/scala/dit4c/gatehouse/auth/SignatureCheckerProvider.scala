@@ -9,8 +9,8 @@ import spray.client.pipelining._
 import akka.actor.ActorRefFactory
 
 trait SignatureCheckerProvider {
-  private val log = java.util.logging.Logger.getLogger(this.getClass.getName)
 
+  def log: akka.event.LoggingAdapter
   implicit def executionContext: ExecutionContext
   implicit def actorRefFactory: ActorRefFactory
 

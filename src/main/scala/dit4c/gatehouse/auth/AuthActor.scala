@@ -12,7 +12,7 @@ import akka.actor.ActorRef
 import akka.actor.Cancellable
 
 class AuthActor(publicKeySource: java.net.URI) extends Actor with SignatureCheckerProvider {
-  val log = Logging(context.system, this)
+  override val log = Logging(context.system, this)
 
   import AuthActor._
 
