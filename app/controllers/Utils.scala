@@ -90,6 +90,9 @@ trait Utils extends Results {
       json.toString
     }
     val header = new JWSHeader(JWSAlgorithm.RS256)
+    // Keyset URL, which we'll set because we have one
+    header.setJWKURL(new java.net.URL(
+        routes.AuthController.publicKeys().absoluteURL(request.secure)))
     val payload = new Payload(tokenString)
     val signer = new RSASSASigner(privateKey)
     val token = new JWSObject(header, payload)
