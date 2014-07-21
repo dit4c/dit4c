@@ -27,7 +27,8 @@ class AuthActorSpec extends Specification with NoTimeConversions {
       val keyFile = File.createTempFile("dit4c-", "-testkeyfile")
       keyFile.deleteOnExit()
 
-      val actorRef = TestActorRef[AuthActor](Props(classOf[AuthActor], keyFile))
+      val actorRef = TestActorRef[AuthActor](
+          Props(classOf[AuthActor], new java.net.URI(keyFile.getAbsolutePath)))
 
       actorRef.underlyingActor must not beNull
     }
@@ -72,7 +73,8 @@ class AuthActorSpec extends Specification with NoTimeConversions {
         token.serialize
       }
 
-      val actorRef = TestActorRef[AuthActor](Props(classOf[AuthActor], keyFile))
+      val actorRef = TestActorRef[AuthActor](
+          Props(classOf[AuthActor], new java.net.URI(keyFile.getAbsolutePath)))
 
       (actorRef ? AuthCheck(token, "foo")) must be_==(AccessGranted).await
       (actorRef ? AuthCheck(token, "invalid")) must beAnInstanceOf[AccessDenied].await

@@ -9,8 +9,9 @@ import akka.event.Logging
 import scala.concurrent.duration.Duration
 import java.util.concurrent.TimeUnit
 import akka.actor.ActorRef
+import akka.actor.Cancellable
 
-class AuthActor(publicKeySource: File) extends Actor {
+class AuthActor(publicKeySource: java.net.URI) extends Actor with SignatureCheckerProvider {
   val log = Logging(context.system, this)
 
   import AuthActor._
@@ -18,6 +19,7 @@ class AuthActor(publicKeySource: File) extends Actor {
   val authorizationChecker = new AuthorizationChecker
 
   implicit val executionContext = context.system.dispatcher
+  implicit val actorRefFactory = context.system
 
   type AuthChecker = AuthCheck => AuthResponse
   type QueuedCheck = (ActorRef, AuthCheck)
@@ -28,20 +30,26 @@ class AuthActor(publicKeySource: File) extends Actor {
   val keyUpdateInterval = Duration.create(1, TimeUnit.MINUTES)
   val base: Receive = {
     case UpdateSignatureChecker =>
-      SignatureCheckerProvider
-        .fromFile(publicKeySource)
+      createSignatureChecker(publicKeySource)
         .foreach { sc =>
           context.self ! ReplaceSignatureChecker(sc)
         }
   }
 
+  var scheduledCheck: Option[Cancellable] = None
+
   override def preStart = {
     // Schedule updates
-    context.system.scheduler.schedule(
-      Duration.Zero,
-      keyUpdateInterval,
-      context.self,
-      UpdateSignatureChecker)
+    scheduledCheck = Some(
+      context.system.scheduler.schedule(
+        Duration.Zero,
+        keyUpdateInterval,
+        context.self,
+        UpdateSignatureChecker))
+  }
+
+  override def postStop = {
+    scheduledCheck.foreach(_.cancel)
   }
 
   val receive: Receive = queueChecks(Nil)

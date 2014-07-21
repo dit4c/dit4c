@@ -33,16 +33,16 @@ object Boot extends App {
 
 }
 
-case class Config(val port: Int = 8080, val keyFile: File = null)
+case class Config(val port: Int = 8080, val keyLocation: java.net.URI = null)
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
-  arg[File]("<private_key_file>")
+  arg[java.net.URI]("<public_key_location>")
     .required()
-    .action { (x, c) => c.copy(keyFile = x) }
-    .text("file containing JWK RSA public keys")
+    .action { (x, c) => c.copy(keyLocation = x) }
+    .text("URL/file containing JWK RSA public keys")
 
 }
