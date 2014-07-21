@@ -33,11 +33,15 @@ object Boot extends App {
 
 }
 
-case class Config(val port: Int = 8080)
+case class Config(val port: Int = 8080, publicKeyLocation: Option[java.net.URI] = None)
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   help("help") text("prints this usage text")
-  opt[Int]('p', "port") action { (x, c) =>
-    c.copy(port = x) } text("port to listen on")
+  opt[Int]('p', "port")
+    .action { (x, c) => c.copy(port = x) }
+    .text("port to listen on")
+  opt[java.net.URI]('s', "signed-by")
+    .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }
+    .text("location of JWK key set used to sign privileged requests")
 
 }

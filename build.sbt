@@ -21,6 +21,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"     % "2.3.7" % "test",
     "org.codehaus.groovy" %   "groovy-all"      % "1.8.8" % "compile",
     "co.freeside"         %   "betamax"         % "1.1.2" % "test",
+    "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0"
   )
 }
