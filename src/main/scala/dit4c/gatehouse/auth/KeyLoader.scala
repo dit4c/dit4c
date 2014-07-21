@@ -8,11 +8,13 @@ object KeyLoader {
 
   implicit def toPublic(keys: Seq[RSAKey]) = keys.map(_.toRSAPublicKey)
 
-  def apply(input: InputStream): Seq[RSAKey] = {
-    val content = scala.io.Source.fromInputStream(input).mkString
-
+  def apply(content: String): Seq[RSAKey] = {
     val keySet = JWKSet.parse(content)
     keySet.getKeys.map( _.asInstanceOf[RSAKey] )
+  }
+
+  def apply(input: InputStream): Seq[RSAKey] = {
+    apply(scala.io.Source.fromInputStream(input).mkString)
   }
 
 }

@@ -37,9 +37,12 @@ case class Config(val port: Int = 8080, val keyFile: File = null)
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")
-  opt[Int]('p', "port") action { (x, c) =>
-    c.copy(port = x) } text("port to listen on")
-  arg[File]("<private_key_file>") required() action { (x, c) =>
-    c.copy(keyFile = x) } text("file containing JWK RSA public keys")
+  opt[Int]('p', "port")
+    .action { (x, c) => c.copy(port = x) }
+    .text("port to listen on")
+  arg[File]("<private_key_file>")
+    .required()
+    .action { (x, c) => c.copy(keyFile = x) }
+    .text("file containing JWK RSA public keys")
 
 }
