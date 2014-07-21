@@ -7,6 +7,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 object Boot extends App {
 
@@ -33,13 +34,23 @@ object Boot extends App {
 
 }
 
-case class Config(val port: Int = 8080, val keyLocation: java.net.URI = null)
+case class Config(
+  val port: Int = 8080,
+  val keyLocation: java.net.URI = null,
+  val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
+  opt[Int]('k', "key-refresh")
+    .optional()
+    .action { (x, c) =>
+      c.copy(keyUpdateInterval = Duration.create(x, TimeUnit.SECONDS))
+     }
+    .text("second interval to use when polling keys")
+
   arg[java.net.URI]("<public_key_location>")
     .required()
     .action { (x, c) => c.copy(keyLocation = x) }

@@ -19,7 +19,7 @@ class MainServiceActor(config: Config) extends Actor with MiscService {
   val dockerIndex = actorRefFactory.actorOf(
       Props(classOf[DockerIndexActor], dockerClient))
   val auth = actorRefFactory.actorOf(
-      Props(classOf[AuthActor], config.keyLocation))
+      Props(classOf[AuthActor], config.keyLocation, config.keyUpdateInterval))
 
   // this actor only runs our route, but you could add
   // other things here, like request stream processing

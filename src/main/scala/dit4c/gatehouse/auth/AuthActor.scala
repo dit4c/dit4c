@@ -10,8 +10,10 @@ import scala.concurrent.duration.Duration
 import java.util.concurrent.TimeUnit
 import akka.actor.ActorRef
 import akka.actor.Cancellable
+import scala.concurrent.duration.FiniteDuration
 
-class AuthActor(publicKeySource: java.net.URI) extends Actor with SignatureCheckerProvider {
+class AuthActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
+    extends Actor with SignatureCheckerProvider {
   override val log = Logging(context.system, this)
 
   import AuthActor._
@@ -27,7 +29,6 @@ class AuthActor(publicKeySource: java.net.URI) extends Actor with SignatureCheck
   /* Signature Checker Updates */
   object UpdateSignatureChecker
   case class ReplaceSignatureChecker(sc: SignatureChecker)
-  val keyUpdateInterval = Duration.create(1, TimeUnit.MINUTES)
   val base: Receive = {
     case UpdateSignatureChecker =>
       createSignatureChecker(publicKeySource)

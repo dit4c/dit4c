@@ -14,6 +14,7 @@ import dit4c.gatehouse.auth.AuthActor.AuthCheck
 import akka.pattern.ask
 import akka.util.Timeout
 import org.specs2.time.NoTimeConversions
+import java.util.concurrent.TimeUnit
 
 class AuthActorSpec extends Specification with NoTimeConversions {
   import scala.concurrent.duration._
@@ -23,12 +24,17 @@ class AuthActorSpec extends Specification with NoTimeConversions {
 
   "Auth Actor" should {
 
+    def newActor(keyFile: File) =
+      TestActorRef[AuthActor](
+          Props(classOf[AuthActor],
+              new java.net.URI(keyFile.getAbsolutePath),
+              Duration.create(1, TimeUnit.HOURS)))
+
     "should not die if fed an empty file" in {
       val keyFile = File.createTempFile("dit4c-", "-testkeyfile")
       keyFile.deleteOnExit()
 
-      val actorRef = TestActorRef[AuthActor](
-          Props(classOf[AuthActor], new java.net.URI(keyFile.getAbsolutePath)))
+      val actorRef = newActor(keyFile)
 
       actorRef.underlyingActor must not beNull
     }
@@ -73,8 +79,7 @@ class AuthActorSpec extends Specification with NoTimeConversions {
         token.serialize
       }
 
-      val actorRef = TestActorRef[AuthActor](
-          Props(classOf[AuthActor], new java.net.URI(keyFile.getAbsolutePath)))
+      val actorRef = newActor(keyFile)
 
       (actorRef ? AuthCheck(token, "foo")) must be_==(AccessGranted).await
       (actorRef ? AuthCheck(token, "invalid")) must beAnInstanceOf[AccessDenied].await
