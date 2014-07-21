@@ -5,6 +5,7 @@
 GET     /login/redirect             @controllers.AuthController.login
 POST    /logout                     @controllers.AuthController.logout
 POST    /auth/callback              @controllers.AuthController.callback
+GET     /public-keys                @controllers.AuthController.publicKeys
 
 GET     /users/current              @controllers.UserController.currentUser
 GET     /users/:id                  @controllers.UserController.get(id)

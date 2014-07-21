@@ -97,6 +97,8 @@ trait Utils extends Results {
     token.serialize
   }
 
+  def publicKeySet: JWKSet = privateKeySet.toPublicJWKSet
+
   private def privateKeySet: JWKSet = {
     try {
       val content = Source.fromFile(privateKeysFile).mkString
