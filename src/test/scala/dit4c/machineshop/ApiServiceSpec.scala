@@ -12,6 +12,10 @@ import dit4c.machineshop.docker.models._
 import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import akka.actor.ActorRef
+import dit4c.machineshop.auth.SignatureActor
+import akka.testkit.TestProbe
+import akka.testkit.TestActor
 
 class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService {
   implicit val actorRefFactory = system
@@ -59,9 +63,23 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
     }
   }
 
+  def mockSignatureActor(response: SignatureActor.AuthResponse): ActorRef = {
+    val probe = TestProbe()
+    probe.setAutoPilot(new TestActor.AutoPilot {
+      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
+        msg match {
+          case SignatureActor.AuthCheck(_) =>
+            sender ! response
+            TestActor.KeepRunning
+        }
+    })
+    probe.ref
+  }
+
   val image = "dit4c/dit4c-container-ipython"
 
-  def route(implicit client: DockerClient) = ApiService(client).route
+  def route(implicit client: DockerClient, signatureActor: Option[ActorRef] = None) =
+    ApiService(client, signatureActor).route
 
   "ApiService" should {
 
@@ -111,6 +129,49 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
           "name" -> JsString("foobar"),
           "image" -> JsString(image))
       Post("/containers/new", requestJson) ~> route ~> check {
+        contentType must_== ContentTypes.`application/json`
+        val json = JsonParser(responseAs[String]).convertTo[JsObject]
+        json.fields("name").convertTo[String] must_== "foobar"
+      }
+      client.containers.list.await must haveSize(1)
+    }
+
+    "require HTTP Signatures for POST requests to /containers/new" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      val client = mockDockerClient
+      client.containers.list.await must beEmpty
+      val requestJson = JsObject(
+          "name" -> JsString("foobar"),
+          "image" -> JsString(image))
+      // Check a challenge is issued
+      Post("/containers/new", requestJson) ~>
+          route(client, Some(mockSignatureActor(
+              SignatureActor.AccessDenied("Just 'cause")))) ~>
+          check {
+        status must_== StatusCodes.Unauthorized
+        header("WWW-Authenticate") must beSome
+      }
+      client.containers.list.await must beEmpty
+      // Create a Authorization header
+      val authHeader = HttpHeaders.Authorization(
+              GenericHttpCredentials("Signature", "",
+                  Map(/* Parameters don't matter - using mock */ )))
+      // Check that signature failure works
+      Post("/containers/new", requestJson) ~>
+          addHeader(authHeader) ~>
+          route(client, Some(mockSignatureActor(
+              SignatureActor.AccessDenied("Just 'cause")))) ~>
+          check {
+        status must_== StatusCodes.Forbidden
+      }
+      client.containers.list.await must beEmpty
+      Post("/containers/new", requestJson) ~>
+          addHeader(authHeader) ~>
+          route(client, Some(mockSignatureActor(
+              SignatureActor.AccessGranted))) ~>
+          check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
         json.fields("name").convertTo[String] must_== "foobar"

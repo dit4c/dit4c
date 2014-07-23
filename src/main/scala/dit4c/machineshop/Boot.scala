@@ -7,6 +7,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 object Boot extends App {
 
@@ -33,7 +34,10 @@ object Boot extends App {
 
 }
 
-case class Config(val port: Int = 8080, publicKeyLocation: Option[java.net.URI] = None)
+case class Config(
+    val port: Int = 8080,
+    val publicKeyLocation: Option[java.net.URI] = None,
+    val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   help("help") text("prints this usage text")
@@ -43,5 +47,10 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   opt[java.net.URI]('s', "signed-by")
     .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }
     .text("location of JWK key set used to sign privileged requests")
-
+  opt[Int]('k', "key-refresh")
+    .optional()
+    .action { (x, c) =>
+      c.copy(keyUpdateInterval = Duration.create(x, TimeUnit.SECONDS))
+     }
+    .text("second interval to use when polling keys")
 }
