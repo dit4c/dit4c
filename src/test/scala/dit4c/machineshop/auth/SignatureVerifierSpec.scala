@@ -28,9 +28,11 @@ class SignatureVerifierSpec extends Specification {
 
   "SignatureVerifier" >> {
 
-    "verifies a JWT " >> {
+    "verifies a HTTP signature" >> {
+      import dit4c.HttpSignatureUtils._
+
       val keyId = "Test RSA key (512 bit)"
-      val keySet = {
+      val (keySet, privateKey) = {
         val generator = KeyPairGenerator.getInstance("RSA")
         generator.initialize(512) // Yes, it's weak, but it's fast!
         val kp = generator.generateKeyPair
@@ -38,65 +40,29 @@ class SignatureVerifierSpec extends Specification {
         val priv = kp.getPrivate.asInstanceOf[RSAPrivateKey]
         val k = new RSAKey(pub, priv, Use.SIGNATURE, JWSAlgorithm.parse("RSA"),
             keyId, null, null, null)
-        new JWKSet(k)
+        (new JWKSet(k), priv)
       }
-
-      def addSignature(requiredHeaders: Seq[String]) =
-        { req: HttpRequest =>
-          def headerValue(name: String) =
-            if (name == "(request-target)")
-              s"${req.method.value.toLowerCase} ${req.uri.path}"
-            else
-              req.headers
-                .find(h => h.name.toLowerCase == name) // First header with name
-                .map(_.value).getOrElse("") // Convert to string
-
-          val signingString = requiredHeaders
-            .map { hn => s"$hn: ${headerValue(hn)}" }
-            .mkString("\n")
-
-          val algorithm = "rsa-sha256"
-
-          def signature(signingString: String): Base64 = {
-            def getSignatureInstance(alg: String): Signature =
-              Signature.getInstance(alg match {
-                case "rsa-sha1"   => "SHA1withRSA"
-                case "rsa-sha256" => "SHA256withRSA"
-              })
-
-            val privateKey =
-              keySet.getKeyByKeyId(keyId).asInstanceOf[RSAKey].toRSAPrivateKey
-
-            val sig = getSignatureInstance(algorithm)
-            sig.initSign(privateKey)
-            sig.update(signingString.getBytes)
-
-            Base64.encode(sig.sign)
-          }
-
-          req ~> addHeader(HttpHeaders.Authorization(
-            GenericHttpCredentials("Signature", "", Map(
-              "keyId" -> keyId,
-              "algorithm" -> algorithm,
-              "headers" -> requiredHeaders.mkString(" "),
-              "signature" -> signature(signingString).toString
-            ))
-          ))
-        }
-
-      val request = Post("/create?name=foo", "") ~>
-        addHeader(HttpHeaders.Date(DateTime.now)) ~>
-        addHeader(HttpHeaders.`Content-Length`(0)) ~>
-        addSignature(Seq("(request-target)", "date", "content-length"))
 
       val verifier = new SignatureVerifier(keySet.toPublicJWKSet)
 
-      verifier(request) must beRight
+      Seq(`RSA-SHA1`, `RSA-SHA256`).foreach { algorithm =>
+        val request = Post("/create?name=foo", "") ~>
+          addHeader(HttpHeaders.Date(DateTime.now)) ~>
+          addHeader(HttpHeaders.`Content-Length`(0)) ~>
+          addSignature(
+              keyId, privateKey, algorithm,
+              Seq("(request-target)", "date", "content-length"))
 
-      verifier(
-        request
-          ~> removeHeader("Date")
-          ~> addHeader(HttpHeaders.Date(DateTime(0)))) must beLeft[String]
+        // Check valid signature verifies
+        verifier(request) must beRight
+        // Check validation fails if we change the date
+        verifier(
+          request
+            ~> removeHeader("Date")
+            ~> addHeader(HttpHeaders.Date(DateTime(0)))) must beLeft[String]
+      }
+
+      done
     }
   }
 }
