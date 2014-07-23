@@ -15,7 +15,6 @@ interactions:
     status: 201
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:48 GMT
       Server: nginx/1.5.12
     body: |
       {"Id":"2d923bc0717f78acefdcd41a5b2c7641328fab5f7b40fa2bb094220195993546","Warnings":null}
@@ -30,7 +29,6 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:48 GMT
       Server: nginx/1.5.12
     body: |-
       [{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643687,"Id":"2d923bc0717f78acefdcd41a5b2c7641328fab5f7b40fa2bb094220195993546","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testdelete"],"Ports":[],"Status":""}

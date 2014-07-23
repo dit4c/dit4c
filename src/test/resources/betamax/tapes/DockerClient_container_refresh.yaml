@@ -15,7 +15,6 @@ interactions:
     status: 201
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:50 GMT
       Server: nginx/1.5.12
     body: |
       {"Id":"ad690ddd32312bba685749057c6ebb5d0d374ce6f09e8611d7b3435101c83699","Warnings":null}
@@ -30,7 +29,6 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:50 GMT
       Server: nginx/1.5.12
     body: |
       {"Args":["-c","/etc/supervisord.conf"],"Config":{"AttachStderr":true,"AttachStdin":false,"AttachStdout":true,"Cmd":["/usr/bin/supervisord","-c","/etc/supervisord.conf"],"CpuShares":0,"Cpuset":"","Domainname":"","Entrypoint":null,"Env":["HOME=/","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"ExposedPorts":{"80/tcp":{}},"Hostname":"testrefresh","Image":"dit4c/dit4c-container-ipython","Memory":0,"MemorySwap":0,"NetworkDisabled":false,"OnBuild":null,"OpenStdin":false,"PortSpecs":null,"StdinOnce":false,"Tty":true,"User":"","Volumes":null,"WorkingDir":""},"Created":"2014-07-18T00:34:50.004568281Z","Driver":"btrfs","ExecDriver":"native-0.2","HostConfig":{"Binds":null,"ContainerIDFile":"","Dns":null,"DnsSearch":null,"Links":null,"LxcConf":null,"NetworkMode":"","PortBindings":null,"Privileged":false,"PublishAllPorts":false,"VolumesFrom":null},"HostnamePath":"","HostsPath":"","Id":"ad690ddd32312bba685749057c6ebb5d0d374ce6f09e8611d7b3435101c83699","Image":"fadf6b58e4591632430119ba1b622245cb6ed3ea2edaa5963cafec714a22e4f4","MountLabel":"system_u:object_r:svirt_sandbox_file_t:s0:c251,c455","Name":"/testrefresh","NetworkSettings":{"Bridge":"","Gateway":"","IPAddress":"","IPPrefixLen":0,"PortMapping":null,"Ports":null},"Path":"/usr/bin/supervisord","ProcessLabel":"system_u:system_r:svirt_lxc_net_t:s0:c251,c455","ResolvConfPath":"","State":{"ExitCode":0,"FinishedAt":"0001-01-01T00:00:00Z","Paused":false,"Pid":0,"Running":false,"StartedAt":"0001-01-01T00:00:00Z"},"Volumes":null,"VolumesRW":null}

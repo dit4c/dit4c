@@ -12,7 +12,6 @@ interactions:
     status: 204
     headers:
       Content-Type: text/plain; charset=utf-8
-      Date: Fri, 18 Jul 2014 00:35:01 GMT
       Server: nginx/1.5.12
 - recorded: 2014-07-18T00:35:01.266Z
   request:
@@ -25,7 +24,6 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:35:01 GMT
       Server: nginx/1.5.12
     body: |-
       [{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643696,"Id":"5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testlist-2"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49155,"Type":"tcp"}],"Status":"Up 3 seconds"}

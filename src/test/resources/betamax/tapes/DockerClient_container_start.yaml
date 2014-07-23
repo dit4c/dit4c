@@ -15,7 +15,6 @@ interactions:
     status: 201
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:43 GMT
       Server: nginx/1.5.12
     body: |
       {"Id":"f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce","Warnings":null}
@@ -33,7 +32,6 @@ interactions:
     status: 204
     headers:
       Content-Type: text/plain; charset=utf-8
-      Date: Fri, 18 Jul 2014 00:34:43 GMT
       Server: nginx/1.5.12
 - recorded: 2014-07-18T00:34:43.313Z
   request:
@@ -46,7 +44,6 @@ interactions:
     status: 200
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:43 GMT
       Server: nginx/1.5.12
     body: |
       {"Args":["-c","/etc/supervisord.conf"],"Config":{"AttachStderr":true,"AttachStdin":false,"AttachStdout":true,"Cmd":["/usr/bin/supervisord","-c","/etc/supervisord.conf"],"CpuShares":0,"Cpuset":"","Domainname":"","Entrypoint":null,"Env":["HOME=/","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"ExposedPorts":{"80/tcp":{}},"Hostname":"teststart","Image":"dit4c/dit4c-container-ipython","Memory":0,"MemorySwap":0,"NetworkDisabled":false,"OnBuild":null,"OpenStdin":false,"PortSpecs":null,"StdinOnce":false,"Tty":true,"User":"","Volumes":null,"WorkingDir":""},"Created":"2014-07-18T00:34:42.612987899Z","Driver":"btrfs","ExecDriver":"native-0.2","HostConfig":{"Binds":null,"ContainerIDFile":"","Dns":null,"DnsSearch":null,"Links":null,"LxcConf":null,"NetworkMode":"","PortBindings":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"49153"}]},"Privileged":false,"PublishAllPorts":true,"VolumesFrom":null},"HostnamePath":"/var/lib/docker/containers/f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce/hostname","HostsPath":"/var/lib/docker/containers/f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce/hosts","Id":"f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce","Image":"fadf6b58e4591632430119ba1b622245cb6ed3ea2edaa5963cafec714a22e4f4","MountLabel":"system_u:object_r:svirt_sandbox_file_t:s0:c525,c792","Name":"/teststart","NetworkSettings":{"Bridge":"docker0","Gateway":"172.17.42.1","IPAddress":"172.17.0.2","IPPrefixLen":16,"PortMapping":null,"Ports":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"49153"}]}},"Path":"/usr/bin/supervisord","ProcessLabel":"system_u:system_r:svirt_lxc_net_t:s0:c525,c792","ResolvConfPath":"/var/lib/docker/containers/f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce/resolv.conf","State":{"ExitCode":0,"FinishedAt":"0001-01-01T00:00:00Z","Paused":false,"Pid":11070,"Running":true,"StartedAt":"2014-07-18T00:34:43.291025037Z"},"Volumes":{},"VolumesRW":{}}

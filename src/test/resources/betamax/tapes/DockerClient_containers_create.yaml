@@ -15,7 +15,6 @@ interactions:
     status: 201
     headers:
       Content-Type: application/json
-      Date: Fri, 18 Jul 2014 00:34:46 GMT
       Server: nginx/1.5.12
     body: |
       {"Id":"f5d7b3f95fb0b0732368d3960bde1ca2a9c257cb63fdbaa2c4452b4ff3e6c377","Warnings":null}
