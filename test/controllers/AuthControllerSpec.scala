@@ -34,8 +34,6 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       val json = contentAsJson(response)
       (json \ "keys").asInstanceOf[JsArray].value.foreach { key =>
         (key \ "kty").as[String] must_== "RSA"
-        (key \ "use").as[String] must_== "sig"
-        (key \ "alg").as[String] must_== "RSA"
         (key \ "n").asOpt[String] must beSome[String]
         (key \ "e").asOpt[String] must beSome[String]
         (key \ "d").asOpt[String] must beNone

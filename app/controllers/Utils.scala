@@ -32,14 +32,18 @@ trait Utils extends Results {
 
   protected lazy val computeNodeDao = new ComputeNodeDAO(db)
   protected lazy val containerDao = new ContainerDAO(db)
+  protected lazy val keyDao = new KeyDAO(db)
   protected lazy val userDao = new UserDAO(db)
 
   implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
     def withUpdatedJwt(user: User): Future[Result] =
-      userContainers(user).map { containers =>
-        response.withCookies(Cookie("dit4c-jwt",
-            jwt(containers.map(_.name)), domain=getCookieDomain))
+      for {
+        containers <- userContainers(user)
+        jwt <- createJWT(containers.map(_.name))
+      } yield {
+        response.withCookies(Cookie("dit4c-jwt", jwt, domain=getCookieDomain))
       }
+
     def withClearedJwt: Future[Result] =
       Future.successful {
         response.withCookies(
@@ -78,64 +82,48 @@ trait Utils extends Results {
       .map(userDao.get) // Get user if userId exists
       .getOrElse(Future.successful(None))
 
-  private def jwt(containers: Seq[String])(implicit request: Request[_]) = {
-    val privateKey = privateKeySet.getKeys.head
-      .asInstanceOf[RSAKey].toRSAPrivateKey
-    val tokenString = {
-      val json = Json.obj(
-          "iis" -> request.host,
-          "iat" -> System.currentTimeMillis / 1000,
-          "http://dit4c.github.io/authorized_containers" -> containers
-        )
-      json.toString
+  private def createJWT(containers: Seq[String])(implicit request: Request[_]) =
+    privateKeySet.map { jks =>
+      val privateKey = jks.getKeys.head
+        .asInstanceOf[RSAKey].toRSAPrivateKey
+      val tokenString = {
+        val json = Json.obj(
+            "iis" -> request.host,
+            "iat" -> System.currentTimeMillis / 1000,
+            "http://dit4c.github.io/authorized_containers" -> containers
+          )
+        json.toString
+      }
+      val header = new JWSHeader(JWSAlgorithm.RS256)
+      // Keyset URL, which we'll set because we have one
+      header.setJWKURL(new java.net.URL(
+          routes.AuthController.publicKeys().absoluteURL(request.secure)))
+      val payload = new Payload(tokenString)
+      val signer = new RSASSASigner(privateKey)
+      val token = new JWSObject(header, payload)
+      token.sign(signer)
+      token.serialize
     }
-    val header = new JWSHeader(JWSAlgorithm.RS256)
-    // Keyset URL, which we'll set because we have one
-    header.setJWKURL(new java.net.URL(
-        routes.AuthController.publicKeys().absoluteURL(request.secure)))
-    val payload = new Payload(tokenString)
-    val signer = new RSASSASigner(privateKey)
-    val token = new JWSObject(header, payload)
-    token.sign(signer)
-    token.serialize
-  }
 
-  def publicKeySet: JWKSet = privateKeySet.toPublicJWKSet
+  // Public keyset includes retired keys
+  def publicKeySet: Future[JWKSet] =
+    keys.map(ks => new JWKSet(ks.map(_.toJWK)).toPublicJWKSet)
 
-  private def privateKeySet: JWKSet = {
-    try {
-      val content = Source.fromFile(privateKeysFile).mkString
-      JWKSet.parse(content)
-    } catch {
-      case _: FileNotFoundException => createNewPrivateKeySet(privateKeysFile)
-    }
-  }
+  // Private keyset excludes retired keys
+  private def privateKeySet: Future[JWKSet] =
+    keys.map(ks => new JWKSet(ks.filter(!_.retired).map(_.toJWK)))
 
-  private lazy val privateKeysFile = {
-    val keyPath = Play.current.configuration
-      .getString("keys.path").getOrElse("keys.json")
-    new File(keyPath)
-  }
+  lazy val keyNamespace: String =
+    Play.current.configuration
+      .getString("application.baseUrl")
+      .getOrElse("DIT4C")
 
-  private def createNewPrivateKeySet(keyFile: File): JWKSet = {
-    val keyLength = 4096 // Current recommended as of 2014
-    val generator = KeyPairGenerator.getInstance("RSA")
-    generator.initialize(keyLength)
-    val kp = generator.generateKeyPair
-    val pub = kp.getPublic.asInstanceOf[RSAPublicKey]
-    val priv = kp.getPrivate.asInstanceOf[RSAPrivateKey]
-    val k = new RSAKey(pub, priv, Use.SIGNATURE, JWSAlgorithm.parse("RSA"),
-        s"RSA key ($keyLength bit)", null, null, null)
-    val keySet = new JWKSet(k);
-    {
-      val w = new BufferedWriter(new FileWriter(keyFile))
-      // We need to explicitly state we want private keys too
-      val serializedJson = keySet.toJSONObject(false).toString
-      // Parse and unparse so we can pretty print for legibility
-      w.write(Json.prettyPrint(Json.parse(serializedJson)))
-      w.close
-    }
-    keySet
+  // Get keys, and create a new key if necessary
+  private def keys = keyDao.list.flatMap { keys =>
+    if (keys.exists(!_.retired))
+      Future.successful(keys)
+    else
+      keyDao.create(keyNamespace).map(keys :+ _)
   }
 
 }

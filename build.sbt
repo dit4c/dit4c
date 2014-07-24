@@ -11,7 +11,7 @@ libraryDependencies ++= Seq(
   cache,
   ws,
   "com.google.inject"   %   "guice"           % "3.0",
-  "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
+  "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS

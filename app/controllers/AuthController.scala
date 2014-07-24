@@ -28,8 +28,10 @@ class AuthController @Inject() (
     val db: CouchDB.Database)
     extends Controller with Utils {
 
-  def publicKeys = Action { implicit request =>
-    Ok(Json.parse(publicKeySet.toJSONObject.toJSONString))
+  def publicKeys = Action.async { implicit request =>
+    publicKeySet.map { jks =>
+      Ok(Json.parse(jks.toJSONObject.toJSONString))
+    }
   }
 
   def login = Action { implicit request =>
