@@ -64,19 +64,25 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
       transition(sv, queue)
   }
 
-  def performChecks(checker: SignatureVerifier): Receive = base.orElse {
+  def performChecks(checker: AuthCheck => AuthResponse): Receive = base.orElse {
     // Perform the check immediately
     case query: AuthCheck =>
-      sender ! checker(query.request)
+      sender ! checker(query)
     // Replace checker
     case ReplaceSignatureVerifier(sv) =>
       transition(sv, Nil)
   }
 
-  private def transition(checker: SignatureVerifier, queue: Seq[QueuedCheck]) {
-    context.become(performChecks(checker))
+  private def transition(sv: SignatureVerifier, queue: Seq[QueuedCheck]) {
+    val f = { query: AuthCheck =>
+      sv(query.request) match {
+        case Right(()) => AccessGranted
+        case Left(msg) => AccessDenied(msg)
+      }
+    }
+    context.become(performChecks(f))
     queue.foreach { case (qSender, qCheck) =>
-      qSender ! checker(qCheck.request)
+      qSender ! f(qCheck)
     }
   }
 
