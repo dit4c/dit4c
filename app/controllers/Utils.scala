@@ -30,10 +30,10 @@ trait Utils extends Results {
 
   protected def db: CouchDB.Database
 
-  protected lazy val computeNodeDao = new ComputeNodeDAO(db)
   protected lazy val containerDao = new ContainerDAO(db)
   protected lazy val keyDao = new KeyDAO(db)
   protected lazy val userDao = new UserDAO(db)
+  protected lazy val computeNodeDao = new ComputeNodeDAO(db, keyDao)
 
   implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
     def withUpdatedJwt(user: User): Future[Result] =

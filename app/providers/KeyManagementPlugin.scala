@@ -27,12 +27,20 @@ class KeyManagementPlugin(app: play.api.Application) extends Plugin {
     app.configuration
       .getString("application.baseUrl")
       .getOrElse("DIT4C"),
+    app.configuration
+      .getInt("keys.length")
+      .getOrElse(4096),
     Period.hours(3),
     Period.hours(24),
     Period.days(7)
   )
 
   private var manager: ActorRef = null
+
+  override def enabled =
+    app.configuration
+      .getBoolean("keys.manage")
+      .getOrElse(true)
 
   override def onStart {
     manager = system.actorOf(Props(classOf[KeyManagementActor], config, db))
@@ -43,6 +51,7 @@ class KeyManagementPlugin(app: play.api.Application) extends Plugin {
 
 case class KeyManagementConfig(
   namespace: String,
+  keyLength: Int,
   creationWait: Period,
   retirementAge: Period,
   deletionAge: Period
@@ -118,9 +127,10 @@ class KeyManagementActor(
       key.createdAt.plus(period).isBefore(DateTime.now)
   }
 
-  private def createNewKey = keyDao.create(config.namespace).map { key =>
-    log.info(s"Created new key: ${key.publicId}")
-  }
+  private def createNewKey =
+    keyDao.create(config.namespace, config.keyLength).map { key =>
+      log.info(s"Created new key: ${key.publicId}")
+    }
 
   private def retireKey(key: Key) = key.retire.map { key =>
     log.info(s"Retiring key: ${key.publicId}")

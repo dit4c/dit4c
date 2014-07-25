@@ -14,6 +14,7 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import testing.TestUtils.fakeApp
+import utils.SpecUtils
 
 /**
  * Add your spec here.
@@ -21,11 +22,10 @@ import testing.TestUtils.fakeApp
  * For more information, consult the wiki.
  */
 @RunWith(classOf[JUnitRunner])
-class ApplicationSpec extends PlaySpecification with NoTimeConversions {
+class ApplicationSpec
+    extends PlaySpecification with NoTimeConversions with SpecUtils {
 
   override implicit def defaultAwaitTimeout: Timeout = 60.seconds
-
-  import testing.TestUtils.fakeApp
 
   "Application" >> {
 
@@ -55,6 +55,8 @@ class ApplicationSpec extends PlaySpecification with NoTimeConversions {
     }
 
     "callback" in new WithApplication(fakeApp) {
+      createTestKey
+
       def base = FakeRequest(POST, "/auth/callback")
 
       val badRequests = Seq(

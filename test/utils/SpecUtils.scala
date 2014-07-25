@@ -39,4 +39,9 @@ trait SpecUtils extends ConcurrentExecutionContext {
   def injector(implicit app: play.api.Application) =
     app.plugin(classOf[InjectorPlugin]).get.injector.get
 
+  def createTestKey(implicit app: play.api.Application): models.Key =
+    Await.result(
+        (new models.KeyDAO(db)).create("DIT4C Test Key", 512),
+        Duration(20, "seconds"))
+
 }

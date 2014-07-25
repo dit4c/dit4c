@@ -19,7 +19,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
   "ComputeNodeDAO" should {
 
     "create a compute node" in new WithApplication(fakeApp) {
-      val dao = new ComputeNodeDAO(db)
+      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
       val node = await(dao.create("Local", "http://localhost:8080/"))
       node.name must_== "Local"
       node.url must_== "http://localhost:8080/"
@@ -33,7 +33,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "list all compute nodes" in new WithApplication(fakeApp) {
-      val dao = new ComputeNodeDAO(db)
+      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
       await(dao.list) must beEmpty
       val node = await(dao.create("Local", "http://localhost:8080/"))
       await(dao.list) must haveSize(1)
