@@ -56,6 +56,17 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.list) must haveSize(1)
     }
 
+    "provide the best signing key" in new WithApplication(fakeApp) {
+      val dao = new KeyDAO(db)
+      // Create three keys sequentially, then retire the oldest
+      val k1 = await(dao.create("localhost.localdomain", 512).flatMap(_.retire))
+      val k2 = await(dao.create("localhost.localdomain", 512))
+      val k3 = await(dao.create("localhost.localdomain", 512))
+      await(dao.list) must haveSize(3)
+      // Best key should be key2
+      await(dao.bestSigningKey) must beSome(k2)
+    }
+
   }
 
   "Key" should {
@@ -68,6 +79,7 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       retiredKey.retired must beTrue
       key.id must be(retiredKey.id)
       key._rev must not be(retiredKey._rev)
+      await(dao.list) must haveSize(1)
     }
 
     "delete" in new WithApplication(fakeApp) {

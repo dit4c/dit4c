@@ -49,6 +49,18 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
     }
   }
 
+  /**
+   * @returns Oldest non-retired key (which may not exist)
+   */
+  def bestSigningKey: Future[Option[Key]] =
+    list.map { keys =>
+      keys
+        .filter(!_.retired)
+        .sortBy(_.createdAt.toString())
+        .headOption
+    }
+
+
   def list: Future[Seq[Key]] = {
     val tempView = TemporaryView(views.js.models.Key_list_map())
     WS.url(s"${db.baseURL}/_temp_view")
@@ -58,13 +70,28 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       }
   }
 
-  private def createNewKeyPair(keyLength: Int): Future[RSAKey] = Future {
+  // RSAKey isn't comparable by default, so we wrap it. (RSAKey is final.)
+  private class WrappedRSAKey(val rsaKey: RSAKey) {
+
+    override def equals(o: Any) = o match {
+      case other: WrappedRSAKey => this.json == other.json
+      case _ => false
+    }
+
+    override def hashCode = json.hashCode
+
+    lazy val json = Json.parse(rsaKey.toJSONString)
+
+  }
+
+  private def createNewKeyPair(keyLength: Int): Future[WrappedRSAKey] = Future {
     val generator = KeyPairGenerator.getInstance("RSA")
     generator.initialize(keyLength)
     val kp = generator.generateKeyPair
     val pub = kp.getPublic.asInstanceOf[RSAPublicKey]
     val priv = kp.getPrivate.asInstanceOf[RSAPrivateKey]
-    new RSAKey(pub, priv, null, null, null, null, null, null, null)
+    new WrappedRSAKey(
+        new RSAKey(pub, priv, null, null, null, null, null, null, null))
   }
 
   implicit val dateTimeFormat: Format[DateTime] = new Format[DateTime]() {
@@ -79,40 +106,41 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       JsString(o.toString)
   }
 
-  implicit val rsaKeyFormat: Format[RSAKey] = new Format[RSAKey]() {
-    def reads(json: JsValue): JsResult[RSAKey] =
-      JsSuccess(JWK.parse(Json.stringify(json)).asInstanceOf[RSAKey])
+  implicit private val rsaKeyFormat: Format[WrappedRSAKey] =
+    new Format[WrappedRSAKey]() {
+      def reads(json: JsValue): JsResult[WrappedRSAKey] =
+        JsSuccess(new WrappedRSAKey(
+            JWK.parse(Json.stringify(json)).asInstanceOf[RSAKey]))
 
-    def writes(o: RSAKey): JsValue = Json.parse(o.toJSONString)
-  }
+      def writes(o: WrappedRSAKey): JsValue = o.json
+    }
 
-  implicit val keyFormat: Format[KeyImpl] = (
+  implicit private val keyFormat: Format[KeyImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "namespace").format[String] and
     (__ \ "createdAt").format[DateTime] and
     (__ \ "retired").format[Boolean] and
-    (__ \ "keyPair").format[RSAKey]
+    (__ \ "keyPair").format[WrappedRSAKey]
   )(KeyImpl.apply _, unlift(KeyImpl.unapply))
     .withTypeAttribute("Key")
 
-  case class KeyImpl(
+  private case class KeyImpl(
       id: String,
       _rev: Option[String],
       namespace: String,
       createdAt: DateTime,
       retired: Boolean,
-      keyPair: RSAKey)(implicit ec: ExecutionContext) extends Key {
+      keyPair: WrappedRSAKey)(implicit ec: ExecutionContext) extends Key {
     import play.api.libs.functional.syntax._
     import play.api.Play.current
 
     override def publicId: String = s"$namespace $createdAt [$id]"
 
-    override def retire: Future[Key] =
+    override def retire: Future[Key] = {
+      val key = this.copy(retired = true)
       for {
-        id <- db.newID
-        key = this.copy(retired = true)
-        response <- WS.url(s"${db.baseURL}/$id").put(Json.toJson(key))
+        response <- WS.url(s"${db.baseURL}/${key.id}").put(Json.toJson(key))
       } yield {
         response.status match {
           case 201 =>
@@ -121,15 +149,16 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
             key.copy(_rev = rev)
         }
       }
+    }
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
     override def toJWK = new RSAKey(
-      keyPair.toRSAPublicKey,
-      keyPair.toRSAPrivateKey,
-      keyPair.getKeyUse,
-      keyPair.getKeyOperations,
-      keyPair.getAlgorithm,
+      keyPair.rsaKey.toRSAPublicKey,
+      keyPair.rsaKey.toRSAPrivateKey,
+      keyPair.rsaKey.getKeyUse,
+      keyPair.rsaKey.getKeyOperations,
+      keyPair.rsaKey.getAlgorithm,
       publicId,
       null, null, null)
 
