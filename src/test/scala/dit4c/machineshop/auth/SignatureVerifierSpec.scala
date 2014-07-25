@@ -22,7 +22,6 @@ import spray.http.DateTime
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
 import spray.json._
-import java.security.MessageDigest
 
 class SignatureVerifierSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,12 +42,6 @@ class SignatureVerifierSpec extends Specification {
         val k = new RSAKey(pub, priv, Use.SIGNATURE, JWSAlgorithm.parse("RSA"),
             keyId, null, null, null)
         (new JWKSet(k), priv)
-      }
-
-      def sha256Signature(json: JsValue): String = {
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(json.compactPrint.getBytes)
-        s"SHA-256=${Base64.encode(digest.digest)}"
       }
 
       val verifier = new SignatureVerifier(keySet.toPublicJWKSet)
@@ -84,19 +77,18 @@ class SignatureVerifierSpec extends Specification {
           JsObject("name" -> JsString("test"), "image" -> JsString("test"))
         val alteredPayload =
           JsObject("name" -> JsString("changed"), "image" -> JsString("test"))
-        val digestHeader =
-          HttpHeaders.RawHeader("Digest", sha256Signature(testPayload))
         verifier(
           Post("/container/new", testPayload ) ~>
             addHeader(HttpHeaders.Date(now)) ~>
-            addHeader(digestHeader) ~>
+            addDigest("SHA-256") ~>
             addSignature(
                 keyId, privateKey, algorithm,
                 Seq("(request-target)", "date", "digest"))) must beRight
         verifier(
-          Post("/container/new", alteredPayload) ~>
+          Post("/container/new", testPayload) ~>
             addHeader(HttpHeaders.Date(now)) ~>
-            addHeader(digestHeader) ~>
+            addDigest("SHA-256") ~>
+            { req => req.withEntity(alteredPayload.prettyPrint) } ~>
             addSignature(
                 keyId, privateKey, algorithm,
                 Seq("(request-target)", "date", "digest"))) must beLeft[String]

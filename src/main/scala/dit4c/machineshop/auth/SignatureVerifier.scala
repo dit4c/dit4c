@@ -54,7 +54,8 @@ class SignatureVerifier(publicKeys: JWKSet) {
         .filter(_.lowercaseName == "digest")
         .map(_.value)
         .map { v =>
-          val Seq(alg, b64digest) = v.split("=").toSeq
+          val param = """([^=]+)=(.*)""".r
+          val param(alg, b64digest) = v
           (alg, b64digest)
         }
     if (digests.isEmpty)
@@ -64,10 +65,11 @@ class SignatureVerifier(publicKeys: JWKSet) {
         .map { case(alg, b64digest) =>
           val digest = MessageDigest.getInstance(alg)
           digest.update(request.entity.data.toByteArray)
-          if (digest.digest == new Base64(b64digest).decode) {
+          val calculated: String = Base64.encode(digest.digest).toString
+          if (calculated == b64digest) {
             None
           } else {
-            Some(s"The $alg message digest did not match.")
+            Some(s"The $alg message digest $calculated did not match $b64digest.")
           }
         }
         .flatten

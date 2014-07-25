@@ -2,10 +2,12 @@ package dit4c
 
 import spray.http.HttpRequest
 import com.nimbusds.jose.util.Base64
+import java.security.MessageDigest
 import java.security.Signature
 import java.security.interfaces.RSAPrivateKey
 import spray.http.HttpHeaders
 import spray.http.GenericHttpCredentials
+import spray.httpx.RequestBuilding._
 
 object HttpSignatureUtils {
 
@@ -14,6 +16,18 @@ object HttpSignatureUtils {
   }
   object `RSA-SHA1` extends SigningAlgorithm("rsa-sha1", "SHA1withRSA")
   object `RSA-SHA256` extends SigningAlgorithm("rsa-sha256", "SHA256withRSA")
+  
+  def addDigest(algorithm: String): HttpRequest => HttpRequest = { req =>
+    val digest: String = {
+      val digest = MessageDigest.getInstance(algorithm)
+      digest.update(req.entity.data.toByteArray)
+      val b64 = Base64.encode(digest.digest)
+      s"${algorithm}=${b64}"
+    }
+    val digestHeader =
+        HttpHeaders.RawHeader("Digest", digest)
+    req ~> addHeader(digestHeader)
+  }
 
   def addSignature(
       keyId: String,
