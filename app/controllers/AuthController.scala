@@ -29,8 +29,11 @@ class AuthController @Inject() (
     extends Controller with Utils {
 
   def publicKeys = Action.async { implicit request =>
-    publicKeySet.map { jks =>
-      Ok(Json.parse(jks.toJSONObject.toJSONString))
+    for {
+      keys <- keyDao.list
+      publicKeySet = new JWKSet(keys.map(_.toJWK)).toPublicJWKSet
+    } yield {
+      Ok(Json.parse(publicKeySet.toJSONObject.toJSONString))
     }
   }
 

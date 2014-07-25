@@ -83,9 +83,8 @@ trait Utils extends Results {
       .getOrElse(Future.successful(None))
 
   private def createJWT(containers: Seq[String])(implicit request: Request[_]) =
-    privateKeySet.map { jks =>
-      val privateKey = jks.getKeys.head
-        .asInstanceOf[RSAKey].toRSAPrivateKey
+    bestPrivateKey.map { jwk =>
+      val privateKey = jwk.toRSAPrivateKey
       val tokenString = {
         val json = Json.obj(
             "iis" -> request.host,
@@ -105,25 +104,12 @@ trait Utils extends Results {
       token.serialize
     }
 
-  // Public keyset includes retired keys
-  def publicKeySet: Future[JWKSet] =
-    keys.map(ks => new JWKSet(ks.map(_.toJWK)).toPublicJWKSet)
-
-  // Private keyset excludes retired keys
-  private def privateKeySet: Future[JWKSet] =
-    keys.map(ks => new JWKSet(ks.filter(!_.retired).map(_.toJWK)))
-
-  lazy val keyNamespace: String =
-    Play.current.configuration
-      .getString("application.baseUrl")
-      .getOrElse("DIT4C")
-
-  // Get keys, and create a new key if necessary
-  private def keys = keyDao.list.flatMap { keys =>
-    if (keys.exists(!_.retired))
-      Future.successful(keys)
-    else
-      keyDao.create(keyNamespace).map(keys :+ _)
-  }
+  // While it's possible not to have a valid key, it's a pretty big error
+  private def bestPrivateKey: Future[RSAKey] =
+    keyDao.bestSigningKey.map {
+      case Some(k) => k.toJWK
+      case None =>
+        throw new RuntimeException("No valid private keys are available!")
+    }
 
 }

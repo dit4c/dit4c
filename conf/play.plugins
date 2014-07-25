@@ -1,2 +1,3 @@
 1001:providers.InjectorPlugin
 10001:providers.db.CouchDBPlugin
+10010:providers.KeyManagementPlugin
