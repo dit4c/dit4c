@@ -21,6 +21,8 @@ import spray.http.GenericHttpCredentials
 import spray.http.DateTime
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
+import spray.json._
+import java.security.MessageDigest
 
 class SignatureVerifierSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,11 +45,18 @@ class SignatureVerifierSpec extends Specification {
         (new JWKSet(k), priv)
       }
 
+      def sha256Signature(json: JsValue): String = {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(json.compactPrint.getBytes)
+        s"SHA-256=${Base64.encode(digest.digest)}"
+      }
+
       val verifier = new SignatureVerifier(keySet.toPublicJWKSet)
 
       Seq(`RSA-SHA1`, `RSA-SHA256`).foreach { algorithm =>
-        val request = Post("/create?name=foo", "") ~>
-          addHeader(HttpHeaders.Date(DateTime.now)) ~>
+        val now = DateTime.now
+        val request = Post("/container/foo/start", "") ~>
+          addHeader(HttpHeaders.Date(now)) ~>
           addHeader(HttpHeaders.`Content-Length`(0)) ~>
           addSignature(
               keyId, privateKey, algorithm,
@@ -59,7 +68,38 @@ class SignatureVerifierSpec extends Specification {
         verifier(
           request
             ~> removeHeader("Date")
-            ~> addHeader(HttpHeaders.Date(DateTime(0)))) must beLeft[String]
+            ~> addHeader(HttpHeaders.Date(now + 1000))) must beLeft[String]
+        // Check validation fails if date is outside a 5 minute skew
+        verifier(
+          Post("/container/foo/start", "") ~>
+            addHeader(HttpHeaders.Date(now - 3600000)) ~>
+            addHeader(HttpHeaders.`Content-Length`(0)) ~>
+            addSignature(
+                keyId, privateKey, algorithm,
+                Seq("(request-target)", "date", "content-length"))) must beLeft[String]
+        // Check validation checks message digests
+        import spray.httpx.SprayJsonSupport._
+        import DefaultJsonProtocol._
+        val testPayload =
+          JsObject("name" -> JsString("test"), "image" -> JsString("test"))
+        val alteredPayload =
+          JsObject("name" -> JsString("changed"), "image" -> JsString("test"))
+        val digestHeader =
+          HttpHeaders.RawHeader("Digest", sha256Signature(testPayload))
+        verifier(
+          Post("/container/new", testPayload ) ~>
+            addHeader(HttpHeaders.Date(now)) ~>
+            addHeader(digestHeader) ~>
+            addSignature(
+                keyId, privateKey, algorithm,
+                Seq("(request-target)", "date", "digest"))) must beRight
+        verifier(
+          Post("/container/new", alteredPayload) ~>
+            addHeader(HttpHeaders.Date(now)) ~>
+            addHeader(digestHeader) ~>
+            addSignature(
+                keyId, privateKey, algorithm,
+                Seq("(request-target)", "date", "digest"))) must beLeft[String]
       }
 
       done
