@@ -44,16 +44,15 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
+  opt[java.net.URI]('s', "signed-by")
+    .required()
+    .action { (x, c) => c.copy(keyLocation = x) }
+    .text("URL/file of JWK RSA keyset used to sign JWT tokens")
   opt[Int]('k', "key-refresh")
     .optional()
     .action { (x, c) =>
       c.copy(keyUpdateInterval = Duration.create(x, TimeUnit.SECONDS))
      }
     .text("second interval to use when polling keys")
-
-  arg[java.net.URI]("<public_key_location>")
-    .required()
-    .action { (x, c) => c.copy(keyLocation = x) }
-    .text("URL/file containing JWK RSA public keys")
 
 }
