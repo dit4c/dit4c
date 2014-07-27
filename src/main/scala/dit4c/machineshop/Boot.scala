@@ -46,7 +46,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
     .text("port to listen on")
   opt[java.net.URI]('s', "signed-by")
     .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }
-    .text("location of JWK key set used to sign privileged requests")
+    .text("URL/file of JWK RSA keyset used to sign privileged requests")
   opt[Int]('k', "key-refresh")
     .optional()
     .action { (x, c) =>
