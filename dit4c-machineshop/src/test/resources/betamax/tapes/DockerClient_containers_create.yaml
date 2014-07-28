@@ -1,0 +1,20 @@
+!tape
+name: DockerClient.containers.create
+interactions:
+- recorded: 2014-07-18T00:34:46.195Z
+  request:
+    method: POST
+    uri: http://localhost:4243/containers/create?name=testnew
+    headers:
+      Content-Length: '153'
+      Content-Type: text/plain; charset=UTF-8
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+    body: '{"Hostname":"testnew","Tty":true,"AttachStdout":true,"AttachStderr":true,"Dns":null,"Image":"dit4c/dit4c-container-ipython","ExposedPorts":{"80/tcp":{}}}'
+  response:
+    status: 201
+    headers:
+      Content-Type: application/json
+      Server: nginx/1.5.12
+    body: |
+      {"Id":"f5d7b3f95fb0b0732368d3960bde1ca2a9c257cb63fdbaa2c4452b4ff3e6c377","Warnings":null}

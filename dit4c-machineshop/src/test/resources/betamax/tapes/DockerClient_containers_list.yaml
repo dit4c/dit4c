@@ -1,0 +1,87 @@
+!tape
+name: DockerClient.containers.list
+interactions:
+- recorded: 2014-07-18T00:34:55.416Z
+  request:
+    method: POST
+    uri: http://localhost:4243/containers/create?name=testlist-1
+    headers:
+      Content-Length: '156'
+      Content-Type: text/plain; charset=UTF-8
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+    body: '{"Hostname":"testlist-1","Tty":true,"AttachStdout":true,"AttachStderr":true,"Dns":null,"Image":"dit4c/dit4c-container-ipython","ExposedPorts":{"80/tcp":{}}}'
+  response:
+    status: 201
+    headers:
+      Content-Type: application/json
+      Server: nginx/1.5.12
+    body: |
+      {"Id":"055d76e7153a33669d2972ba2ae7e291ac12cc55de645031a646105c24b4dac5","Warnings":null}
+- recorded: 2014-07-18T00:34:57.454Z
+  request:
+    method: POST
+    uri: http://localhost:4243/containers/create?name=testlist-2
+    headers:
+      Content-Length: '156'
+      Content-Type: text/plain; charset=UTF-8
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+    body: '{"Hostname":"testlist-2","Tty":true,"AttachStdout":true,"AttachStderr":true,"Dns":null,"Image":"dit4c/dit4c-container-ipython","ExposedPorts":{"80/tcp":{}}}'
+  response:
+    status: 201
+    headers:
+      Content-Type: application/json
+      Server: nginx/1.5.12
+    body: |
+      {"Id":"5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555","Warnings":null}
+- recorded: 2014-07-18T00:34:57.510Z
+  request:
+    method: POST
+    uri: http://localhost:4243/containers/5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555/start
+    headers:
+      Content-Length: '42'
+      Content-Type: application/json; charset=UTF-8
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+    body: '{"PortBindings":{},"PublishAllPorts":true}'
+  response:
+    status: 204
+    headers:
+      Content-Type: text/plain; charset=utf-8
+      Server: nginx/1.5.12
+- recorded: 2014-07-18T00:34:57.518Z
+  request:
+    method: GET
+    uri: http://localhost:4243/containers/5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555/json
+    headers:
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+  response:
+    status: 200
+    headers:
+      Content-Type: application/json
+      Server: nginx/1.5.12
+    body: |
+      {"Args":["-c","/etc/supervisord.conf"],"Config":{"AttachStderr":true,"AttachStdin":false,"AttachStdout":true,"Cmd":["/usr/bin/supervisord","-c","/etc/supervisord.conf"],"CpuShares":0,"Cpuset":"","Domainname":"","Entrypoint":null,"Env":["HOME=/","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"ExposedPorts":{"80/tcp":{}},"Hostname":"testlist-2","Image":"dit4c/dit4c-container-ipython","Memory":0,"MemorySwap":0,"NetworkDisabled":false,"OnBuild":null,"OpenStdin":false,"PortSpecs":null,"StdinOnce":false,"Tty":true,"User":"","Volumes":null,"WorkingDir":""},"Created":"2014-07-18T00:34:56.521159218Z","Driver":"btrfs","ExecDriver":"native-0.2","HostConfig":{"Binds":null,"ContainerIDFile":"","Dns":null,"DnsSearch":null,"Links":null,"LxcConf":null,"NetworkMode":"","PortBindings":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"49155"}]},"Privileged":false,"PublishAllPorts":true,"VolumesFrom":null},"HostnamePath":"/var/lib/docker/containers/5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555/hostname","HostsPath":"/var/lib/docker/containers/5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555/hosts","Id":"5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555","Image":"fadf6b58e4591632430119ba1b622245cb6ed3ea2edaa5963cafec714a22e4f4","MountLabel":"system_u:object_r:svirt_sandbox_file_t:s0:c315,c755","Name":"/testlist-2","NetworkSettings":{"Bridge":"docker0","Gateway":"172.17.42.1","IPAddress":"172.17.0.4","IPPrefixLen":16,"PortMapping":null,"Ports":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"49155"}]}},"Path":"/usr/bin/supervisord","ProcessLabel":"system_u:system_r:svirt_lxc_net_t:s0:c315,c755","ResolvConfPath":"/var/lib/docker/containers/5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555/resolv.conf","State":{"ExitCode":0,"FinishedAt":"0001-01-01T00:00:00Z","Paused":false,"Pid":11249,"Running":true,"StartedAt":"2014-07-18T00:34:57.507986254Z"},"Volumes":{},"VolumesRW":{}}
+- recorded: 2014-07-18T00:34:57.541Z
+  request:
+    method: GET
+    uri: http://localhost:4243/containers/json?all=1
+    headers:
+      Host: localhost:4243
+      User-Agent: spray-can/1.3.1
+  response:
+    status: 200
+    headers:
+      Content-Type: application/json
+      Server: nginx/1.5.12
+    body: |-
+      [{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643696,"Id":"5672e824aa9082e05e053d5162df99483142517e1bde613135509540b527e555","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testlist-2"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49155,"Type":"tcp"}],"Status":"Up Less than a second"}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643693,"Id":"055d76e7153a33669d2972ba2ae7e291ac12cc55de645031a646105c24b4dac5","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testlist-1"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643691,"Id":"dc07b60033a16b31fb7c79a9a7d36df4e453444afc53d3ba2defa059ab1f4fba","Image":"dit4c/dit4c-container-ipython:latest","Names":["/teststop"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49154,"Type":"tcp"}],"Status":"Up 5 seconds"}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643690,"Id":"ad690ddd32312bba685749057c6ebb5d0d374ce6f09e8611d7b3435101c83699","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testrefresh"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643687,"Id":"2d923bc0717f78acefdcd41a5b2c7641328fab5f7b40fa2bb094220195993546","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testdelete"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643685,"Id":"f5d7b3f95fb0b0732368d3960bde1ca2a9c257cb63fdbaa2c4452b4ff3e6c377","Image":"dit4c/dit4c-container-ipython:latest","Names":["/testnew"],"Ports":[],"Status":""}
+      ,{"Command":"/usr/bin/supervisord -c /etc/supervisord.conf","Created":1405643682,"Id":"f1e5435c83b5b12f7a24dd657374f561ac6d818c78c178f37489bbb362152bce","Image":"dit4c/dit4c-container-ipython:latest","Names":["/teststart"],"Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":49153,"Type":"tcp"}],"Status":"Up 14 seconds"}
+      ]
