@@ -1,9 +1,6 @@
-import sbtrelease._
-import ReleaseStateTransformations._
+name  := "dit4c-machineshop"
 
-organization  := "dit4c.machineshop"
-
-scalaVersion  := "2.10.4"
+scalaVersion  := "2.10.4" // Stuck until spray-json updates
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
@@ -39,7 +36,6 @@ Revolver.settings
 
 seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
 
-
 // Build runnable executable
 lazy val generateExecutable = taskKey[String]("Creates a single-file Linux executable using one-jar and a stub script.")
 
@@ -64,18 +60,3 @@ generateExecutable := {
   // Return path
   outputFile.getAbsolutePath
 }
-
-releaseSettings
-
-ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-  checkSnapshotDependencies,              // : ReleaseStep
-  inquireVersions,                        // : ReleaseStep
-  runClean,                               // : ReleaseStep
-  runTest,                                // : ReleaseStep
-  setReleaseVersion,                      // : ReleaseStep
-  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
-  tagRelease,                             // : ReleaseStep
-  setNextVersion,                         // : ReleaseStep
-  commitNextVersion,                      // : ReleaseStep
-  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
-)

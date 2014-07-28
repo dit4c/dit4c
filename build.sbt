@@ -1,2 +1,34 @@
-scalaVersion  := "2.11.2"
+import sbtrelease._
+import ReleaseStateTransformations._
 
+scalaVersion in ThisBuild := "2.11.2"
+
+// Project definitions
+
+lazy val dit4c = project.
+  aggregate(gatehouse, machineshop, highcommand)
+
+lazy val gatehouse   = project in file("dit4c-gatehouse")
+
+lazy val highcommand = (project in file("dit4c-highcommand")).
+  enablePlugins(PlayScala).
+  enablePlugins(SbtWeb)
+
+lazy val machineshop = project in file("dit4c-machineshop")
+
+// Release settings
+
+releaseSettings
+
+ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,              // : ReleaseStep
+  inquireVersions,                        // : ReleaseStep
+  runClean,                               // : ReleaseStep
+  runTest,                                // : ReleaseStep
+  setReleaseVersion,                      // : ReleaseStep
+  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
+  tagRelease,                             // : ReleaseStep
+  setNextVersion,                         // : ReleaseStep
+  commitNextVersion,                      // : ReleaseStep
+  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
+)

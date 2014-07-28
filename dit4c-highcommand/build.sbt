@@ -3,10 +3,6 @@ import ReleaseStateTransformations._
 
 name := "dit4c-highcommand"
 
-lazy val root = (project in file(".")).enablePlugins(PlayScala).enablePlugins(SbtWeb)
-
-scalaVersion := "2.11.1"
-
 libraryDependencies ++= Seq(
   cache,
   ws,
@@ -57,21 +53,6 @@ val closureOptions = {
   CompilationLevel.WHITESPACE_ONLY.setOptionsForCompilationLevel(opts)
   opts
 }
-
-releaseSettings
-
-ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-  checkSnapshotDependencies,              // : ReleaseStep
-  inquireVersions,                        // : ReleaseStep
-  runClean,                               // : ReleaseStep
-  runTest,                                // : ReleaseStep
-  setReleaseVersion,                      // : ReleaseStep
-  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
-  tagRelease,                             // : ReleaseStep
-  setNextVersion,                         // : ReleaseStep
-  commitNextVersion,                      // : ReleaseStep
-  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
-)
 
 pipelineStages := Seq(rjs, digest, gzip)
 
