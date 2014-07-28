@@ -1,0 +1,27 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+GET     /login/redirect             @controllers.AuthController.login
+POST    /logout                     @controllers.AuthController.logout
+POST    /auth/callback              @controllers.AuthController.callback
+GET     /public-keys                @controllers.AuthController.publicKeys
+
+GET     /users/current              @controllers.UserController.currentUser
+GET     /users/:id                  @controllers.UserController.get(id)
+
+# Map static resources from the /public folder to the /assets URL path
+GET     /favicon.ico                controllers.Assets.at(path="/public", file="images/favicon.ico")
+GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
+GET     /webjars/*file              controllers.WebJarAssets.at(file)
+
+# Home page
+GET     /                           @controllers.Application.main(path="")
+GET     /login                      @controllers.Application.main(path="login")
+GET     /containers                 @controllers.ContainerController.index
+GET     /containers/checkNew        @controllers.ContainerController.checkNewName(name: String)
+POST    /containers                 @controllers.ContainerController.create
+PUT     /containers/:id             @controllers.ContainerController.update(id)
+DELETE  /containers/:id             @controllers.ContainerController.delete(id)
+
+GET     /waiting                    @controllers.Application.waiting

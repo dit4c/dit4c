@@ -1,0 +1,1 @@
+requirejs(['bootstrap', './bootstrap-app'], (ng) -> )

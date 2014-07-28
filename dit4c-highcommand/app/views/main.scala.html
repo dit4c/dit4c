@@ -1,0 +1,154 @@
+@(loginButton: String => Html)
+
+@import helpers.AppVersion
+
+<!DOCTYPE html5>
+<html>
+  <head>
+    <title>DIT4C @AppVersion</title>
+
+    <link href="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.css"))" rel="stylesheet">
+    <link rel="stylesheet" media="screen" href="@routes.Assets.versioned("stylesheets/main.css")">
+
+    <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
+
+    <script>
+    // Enhance RequireJS to handle WebJARs
+    @Html(org.webjars.RequireJS.getSetupJavaScript("/webjars/"))
+    </script>
+  </head>
+  <body ng-controller="ApplicationCtrl">
+    <div data-ng-view></div>
+
+    <script type="text/ng-template" id="navbar.html">
+    <nav class="navbar navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a href="/" class="navbar-brand">DIT4C @{AppVersion}</a>
+        </div>
+        <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+          <div ng-if="currentUser">
+            <ul class="nav navbar-nav">
+              <li><a href="/containers">Containers</a></li>
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" title="{{currentUser.id}}">
+                  <span ng-if="currentUser.name">{{currentUser.name}}</span>
+                  <span ng-if="!currentUser.name">Unknown</span>
+                  <b class="caret"></b>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-right" role="menu">
+                  <li><a href="/logout">Logout</a></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <p ng-if="!currentUser" class="navbar-text navbar-right">
+            <a href="/login">Not logged in</a>
+          </p>
+        </div>
+      </div>
+    </nav>
+    </script>
+
+    <script type="text/ng-template" id="index.html">
+    <div ng-include src="'navbar.html'"></div>
+    <div id="home-jumbo" class="jumbotron">
+      <div class="container">
+        <img class="center-block" src="assets/images/DIT4C_logo_white.png"/>
+      </div>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="login.html">
+    <div ng-include src="'navbar.html'"></div>
+    <div class="container">
+      <h1>Authenticate your identity</h1>
+      @loginButton("/login/redirect")
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="containers.html">
+    <div ng-include src="'navbar.html'"></div>
+    <div class="container">
+      <h1>Containers</h1>
+
+      <table class="table">
+        <thead>
+          <tr><th>Container Name</th><th>Active?</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <form class="form-inline">
+                <div class="form-group has-feedback"
+                     ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
+                     title="{{nameCheck.reason}}">
+                  <input type="text" class="form-control"
+                    ng-model="newContainer.name"
+                    ng-change="checkName(newContainer.name)"
+                    />
+                  <span class="glyphicon form-control-feedback"
+                    ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
+                </div>
+                <select class="form-control" ng-model="newContainer.image"
+                  ng-options="image.value as image.label for image in images"></select>
+                <div class="checkbox">
+                  <label>
+                    Start?
+                    <input type="checkbox" ng-model="newContainer.active"/>
+                  </label>
+                </div>
+                <button class="btn btn-primary" ng-click="create()">
+                  Create
+                </button>
+              </form>
+            </td>
+          </tr>
+          <tr ng-repeat="container in containers | orderBy:'name'">
+            <td>
+              <a ng-if="container.active" href="{{rootUrl(container.name)}}"
+                 target="_blank">{{container.name}}</a>
+              <span ng-if="!container.active">{{container.name}}</span>
+            </td>
+            <td>
+              <div class="btn-group">
+                <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
+                <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
+                <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
+                <button ng-if="!container.active" class="btn btn-primary disabled active" role="button">Off</button>
+              </div>
+            </td>
+            <td>
+              <button class="btn btn-danger" ng-click="delete(container.id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="notfound.html">
+    <div id="home-jumbo" class="jumbotron">
+      <div class="container">
+        <h1>
+        Not Found
+        </h1>
+        <p>
+          It's not here, whatever it is...
+        </p>
+      </div>
+    </div>
+    </script>
+
+    <script data-main="@routes.Assets.versioned("javascripts/main.js")"
+            src="@routes.WebJarAssets.at(WebJarAssets.locate("require.min.js"))"></script>
+  </body>
+</html>
