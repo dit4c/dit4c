@@ -1,12 +1,11 @@
 import sbtrelease._
 import ReleaseStateTransformations._
 
+name := "dit4c"
+
 scalaVersion in ThisBuild := "2.11.2"
 
-// Project definitions
-
-lazy val dit4c = project.
-  aggregate(gatehouse, machineshop, highcommand)
+// Project definitions (automatically aggregated)
 
 lazy val gatehouse   = project in file("dit4c-gatehouse")
 
