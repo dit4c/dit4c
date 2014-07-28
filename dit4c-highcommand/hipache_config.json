@@ -1,0 +1,13 @@
+{
+  "server": {
+    "debug": true,
+    "accessLog": "access.log",
+    "workers": 5,
+    "maxSockets": 100,
+    "deadBackendTTL": 30
+  },
+  "http": {
+    "port": 6000
+  },
+  "driver": "redis://127.0.0.1:6379/0#dit4c:hipache:"
+}

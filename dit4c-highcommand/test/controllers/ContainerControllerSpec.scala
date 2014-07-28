@@ -109,5 +109,6 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
     override def delete = successful[Unit](Unit)
     override def start = successful(MockCNC(name, true))
     override def stop = successful(MockCNC(name, false))
+    override def proxyBackend = ???
   }
 }

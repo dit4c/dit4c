@@ -8,6 +8,13 @@ import com.google.inject.Inject
 import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
+import play.mvc.Http.RequestHeader
+import providers.hipache.HipacheActor
+import providers.hipache.Hipache
+import akka.actor.ActorRef
+import akka.util.Timeout
+import java.util.concurrent.TimeUnit
+import providers.hipache.HipachePlugin
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
@@ -43,6 +50,7 @@ class ContainerController @Inject() (
         for {
           container <- containerDao.create(request.user, name, description, image)
           p <- cnpHelper.creator(container)
+          _ <- HipacheInterface.put(p)
           cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
         } yield {
           Created(Json.obj(
@@ -109,7 +117,11 @@ class ContainerController @Inject() (
               // TODO: Improve this handling
               Future.successful(NotFound)
             case Some(cnp) =>
-              container.delete.flatMap(_ => cnp.delete).map { _ => NoContent }
+              for {
+                _ <- container.delete
+                _ <- cnp.delete
+                _ <- HipacheInterface.delete(cnp)
+              } yield NoContent
           }
       }
   }
@@ -171,6 +183,41 @@ class ContainerController @Inject() (
         }
       }
     }
+  }
+
+
+  object HipacheInterface {
+    import akka.pattern.ask
+    import Hipache._
+    import HipacheActor._
+
+    implicit val timeout = Timeout(10, TimeUnit.SECONDS)
+
+    def put(container: ComputeNode.Container)(implicit req: Request[_]) =
+      withHipache { hipache =>
+        hipache ? Put(container, container.proxyBackend)
+      }
+
+
+    def delete(container: ComputeNode.Container)(implicit req: Request[_]) =
+      withHipache { hipache =>
+        hipache ? Delete(container)
+      }
+
+    private def withHipache[A](f: ActorRef => Future[A]): Future[Unit] =
+      hipacheActor.map {
+        case Some(actorRef) => f(actorRef).map(_ => ())
+        case None => Future.successful(())
+      }
+
+    private def hipacheActor: Future[Option[ActorRef]] =
+      Play.current.plugin[HipachePlugin].get.client
+
+    private implicit def asFrontend(
+        c: ComputeNode.Container)(implicit req: Request[_]): Frontend = {
+      Frontend(c.name, s"${c.name}.${req.host}")
+    }
+
   }
 
 }

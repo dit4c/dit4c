@@ -17,6 +17,7 @@ import java.security.Signature
 import com.nimbusds.jose.util.Base64
 import play.api.libs.ws.InMemoryBody
 import java.security.MessageDigest
+import providers.hipache.Hipache
 
 class ComputeNodeDAO @Inject() (
     protected val db: CouchDB.Database,
@@ -177,6 +178,11 @@ class ComputeNodeDAO @Inject() (
         }
       }
 
+      override def proxyBackend: Hipache.Backend = {
+        val uri = new java.net.URI(url)
+        Hipache.Backend(uri.getHost)
+      }
+
     }
 
     implicit val containerReads: Reads[Container] = (
@@ -202,9 +208,13 @@ object ComputeNode {
     def get(name: String): Future[Option[ComputeNode.Container]]
     def list: Future[Seq[ComputeNode.Container]]
   }
+
   trait Container {
     def name: String
     def active: Boolean
+
+    def proxyBackend: Hipache.Backend
+
     def start: Future[Container]
     def stop: Future[Container]
     def delete: Future[Unit]
