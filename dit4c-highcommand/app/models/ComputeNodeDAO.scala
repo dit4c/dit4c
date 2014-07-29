@@ -27,9 +27,9 @@ class ComputeNodeDAO @Inject() (
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
-  def create(name: String, url: String): Future[ComputeNode] =
+  def create(name: String, managementUrl: String, backend: Hipache.Backend): Future[ComputeNode] =
     db.newID.flatMap { id =>
-      val node = ComputeNodeImpl(id, None, name, url)
+      val node = ComputeNodeImpl(id, None, name, managementUrl, backend)
       WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).map { response =>
         response.status match {
           case 201 => node
@@ -46,11 +46,18 @@ class ComputeNodeDAO @Inject() (
       }
   }
 
+  implicit val hipacheBackendFormat: Format[Hipache.Backend] = (
+    (__ \ "host").format[String] and
+    (__ \ "port").format[Int] and
+    (__ \ "scheme").format[String]
+  )(Hipache.Backend.apply _, unlift(Hipache.Backend.unapply))
+
   implicit val computeNodeFormat: Format[ComputeNodeImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
-    (__ \ "url").format[String]
+    (__ \ "managementURL").format[String] and
+    (__ \ "backend").format[Hipache.Backend]
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
     .withTypeAttribute("ComputeNode")
 
@@ -114,8 +121,15 @@ class ComputeNodeDAO @Inject() (
     }
   }
 
-  case class ComputeNodeImpl(id: String, _rev: Option[String], name: String, url: String)(implicit ec: ExecutionContext) extends ComputeNode {
+  case class ComputeNodeImpl(
+      id: String,
+      _rev: Option[String],
+      name: String,
+      managementUrl: String,
+      backend: Hipache.Backend
+      )(implicit ec: ExecutionContext) extends ComputeNode {
     import play.api.libs.functional.syntax._
+
     import play.api.Play.current
 
     import ComputeNode.Container
@@ -123,7 +137,7 @@ class ComputeNodeDAO @Inject() (
     object containers extends ComputeNode.Containers {
 
       def create(name: String, image: String) = withPrivateKey { key =>
-        WS.url(s"${url}containers/new")
+        ws("containers/new")
           .withMethod("POST")
           .withHeaders("Content-Type" -> "application/json; charset=utf-8")
           .withBody(InMemoryBody(Json.stringify(
@@ -135,21 +149,24 @@ class ComputeNodeDAO @Inject() (
       }
 
       def get(name: String): Future[Option[Container]] =
-        WS.url(s"${url}containers/$name")
+        ws(s"containers/$name")
           .get()
           .map(r => Try(r.json.as[Container]).toOption)
 
       def list: Future[Seq[Container]] =
-        WS.url(s"${url}containers").get().map { response =>
+        ws("containers").get().map { response =>
           response.json.asInstanceOf[JsArray].value.map(_.as[Container])
         }
 
     }
 
-    class ContainerImpl(val name: String, val active: Boolean)(implicit ec: ExecutionContext) extends Container {
+    class ContainerImpl(
+        val name: String,
+        val active: Boolean
+        )(implicit ec: ExecutionContext) extends Container {
 
       override def start: Future[Container] = withPrivateKey { key =>
-        WS.url(s"${url}containers/$name/start")
+        ws(s"containers/$name/start")
           .withMethod("POST")
           .httpSign(key)
           .execute()
@@ -157,7 +174,7 @@ class ComputeNodeDAO @Inject() (
       }
 
       override def stop: Future[Container] = withPrivateKey { key =>
-        WS.url(s"${url}containers/$name/stop")
+        ws(s"containers/$name/stop")
           .withMethod("POST")
           .httpSign(key)
           .execute()
@@ -166,7 +183,7 @@ class ComputeNodeDAO @Inject() (
 
       override def delete: Future[Unit] = withPrivateKey { key =>
         stop.flatMap { _ =>
-          WS.url(s"${url}containers/$name")
+          ws(s"containers/$name")
             .withMethod("DELETE")
             .httpSign(key)
             .execute()
@@ -178,12 +195,11 @@ class ComputeNodeDAO @Inject() (
         }
       }
 
-      override def proxyBackend: Hipache.Backend = {
-        val uri = new java.net.URI(url)
-        Hipache.Backend(uri.getHost)
-      }
+      override def proxyBackend: Hipache.Backend = backend
 
     }
+
+    private def ws(path: String) = WS.url(s"$managementUrl$path")
 
     implicit val containerReads: Reads[Container] = (
       (__ \ "name").read[String] and
@@ -196,7 +212,8 @@ trait ComputeNode {
   def id: String
   def _rev: Option[String]
   def name: String
-  def url: String
+  def managementUrl: String
+  def backend: Hipache.Backend
 
   def containers: ComputeNode.Containers
 
