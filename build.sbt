@@ -5,6 +5,9 @@ name := "dit4c"
 
 scalaVersion in ThisBuild := "2.11.2"
 
+// Target JDK 1.7
+scalacOptions in ThisBuild += "-target:jvm-1.7"
+
 // Project definitions (automatically aggregated)
 
 lazy val gatehouse   = project in file("dit4c-gatehouse")

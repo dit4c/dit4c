@@ -1,3 +1,6 @@
+import sbtdocker.{ImageName, Dockerfile}
+import DockerKeys._
+
 name  := "dit4c-machineshop"
 
 scalaVersion  := "2.10.4" // Stuck until spray-json updates
