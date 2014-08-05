@@ -63,3 +63,31 @@ generateExecutable := {
   // Return path
   outputFile.getAbsolutePath
 }
+
+sbtdocker.Plugin.dockerSettings
+
+// Make docker depend on the package task, which generates a jar file of the application code
+docker <<= docker.dependsOn(oneJar)
+
+// Docker build
+dockerfile in docker := {
+  import sbtdocker.Instructions._
+  import sbtdocker._
+  val jarFile = artifactPath.in(Compile, oneJar).value
+  val dockerResources = baseDirectory.value / "src" / "main" / "docker"
+  val configs = dockerResources / "etc"
+  immutable.Dockerfile.empty
+    .from("dit4c/dit4c-platform-base")
+    .run("yum", "-y", "install", "java-1.7.0-openjdk-headless", "socat")
+    .add(jarFile, "/opt/dit4c-machineshop.jar")
+    .add(configs, "/etc")
+    .cmd("/usr/bin/supervisord", "-n")
+    .expose(8080)
+}
+
+// Set a custom image name
+imageName in docker := {
+  ImageName(namespace = Some("dit4c"),
+    repository = "dit4c-platform-machineshop",
+    tag = Some(version.value))
+}

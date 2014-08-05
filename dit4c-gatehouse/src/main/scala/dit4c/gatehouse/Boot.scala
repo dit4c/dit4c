@@ -28,19 +28,25 @@ object Boot extends App {
         "main-service")
 
     implicit val timeout = Timeout(5.seconds)
-    // start a new HTTP server on port 8080 with our service actor as handler
-    IO(Http) ? Http.Bind(service, interface = "localhost", port = config.port)
+    // start a new HTTP server on specified interface and port
+    IO(Http) ? Http.Bind(service,
+        interface = config.interface,
+        port = config.port)
   }
 
 }
 
 case class Config(
+  val interface: String = "localhost",
   val port: Int = 8080,
   val keyLocation: java.net.URI = null,
   val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")
+  opt[String]('i', "interface")
+    .action { (x, c) => c.copy(interface = x) }
+    .text("interface to bind to")
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
