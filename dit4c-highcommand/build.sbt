@@ -76,7 +76,6 @@ dockerfile in docker := {
  immutable.Dockerfile.empty
    .from("dit4c/dit4c-platform-base")
    .run("yum", "-y", "install", "java-1.7.0-openjdk-headless")
-   .run("yum", "-y", "install", "couchdb")
    .add(stageDir, "/opt/dit4c-highcommand/")
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")
