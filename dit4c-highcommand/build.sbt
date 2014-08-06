@@ -1,5 +1,5 @@
-import sbtrelease._
-import ReleaseStateTransformations._
+import sbtdocker.{ImageName, Dockerfile}
+import DockerKeys._
 
 name := "dit4c-highcommand"
 
@@ -59,6 +59,35 @@ val closureOptions = {
 
 pipelineStages := Seq(rjs, digest, gzip)
 
-//closureCompilerOptions ++= Seq("--language_in", "ECMASCRIPT5")
+sbtdocker.Plugin.dockerSettings
 
-//play.Project.playScalaSettings ++ closureCompilerSettings(closureOptions)
+// Make docker depend on the package task, which generates a jar file of the application code
+docker <<= docker.dependsOn(com.typesafe.sbt.packager.universal.Keys.stage)
+
+// Docker build
+dockerfile in docker := {
+ import sbtdocker.Instructions._
+ import sbtdocker._
+ val stageDir =
+   com.typesafe.sbt.packager.universal.Keys.stagingDirectory.in(Universal).value
+ val dockerResources = baseDirectory.value / "docker"
+ val configs = dockerResources / "etc"
+ val prodConfig = dockerResources / "opt" / "dit4c-highcommand" / "prod.conf"
+ immutable.Dockerfile.empty
+   .from("dit4c/dit4c-platform-base")
+   .run("yum", "-y", "install", "java-1.7.0-openjdk-headless")
+   .run("yum", "-y", "install", "couchdb")
+   .add(stageDir, "/opt/dit4c-highcommand/")
+   .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
+   .add(configs, "/etc")
+   .run("chmod", "+x", "/opt/dit4c-highcommand/bin/dit4c-highcommand")
+   .cmd("/usr/bin/supervisord", "-n")
+   .expose(9000)
+}
+
+// Set a custom image name
+imageName in docker := {
+ ImageName(namespace = Some("dit4c"),
+   repository = "dit4c-platform-highcommand",
+   tag = Some(version.value))
+}
