@@ -22,8 +22,8 @@ class EphemeralCouchDBInstance(implicit ec: ExecutionContext, app: Application) 
 
   override lazy val baseDir = Files.createTempDirectory("couchdb-")
 
-  override def shutdown {
-    super.shutdown
+  override def disconnect {
+    super.disconnect
     recursivelyDelete(baseDir)
   }
 

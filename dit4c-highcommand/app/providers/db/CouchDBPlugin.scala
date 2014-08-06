@@ -19,9 +19,12 @@ class CouchDBPlugin(implicit app: Application) extends Plugin with Provider[Couc
 
   lazy val log = play.api.Logger
 
-  lazy val serverInstance: ManagedCouchDBInstance =
+  lazy val serverInstance: CouchDB.Instance =
     if (app.configuration.getBoolean("couchdb.testing").getOrElse(false)) {
       new EphemeralCouchDBInstance
+    } else if (app.configuration.getString("couchdb.url").isDefined) {
+      new ExternalCouchDBInstance(new java.net.URL(
+        app.configuration.getString("couchdb.url").get))
     } else {
       new PersistentCouchDBInstance("./db", 40000)
     }
@@ -33,7 +36,7 @@ class CouchDBPlugin(implicit app: Application) extends Plugin with Provider[Couc
   }
 
   override def onStop {
-    serverInstance.shutdown
+    serverInstance.disconnect
   }
 
 }

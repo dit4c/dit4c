@@ -50,6 +50,8 @@ object CouchDB {
         uuids.head
       }
     }
+    
+    def disconnect {}
 
   }
 

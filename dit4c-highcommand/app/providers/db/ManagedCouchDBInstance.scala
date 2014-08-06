@@ -15,7 +15,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Applic
 
   val (process, url) = startProcess
 
-  def shutdown {
+  override def disconnect {
     process.destroy
   }
 
