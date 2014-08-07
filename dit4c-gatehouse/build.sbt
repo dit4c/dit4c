@@ -65,13 +65,17 @@ dockerfile in docker := {
   val jarFile = artifactPath.in(Compile, oneJar).value
   val dockerResources = baseDirectory.value / "src" / "main" / "docker"
   val configs = dockerResources / "etc"
+  val optFiles = dockerResources / "opt"
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-base")
-    .run("yum", "-y", "install", "java-1.7.0-openjdk-headless", "nginx", "socat")
+    .run("""
+      yum -y install java-1.7.0-openjdk-headless nginx socat &&
+      rm /etc/nginx/conf.d/*.conf
+      """.trim.split("\\s+"): _*)
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
     .add(configs, "/etc")
-    .run("nginx", "-t")
-    .cmd("/usr/bin/supervisord", "-n")
+    .add(optFiles, "/opt")
+    .cmd("bash", "/opt/run.sh")
     .expose(80)
 }
 
