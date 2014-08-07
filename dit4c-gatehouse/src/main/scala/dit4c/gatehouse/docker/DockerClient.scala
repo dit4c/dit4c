@@ -28,7 +28,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
     import spray.httpx.ResponseTransformation._
 
     val pipeline: HttpRequest => Future[Map[String, Int]] =
-      sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+      sendAndReceive ~> parseJsonResponse
 
     pipeline {
       import spray.httpx.RequestBuilding._
@@ -45,9 +45,10 @@ class DockerClient(val baseUrl: spray.http.Uri) {
 
     var pairs = objs.map { obj: JsObject =>
       var Seq(namesWithSlashes, portArr) = obj.getFields("Names", "Ports")
-      // Get a single name without a slash
+      // Get the first name, without the slash
+      // (Multiple names are possible, but first should be native name.)
       var name = namesWithSlashes.convertTo[List[String]] match {
-        case Seq(nameWithSlash: String) if nameWithSlash.startsWith("/") =>
+        case nameWithSlash :: _ if nameWithSlash.startsWith("/") =>
           nameWithSlash.stripPrefix("/")
       }
 

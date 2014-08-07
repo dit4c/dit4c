@@ -183,9 +183,10 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
           .map { obj: JsObject =>
             val Seq(jsId, namesWithSlashes, jsStatus) =
               obj.getFields("Id", "Names", "Status")
-            // Get a single name without a slash
+            // Get the first name, without the slash
+            // (Multiple names are possible, but first should be native name.)
             val name: String = namesWithSlashes.convertTo[List[String]] match {
-              case Seq(nameWithSlash: String) if nameWithSlash.startsWith("/") =>
+              case nameWithSlash :: _ if nameWithSlash.startsWith("/") =>
                 nameWithSlash.stripPrefix("/")
             }
             val status =

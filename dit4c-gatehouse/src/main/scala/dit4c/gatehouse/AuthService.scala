@@ -23,7 +23,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
 
-  implicit val timeout = Timeout(100.millis)
+  implicit val timeout = Timeout(250.millis)
 
   val AUTH_TOKEN_COOKIE = "dit4c-jwt"
 
@@ -50,15 +50,15 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
                       }
                   }
                 case Success(AccessDenied(reason)) =>
-                  logRequestResponse(reason) {
-                    complete(403, HttpEntity.Empty)
+                  logRequestResponse(reason, Logging.InfoLevel) {
+                    complete(403, reason)
                   }
                 case Success(unknown) =>
-                  logRequestResponse(s"unknown auth response: $unknown") {
+                  logRequestResponse(s"unknown auth response: $unknown", Logging.InfoLevel) {
                     complete(500, HttpEntity.Empty)
                   }
                 case Failure(e) =>
-                  logRequestResponse(s"query error: $e") {
+                  logRequestResponse(s"query error: $e", Logging.InfoLevel) {
                     complete(500, HttpEntity.Empty)
                   }
               }

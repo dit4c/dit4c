@@ -5,9 +5,12 @@ import akka.actor.Actor
 import scala.collection.immutable.Queue
 import akka.actor.ActorRef
 import akka.event.LoggingReceive
+import akka.event.Logging
+import scala.util.{Success,Failure}
 
 class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   import context.dispatcher
+  val log = Logging(context.system, this)
   val tick =
     context.system.scheduler.schedule(1000 millis, 1000 millis, self, "tick")
 
@@ -51,8 +54,11 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   }
 
   private def pollDocker = {
-    dockerClient.containerPorts.onSuccess({ case m: Map[String, Int] =>
-      self ! UpdatePortIndex(m)
+    dockerClient.containerPorts.onComplete({
+      case Success(m: Map[String, Int]) =>
+        self ! UpdatePortIndex(m)
+      case Failure(e) =>
+        log.warning(s"Docker poll failed: $e")
     })
   }
 
