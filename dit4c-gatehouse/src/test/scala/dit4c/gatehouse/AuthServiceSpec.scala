@@ -48,7 +48,8 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
             Cookie(HttpCookie("dit4c-jwt", badToken)) ~>
             route ~> check {
           status must be(Forbidden)
-          entity must be(HttpEntity.Empty)
+          entity must_== HttpEntity(
+            ContentTypes.`text/plain(UTF-8)`,"invalid token")
           header("X-Upstream-Port") must beNone
         }
       }
