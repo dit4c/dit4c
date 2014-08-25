@@ -100,7 +100,7 @@ class KeyManagementActor(
    */
   def retireOldKeys(keys: Seq[Key]): Future[Seq[Key]] =
     conditionalKeyAction(keys,
-        (key: Key) => key.isOlderThan(config.retirementAge),
+        (key: Key) => !key.retired && key.isOlderThan(config.retirementAge),
         retireKey)
 
   /**
@@ -108,7 +108,7 @@ class KeyManagementActor(
    */
   def deleteOldKeys(keys: Seq[Key]): Future[Seq[Key]] =
     conditionalKeyAction(keys,
-        (key: Key) => key.isOlderThan(config.deletionAge),
+        (key: Key) => key.retired && key.isOlderThan(config.deletionAge),
         deleteKey)
 
   private def conditionalKeyAction(
@@ -136,7 +136,7 @@ class KeyManagementActor(
     log.info(s"Retiring key: ${key.publicId}")
   }
 
-  private def deleteKey(key: Key) = key.retire.map { _ =>
+  private def deleteKey(key: Key) = key.delete.map { _ =>
     log.info(s"Deleted key: ${key.publicId}")
   }
 
