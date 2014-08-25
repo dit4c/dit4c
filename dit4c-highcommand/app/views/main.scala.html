@@ -119,12 +119,15 @@
               <span ng-if="!container.active">{{container.name}}</span>
             </td>
             <td>
-              <div class="btn-group">
+              <div class="btn-group" ng-if="container.active != null">
                 <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
                 <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
                 <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
                 <button ng-if="!container.active" class="btn btn-primary disabled active" role="button">Off</button>
               </div>
+              <span class="text-muted" ng-if="container.active == null">
+                status unknown
+              </span>
             </td>
             <td>
               <button class="btn btn-danger" ng-click="delete(container.id)">Delete</button>

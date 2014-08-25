@@ -197,6 +197,8 @@ class ComputeNodeDAO @Inject() (
 
       override def proxyBackend: Hipache.Backend = backend
 
+      override def toString = s"ComputeNode.Container($name, $active)"
+
     }
 
     private def ws(path: String) = WS.url(s"$managementUrl$path")

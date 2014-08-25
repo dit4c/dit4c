@@ -23,12 +23,13 @@ class ComputeNodeContainerHelperImpl @Inject() (dao: ComputeNodeDAO)
   }
 
   override def resolver = {
-    lazy val bulkResolver: Future[String => Option[ComputeNode.Container]] = {
-      dao.list
-        .flatMap(nodes => Future.sequence(nodes.map(_.containers.list)))
-        .map(_.flatten.toList.sortBy(_.name))
-        .map(_.map(cnp => (cnp.name -> cnp)).toMap.get _)
-    }
+    lazy val bulkResolver: Future[String => Option[ComputeNode.Container]] =
+      for {
+        nodes <- dao.list
+        cncLists <- Future.sequence(nodes.map(_.containers.list))
+        cncList = cncLists.flatten.toList.sortBy(_.name)
+        cncMap = cncList.map(cnp => (cnp.name -> cnp)).toMap
+      } yield cncMap.get _
     { container: Container => bulkResolver.map(f => f(container.name)) }
   }
 

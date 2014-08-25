@@ -73,7 +73,7 @@ class ContainerController @Inject() (
             "id" -> c.id,
             "name" -> c.name,
             "description" -> c.description,
-            "active" -> cnc.active
+            "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
           )
         })
       Ok(json)
@@ -168,7 +168,7 @@ class ContainerController @Inject() (
       val msg: String)
 
   private def containerPairs(implicit request: AuthenticatedRequest[_]):
-      Future[Seq[(Container, ComputeNode.Container)]] = {
+      Future[Seq[(Container, Option[ComputeNode.Container])]] = {
     containerDao.list.flatMap { containers =>
       val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
       val r = cnpHelper.resolver // Use a single resolver instance
@@ -176,11 +176,8 @@ class ContainerController @Inject() (
         // For each container do a lookup with the resolver
         userContainers.map(r)
       ).map { results =>
-        // Zip together container with result, then remove containers with missing
-        // compute node containers.
-        userContainers.zip(results).flatMap { pair =>
-          pair._2.map(pair._1 -> _)
-        }
+        // Zip together container with optional ComputeNode.Container
+        userContainers.zip(results)
       }
     }
   }
@@ -211,7 +208,10 @@ class ContainerController @Inject() (
       }
 
     private def hipacheActor: Future[Option[ActorRef]] =
-      Play.current.plugin[HipachePlugin].get.client
+      Play.current.plugin[HipachePlugin] match {
+        case Some(plugin) => plugin.client
+        case None => Future.successful(None)
+      }
 
     private implicit def asFrontend(
         c: ComputeNode.Container)(implicit req: Request[_]): Frontend = {

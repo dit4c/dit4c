@@ -22,7 +22,7 @@ class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
               <body>
                 <h1>DIT4C MachineShop</h1>
                 <ul>
-                  <li><a href="/projects">/projects</a></li>
+                  <li><a href="/containers">/containers</a></li>
                 </ul>
               </body>
             </html>
