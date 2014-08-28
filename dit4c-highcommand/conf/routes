@@ -18,10 +18,17 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 # Home page
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
+GET     /waiting                    @controllers.Application.waiting
+
+# Compute Nodes
+GET     /compute-nodes              @controllers.ComputeNodeController.index
+POST    /compute-nodes              @controllers.ComputeNodeController.create
+PUT     /compute-nodes/:id          @controllers.ComputeNodeController.update(id)
+DELETE  /compute-nodes/:id          @controllers.ComputeNodeController.delete(id)
+
+# Containers
 GET     /containers                 @controllers.ContainerController.index
-GET     /containers/checkNew        @controllers.ContainerController.checkNewName(name: String)
+GET     /containers/check-new       @controllers.ContainerController.checkNewName(name: String)
 POST    /containers                 @controllers.ContainerController.create
 PUT     /containers/:id             @controllers.ContainerController.update(id)
 DELETE  /containers/:id             @controllers.ContainerController.delete(id)
-
-GET     /waiting                    @controllers.Application.waiting

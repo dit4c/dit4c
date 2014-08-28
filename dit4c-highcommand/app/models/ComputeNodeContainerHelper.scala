@@ -2,10 +2,13 @@ package models
 
 import com.google.inject._
 import scala.concurrent._
+import scala.util.{Try, Success, Failure}
+import providers.machineshop.ContainerProvider
+import providers.machineshop.MachineShop
 
 trait ComputeNodeContainerHelper {
-  type ComputeNodeContainerCreator = Container => Future[ComputeNode.Container]
-  type ComputeNodeContainerResolver = Container => Future[Option[ComputeNode.Container]]
+  type ComputeNodeContainerCreator = Container => Future[MachineShop.Container]
+  type ComputeNodeContainerResolver = Container => Future[Option[MachineShop.Container]]
   def creator: ComputeNodeContainerCreator
   def resolver: ComputeNodeContainerResolver
 }
@@ -16,22 +19,22 @@ class ComputeNodeContainerHelperImpl @Inject() (dao: ComputeNodeDAO)
 
   override def creator = { container: Container =>
     for {
-      nodes <- dao.list
-      node = nodes.head
-      c <- node.containers.create(container.name, container.image)
+      node <- dao.get(container.computeNodeId)
+      c <- node.get.containers.create(container.name, container.image)
     } yield c
   }
 
-  override def resolver = {
-    lazy val bulkResolver: Future[String => Option[ComputeNode.Container]] =
-      for {
-        nodes <- dao.list
-        cncLists <- Future.sequence(nodes.map(_.containers.list))
-        cncList = cncLists.flatten.toList.sortBy(_.name)
-        cncMap = cncList.map(cnp => (cnp.name -> cnp)).toMap
-      } yield cncMap.get _
-    { container: Container => bulkResolver.map(f => f(container.name)) }
+  override def resolver = { container: Container =>
+    for {
+      node <- dao.get(container.computeNodeId)
+      c <- node.get.containers.get(container.name)
+    } yield c
   }
+
+
+  // Get list or return empty list
+  private def nodeContainers(node: ComputeNode) =
+    node.containers.list.fallbackTo(Future.successful(Nil))
 
 
 }

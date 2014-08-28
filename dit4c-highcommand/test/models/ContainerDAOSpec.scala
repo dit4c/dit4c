@@ -22,23 +22,25 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
 
   "ContainerDAO" should {
 
-    "create a project from a name and description" in new WithApplication(fakeApp) {
+    "create a container from a name and description" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val dao = new ContainerDAO(db)
       Seq(
         ("test1", ""),
         ("test2", "A test description.")
       ).foreach { case (name, desc) =>
-        val project = await(dao.create(session.user, name, desc, dummyImage))
-        project.name must be(project.name)
-        project.description must be(project.description)
+        val cn = MockComputeNode("mockcontainerid")
+        val container = await(dao.create(session.user, name, dummyImage, cn))
+        container.name must be(container.name)
+        container.image must be(container.image)
         // Check database has data
-        val cr = await(WS.url(s"${db.baseURL}/${project.id}").get)
+        val cr = await(WS.url(s"${db.baseURL}/${container.id}").get)
         cr.status must_== 200
         (cr.json \ "type").as[String] must_== "Container"
-        (cr.json \ "_id").as[String] must_== project.id
-        (cr.json \ "name").as[String] must_== project.name
-        (cr.json \ "description").as[String] must_== project.description
+        (cr.json \ "_id").as[String] must_== container.id
+        (cr.json \ "name").as[String] must_== container.name
+        (cr.json \ "image").as[String] must_== container.image
+        (cr.json \ "computeNodeId").as[String] must_== container.computeNodeId
       }
       done
     }
@@ -46,20 +48,30 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
     "get by ID" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val dao = new ContainerDAO(db)
-      val project = await(dao.create(
-          session.user, "test1", "A test description.", dummyImage))
-      await(dao.get(project.id)) must beSome
+      val cn = MockComputeNode("mockcontainerid")
+      val container = await(dao.create(
+          session.user, "test1", dummyImage, cn))
+      await(dao.get(container.id)) must beSome
     }
 
-    "delete projects" in new WithApplication(fakeApp) {
+    "delete containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       def getId(id: String) = await(WS.url(s"${db.baseURL}/$id").get)
       val dao = new ContainerDAO(db)
-      val project = await(dao.create(
-          session.user, "test1", "A test description.", dummyImage))
-      getId(project.id).status must_== 200
-      await(project.delete)
-      getId(project.id).status must_== 404
+      val cn = MockComputeNode("mockcontainerid")
+      val container = await(dao.create(
+          session.user, "test1", dummyImage, cn))
+      getId(container.id).status must_== 200
+      await(container.delete)
+      getId(container.id).status must_== 404
+    }
+
+    case class MockComputeNode(val id: String) extends ComputeNode {
+      override def _rev: Option[String] = ???
+      override def backend: providers.hipache.Hipache.Backend = ???
+      override def containers: providers.machineshop.ContainerProvider = ???
+      override def managementUrl: String = ???
+      override def name: String = ???
     }
 
   }

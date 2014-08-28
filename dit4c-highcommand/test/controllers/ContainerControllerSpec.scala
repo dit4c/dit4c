@@ -17,6 +17,8 @@ import providers.InjectorPlugin
 import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
 import utils.SpecUtils
+import providers.machineshop.MachineShop
+import providers.hipache.Hipache
 
 /**
  * Add your spec here.
@@ -35,14 +37,18 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
       val controller = getMockedController
+      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
       val containerDao = new ContainerDAO(db)
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode = 
+        await(computeNodeDao.create("Local", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
       val containers = Seq(
-        await(containerDao.create(session.user, "name1", "desc1", testImage)),
-        await(containerDao.create(session.user, "name2", "desc2", testImage)),
-        await(containerDao.create(session.user, "name3", "desc3", testImage))
+        await(containerDao.create(session.user, "name1", testImage, computeNode)),
+        await(containerDao.create(session.user, "name2", testImage, computeNode)),
+        await(containerDao.create(session.user, "name3", testImage, computeNode))
       )
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
@@ -51,14 +57,17 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       containers.zip(jsObjs).foreach { case (container, json) =>
         (json \ "id").as[String] must_== container.id
         (json \ "name").as[String] must_== container.name
-        (json \ "description").as[String] must_== container.description
         (json \ "active").as[Boolean] must beFalse
       }
     }
 
     "check names for new containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
-      val controller = getMockedController;
+      val controller = getMockedController
+      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val computeNode = 
+        await(computeNodeDao.create("Local", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")));
       // Check with valid name
       {
         val response = controller.checkNewName("test")(session.newRequest)
@@ -75,7 +84,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       }
       // Check with a used name
       val containerDao = new ContainerDAO(db)
-      await(containerDao.create(session.user, "test", "", testImage));
+      await(containerDao.create(session.user, "test", testImage, computeNode));
       {
         val response = controller.checkNewName("test")(session.newRequest)
         status(response) must_== 200
@@ -92,10 +101,10 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
           db,
           new ComputeNodeContainerHelper {
             override def creator = { container =>
-              Future.successful(MockCNC(container.name, false))
+              Future.successful(MockMCC(container.name, false))
             }
             override def resolver = { container =>
-              Future.successful(Some(MockCNC(container.name, false)))
+              Future.successful(Some(MockMCC(container.name, false)))
             }
           },
           injector.getInstance(classOf[Application]))
@@ -103,12 +112,11 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
 
   }
 
-  case class MockCNC(val name: String, val active: Boolean)
-    extends ComputeNode.Container {
+  case class MockMCC(val name: String, val active: Boolean)
+    extends MachineShop.Container {
     import Future.successful
     override def delete = successful[Unit](Unit)
-    override def start = successful(MockCNC(name, true))
-    override def stop = successful(MockCNC(name, false))
-    override def proxyBackend = ???
+    override def start = successful(MockMCC(name, true))
+    override def stop = successful(MockMCC(name, false))
   }
 }

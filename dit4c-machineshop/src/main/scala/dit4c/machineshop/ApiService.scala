@@ -29,7 +29,7 @@ class ApiService(
     signatureActor: Option[ActorRef]) extends HttpService with RouteProvider {
   import scala.concurrent.duration._
 
-  implicit val timeout = Timeout(100.millis)
+  implicit val timeout = Timeout(10.seconds)
 
   import dit4c.machineshop.auth.SignatureActor._
   import scala.concurrent.ExecutionContext.Implicits.global

@@ -56,10 +56,9 @@ define(['./module'], (controllers) ->
         $scope.nameCheck = {}
       else
         $http
-          .get('/containers/checkNew?name='+name)
+          .get('/containers/check-new?name='+name)
           .then (response) ->
             $scope.nameCheck = response.data
-    
-      
+
   )
 )

@@ -15,14 +15,15 @@ class ContainerDAO(protected val db: CouchDB.Database)
   def create(
       user: User,
       name: String,
-      description: String,
-      image: String): Future[Container] =
+      image: String,
+      computeNode: ComputeNode): Future[Container] =
     list.flatMap { projects =>
       if (projects.exists(_.name == name)) {
         throw new Exception("Container with that name already exists.")
       }
       db.newID.flatMap { id =>
-        val node = ContainerImpl(id, None, name, description, image, Set(user.id))
+        val node = ContainerImpl(id, None, name, image, computeNode.id,
+          Set(user.id))
         WS.url(s"${db.baseURL}/$id")
           .put(Json.toJson(node))
           .flatMap { response =>
@@ -54,8 +55,8 @@ class ContainerDAO(protected val db: CouchDB.Database)
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
-    (__ \ "description").format[String] and
     (__ \ "image").format[String] and
+    (__ \ "computeNodeId").format[String] and
     (__ \ "ownerIDs").format[Set[String]]
   )(ContainerImpl.apply _, unlift(ContainerImpl.unapply))
     .withTypeAttribute("Container")
@@ -65,8 +66,8 @@ class ContainerDAO(protected val db: CouchDB.Database)
       id: String,
       _rev: Option[String],
       name: String,
-      description: String,
       image: String,
+      computeNodeId: String,
       ownerIDs: Set[String]) extends Container {
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
@@ -80,8 +81,8 @@ trait Container {
   def id: String
   def _rev: Option[String]
   def name: String
-  def description: String
   def image: String
+  def computeNodeId: String
   def ownerIDs: Set[String]
 
   def delete: Future[Unit]

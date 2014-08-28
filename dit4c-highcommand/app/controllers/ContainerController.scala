@@ -15,14 +15,15 @@ import akka.actor.ActorRef
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import providers.hipache.HipachePlugin
+import providers.machineshop.MachineShop
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
     cnpHelper: ComputeNodeContainerHelper,
     mainController: Application) extends Controller with Utils {
 
-  implicit class CNCHelper(cnp: ComputeNode.Container) {
-    def makeActive(shouldBeActive: Boolean): Future[ComputeNode.Container] =
+  implicit class CNCHelper(cnp: MachineShop.Container) {
+    def makeActive(shouldBeActive: Boolean): Future[MachineShop.Container] =
       if (cnp.active != shouldBeActive)
         if (shouldBeActive)
           cnp.start
@@ -48,7 +49,9 @@ class ContainerController @Inject() (
       val shouldBeActive = (json \ "active").as[Boolean]
       val response: Future[Result] =
         for {
-          container <- containerDao.create(request.user, name, description, image)
+          nodes <- computeNodeDao.list
+          node = nodes.head
+          container <- containerDao.create(request.user, name, image, node)
           p <- cnpHelper.creator(container)
           _ <- HipacheInterface.put(p)
           cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
@@ -56,7 +59,6 @@ class ContainerController @Inject() (
           Created(Json.obj(
             "id" -> container.id,
             "name" -> container.name,
-            "description" -> container.description,
             "image" -> container.image,
             "active" -> cnContainer.active
           ))
@@ -72,7 +74,6 @@ class ContainerController @Inject() (
           Json.obj(
             "id" -> c.id,
             "name" -> c.name,
-            "description" -> c.description,
             "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
           )
         })
@@ -97,7 +98,6 @@ class ContainerController @Inject() (
                   Ok(Json.obj(
                     "id" -> container.id,
                     "name" -> container.name,
-                    "description" -> container.description,
                     "active" -> updatedCnp.active
                   ))
                 }
@@ -168,7 +168,7 @@ class ContainerController @Inject() (
       val msg: String)
 
   private def containerPairs(implicit request: AuthenticatedRequest[_]):
-      Future[Seq[(Container, Option[ComputeNode.Container])]] = {
+      Future[Seq[(Container, Option[MachineShop.Container])]] = {
     containerDao.list.flatMap { containers =>
       val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
       val r = cnpHelper.resolver // Use a single resolver instance
@@ -176,7 +176,7 @@ class ContainerController @Inject() (
         // For each container do a lookup with the resolver
         userContainers.map(r)
       ).map { results =>
-        // Zip together container with optional ComputeNode.Container
+        // Zip together container with optional MachineShop.Container
         userContainers.zip(results)
       }
     }
@@ -190,13 +190,15 @@ class ContainerController @Inject() (
 
     implicit val timeout = Timeout(10, TimeUnit.SECONDS)
 
-    def put(container: ComputeNode.Container)(implicit req: Request[_]) =
+    def put(container: MachineShop.Container)(implicit req: Request[_]) =
       withHipache { hipache =>
-        hipache ? Put(container, container.proxyBackend)
+        // TODO: Use ComputeNode backend to perform
+        //hipache ? Put(container, container.proxyBackend)
+        Future.successful(())
       }
 
 
-    def delete(container: ComputeNode.Container)(implicit req: Request[_]) =
+    def delete(container: MachineShop.Container)(implicit req: Request[_]) =
       withHipache { hipache =>
         hipache ? Delete(container)
       }
@@ -214,7 +216,7 @@ class ContainerController @Inject() (
       }
 
     private implicit def asFrontend(
-        c: ComputeNode.Container)(implicit req: Request[_]): Frontend = {
+        c: MachineShop.Container)(implicit req: Request[_]): Frontend = {
       Frontend(c.name, s"${c.name}.${req.host}")
     }
 
