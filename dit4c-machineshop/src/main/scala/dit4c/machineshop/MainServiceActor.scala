@@ -28,6 +28,6 @@ class MainServiceActor(config: Config) extends Actor with HttpService {
   // other things here, like request stream processing
   // or timeout handling
   def receive = runRoute(
-      MiscService().route ~
+      MiscService(config.serverId).route ~
       ApiService(dockerClient, signatureActor).route)
 }

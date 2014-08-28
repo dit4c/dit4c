@@ -9,7 +9,8 @@ import spray.json._
 import MediaTypes._
 import scala.collection.JavaConversions._
 
-class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
+class MiscService(arf: ActorRefFactory, serverId: String)
+    extends HttpService with RouteProvider {
 
   implicit val actorRefFactory = arf
 
@@ -20,7 +21,7 @@ class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
           complete {
             <html>
               <body>
-                <h1>DIT4C MachineShop</h1>
+                <h1>DIT4C MachineShop ({serverId})</h1>
                 <ul>
                   <li><a href="/containers">/containers</a></li>
                 </ul>
@@ -28,6 +29,11 @@ class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
             </html>
           }
         }
+      }
+    } ~
+    path("server-id") {
+      respondWithMediaType(`text/plain`) {
+        complete(serverId)
       }
     } ~
     path("favicon.ico") {
@@ -41,6 +47,7 @@ class MiscService(arf: ActorRefFactory) extends HttpService with RouteProvider {
 
 object MiscService {
 
-  def apply()(implicit actorRefFactory: ActorRefFactory) = new MiscService(actorRefFactory)
+  def apply(serverId: String)(implicit actorRefFactory: ActorRefFactory) =
+    new MiscService(actorRefFactory, serverId)
 
 }

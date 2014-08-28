@@ -39,10 +39,17 @@ object Boot extends App {
 case class Config(
     val interface: String = "localhost",
     val port: Int = 8080,
+    val serverId: String = null,
     val publicKeyLocation: Option[java.net.URI] = None,
     val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
+  // Courtesy of https://gist.github.com/mayoYamasaki/4085712
+  def sha1(bytes: Array[Byte]) = {
+    val md = java.security.MessageDigest.getInstance("SHA-1")
+    md.digest(bytes).map("%02x".format(_)).mkString
+  }
+
   help("help") text("prints this usage text")
   opt[String]('i', "interface")
     .action { (x, c) => c.copy(interface = x) }
@@ -59,4 +66,25 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
       c.copy(keyUpdateInterval = Duration.create(x, TimeUnit.SECONDS))
      }
     .text("second interval to use when polling keys")
+  opt[String]("server-id-seed")
+    .action { (x, c) => c.copy(serverId = sha1(x.getBytes)) }
+    .text("seed string for server ID")
+  opt[java.io.File]("server-id-seed-file")
+    .action { (file, c) =>
+      def readFileBytes(file: java.io.File) = {
+        import java.io._
+        val bis = new BufferedInputStream(new FileInputStream(file))
+        Stream.continually(bis.read).takeWhile(-1 != _).map(_.toByte).toArray
+      }
+      c.copy(serverId = sha1(readFileBytes(file)))
+    }
+    .validate { file =>
+      if (file.isFile) Right() else Left("server ID file must exist")
+    }
+    .text("file containing seed data for server ID")
+  checkConfig { c =>
+    if (c.serverId == null) failure("server ID must be set")
+    else success
+  }
+
 }
