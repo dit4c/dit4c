@@ -16,11 +16,9 @@ define(['./module'], (controllers) ->
       $scope.computeNodes.filter (node) ->
         node.usable
     
-    $scope.newContainerComputeNode = $scope.usableComputeNodes()[0]
-    
     $scope.newContainer =
       name: ""
-      computeNodeId: ($scope.newContainerComputeNode||{}).id
+      computeNode: $scope.usableComputeNodes()[0]
       image: $scope.images[0].value
       active: false
     
@@ -28,8 +26,14 @@ define(['./module'], (controllers) ->
       "//"+name+"."+$location.host()
     
     $scope.create = () ->
+      console.log($scope.newContainerComputeNode, $scope.usableComputeNodes())
       $http
-        .post('/containers', $scope.newContainer)
+        .post('/containers',
+          name: $scope.newContainer.name
+          computeNodeId: ($scope.newContainer.computeNode||{}).id,
+          image: $scope.newContainer.image
+          active: $scope.newContainer.active
+        )
         .then (response) ->
           $scope.newContainer.name = ""
           $scope.containers.push(response.data)

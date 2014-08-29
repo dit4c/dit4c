@@ -93,9 +93,7 @@
             <span class="glyphicon form-control-feedback"
               ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
           </div>
-          <input type="hidden" ng-model="newContainer.computeNodeId"
-            value="{{newContainerComputeNode.id}}" />
-          <select class="form-control" ng-model="newContainerComputeNode"
+          <select class="form-control" ng-model="newContainer.computeNode"
           	required="true"
             ng-options="node.name for node in usableComputeNodes() track by node.id"></select>
           <select class="form-control" ng-model="newContainer.image"
