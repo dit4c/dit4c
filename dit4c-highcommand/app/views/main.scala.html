@@ -81,7 +81,7 @@
       <h1>Containers</h1>
 
       <div>
-        <form class="form-inline">
+        <form class="form-inline" ng-if="usableComputeNodes().length > 0">
           <div class="form-group has-feedback"
                ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
                title="{{nameCheck.reason}}">
@@ -93,6 +93,11 @@
             <span class="glyphicon form-control-feedback"
               ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
           </div>
+          <input type="hidden" ng-model="newContainer.computeNodeId"
+            value="{{newContainerComputeNode.id}}" />
+          <select class="form-control" ng-model="newContainerComputeNode"
+          	required="true"
+            ng-options="node.name for node in usableComputeNodes() track by node.id"></select>
           <select class="form-control" ng-model="newContainer.image"
             ng-options="image.value as image.label for image in images"></select>
           <div class="checkbox">
@@ -140,7 +145,13 @@
               </span>
             </td>
             <td>
-              <button class="btn btn-danger" ng-click="delete(container.id)">Delete</button>
+              <button class="btn btn-danger"
+                ng-click="delete(container.id)">Delete</button>
+            </td>
+          </tr>
+          <tr ng-if="containers.length == 0">
+            <td colspan="4" class="text-center text-muted">
+              You do not currently have any containers.
             </td>
           </tr>
         </tbody>

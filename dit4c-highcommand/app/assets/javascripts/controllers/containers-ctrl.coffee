@@ -1,7 +1,7 @@
 define(['./module'], (controllers) ->
   'use strict'
   
-  controllers.controller('ContainersCtrl', ($scope, $route, $http, $location) ->
+  controllers.controller('ContainersCtrl', ($scope, $route, $http, $location, $filter) ->
     $scope.images = [
       { value: "dit4c/dit4c-container-base", label: "Base" },
       { value: "dit4c/dit4c-container-ipython", label: "iPython" },
@@ -12,8 +12,15 @@ define(['./module'], (controllers) ->
     
     $scope.containers = $route.current.locals.containers
     
+    $scope.usableComputeNodes = () ->
+      $scope.computeNodes.filter (node) ->
+        node.usable
+    
+    $scope.newContainerComputeNode = $scope.usableComputeNodes()[0]
+    
     $scope.newContainer =
-      name: "",
+      name: ""
+      computeNodeId: ($scope.newContainerComputeNode||{}).id
       image: $scope.images[0].value
       active: false
     
