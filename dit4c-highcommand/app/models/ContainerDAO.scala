@@ -76,14 +76,11 @@ class ContainerDAO(protected val db: CouchDB.Database)
 
 }
 
-trait Container {
+trait Container extends OwnableModel {
 
-  def id: String
-  def _rev: Option[String]
   def name: String
   def image: String
   def computeNodeId: String
-  def ownerIDs: Set[String]
 
   def delete: Future[Unit]
 

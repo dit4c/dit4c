@@ -81,7 +81,21 @@ trait DAOUtils {
 
 }
 
-trait DAOModel[M <: DAOModel[M]] {
+trait BaseModel {
   def id: String
+  def _rev: Option[String]
+}
+
+trait DAOModel[M <: DAOModel[M]] extends BaseModel {
   def revUpdate(newRev: String): M
+}
+
+trait OwnableModel extends BaseModel {
+  def ownerIDs: Set[String]
+  def ownedBy(other: BaseModel): Boolean = ownerIDs.contains(other.id)
+}
+
+trait UsableModel extends BaseModel {
+  def userIDs: Set[String]
+  def usableBy(other: BaseModel): Boolean = userIDs.contains(other.id)
 }

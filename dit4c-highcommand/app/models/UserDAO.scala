@@ -77,9 +77,7 @@ class UserDAO(protected val db: CouchDB.Database)
 
 }
 
-trait User {
-  def id: String
-  def _rev: Option[String]
+trait User extends BaseModel {
   def name: Option[String]
   def email: Option[String]
   def identities: Seq[String]

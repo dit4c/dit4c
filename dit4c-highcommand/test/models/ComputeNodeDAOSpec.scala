@@ -20,8 +20,10 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
   "ComputeNodeDAO" should {
 
     "create a compute node" in new WithApplication(fakeApp) {
+      val session = new UserSession(db)
       val dao = new ComputeNodeDAO(db, new KeyDAO(db))
       val node = await(dao.create(
+          session.user,
           "Local",
           "fakeid",
           "http://localhost:8080/",
@@ -43,12 +45,16 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       (json \ "backend" \ "host").as[String] must_== "localhost"
       (json \ "backend" \ "port").as[Int] must_== 6000
       (json \ "backend" \ "scheme").as[String] must_== "http"
+      (json \ "ownerIDs").as[Set[String]] must contain(session.user.id)
+      (json \ "userIDs").as[Set[String]] must contain(session.user.id)
     }
 
     "list all compute nodes" in new WithApplication(fakeApp) {
+      val session = new UserSession(db)
       val dao = new ComputeNodeDAO(db, new KeyDAO(db))
       await(dao.list) must beEmpty
       val node = await(dao.create(
+          session.user,
           "Local",
           "fakeid",
           "http://localhost:8080/",

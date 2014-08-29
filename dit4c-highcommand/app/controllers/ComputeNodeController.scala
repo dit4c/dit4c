@@ -66,7 +66,8 @@ class ComputeNodeController @Inject() (
         case Left(msg) => Future.successful(BadRequest(msg))
         case Right(serverId) =>
           for {
-            node <- computeNodeDao.create(name, serverId, managementUrl, backend)
+            node <- computeNodeDao.create(request.user,
+                name, serverId, managementUrl, backend)
           } yield {
             Created(Json.obj(
               "id" -> node.id,

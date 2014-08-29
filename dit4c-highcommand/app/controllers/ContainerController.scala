@@ -45,23 +45,29 @@ class ContainerController @Inject() (
       val name = (json \ "name").as[String]
       val image = (json \ "image").as[String]
       val shouldBeActive = (json \ "active").as[Boolean]
-      val response: Future[Result] =
+      val fNode: Future[Option[ComputeNode]] =
         for {
           nodes <- computeNodeDao.list
-          node = nodes.head
-          container <- containerDao.create(request.user, name, image, node)
-          p <- cnpHelper.creator(container)
-          _ <- HipacheInterface.put(p)
-          cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
-        } yield {
-          Created(Json.obj(
-            "id" -> container.id,
-            "name" -> container.name,
-            "image" -> container.image,
-            "active" -> cnContainer.active
-          ))
-        }
-      response.flatMap(_.withUpdatedJwt(request.user))
+          node = nodes.find(_.usableBy(request.user))
+        } yield node
+
+      fNode.flatMap {
+        case None => Future.successful(BadRequest("No eligible compute nodes."))
+        case Some(node) =>
+          for {
+            container <- containerDao.create(request.user, name, image, node)
+            p <- cnpHelper.creator(container)
+            _ <- HipacheInterface.put(p)
+            cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
+            result = Created(Json.obj(
+              "id" -> container.id,
+              "name" -> container.name,
+              "image" -> container.image,
+              "active" -> cnContainer.active
+            ))
+            resultWithJwt <- result.withUpdatedJwt(request.user)
+          } yield resultWithJwt
+      }
     }.getOrElse(Future.successful(BadRequest))
   }
 

@@ -30,13 +30,14 @@ class ComputeNodeDAO @Inject() (
   import play.api.Play.current
 
   def create(
+      user: User,
       name: String,
       serverId: String,
       managementUrl: String,
       backend: Hipache.Backend): Future[ComputeNode] =
     db.newID.flatMap { id =>
       val node = ComputeNodeImpl(id, None,
-          name, serverId, managementUrl, backend)
+          name, serverId, managementUrl, backend, Set(user.id), Set(user.id))
       WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).map { response =>
         response.status match {
           case 201 => node
@@ -63,7 +64,9 @@ class ComputeNodeDAO @Inject() (
     (__ \ "name").format[String] and
     (__ \ "serverID").format[String] and
     (__ \ "managementURL").format[String] and
-    (__ \ "backend").format[Hipache.Backend]
+    (__ \ "backend").format[Hipache.Backend] and
+    (__ \ "ownerIDs").format[Set[String]] and
+    (__ \ "userIDs").format[Set[String]]
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
     .withTypeAttribute("ComputeNode")
 
@@ -73,9 +76,10 @@ class ComputeNodeDAO @Inject() (
       name: String,
       serverId: String,
       managementUrl: String,
-      backend: Hipache.Backend
-      )(implicit ec: ExecutionContext)
-      extends ComputeNode {
+      backend: Hipache.Backend,
+      ownerIDs: Set[String],
+      userIDs: Set[String]
+      )(implicit ec: ExecutionContext) extends ComputeNode {
 
     import play.api.Play.current
 
@@ -86,9 +90,7 @@ class ComputeNodeDAO @Inject() (
   }
 }
 
-trait ComputeNode {
-  def id: String
-  def _rev: Option[String]
+trait ComputeNode extends OwnableModel with UsableModel {
   def name: String
   def serverId: String
   def managementUrl: String

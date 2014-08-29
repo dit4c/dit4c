@@ -41,6 +41,7 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
         (cr.json \ "name").as[String] must_== container.name
         (cr.json \ "image").as[String] must_== container.image
         (cr.json \ "computeNodeId").as[String] must_== container.computeNodeId
+        (cr.json \ "ownerIDs").as[Set[String]] must contain(session.user.id)
       }
       done
     }
@@ -73,6 +74,8 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       override def managementUrl: String = ???
       override def name: String = ???
       override def serverId = ???
+      override def ownerIDs = ???
+      override def userIDs = ???
     }
 
   }
