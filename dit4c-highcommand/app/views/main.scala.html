@@ -80,43 +80,53 @@
     <div class="container">
       <h1>Containers</h1>
 
+      <div>
+        <form class="form-inline">
+          <div class="form-group has-feedback"
+               ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
+               title="{{nameCheck.reason}}">
+            <input type="text" class="form-control"
+              ng-model="newContainer.name"
+              ng-change="checkName(newContainer.name)"
+              placeholder="Container Name"
+              />
+            <span class="glyphicon form-control-feedback"
+              ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
+          </div>
+          <select class="form-control" ng-model="newContainer.image"
+            ng-options="image.value as image.label for image in images"></select>
+          <div class="checkbox">
+            <label>
+              Start?
+              <input type="checkbox" ng-model="newContainer.active"/>
+            </label>
+          </div>
+          <button class="btn btn-primary" ng-click="create()">
+            Create
+          </button>
+        </form>
+      </div>
+
       <table class="table">
         <thead>
-          <tr><th>Container Name</th><th>Active?</th><th></th></tr>
+          <tr>
+            <th>Container Name</th>
+            <th>Compute Node</th>
+            <th>Active?</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colspan="3">
-              <form class="form-inline">
-                <div class="form-group has-feedback"
-                     ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
-                     title="{{nameCheck.reason}}">
-                  <input type="text" class="form-control"
-                    ng-model="newContainer.name"
-                    ng-change="checkName(newContainer.name)"
-                    />
-                  <span class="glyphicon form-control-feedback"
-                    ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
-                </div>
-                <select class="form-control" ng-model="newContainer.image"
-                  ng-options="image.value as image.label for image in images"></select>
-                <div class="checkbox">
-                  <label>
-                    Start?
-                    <input type="checkbox" ng-model="newContainer.active"/>
-                  </label>
-                </div>
-                <button class="btn btn-primary" ng-click="create()">
-                  Create
-                </button>
-              </form>
-            </td>
-          </tr>
           <tr ng-repeat="container in containers | orderBy:'name'">
             <td>
               <a ng-if="container.active" href="{{rootUrl(container.name)}}"
                  target="_blank">{{container.name}}</a>
-              <span ng-if="!container.active">{{container.name}}</span>
+              <span ng-if="!container.active" title="{{container.id}}">{{container.name}}</span>
+            </td>
+            <td>
+              <span ng-repeat="node in computeNodes | filter:container.computeNodeId:id">
+                <span title="{{node.id}}">{{node.name}}</span>
+              </span>
             </td>
             <td>
               <div class="btn-group" ng-if="container.active != null">

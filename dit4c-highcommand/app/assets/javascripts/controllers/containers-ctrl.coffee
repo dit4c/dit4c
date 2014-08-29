@@ -8,6 +8,8 @@ define(['./module'], (controllers) ->
       { value: "dit4c/dit4c-container-rstudio", label: "RStudio" }
     ]
     
+    $scope.computeNodes = $route.current.locals.computeNodes
+    
     $scope.containers = $route.current.locals.containers
     
     $scope.newContainer =

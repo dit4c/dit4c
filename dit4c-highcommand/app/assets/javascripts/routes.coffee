@@ -35,6 +35,11 @@ define(['./app'], (app) ->
             .get('/containers')
             .then (response) ->
               response.data
+        computeNodes: ($http) ->
+          $http
+            .get('/compute-nodes')
+            .then (response) ->
+              response.data
     )
     
     $routeProvider.when('/notfound',

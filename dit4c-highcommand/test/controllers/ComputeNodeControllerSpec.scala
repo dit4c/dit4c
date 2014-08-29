@@ -52,6 +52,8 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       json must haveSize(1)
       json.head \ "id" must beAnInstanceOf[JsString]
       json.head \ "name" must_== JsString("Local")
+      json.head \ "owned" must_== JsBoolean(true)
+      json.head \ "usable" must_== JsBoolean(true)
     }
 
   }

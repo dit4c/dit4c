@@ -62,6 +62,7 @@ class ContainerController @Inject() (
             result = Created(Json.obj(
               "id" -> container.id,
               "name" -> container.name,
+              "computeNodeId" -> container.computeNodeId,
               "image" -> container.image,
               "active" -> cnContainer.active
             ))
@@ -78,6 +79,8 @@ class ContainerController @Inject() (
           Json.obj(
             "id" -> c.id,
             "name" -> c.name,
+            "computeNodeId" -> c.computeNodeId,
+            "image" -> c.image,
             "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
           )
         })

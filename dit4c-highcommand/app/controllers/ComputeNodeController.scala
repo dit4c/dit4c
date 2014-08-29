@@ -85,7 +85,9 @@ class ComputeNodeController @Inject() (
       val json = JsArray(nodes.map { node =>
           Json.obj(
             "id" -> node.id,
-            "name" -> node.name
+            "name" -> node.name,
+            "owned" -> node.ownedBy(request.user),
+            "usable" -> node.usableBy(request.user)
           )
         })
       Ok(json)
