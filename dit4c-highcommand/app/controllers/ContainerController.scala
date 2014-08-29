@@ -44,15 +44,16 @@ class ContainerController @Inject() (
     request.body.asJson.map { json =>
       val name = (json \ "name").as[String]
       val image = (json \ "image").as[String]
+      val computeNodeId = (json \ "computeNodeId").as[String]
       val shouldBeActive = (json \ "active").as[Boolean]
       val fNode: Future[Option[ComputeNode]] =
         for {
-          nodes <- computeNodeDao.list
+          nodes <- computeNodeDao.get(computeNodeId)
           node = nodes.find(_.usableBy(request.user))
         } yield node
 
       fNode.flatMap {
-        case None => Future.successful(BadRequest("No eligible compute nodes."))
+        case None => Future.successful(BadRequest("Invalid compute node."))
         case Some(node) =>
           for {
             container <- containerDao.create(request.user, name, image, node)
