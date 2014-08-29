@@ -27,7 +27,7 @@ class ComputeNodeController @Inject() (
 
   def index: Action[AnyContent] = Action.async { implicit request =>
     render.async {
-      //case Accepts.Html() => mainController.main("containers")(request)
+      case Accepts.Html() => mainController.main("compute-nodes")(request)
       case Accepts.Json() => list(request)
     }
   }
@@ -69,12 +69,7 @@ class ComputeNodeController @Inject() (
             node <- computeNodeDao.create(request.user,
                 name, serverId, managementUrl, backend)
           } yield {
-            Created(Json.obj(
-              "id" -> node.id,
-              "name" -> node.name,
-              "managementUrl" -> node.managementUrl,
-              "backend" -> node.backend
-            ))
+            Created(toJson(node))
           }
       }
     }.getOrElse(Future.successful(BadRequest("Request must be JSON")))
@@ -82,14 +77,7 @@ class ComputeNodeController @Inject() (
 
   def list: Action[AnyContent] = Authenticated.async { implicit request =>
     computeNodeDao.list map { nodes =>
-      val json = JsArray(nodes.map { node =>
-          Json.obj(
-            "id" -> node.id,
-            "name" -> node.name,
-            "owned" -> node.ownedBy(request.user),
-            "usable" -> node.usableBy(request.user)
-          )
-        })
+      val json = JsArray(nodes.map(toJson))
       Ok(json)
     }
   }
@@ -97,5 +85,26 @@ class ComputeNodeController @Inject() (
   def update(id: String): Action[AnyContent] = ???
 
   def delete(id: String): Action[AnyContent] = ???
+
+
+  protected def toJson(
+        node: ComputeNode
+      )(implicit request: AuthenticatedRequest[_]) = {
+    val base =
+      Json.obj(
+        "id" -> node.id,
+        "name" -> node.name,
+        "owned" -> node.ownedBy(request.user),
+        "usable" -> node.usableBy(request.user)
+      )
+    if (node.ownedBy(request.user))
+      base ++ Json.obj(
+        "managementUrl" -> node.managementUrl,
+        "backend" -> node.backend
+      )
+    else
+      base
+  }
+
 
 }

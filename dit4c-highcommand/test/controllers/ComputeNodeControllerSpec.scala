@@ -50,10 +50,17 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       status(nonEmptyResponse) must_== 200
       val json = contentAsJson(nonEmptyResponse).as[List[JsObject]]
       json must haveSize(1)
-      json.head \ "id" must beAnInstanceOf[JsString]
-      json.head \ "name" must_== JsString("Local")
-      json.head \ "owned" must_== JsBoolean(true)
-      json.head \ "usable" must_== JsBoolean(true)
+      json match {
+        case Seq(json) =>
+          json \ "id" must beAnInstanceOf[JsString]
+          json \ "name" must_== JsString("Local")
+          json \ "managementUrl" must_== JsString("http://localhost:5000/")
+          json \ "backend" \ "host" must_== JsString("localhost")
+          json \ "backend" \ "port" must_== JsNumber(8080)
+          json \ "backend" \ "scheme" must_== JsString("https")
+          json \ "owned" must_== JsBoolean(true)
+          json \ "usable" must_== JsBoolean(true)
+      }
     }
 
   }

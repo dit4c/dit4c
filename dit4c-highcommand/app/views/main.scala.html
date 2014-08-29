@@ -36,6 +36,7 @@
           <div ng-if="currentUser">
             <ul class="nav navbar-nav">
               <li><a href="/containers">Containers</a></li>
+              <li><a href="/compute-nodes">Compute Nodes</a></li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
               <li class="dropdown">
@@ -88,7 +89,7 @@
             <input type="text" class="form-control"
               ng-model="newContainer.name"
               ng-change="checkName(newContainer.name)"
-              placeholder="Container Name"
+              placeholder="Containeoverallr Name"
               />
             <span class="glyphicon form-control-feedback"
               ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
@@ -151,6 +152,34 @@
             <td colspan="4" class="text-center text-muted">
               You do not currently have any containers.
             </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </script>
+    
+    <script type="text/ng-template" id="compute-nodes.html">
+    <div ng-include src="'navbar.html'"></div>
+    <div class="container">
+      <h1>Compute Nodes</h1>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Compute Node</th>
+            <th></th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="node in computeNodes | orderBy:'name'">
+            <td>{{node.name}}</td>
+            <td>
+              <button class="btn btn-default" ng-if="node.owned">
+                Edit
+              </button>
+            </td>
+            <td><pre>{{ node | json }}</pre></td>
           </tr>
         </tbody>
       </table>

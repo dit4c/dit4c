@@ -42,6 +42,17 @@ define(['./app'], (app) ->
               response.data
     )
     
+    $routeProvider.when('/compute-nodes',
+      templateUrl: 'compute-nodes.html'
+      controller: 'ComputeNodesCtrl',
+      resolve:
+        computeNodes: ($http) ->
+          $http
+            .get('/compute-nodes')
+            .then (response) ->
+              response.data
+    )
+    
     $routeProvider.when('/notfound',
       templateUrl: 'notfound.html'
     )
