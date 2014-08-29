@@ -61,6 +61,27 @@ trait DAOUtils {
               s"Unexpected return code for DELETE: ${response.status}")
         }
     }
+
+    def update[M <: DAOModel[M]](changed: => M)(
+        implicit wjs: Writes[M]): Future[M] = {
+      for {
+        response <- WS.url(s"${db.baseURL}/${changed.id}")
+                      .put(Json.toJson(changed))
+      } yield {
+        response.status match {
+          case 201 =>
+            // Update with revision
+            val rev = (response.json \ "rev").as[String]
+            changed.revUpdate(rev)
+        }
+      }
+    }
+
   }
 
+}
+
+trait DAOModel[M <: DAOModel[M]] {
+  def id: String
+  def revUpdate(newRev: String): M
 }

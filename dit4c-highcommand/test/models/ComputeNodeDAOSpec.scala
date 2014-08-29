@@ -23,10 +23,12 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       val dao = new ComputeNodeDAO(db, new KeyDAO(db))
       val node = await(dao.create(
           "Local",
+          "fakeid",
           "http://localhost:8080/",
           Hipache.Backend("localhost", 6000)
       ))
       node.name must_== "Local"
+      node.serverId must_== "fakeid"
       node.managementUrl must_== "http://localhost:8080/"
       node.backend must_== Hipache.Backend("localhost", 6000)
       // Check database has data
@@ -36,6 +38,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       (json \ "type").as[String] must_== "ComputeNode"
       (json \ "_id").as[String] must_== node.id
       (json \ "name").as[String] must_== node.name
+      (json \ "serverID").as[String] must_== node.serverId
       (json \ "managementURL").as[String] must_== node.managementUrl
       (json \ "backend" \ "host").as[String] must_== "localhost"
       (json \ "backend" \ "port").as[Int] must_== 6000
@@ -47,6 +50,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.list) must beEmpty
       val node = await(dao.create(
           "Local",
+          "fakeid",
           "http://localhost:8080/",
           Hipache.Backend("localhost", 6000)
       ))

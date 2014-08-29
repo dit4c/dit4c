@@ -1,6 +1,8 @@
 package providers.hipache
 
 import redis.RedisServer
+import play.api.libs.json.Format
+import play.api.libs.json.JsPath
 
 object Hipache {
 
@@ -18,5 +20,15 @@ object Hipache {
       scheme: String = "http") {
     override def toString = s"$scheme://$host:$port"
   }
+
+  implicit val hipacheBackendFormat: Format[Hipache.Backend] = {
+    import play.api.libs.functional.syntax._
+    (
+      (JsPath \ "host").format[String] and
+      (JsPath \ "port").format[Int] and
+      (JsPath \ "scheme").format[String]
+    )(Hipache.Backend.apply _, unlift(Hipache.Backend.unapply))
+  }
+
 
 }

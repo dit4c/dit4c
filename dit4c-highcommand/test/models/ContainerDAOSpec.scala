@@ -72,6 +72,7 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       override def containers: providers.machineshop.ContainerProvider = ???
       override def managementUrl: String = ???
       override def name: String = ???
+      override def serverId = ???
     }
 
   }

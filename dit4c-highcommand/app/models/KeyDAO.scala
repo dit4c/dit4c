@@ -131,24 +131,16 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       namespace: String,
       createdAt: DateTime,
       retired: Boolean,
-      keyPair: WrappedRSAKey)(implicit ec: ExecutionContext) extends Key {
+      keyPair: WrappedRSAKey)(implicit ec: ExecutionContext)
+      extends Key with DAOModel[KeyImpl] {
+
     import play.api.libs.functional.syntax._
     import play.api.Play.current
 
     override def publicId: String = s"$namespace $createdAt [$id]"
 
-    override def retire: Future[Key] = {
-      val key = this.copy(retired = true)
-      for {
-        response <- WS.url(s"${db.baseURL}/${key.id}").put(Json.toJson(key))
-      } yield {
-        response.status match {
-          case 201 =>
-            // Update with revision
-            val rev = (response.json \ "rev").as[Option[String]]
-            key.copy(_rev = rev)
-        }
-      }
+    override def retire: Future[Key] = utils.update {
+      this.copy(retired = true)
     }
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
@@ -161,6 +153,8 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       keyPair.rsaKey.getAlgorithm,
       publicId,
       null, null, null)
+
+    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
   }
 

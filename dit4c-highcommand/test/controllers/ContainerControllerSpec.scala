@@ -43,7 +43,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
       val computeNode = 
-        await(computeNodeDao.create("Local", "http://localhost:5000/",
+        await(computeNodeDao.create("Local", "fakeid", "http://localhost:5000/",
             Hipache.Backend("localhost", 8080, "https")))
       val containers = Seq(
         await(containerDao.create(session.user, "name1", testImage, computeNode)),
@@ -66,7 +66,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val controller = getMockedController
       val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
       val computeNode = 
-        await(computeNodeDao.create("Local", "http://localhost:5000/",
+        await(computeNodeDao.create("Local", "fakeid", "http://localhost:5000/",
             Hipache.Backend("localhost", 8080, "https")));
       // Check with valid name
       {

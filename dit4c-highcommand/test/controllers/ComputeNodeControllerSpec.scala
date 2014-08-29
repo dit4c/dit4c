@@ -42,7 +42,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
 
-      await(dao.create("Local", "http://localhost:5000/",
+      await(dao.create("Local", "fakeid", "http://localhost:5000/",
           Hipache.Backend("localhost", 8080, "https")))
 
       val nonEmptyResponse = controller.list(session.newRequest)

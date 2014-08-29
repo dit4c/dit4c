@@ -19,6 +19,7 @@ import play.api.libs.ws.InMemoryBody
 import java.security.MessageDigest
 import providers.hipache.Hipache
 import providers.machineshop.ContainerProvider
+import providers.machineshop.MachineShop
 
 class ComputeNodeDAO @Inject() (
     protected val db: CouchDB.Database,
@@ -28,9 +29,14 @@ class ComputeNodeDAO @Inject() (
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
-  def create(name: String, managementUrl: String, backend: Hipache.Backend): Future[ComputeNode] =
+  def create(
+      name: String,
+      serverId: String,
+      managementUrl: String,
+      backend: Hipache.Backend): Future[ComputeNode] =
     db.newID.flatMap { id =>
-      val node = ComputeNodeImpl(id, None, name, managementUrl, backend)
+      val node = ComputeNodeImpl(id, None,
+          name, serverId, managementUrl, backend)
       WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).map { response =>
         response.status match {
           case 201 => node
@@ -49,16 +55,13 @@ class ComputeNodeDAO @Inject() (
 
   def get(id: String) = list.map(nodes => nodes.find(_.id == id))
 
-  implicit val hipacheBackendFormat: Format[Hipache.Backend] = (
-    (__ \ "host").format[String] and
-    (__ \ "port").format[Int] and
-    (__ \ "scheme").format[String]
-  )(Hipache.Backend.apply _, unlift(Hipache.Backend.unapply))
+  import Hipache.hipacheBackendFormat
 
   implicit val computeNodeFormat: Format[ComputeNodeImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
+    (__ \ "serverID").format[String] and
     (__ \ "managementURL").format[String] and
     (__ \ "backend").format[Hipache.Backend]
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
@@ -68,9 +71,12 @@ class ComputeNodeDAO @Inject() (
       id: String,
       _rev: Option[String],
       name: String,
+      serverId: String,
       managementUrl: String,
       backend: Hipache.Backend
-      )(implicit ec: ExecutionContext) extends ComputeNode {
+      )(implicit ec: ExecutionContext)
+      extends ComputeNode {
+
     import play.api.Play.current
 
     val containers = new ContainerProvider(
@@ -84,6 +90,7 @@ trait ComputeNode {
   def id: String
   def _rev: Option[String]
   def name: String
+  def serverId: String
   def managementUrl: String
   def backend: Hipache.Backend
 

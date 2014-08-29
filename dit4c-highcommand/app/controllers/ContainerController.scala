@@ -43,8 +43,6 @@ class ContainerController @Inject() (
   def create = Authenticated.async { implicit request =>
     request.body.asJson.map { json =>
       val name = (json \ "name").as[String]
-      val description = (json \ "description").as[Option[String]]
-        .getOrElse("")
       val image = (json \ "image").as[String]
       val shouldBeActive = (json \ "active").as[Boolean]
       val response: Future[Result] =
