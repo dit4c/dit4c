@@ -8,7 +8,7 @@ import spray.routing.HttpService
 
 class MiscServiceSpec extends Specification with Specs2RouteTest with HttpService {
   implicit def actorRefFactory = system
-  val miscRoute = MiscService().route
+  val miscRoute = MiscService("fake-server-id").route
 
   "MiscService" should {
 
@@ -21,6 +21,12 @@ class MiscServiceSpec extends Specification with Specs2RouteTest with HttpServic
     "return favicon for GET requests to /favicon.ico" in {
       Get("/favicon.ico") ~> miscRoute ~> check {
         responseAs[Array[Byte]] must not beEmpty
+      }
+    }
+
+    "return server ID for GET requests to /server-id" in {
+      Get("/server-id") ~> miscRoute ~> check {
+        responseAs[String] must_== "fake-server-id"
       }
     }
 
