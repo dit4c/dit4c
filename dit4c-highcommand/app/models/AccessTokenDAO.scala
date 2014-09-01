@@ -20,6 +20,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import java.security.interfaces.RSAPublicKey
 import java.security.KeyPairGenerator
 import com.nimbusds.jose.JWSAlgorithm
+import scala.util.Random
 
 class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
@@ -28,11 +29,14 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   import play.api.Play.current
   import AccessToken._
 
+  val newCodeLength = 12
+  val validCodeChars: IndexedSeq[Char] = ('0' to '9') ++ ('A' to 'Z')
+
   def create(
       accessType: AccessType.Value,
       computeNode: ComputeNode): Future[AccessToken] =
     utils.create { id =>
-      AccessTokenImpl(id, None, accessType, new Resource(computeNode))
+      AccessTokenImpl(id, None, newCode, accessType, new Resource(computeNode))
     }
 
   def get(id: String): Future[Option[AccessToken]] = utils.get(id)
@@ -46,6 +50,10 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
         (response.json \ "rows" \\ "value").flatMap(fromJson[AccessTokenImpl])
       }
   }
+
+  protected def newCode: String = codeChars.take(newCodeLength).mkString
+  protected def codeChars: Stream[Char] = random(validCodeChars) #:: codeChars
+  protected def random(cs: IndexedSeq[Char]) = cs(Random.nextInt(cs.length))
 
   implicit val accessTypeFormat = new Format[AccessType.Value] {
     def reads(json: JsValue) =
@@ -79,6 +87,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   implicit private val accessTokenFormat: Format[AccessTokenImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
+    (__ \ "code").format[String] and
     (__ \ "accessType").format[AccessType.Value] and
     (__ \ "resource").format[Resource]
   )(AccessTokenImpl.apply _, unlift(AccessTokenImpl.unapply))
@@ -87,6 +96,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   case class AccessTokenImpl(
       id: String,
       _rev: Option[String],
+      code: String,
       accessType: AccessType.Value,
       resource: Resource
     ) extends AccessToken with DAOModel[AccessTokenImpl] {
@@ -102,6 +112,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
 trait AccessToken extends BaseModel {
   import AccessToken._
 
+  def code: String
   def accessType: AccessType.Value
   def resource: Resource
 

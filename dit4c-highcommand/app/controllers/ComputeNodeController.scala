@@ -86,6 +86,16 @@ class ComputeNodeController @Inject() (
 
   def delete(id: String): Action[AnyContent] = ???
 
+  // Access Tokens
+
+  def createToken(nodeId: String): Action[AnyContent] = ???
+
+  def listTokens(nodeId: String): Action[AnyContent] = ???
+
+  def redeemToken(nodeId: String): Action[AnyContent] = ???
+
+  def deleteToken(nodeId: String): Action[AnyContent] = ???
+
 
   protected def toJson(
         node: ComputeNode
