@@ -1,5 +1,7 @@
 define([
     'angular',
+    'ui-bootstrap',
+    'ui-bootstrap-tpls',
     './controllers/index',
     './directives/index',
     './filters/index',
@@ -9,6 +11,7 @@ define([
   
   app = ng.module('app', [
     'ngRoute',
+    'ui.bootstrap',
     'app.services',
     'app.controllers',
     'app.filters',

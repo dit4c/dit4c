@@ -8,6 +8,7 @@
     <title>DIT4C @AppVersion</title>
 
     <link href="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.css"))" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
     <link rel="stylesheet" media="screen" href="@routes.Assets.versioned("stylesheets/main.css")">
 
     <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
@@ -163,6 +164,118 @@
     <div class="container">
       <h1>Compute Nodes</h1>
 
+      <div>
+        <button class="btn btn-default" ng-click="isAccessFormOpen = !isAccessFormOpen">
+          <i class="fa fa-key"></i>
+          Claim Compute Node Access
+        </button>
+        <button class="btn btn-default" ng-click="isAddFormOpen = !isAddFormOpen">
+          <i class="fa fa-plus"></i>
+          Add New Compute Node
+        </button>
+      </div>
+
+      <br/>
+
+      <div ng-show="isAccessFormOpen">
+        <form class="form-horizontal" role="form">
+          <div class="form-group">
+            <label for="accessform-node" class="col-sm-2 control-label">
+              Compute Node
+            </label>
+            <div class="col-sm-10">
+            <select id="accessform-node"
+            	class="form-control" ng-model="accessForm.node"
+            	ng-options="node.name for node in computeNodes track by node.id"
+              ></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="accessform-code" class="col-sm-2 control-label">
+              Access Code
+            </label>
+            <div class="col-sm-10">
+            <input id="accessform-code" type="text"
+              class="form-control" ng-model="accessForm.code"
+              style="font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;"
+              ng-keypress="keyCodeFilter($event, 12, 3)"
+              ></select>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div ng-show="isAddFormOpen">
+        <form class="form-horizontal" role="form">
+          <div class="form-group">
+            <label for="addform-name" class="col-sm-2 control-label">
+              Name
+            </label>
+            <div class="col-sm-10">
+            <input id="addform-name" type="text"
+              class="form-control" ng-model="addForm.name"
+              ></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="addform-url" class="col-sm-2 control-label">
+              Management URL
+            </label>
+            <div class="col-sm-10">
+            <input id="addform-url" type="text"
+              class="form-control" ng-model="addForm.managementUrl"
+              ></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-2 control-label">
+              Backend
+            </label>
+            <div class="col-sm-10">
+              <div class="form-group">
+                <label class="col-sm-2 control-label">
+                  Scheme
+                </label>
+                <div class="col-sm-10">
+                  <select id="addform-backend-scheme"
+                    class="form-control" ng-model="addForm.backend.scheme">
+                    <option value="http">HTTP</option>
+                    <option value="https">HTTPS</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2 control-label">
+                  Host
+                </label>
+                <div class="col-sm-10">
+                  <input id="addform-backend-host" type="text"
+                    class="form-control" ng-model="addForm.backend.host"
+                    ></select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2 control-label">
+                  Port
+                </label>
+                <div class="col-sm-10">
+                  <input id="addform-backend-port"
+                    class="form-control" ng-model="addForm.backend.port"
+                    type="number" min="1" max="65525">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="col-sm-offset-2 col-sm-10">
+              <button class="btn btn-default" ng-click="addNode()">
+                Create
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
       <table class="table">
         <thead>
           <tr>
@@ -172,7 +285,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr ng-repeat="node in computeNodes | orderBy:'name'">
+          <tr ng-repeat="node in computeNodes | filter:{'usable': true} | orderBy:'name'">
             <td>{{node.name}}</td>
             <td>
               <button class="btn btn-default" ng-if="node.owned">
