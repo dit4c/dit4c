@@ -43,6 +43,9 @@ define(['./module'], (controllers) ->
     
     $scope.addNode = () ->
       console.log($scope.addForm)
+      
+    $scope.claimNode = () ->
+      console.log($scope.accessForm)
 
   )
 )

@@ -32,22 +32,14 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
    * @param keyLength   Length of key to generate (default: 4096)
    * @return Future key object
    */
-  def create(namespace: String, keyLength: Int = 4096): Future[Key] = {
+  def create(namespace: String, keyLength: Int = 4096): Future[Key] =
     for {
-      id <- db.newID
       keyPair <- createNewKeyPair(keyLength)
-      createdAt = DateTime.now(DateTimeZone.UTC)
-      key = KeyImpl(id, None, namespace, createdAt, false, keyPair)
-      response <- WS.url(s"${db.baseURL}/$id").put(Json.toJson(key))
-    } yield {
-      response.status match {
-        case 201 =>
-          // Update with revision
-          val rev = (response.json \ "rev").as[Option[String]]
-          key.copy(_rev = rev)
+      key <- utils.create { id =>
+        val createdAt = DateTime.now(DateTimeZone.UTC)
+        KeyImpl(id, None, namespace, createdAt, false, keyPair)
       }
-    }
-  }
+    } yield key
 
   /**
    * @returns Oldest non-retired key (which may not exist)

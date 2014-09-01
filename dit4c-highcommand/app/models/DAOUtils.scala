@@ -51,6 +51,36 @@ trait DAOUtils {
   }
 
   object utils {
+
+    def create[M <: DAOModel[M]](newModelFunc: String => M)(
+        implicit wjs: Writes[M]): Future[M] = {
+      for {
+        id <- db.newID
+        newModel = newModelFunc(id)
+        response <- WS.url(s"${db.baseURL}/${newModel.id}")
+                      .put(Json.toJson(newModel))
+      } yield {
+        response.status match {
+          case 201 =>
+            // Update with revision
+            val rev = (response.json \ "rev").as[String]
+            newModel.revUpdate(rev)
+        }
+      }
+    }
+
+    def get[M <: DAOModel[M]](id: String)(
+        implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =
+      WS.url(s"${db.baseURL}/$id").get.map { response =>
+        (response.status match {
+          case 200 => Some(response.json)
+          case _ => None
+        }).flatMap(fromJson[M])
+      }
+
+    def delete[M <: BaseModel](model: M): Future[Unit] =
+      delete(model.id, model._rev.get)
+
     def delete(id: String, rev: String): Future[Unit] = {
       WS.url(s"${db.baseURL}/$id")
         .withHeaders("If-Match" -> rev)
