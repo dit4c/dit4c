@@ -77,21 +77,24 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
   def mockComputeNode = {
     val randomId = UUID.randomUUID.toString
     new ComputeNode {
-      def id: String = randomId
-      def _rev: Option[String] = ???
+      override def id = randomId
+      override def _rev = ???
 
       // Members declared in models.ComputeNode
-      def backend: providers.hipache.Hipache.Backend = ???
-      def containers: providers.machineshop.ContainerProvider = ???
-      def managementUrl: String = ???
-      def name: String = ???
-      def serverId: String = ???
+      override def backend = ???
+      override def containers = ???
+      override def managementUrl = ???
+      override def name = ???
+      override def serverId = ???
 
       // Members declared in models.OwnableModel
-      def ownerIDs: Set[String] = ???
+      override def ownerIDs = ???
 
       // Members declared in models.UsableModel
-      def userIDs: Set[String] = ???
+      override def userIDs = ???
+
+      override def addOwner(user: User) = ???
+      override def addUser(user: User) = ???
     }
   }
 

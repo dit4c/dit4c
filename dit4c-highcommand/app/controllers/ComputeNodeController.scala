@@ -92,10 +92,53 @@ class ComputeNodeController @Inject() (
 
   def listTokens(nodeId: String): Action[AnyContent] = ???
 
-  def redeemToken(nodeId: String): Action[AnyContent] = ???
+  def redeemToken(nodeId: String, code: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId) { computeNode =>
+        withToken(computeNode, code) { token =>
+          import AccessToken.AccessType._
+          for {
+            token <- token.accessType match {
+              case Share => computeNode.addUser(request.user)
+            }
+          } yield {
+            Ok("Access granted.")
+          }
+        }
+      }
+    }
 
   def deleteToken(nodeId: String): Action[AnyContent] = ???
 
+  implicit protected def sync2async[A](obj: A) = Future.successful(obj)
+
+  protected def withToken(
+        computeNode: ComputeNode,
+        code: String
+      )(
+        action: AccessToken => Future[Result]
+      ): Future[Result] =
+    for {
+      tokens <- accessTokenDao.listFor(computeNode)
+      possibleToken = tokens.find(_.code == code)
+      result <- possibleToken match {
+        case Some(token) => action(token)
+        case None => sync2async(NotFound("Access code does not exist."))
+      }
+    } yield result
+
+  protected def withComputeNode(
+        nodeId: String
+      )(
+        action: ComputeNode => Future[Result]
+      ): Future[Result] =
+    for {
+      possibleNode <- computeNodeDao.get(nodeId)
+      result <- possibleNode match {
+        case Some(node) => action(node)
+        case None => sync2async(NotFound("Compute Node does not exist."))
+      }
+    } yield result
 
   protected def toJson(
         node: ComputeNode

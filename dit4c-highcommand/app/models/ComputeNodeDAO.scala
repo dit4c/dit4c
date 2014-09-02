@@ -79,13 +79,24 @@ class ComputeNodeDAO @Inject() (
       backend: Hipache.Backend,
       ownerIDs: Set[String],
       userIDs: Set[String]
-      )(implicit ec: ExecutionContext) extends ComputeNode {
+      )(implicit ec: ExecutionContext)
+      extends ComputeNode with DAOModel[ComputeNodeImpl] {
 
     import play.api.Play.current
 
     val containers = new ContainerProvider(
       managementUrl,
       () => keyDao.bestSigningKey.map(_.get.toJWK))
+
+    def addOwner(user: User): Future[ComputeNode] =
+      utils.update(this.copy(
+          ownerIDs = ownerIDs + user.id,
+          userIDs = userIDs + user.id))
+
+    def addUser(user: User): Future[ComputeNode] =
+      utils.update(this.copy(userIDs = userIDs + user.id))
+
+    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
   }
 }
@@ -97,6 +108,9 @@ trait ComputeNode extends OwnableModel with UsableModel {
   def backend: Hipache.Backend
 
   def containers: ContainerProvider
+
+  def addOwner(user: User): Future[ComputeNode]
+  def addUser(user: User): Future[ComputeNode]
 
 }
 

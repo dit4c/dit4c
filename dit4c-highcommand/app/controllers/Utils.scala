@@ -30,6 +30,7 @@ trait Utils extends Results {
 
   protected def db: CouchDB.Database
 
+  protected lazy val accessTokenDao = new AccessTokenDAO(db)
   protected lazy val containerDao = new ContainerDAO(db)
   protected lazy val keyDao = new KeyDAO(db)
   protected lazy val userDao = new UserDAO(db)

@@ -63,5 +63,34 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       }
     }
 
+    "redeem an access token" in new WithApplication(fakeApp) {
+      val atDao = injector.getInstance(classOf[AccessTokenDAO])
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val creatingSession = new UserSession(db, MockIdentity(
+        "testing:creator", Some("Creator"), None
+      ))
+      val redeemingSession = new UserSession(db, MockIdentity(
+        "testing:redeemer", Some("Redeemer"), None
+      ))
+      val cn = await(cnDao.create(creatingSession.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+      val token = await(atDao.create(AccessToken.AccessType.Share, cn))
+
+      cn.userIDs must contain(creatingSession.user.id)
+      cn.userIDs must not contain(redeemingSession.user.id)
+
+      val redemptionResponse = controller.redeemToken(
+          cn.id,
+          token.code
+          )(redeemingSession.newRequest)
+      status(redemptionResponse) must_== 200
+
+      val updatedCN = await(cnDao.get(cn.id)).get
+      updatedCN.userIDs must contain(creatingSession.user.id)
+      updatedCN.userIDs must contain(redeemingSession.user.id)
+    }
+
   }
 }

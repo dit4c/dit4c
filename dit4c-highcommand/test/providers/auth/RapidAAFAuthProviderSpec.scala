@@ -60,6 +60,7 @@ class AAFAuthProviderSpec extends Specification {
       val request = FakeRequest("POST", "/auth/callback")
         .withFormUrlEncodedBody("assertion" -> serializedToken)
       val callbackResult = authProvider.callbackHandler(request)
+      println(callbackResult)
       callbackResult must beAnInstanceOf[CallbackResult.Success]
       val res = callbackResult.asInstanceOf[CallbackResult.Success]
       res.identity.uniqueId must_== s"RapidAAF:$targetedId"
