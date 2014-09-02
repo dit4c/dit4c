@@ -103,7 +103,7 @@ object ContainerProvider {
     def httpSign(privateKey: RSAKey): WSRequestHolder = {
       def now = {
         val sdf = new java.text.SimpleDateFormat(
-            "E, d MMM yyyy HH:mm:ss z", java.util.Locale.US)
+            "E, dd MMM yyyy HH:mm:ss z", java.util.Locale.US)
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"))
         sdf.format(new Date())
       }
