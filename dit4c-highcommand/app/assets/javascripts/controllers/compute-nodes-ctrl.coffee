@@ -43,11 +43,27 @@ define(['./module'], (controllers) ->
         when lowerAlpha
           addChar(e.keyCode - 32)
     
+    refreshComputeNodes = () ->
+      $http
+        .get('/compute-nodes')
+        .then (response) ->
+          $scope.computeNodes.length = 0
+          response.data.forEach (computeNode) ->
+            $scope.computeNodes.push(computeNode)
+    
     $scope.addNode = () ->
       console.log($scope.addForm)
       
     $scope.claimNode = () ->
-      console.log($scope.accessForm)
+      nodeId = $scope.accessForm.node.id
+      code = $scope.accessForm.code.replace(/-/g,'')
+      $http
+        .post('/compute-nodes/'+nodeId+"/redeem-token?code="+code)
+        .success (response) ->
+          refreshComputeNodes()
+        .error (response) ->
+          # TODO: Handle errors
+          console.log(response)
       
     $scope.addToken = (node) ->
       $http
