@@ -99,6 +99,7 @@ class ComputeNodeController @Inject() (
           import AccessToken.AccessType._
           for {
             token <- token.accessType match {
+              case Own => computeNode.addOwner(request.user)
               case Share => computeNode.addUser(request.user)
             }
           } yield {

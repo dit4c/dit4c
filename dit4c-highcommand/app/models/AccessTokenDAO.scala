@@ -123,7 +123,7 @@ trait AccessToken extends BaseModel {
 object AccessToken {
 
   object AccessType extends Enumeration {
-    val Share = Value
+    val Own, Share = Value
   }
 
   object ResourceType extends Enumeration {
