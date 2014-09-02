@@ -40,37 +40,36 @@ class ContainerController @Inject() (
     }
   }
 
-  def create = Authenticated.async { implicit request =>
-    request.body.asJson.map { json =>
-      val name = (json \ "name").as[String]
-      val image = (json \ "image").as[String]
-      val computeNodeId = (json \ "computeNodeId").as[String]
-      val shouldBeActive = (json \ "active").as[Boolean]
-      val fNode: Future[Option[ComputeNode]] =
-        for {
-          nodes <- computeNodeDao.get(computeNodeId)
-          node = nodes.find(_.usableBy(request.user))
-        } yield node
+  def create = Authenticated.async(parse.json) { implicit request =>
+    val json = request.body
+    val name = (json \ "name").as[String]
+    val image = (json \ "image").as[String]
+    val computeNodeId = (json \ "computeNodeId").as[String]
+    val shouldBeActive = (json \ "active").as[Boolean]
+    val fNode: Future[Option[ComputeNode]] =
+      for {
+        nodes <- computeNodeDao.get(computeNodeId)
+        node = nodes.find(_.usableBy(request.user))
+      } yield node
 
-      fNode.flatMap {
-        case None => Future.successful(BadRequest("Invalid compute node."))
-        case Some(node) =>
-          for {
-            container <- containerDao.create(request.user, name, image, node)
-            p <- cnpHelper.creator(container)
-            _ <- HipacheInterface.put(p)
-            cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
-            result = Created(Json.obj(
-              "id" -> container.id,
-              "name" -> container.name,
-              "computeNodeId" -> container.computeNodeId,
-              "image" -> container.image,
-              "active" -> cnContainer.active
-            ))
-            resultWithJwt <- result.withUpdatedJwt(request.user)
-          } yield resultWithJwt
-      }
-    }.getOrElse(Future.successful(BadRequest))
+    fNode.flatMap {
+      case None => Future.successful(BadRequest("Invalid compute node."))
+      case Some(node) =>
+        for {
+          container <- containerDao.create(request.user, name, image, node)
+          p <- cnpHelper.creator(container)
+          _ <- HipacheInterface.put(p)
+          cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
+          result = Created(Json.obj(
+            "id" -> container.id,
+            "name" -> container.name,
+            "computeNodeId" -> container.computeNodeId,
+            "image" -> container.image,
+            "active" -> cnContainer.active
+          ))
+          resultWithJwt <- result.withUpdatedJwt(request.user)
+        } yield resultWithJwt
+    }
   }
 
   def list = Authenticated.async { implicit request =>
@@ -89,29 +88,27 @@ class ContainerController @Inject() (
     }
   }
 
-  def update(id: String) = Authenticated.async { implicit request =>
-    request.body.asJson.map { json =>
-      val shouldBeActive: Boolean = (json \ "active").as[Boolean]
-      containerDao.get(id)
-        .flatMap[Result] {
+  def update(id: String) = Authenticated.async(parse.json) { implicit request =>
+    val json = request.body
+    val shouldBeActive: Boolean = (json \ "active").as[Boolean]
+    containerDao.get(id).flatMap[Result] {
+      case None =>
+        Future.successful(NotFound)
+      case Some(container) =>
+        cnpHelper.resolver(container).flatMap {
           case None =>
+            // TODO: Improve this handling
             Future.successful(NotFound)
-          case Some(container) =>
-            cnpHelper.resolver(container).flatMap {
-              case None =>
-                // TODO: Improve this handling
-                Future.successful(NotFound)
-              case Some(cnp) =>
-                cnp.makeActive(shouldBeActive).map { updatedCnp =>
-                  Ok(Json.obj(
-                    "id" -> container.id,
-                    "name" -> container.name,
-                    "active" -> updatedCnp.active
-                  ))
-                }
+          case Some(cnp) =>
+            cnp.makeActive(shouldBeActive).map { updatedCnp =>
+              Ok(Json.obj(
+                "id" -> container.id,
+                "name" -> container.name,
+                "active" -> updatedCnp.active
+              ))
             }
         }
-    }.getOrElse(Future.successful(BadRequest))
+    }
   }
 
   def delete(id: String) = Authenticated.async { implicit request =>

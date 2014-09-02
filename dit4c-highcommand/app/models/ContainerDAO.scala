@@ -17,8 +17,8 @@ class ContainerDAO(protected val db: CouchDB.Database)
       name: String,
       image: String,
       computeNode: ComputeNode): Future[Container] =
-    list.flatMap { projects =>
-      if (projects.exists(_.name == name)) {
+    list.flatMap { containers =>
+      if (containers.exists(_.name == name)) {
         throw new Exception("Container with that name already exists.")
       }
       db.newID.flatMap { id =>
