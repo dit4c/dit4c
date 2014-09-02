@@ -94,5 +94,53 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       updatedCN.userIDs must contain(redeemingSession.user.id)
     }
 
+    "create an access token" in new WithApplication(fakeApp) {
+      val atDao = injector.getInstance(classOf[AccessTokenDAO])
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val cn = await(cnDao.create(session.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+
+      val body: JsValue = Json.obj("type" -> "share")
+      val req = session.newRequest.withBody(body)
+      val response = controller.createToken(cn.id)(req)
+      status(response) must_== 201
+
+      val token = await(atDao.listFor(cn)).head
+      token.accessType must be(AccessToken.AccessType.Share)
+
+      val json = contentAsJson(response).as[JsObject]
+      json \ "code" must_== JsString(token.code)
+      json \ "type" must_== JsString("share")
+    }
+
+    "provide JSON list of access tokens" in new WithApplication(fakeApp) {
+      val atDao = injector.getInstance(classOf[AccessTokenDAO])
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val cn = await(cnDao.create(session.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+
+      val emptyResponse = controller.listTokens(cn.id)(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+
+      val token = await(atDao.create(AccessToken.AccessType.Share, cn))
+
+      val nonEmptyResponse = controller.listTokens(cn.id)(session.newRequest)
+      status(nonEmptyResponse) must_== 200
+      val json = contentAsJson(nonEmptyResponse).as[List[JsObject]]
+      json must haveSize(1)
+      json match {
+        case Seq(json) =>
+          json \ "code" must_== JsString(token.code)
+          json \ "type" must_== JsString("share")
+      }
+    }
+
   }
 }

@@ -18,6 +18,7 @@ import providers.hipache.HipachePlugin
 import providers.machineshop.MachineShop
 import scala.util.Try
 import java.net.ConnectException
+import models.AccessToken.AccessType
 
 class ComputeNodeController @Inject() (
     val db: CouchDB.Database,
@@ -69,7 +70,7 @@ class ComputeNodeController @Inject() (
             node <- computeNodeDao.create(request.user,
                 name, serverId, managementUrl, backend)
           } yield {
-            Created(toJson(node))
+            Created(Json.toJson(node))
           }
       }
     }.getOrElse(Future.successful(BadRequest("Request must be JSON")))
@@ -77,7 +78,7 @@ class ComputeNodeController @Inject() (
 
   def list: Action[AnyContent] = Authenticated.async { implicit request =>
     computeNodeDao.list map { nodes =>
-      val json = JsArray(nodes.map(toJson))
+      val json = JsArray(nodes.map(Json.toJson(_)))
       Ok(json)
     }
   }
@@ -88,9 +89,26 @@ class ComputeNodeController @Inject() (
 
   // Access Tokens
 
-  def createToken(nodeId: String): Action[AnyContent] = ???
+  def createToken(nodeId: String) =
+    Authenticated.async(parse.json) { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        val accessType = (request.body \ "type").as[String] match {
+          case "share" => AccessType.Share
+          case "own"   => AccessType.Own
+        }
+        for {
+          token <- accessTokenDao.create(accessType, computeNode)
+        } yield Created(Json.toJson(token))
+      })
+    }
 
-  def listTokens(nodeId: String): Action[AnyContent] = ???
+  def listTokens(nodeId: String) = Authenticated.async { implicit request =>
+    withComputeNode(nodeId)(asOwner { computeNode =>
+      for {
+        tokens <- accessTokenDao.listFor(computeNode)
+      } yield Ok(JsArray(tokens.map(Json.toJson(_))))
+    })
+  }
 
   def redeemToken(nodeId: String, code: String) =
     Authenticated.async { implicit request =>
@@ -109,9 +127,19 @@ class ComputeNodeController @Inject() (
       }
     }
 
-  def deleteToken(nodeId: String): Action[AnyContent] = ???
+  def deleteToken(nodeId: String, code: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        withToken(computeNode, code) { token =>
+          for {
+            _ <- token.delete
+          } yield NoContent
+        }
+      })
+    }
 
-  implicit protected def sync2async[A](obj: A) = Future.successful(obj)
+
+  protected def sync2async[A](obj: A) = Future.successful(obj)
 
   protected def withToken(
         computeNode: ComputeNode,
@@ -141,23 +169,40 @@ class ComputeNodeController @Inject() (
       }
     } yield result
 
-  protected def toJson(
-        node: ComputeNode
-      )(implicit request: AuthenticatedRequest[_]) = {
-    val base =
-      Json.obj(
-        "id" -> node.id,
-        "name" -> node.name,
-        "owned" -> node.ownedBy(request.user),
-        "usable" -> node.usableBy(request.user)
-      )
-    if (node.ownedBy(request.user))
-      base ++ Json.obj(
-        "managementUrl" -> node.managementUrl,
-        "backend" -> node.backend
-      )
-    else
-      base
+  protected def asOwner(
+        action: ComputeNode => Future[Result]
+      )(
+        implicit request: AuthenticatedRequest[_]
+      ): ComputeNode => Future[Result] = {
+    case node if node.ownerIDs.contains(request.user.id) => action(node)
+    case _ => sync2async(Forbidden("You do not own this compute node."))
+  }
+
+  implicit def nodeWriter(implicit request: AuthenticatedRequest[_]) =
+    new Writes[ComputeNode] {
+      override def writes(node: ComputeNode) = {
+        val base =
+          Json.obj(
+            "id" -> node.id,
+            "name" -> node.name,
+            "owned" -> node.ownedBy(request.user),
+            "usable" -> node.usableBy(request.user)
+          )
+        if (node.ownedBy(request.user))
+          base ++ Json.obj(
+            "managementUrl" -> node.managementUrl,
+            "backend" -> node.backend
+          )
+        else
+          base
+      }
+    }
+
+  implicit lazy val tokenWriter = new Writes[AccessToken]() {
+    override def writes(o: AccessToken) = Json.obj(
+      "code" -> o.code,
+      "type" -> o.accessType.toString.toLowerCase
+    )
   }
 
 

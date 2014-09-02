@@ -25,7 +25,10 @@ GET     /compute-nodes              @controllers.ComputeNodeController.index
 POST    /compute-nodes              @controllers.ComputeNodeController.create
 PUT     /compute-nodes/:id          @controllers.ComputeNodeController.update(id)
 DELETE  /compute-nodes/:id          @controllers.ComputeNodeController.delete(id)
-POST    /compute-nodes/:id/redeem-token @controllers.ComputeNodeController.redeemToken(id: String, code: String)
+POST    /compute-nodes/:id/redeem-token @controllers.ComputeNodeController.redeemToken(id, code)
+POST    /compute-nodes/:id/tokens       @controllers.ComputeNodeController.createToken(id)
+GET     /compute-nodes/:id/tokens       @controllers.ComputeNodeController.listTokens(id)
+DELETE  /compute-nodes/:id/tokens/:code @controllers.ComputeNodeController.deleteToken(id, code)
 
 # Containers
 GET     /containers                 @controllers.ContainerController.index
