@@ -3,6 +3,8 @@ define(['./module'], (controllers) ->
   
   controllers.controller('ComputeNodesCtrl', ($scope, $route, $http, $location, $filter) ->
     
+    $scope.tokens = {}
+    
     $scope.computeNodes = $route.current.locals.computeNodes
     
     $scope.containers = $route.current.locals.containers
@@ -46,6 +48,35 @@ define(['./module'], (controllers) ->
       
     $scope.claimNode = () ->
       console.log($scope.accessForm)
+      
+    $scope.addToken = (node) ->
+      $http
+        .post('/compute-nodes/'+node.id+"/tokens",
+          type: 'share'
+        )
+        .then (response) ->
+          token = response.data
+          $scope.tokens[node.id] ||= []
+          $scope.tokens[node.id].push(token)
+          
+    $scope.removeToken = (node, token) ->
+      $http
+        .delete('/compute-nodes/'+node.id+"/tokens/"+token.code)
+        .then (response) ->
+          $scope.tokens[node.id] ||= []
+          $scope.tokens[node.id] = $scope.tokens[node.id].filter (t) ->
+            t.code != token.code
+
+    $route.current.locals.computeNodes
+      .filter (node) ->
+        node.owned
+      .forEach (node) ->
+        $http
+          .get('/compute-nodes/'+node.id+"/tokens")
+          .then (response) ->
+            $scope.tokens[node.id] = []
+            response.data.forEach (token) ->
+              $scope.tokens[node.id].push(token)
 
   )
 )

@@ -26,7 +26,6 @@ define(['./module'], (controllers) ->
       "//"+name+"."+$location.host()
     
     $scope.create = () ->
-      console.log($scope.newContainerComputeNode, $scope.usableComputeNodes())
       $http
         .post('/containers',
           name: $scope.newContainer.name
@@ -72,6 +71,6 @@ define(['./module'], (controllers) ->
           .get('/containers/check-new?name='+name)
           .then (response) ->
             $scope.nameCheck = response.data
-
+    
   )
 )
