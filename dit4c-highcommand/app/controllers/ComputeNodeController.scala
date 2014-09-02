@@ -102,7 +102,7 @@ class ComputeNodeController @Inject() (
               case Share => computeNode.addUser(request.user)
             }
           } yield {
-            Ok("Access granted.")
+            SeeOther(routes.ContainerController.index.url)
           }
         }
       }

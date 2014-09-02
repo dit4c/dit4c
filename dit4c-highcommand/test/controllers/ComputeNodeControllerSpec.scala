@@ -85,7 +85,9 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
           cn.id,
           token.code
           )(redeemingSession.newRequest)
-      status(redemptionResponse) must_== 200
+      status(redemptionResponse) must_== 303
+      redirectLocation(redemptionResponse) must beSome(
+        routes.ContainerController.index.url)
 
       val updatedCN = await(cnDao.get(cn.id)).get
       updatedCN.userIDs must contain(creatingSession.user.id)
