@@ -22,6 +22,8 @@ lazy val machineshop = project in file("dit4c-machineshop")
 
 releaseSettings
 
+crossScalaVersions := Nil
+
 ReleaseKeys.releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,              // : ReleaseStep
   inquireVersions,                        // : ReleaseStep
