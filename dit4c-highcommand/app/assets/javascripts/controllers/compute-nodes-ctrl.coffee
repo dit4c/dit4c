@@ -1,9 +1,11 @@
 define(['./module'], (controllers) ->
   'use strict'
   
-  controllers.controller('ComputeNodesCtrl', ($scope, $route, $http, $location, $filter) ->
+  controllers.controller('ComputeNodesCtrl', ($scope, $route, $http, $location, $filter, $q) ->
     
     $scope.tokens = {}
+    $scope.owners = {}
+    $scope.users = {}
     
     $scope.computeNodes = $route.current.locals.computeNodes
     
@@ -91,7 +93,7 @@ define(['./module'], (controllers) ->
             $scope.computeNodes
               .filter (node) ->
                 node.owned and node.id == nodeId
-              .forEach $scope.refreshTokens
+              .forEach refreshAssociatedCollections
         .error (response) ->
           # TODO: Handle errors
           console.log(response)
@@ -101,31 +103,68 @@ define(['./module'], (controllers) ->
         .post('/compute-nodes/'+node.id+"/tokens",
           type: type
         )
-        .then (response) ->
-          token = response.data
+        .success (token) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id].push(token)
-          
+
     $scope.removeToken = (node, token) ->
       $http
         .delete('/compute-nodes/'+node.id+"/tokens/"+token.code)
-        .then (response) ->
+        .success () ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id] = $scope.tokens[node.id].filter (t) ->
             t.code != token.code
 
-    $scope.refreshTokens = (node) ->
-        $http
-          .get('/compute-nodes/'+node.id+"/tokens")
-          .then (response) ->
-            $scope.tokens[node.id] = []
-            response.data.forEach (token) ->
-              $scope.tokens[node.id].push(token)
+    $scope.removeOwner = (node, owner) ->
+      $http
+        .delete('/compute-nodes/'+node.id+"/owners/"+owner.id)
+        .success () ->
+          $scope.owners[node.id] ||= []
+          $scope.owners[node.id] = $scope.owners[node.id].filter (o) ->
+            o.id != owner.id
+
+    $scope.removeUser = (node, user) ->
+      $http
+        .delete('/compute-nodes/'+node.id+"/users/"+user.id)
+        .success () ->
+          $scope.users[node.id] ||= []
+          $scope.users[node.id] = $scope.users[node.id].filter (u) ->
+            u.id != user.id
+
+    refreshTokens = (node) ->
+      $http
+        .get('/compute-nodes/'+node.id+"/tokens")
+        .then (response) ->
+          $scope.tokens[node.id] = []
+          response.data.forEach (token) ->
+            $scope.tokens[node.id].push(token)
+    
+    refreshOwners = (node) ->
+      $http
+        .get('/compute-nodes/'+node.id+"/owners")
+        .then (response) ->
+          $scope.owners[node.id] = []
+          response.data.forEach (owner) ->
+            $scope.owners[node.id].push(owner)
+
+    refreshUsers = (node) ->
+      $http
+        .get('/compute-nodes/'+node.id+"/users")
+        .then (response) ->
+          $scope.users[node.id] = []
+          response.data.forEach (user) ->
+            $scope.users[node.id].push(user)
+    
+    refreshAssociatedCollections = (node) ->
+      $q.all([
+        refreshTokens(node),
+        refreshOwners(node),
+        refreshUsers(node)])
     
     $route.current.locals.computeNodes
       .filter (node) ->
         node.owned
-      .forEach $scope.refreshTokens
+      .forEach refreshAssociatedCollections
 
   )
 )

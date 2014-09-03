@@ -291,7 +291,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr ng-repeat="node in computeNodes | filter:{'usable': true} | orderBy:'name'">
+          <tr ng-repeat="node in computeNodes | filter:relevantComputeNodes | orderBy:'name'">
             <td>
               <span>{{node.name}}</span>
               
@@ -382,7 +382,7 @@
                       <span ng-if="token.type == 'own'">Ownership</span>
                     </td>
                     <td>
-                      <button class="btn btn-default" ng-click="removeToken(node, token)">
+                      <button class="btn btn-danger" ng-click="removeToken(node, token)">
                         <i class="fa fa-remove"></i>
                       </button>
                     </td>
@@ -396,6 +396,54 @@
                       <button class="btn btn-link btn-muted" ng-click="addToken(node, 'own')">
                         <i class="fa fa-plus"></i>
                         New Ownership Token
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <table class="table" ng-if="node.owned">
+                <thead>
+                  <tr>
+                    <th>Users</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr ng-repeat="user in users[node.id]">
+                    <td>
+                      {{user.name}}
+                      <span ng-if="user.email">
+                        <a href="mailto:{{user.email}}">{{user.email}}</a>
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-danger" ng-click="removeUser(node, user)">
+                        <i class="fa fa-remove"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <table class="table" ng-if="node.owned">
+                <thead>
+                  <tr>
+                    <th>Owners</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr ng-repeat="owner in owners[node.id]">
+                    <td>
+                      {{owner.name}}
+                      <span ng-if="owner.email">
+                        <a href="mailto:{{owner.email}}">{{owner.email}}</a>
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-danger" ng-click="removeOwner(node, owner)">
+                        <i class="fa fa-remove"></i>
                       </button>
                     </td>
                   </tr>
