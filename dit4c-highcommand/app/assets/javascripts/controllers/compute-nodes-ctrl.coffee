@@ -13,6 +13,7 @@ define(['./module'], (controllers) ->
     $scope.relevantComputeNode = (node) ->
       node.usable or node.owned
     
+    $scope.accessFormError = null
     $scope.accessForm =
       code: ''
       
@@ -97,8 +98,7 @@ define(['./module'], (controllers) ->
                 node.owned and node.id == nodeId
               .forEach refreshAssociatedCollections
         .error (response) ->
-          # TODO: Handle errors
-          console.log(response)
+          $scope.accessFormError = response
       
     $scope.addToken = (node, type) ->
       $http

@@ -190,7 +190,7 @@
               ></select>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" ng-class="{'has-error': !!accessFormError}">
             <label for="accessform-code" class="col-sm-2 control-label">
               Access Code
             </label>
@@ -198,8 +198,10 @@
             <input id="accessform-code" type="text"
               class="form-control" ng-model="accessForm.code"
               style="font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;"
+              ng-change="accessFormError = null"
               ng-keypress="keyCodeFilter($event, 12, 3)"
               ></select>
+            <span class="help-block" ng-if="accessFormError">{{accessFormError}}</span>
             </div>
           </div>
           <div class="form-group">
