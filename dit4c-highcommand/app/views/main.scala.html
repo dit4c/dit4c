@@ -442,7 +442,9 @@
                       </span>
                     </td>
                     <td>
-                      <button class="btn btn-danger" ng-click="removeOwner(node, owner)">
+                      <button class="btn btn-danger"
+                        ng-if="owners[node.id].length > 1"
+                        ng-click="removeOwner(node, owner)">
                         <i class="fa fa-remove"></i>
                       </button>
                     </td>
