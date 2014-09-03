@@ -87,15 +87,19 @@ define(['./module'], (controllers) ->
       $http
         .post('/compute-nodes/'+nodeId+"/redeem-token?code="+code)
         .success (response) ->
-          refreshComputeNodes()
+          refreshComputeNodes().then () ->
+            $scope.computeNodes
+              .filter (node) ->
+                node.owned and node.id == nodeId
+              .forEach $scope.refreshTokens
         .error (response) ->
           # TODO: Handle errors
           console.log(response)
       
-    $scope.addToken = (node) ->
+    $scope.addToken = (node, type) ->
       $http
         .post('/compute-nodes/'+node.id+"/tokens",
-          type: 'share'
+          type: type
         )
         .then (response) ->
           token = response.data
@@ -110,16 +114,18 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] = $scope.tokens[node.id].filter (t) ->
             t.code != token.code
 
-    $route.current.locals.computeNodes
-      .filter (node) ->
-        node.owned
-      .forEach (node) ->
+    $scope.refreshTokens = (node) ->
         $http
           .get('/compute-nodes/'+node.id+"/tokens")
           .then (response) ->
             $scope.tokens[node.id] = []
             response.data.forEach (token) ->
               $scope.tokens[node.id].push(token)
+    
+    $route.current.locals.computeNodes
+      .filter (node) ->
+        node.owned
+      .forEach $scope.refreshTokens
 
   )
 )

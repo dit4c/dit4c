@@ -389,8 +389,13 @@
                   </tr>
                   <tr>
                     <td>
-                      <button class="btn btn-default" ng-click="addToken(node)">
+                      <button class="btn btn-default" ng-click="addToken(node, 'share')">
                         <i class="fa fa-plus"></i>
+                        New Sharing Token
+                      </button>
+                      <button class="btn btn-link btn-muted" ng-click="addToken(node, 'own')">
+                        <i class="fa fa-plus"></i>
+                        New Ownership Token
                       </button>
                     </td>
                   </tr>
