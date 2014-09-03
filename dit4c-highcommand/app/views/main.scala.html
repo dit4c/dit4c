@@ -329,6 +329,10 @@
               <button class="btn btn-default" ng-if="node.owned">
                 Edit
               </button>
+              <button class="btn btn-danger"
+                ng-if="node.owned" ng-click="removeNode(node)">
+                Delete
+              </button>
             </td>
             <td><pre>{{ node | json }}</pre></td>
           </tr>

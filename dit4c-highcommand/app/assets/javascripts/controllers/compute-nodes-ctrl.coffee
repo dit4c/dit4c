@@ -52,7 +52,19 @@ define(['./module'], (controllers) ->
             $scope.computeNodes.push(computeNode)
     
     $scope.addNode = () ->
-      console.log($scope.addForm)
+      $http
+        .post('/compute-nodes', $scope.addForm)
+        .success (response) ->
+          refreshComputeNodes()
+        .error (response) ->
+          # TODO: Handle errors
+          console.log(response)
+          
+    $scope.removeNode = (node) ->
+      $http
+        .delete('/compute-nodes/'+node.id)
+        .then (response) ->
+          refreshComputeNodes()
       
     $scope.claimNode = () ->
       nodeId = $scope.accessForm.node.id

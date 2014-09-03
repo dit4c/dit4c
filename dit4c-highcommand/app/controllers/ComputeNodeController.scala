@@ -33,47 +33,46 @@ class ComputeNodeController @Inject() (
     }
   }
 
-  def create: Action[AnyContent] = Authenticated.async { implicit request =>
-    request.body.asJson.map { json =>
-      val name = (json \ "name").as[String]
-      val managementUrl = (json \ "managementUrl").as[String]
-      val backend = (json \ "backend").as[Hipache.Backend]
+  def create = Authenticated.async(parse.json) { implicit request =>
+    val json = request.body
+    val name = (json \ "name").as[String]
+    val managementUrl = (json \ "managementUrl").as[String]
+    val backend = (json \ "backend").as[Hipache.Backend]
 
-      // Check this is a new server
-      val fServerId: Future[Either[String, String]] =
-        for {
-          serverId <- MachineShop.fetchServerId(managementUrl)
-              .map(Some(_))
-              .fallbackTo(Future.successful(None))
-          existingNodes <- computeNodeDao.list
-          attrs = (f: ComputeNode => String) => existingNodes.map(f)
-        } yield {
-          if (attrs(_.name).contains(name))
-            Left("Node with same name already exists.")
-          else if (attrs(_.managementUrl).contains(managementUrl))
-            Left("Node with same URL already exists.")
-          else
-            serverId match {
-              case None =>
-                Left("Node was not contactable.")
-              case Some(id) if (attrs(_.serverId).contains(id)) =>
-                Left("Node with same server ID already exists.")
-              case Some(id) =>
-                Right(id)
-            }
-        }
-
-      fServerId.flatMap {
-        case Left(msg) => Future.successful(BadRequest(msg))
-        case Right(serverId) =>
-          for {
-            node <- computeNodeDao.create(request.user,
-                name, serverId, managementUrl, backend)
-          } yield {
-            Created(Json.toJson(node))
+    // Check this is a new server
+    val fServerId: Future[Either[String, String]] =
+      for {
+        serverId <- MachineShop.fetchServerId(managementUrl)
+            .map(Some(_))
+            .fallbackTo(sync2async(None))
+        existingNodes <- computeNodeDao.list
+        attrs = (f: ComputeNode => String) => existingNodes.map(f)
+      } yield {
+        if (attrs(_.name).contains(name))
+          Left("Node with same name already exists.")
+        else if (attrs(_.managementUrl).contains(managementUrl))
+          Left("Node with same URL already exists.")
+        else
+          serverId match {
+            case None =>
+              Left("Node was not contactable.")
+            case Some(id) if (attrs(_.serverId).contains(id)) =>
+              Left("Node with same server ID already exists.")
+            case Some(id) =>
+              Right(id)
           }
       }
-    }.getOrElse(Future.successful(BadRequest("Request must be JSON")))
+
+    fServerId.flatMap {
+      case Left(msg) => sync2async(BadRequest(msg))
+      case Right(serverId) =>
+        for {
+          node <- computeNodeDao.create(request.user,
+              name, serverId, managementUrl, backend)
+        } yield {
+          Created(Json.toJson(node))
+        }
+    }
   }
 
   def list: Action[AnyContent] = Authenticated.async { implicit request =>
@@ -85,7 +84,19 @@ class ComputeNodeController @Inject() (
 
   def update(id: String): Action[AnyContent] = ???
 
-  def delete(id: String): Action[AnyContent] = ???
+  def delete(id: String): Action[AnyContent] =
+    Authenticated.async { implicit request =>
+      withComputeNode(id)(asOwner { computeNode =>
+        for {
+          tokens <- accessTokenDao.listFor(computeNode)
+          _ <- Future.sequence(tokens.map(_.delete))
+          allContainers <- containerDao.list
+          nodeContainers = allContainers.filter(_.computeNodeId == id)
+          _ <- Future.sequence(nodeContainers.map(_.delete))
+          _ <- computeNode.delete
+        } yield NoContent
+      })
+    }
 
   // Access Tokens
 

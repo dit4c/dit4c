@@ -88,13 +88,15 @@ class ComputeNodeDAO @Inject() (
       managementUrl,
       () => keyDao.bestSigningKey.map(_.get.toJWK))
 
-    def addOwner(user: User): Future[ComputeNode] =
+    override def addOwner(user: User) =
       utils.update(this.copy(
           ownerIDs = ownerIDs + user.id,
           userIDs = userIDs + user.id))
 
-    def addUser(user: User): Future[ComputeNode] =
+    override def addUser(user: User) =
       utils.update(this.copy(userIDs = userIDs + user.id))
+
+    override def delete: Future[Unit] = utils.delete(this)
 
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
@@ -111,6 +113,7 @@ trait ComputeNode extends OwnableModel with UsableModel {
 
   def addOwner(user: User): Future[ComputeNode]
   def addUser(user: User): Future[ComputeNode]
+  def delete: Future[Unit]
 
 }
 

@@ -2,6 +2,7 @@ package providers.machineshop
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 import play.api.libs.ws.WS
 
 object MachineShop {
@@ -20,7 +21,8 @@ object MachineShop {
     import play.api.Play.current
     val path = "server-id"
     for {
-      response <- WS.url(s"$managementUrl$path").get
+      call <- Future.fromTry(Try(WS.url(s"$managementUrl$path")))
+      response <- call.get
     } yield response.body.trim
   }
 
