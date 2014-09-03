@@ -165,11 +165,11 @@
       <h1>Compute Nodes</h1>
 
       <div>
-        <button class="btn btn-default" ng-click="isAccessFormOpen = !isAccessFormOpen">
+        <button class="btn btn-default" ng-click="isAccessFormOpen = !isAccessFormOpen; accessFormError = null">
           <i class="fa fa-key"></i>
           Claim Compute Node Access
         </button>
-        <button class="btn btn-default" ng-click="isAddFormOpen = !isAddFormOpen">
+        <button class="btn btn-default" ng-click="isAddFormOpen = !isAddFormOpen; addFormError = null">
           <i class="fa fa-plus"></i>
           Add New Compute Node
         </button>
@@ -282,6 +282,8 @@
               </button>
             </div>
           </div>
+          <div class="alert alert-danger" role="alert"
+            ng-if="!!addFormError" ng-bind="addFormError"></div>
         </form>
       </div>
 

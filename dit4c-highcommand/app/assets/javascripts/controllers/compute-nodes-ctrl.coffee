@@ -17,6 +17,7 @@ define(['./module'], (controllers) ->
     $scope.accessForm =
       code: ''
       
+    $scope.addFormError = null
     $scope.addForm =
       name: ''
       managementUrl: ''
@@ -62,8 +63,7 @@ define(['./module'], (controllers) ->
         .success (response) ->
           refreshComputeNodes()
         .error (response) ->
-          # TODO: Handle errors
-          console.log(response)
+          $scope.addFormError = response
   
     $scope.populateEditForm = (node) ->
       node.editForm =
