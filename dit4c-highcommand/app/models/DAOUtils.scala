@@ -107,6 +107,10 @@ trait DAOUtils {
       }
     }
 
+    class UpdateOp[M <: DAOModel[M]](model: M)(
+        implicit wjs: Writes[M]) extends UpdateOperation[M] {
+      def exec(): Future[M] = update(model)
+    }
   }
 
 }
@@ -128,4 +132,12 @@ trait OwnableModel extends BaseModel {
 trait UsableModel extends BaseModel {
   def userIDs: Set[String]
   def usableBy(other: BaseModel): Boolean = userIDs.contains(other.id)
+}
+
+trait UpdatableModel[U] {
+  def update: U
+}
+
+trait UpdateOperation[+M] {
+  def exec(): Future[M]
 }

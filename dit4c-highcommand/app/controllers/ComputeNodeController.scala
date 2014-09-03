@@ -82,7 +82,19 @@ class ComputeNodeController @Inject() (
     }
   }
 
-  def update(id: String): Action[AnyContent] = ???
+  def update(id: String) = Authenticated.async(parse.json) { implicit request =>
+    withComputeNode(id)(asOwner { computeNode =>
+      val json = request.body
+
+      for {
+        updated <- computeNode.update
+          .withName((json \ "name").as[String])
+          .withManagementUrl((json \ "managementUrl").as[String])
+          .withBackend((json \ "backend").as[Hipache.Backend])
+          .exec()
+      } yield Ok(Json.toJson(updated))
+    })
+  }
 
   def delete(id: String): Action[AnyContent] =
     Authenticated.async { implicit request =>

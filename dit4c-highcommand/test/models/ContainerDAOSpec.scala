@@ -77,8 +77,12 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       override def ownerIDs = ???
       override def userIDs = ???
 
+      // Members declared in models.UpdatableModel
+      override def update = ???
+
       override def addOwner(user: User) = ???
       override def addUser(user: User) = ???
+      override def delete = ???
     }
 
   }

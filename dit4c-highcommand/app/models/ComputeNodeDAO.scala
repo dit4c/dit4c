@@ -80,13 +80,17 @@ class ComputeNodeDAO @Inject() (
       ownerIDs: Set[String],
       userIDs: Set[String]
       )(implicit ec: ExecutionContext)
-      extends ComputeNode with DAOModel[ComputeNodeImpl] {
+      extends ComputeNode
+      with DAOModel[ComputeNodeImpl]
+      with UpdatableModel[ComputeNode.UpdateOp] {
 
     import play.api.Play.current
 
     val containers = new ContainerProvider(
       managementUrl,
       () => keyDao.bestSigningKey.map(_.get.toJWK))
+
+    override def update = UpdateOp(this)
 
     override def addOwner(user: User) =
       utils.update(this.copy(
@@ -100,7 +104,22 @@ class ComputeNodeDAO @Inject() (
 
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
+    // Used to update multiple attributes at once
+    implicit class UpdateOp(model: ComputeNodeImpl)
+        extends utils.UpdateOp(model)
+        with ComputeNode.UpdateOp {
+      override def withName(name: String) =
+        model.copy(name = name)
+
+      override def withManagementUrl(url: String) =
+        model.copy(managementUrl = url)
+
+      override def withBackend(backend: Hipache.Backend) =
+        model.copy(backend = backend)
+    }
+
   }
+
 }
 
 trait ComputeNode extends OwnableModel with UsableModel {
@@ -111,9 +130,23 @@ trait ComputeNode extends OwnableModel with UsableModel {
 
   def containers: ContainerProvider
 
+  def update: ComputeNode.UpdateOp
+
   def addOwner(user: User): Future[ComputeNode]
   def addUser(user: User): Future[ComputeNode]
   def delete: Future[Unit]
 
 }
+
+object ComputeNode {
+
+  trait UpdateOp extends UpdateOperation[ComputeNode] {
+    def withName(name: String): UpdateOp
+    def withManagementUrl(url: String): UpdateOp
+    def withBackend(backend: Hipache.Backend): UpdateOp
+  }
+
+}
+
+
 

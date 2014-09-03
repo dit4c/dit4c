@@ -59,7 +59,22 @@ define(['./module'], (controllers) ->
         .error (response) ->
           # TODO: Handle errors
           console.log(response)
-          
+  
+    $scope.populateEditForm = (node) ->
+      node.editForm =
+        name: node.name
+        managementUrl: node.managementUrl
+        backend: node.backend
+  
+    $scope.clearEditForm = (node) ->
+      node.editForm = undefined
+  
+    $scope.updateNode = (node) ->
+      $http
+        .put('/compute-nodes/'+node.id, node.editForm)
+        .then (response) ->
+          refreshComputeNodes()
+
     $scope.removeNode = (node) ->
       $http
         .delete('/compute-nodes/'+node.id)

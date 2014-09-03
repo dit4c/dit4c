@@ -288,14 +288,86 @@
           <tr>
             <th>Compute Node</th>
             <th></th>
-            <th>Data</th>
           </tr>
         </thead>
         <tbody>
           <tr ng-repeat="node in computeNodes | filter:{'usable': true} | orderBy:'name'">
             <td>
               <span>{{node.name}}</span>
-              <table class="table" ng-if="tokens[node.id]">
+              
+              <form class="form form-horizontal" ng-if="node.editForm" role="form">
+                <div class="form-group">
+                  <label for="editForm-{{node.id}}-name" class="col-sm-2 control-label">
+                    Name
+                  </label>
+                  <div class="col-sm-10">
+                  <input id="editForm-{{node.id}}-name" type="text"
+                    class="form-control" ng-model="node.editForm.name"
+                    ></select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="editForm-{{node.id}}-url" class="col-sm-2 control-label">
+                    Management URL
+                  </label>
+                  <div class="col-sm-10">
+                  <input id="editForm-{{node.id}}-url" type="text"
+                    class="form-control" ng-model="node.editForm.managementUrl"
+                    ></select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="col-sm-2 control-label">
+                    Backend
+                  </label>
+                  <div class="col-sm-10">
+                    <div class="form-group">
+                      <label for="editForm-{{node.id}}-backend-scheme" class="col-sm-2 control-label">
+                        Scheme
+                      </label>
+                      <div class="col-sm-10">
+                        <select id="editForm-{{node.id}}-backend-scheme"
+                          class="form-control" ng-model="node.editForm.backend.scheme">
+                          <option value="http">HTTP</option>
+                          <option value="https">HTTPS</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label for="editForm-{{node.id}}-backend-host" class="col-sm-2 control-label">
+                        Host
+                      </label>
+                      <div class="col-sm-10">
+                        <input id="editForm-{{node.id}}-backend-host" type="text"
+                          class="form-control" ng-model="node.editForm.backend.host"
+                          ></select>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label for="editForm-{{node.id}}-backend-port" class="col-sm-2 control-label">
+                        Port
+                      </label>
+                      <div class="col-sm-10">
+                        <input id="editForm-{{node.id}}-backend-port"
+                          class="form-control" ng-model="node.editForm.backend.port"
+                          type="number" min="1" max="65525">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <div class="col-sm-offset-2 col-sm-10">
+                    <button class="btn btn-default" ng-click="updateNode(node)">
+                      Update
+                    </button>
+                    <button class="btn btn-default" ng-click="clearEditForm(node)">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <table class="table" ng-if="node.owned">
                 <thead>
                   <tr>
                     <th>Access Token</th>
@@ -326,7 +398,7 @@
               </table>
             </td>
             <td>
-              <button class="btn btn-default" ng-if="node.owned">
+              <button class="btn btn-default" ng-disabled="node.editForm" ng-if="node.owned" ng-click="populateEditForm(node)">
                 Edit
               </button>
               <button class="btn btn-danger"
@@ -334,7 +406,6 @@
                 Delete
               </button>
             </td>
-            <td><pre>{{ node | json }}</pre></td>
           </tr>
         </tbody>
       </table>
