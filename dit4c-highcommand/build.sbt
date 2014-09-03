@@ -14,8 +14,9 @@ libraryDependencies ++= Seq(
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS
   "org.webjars" % "angular-ui-bootstrap" % "0.11.0-2",
-  // Bootstrap
+  // Bootstrap & Font Awesome
   "org.webjars" % "bootstrap" % "3.2.0",
+  "org.webjars" % "font-awesome" % "4.2.0",
   // domReady
   "org.webjars" % "requirejs-domready" % "2.0.1-1"
 )
