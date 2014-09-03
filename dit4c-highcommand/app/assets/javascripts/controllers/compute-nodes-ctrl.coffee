@@ -10,6 +10,8 @@ define(['./module'], (controllers) ->
     $scope.computeNodes = $route.current.locals.computeNodes
     
     $scope.containers = $route.current.locals.containers
+    $scope.relevantComputeNode = (node) ->
+      node.usable or node.owned
     
     $scope.accessForm =
       code: ''
