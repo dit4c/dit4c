@@ -1,5 +1,6 @@
 package models
 
+import com.google.inject.Inject
 import providers.db.CouchDB
 import play.api.libs.ws.WS
 import providers.auth._
@@ -8,7 +9,7 @@ import play.api.libs.json._
 import scala.concurrent.Future
 import play.api.templates.JavaScript
 
-class UserDAO(protected val db: CouchDB.Database)
+class UserDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._

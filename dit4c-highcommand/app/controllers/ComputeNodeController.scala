@@ -161,6 +161,47 @@ class ComputeNodeController @Inject() (
       })
     }
 
+  def listOwners(nodeId: String) = userListAction(nodeId, _.ownerIDs)
+
+  def removeOwner(nodeId: String, userId: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner {
+        case node if !node.ownerIDs.contains(userId) =>
+          sync2async(NotFound("Specified owner doesn't exist."))
+        case node if node.ownerIDs.size < 2 =>
+          sync2async(Forbidden("Cannot remove last owner."))
+        case node =>
+          for {
+            _ <- node.removeOwner(userId)
+          } yield NoContent
+      })
+    }
+
+  def listUsers(nodeId: String) = userListAction(nodeId, _.userIDs)
+
+  def removeUser(nodeId: String, userId: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner {
+        case node if !node.userIDs.contains(userId) =>
+          throw new Exception(node.toString)
+          sync2async(NotFound("Specified user doesn't exist."))
+        case node =>
+          for {
+            _ <- node.removeUser(userId)
+          } yield NoContent
+      })
+    }
+
+  protected def userListAction(
+      nodeId: String,
+      getSetOfIDs: ComputeNode => Set[String]) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        for {
+          owners <- Future.sequence(getSetOfIDs(computeNode).map(userDao.get))
+        } yield Ok(JsArray(owners.flatten.toSeq.map(Json.toJson(_))))
+      })
+    }
 
   protected def sync2async[A](obj: A) = Future.successful(obj)
 
@@ -220,6 +261,14 @@ class ComputeNodeController @Inject() (
           base
       }
     }
+
+  implicit lazy val userWriter = new Writes[User]() {
+    override def writes(o: User) = Json.obj(
+      "id"    -> o.id,
+      "name"  -> o.name,
+      "email" -> o.email
+    )
+  }
 
   implicit lazy val tokenWriter = new Writes[AccessToken]() {
     override def writes(o: AccessToken) = Json.obj(

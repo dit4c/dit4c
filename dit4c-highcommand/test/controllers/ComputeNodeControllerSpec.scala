@@ -33,7 +33,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
 
   "ComputeNodeController" should {
 
-    "provide JSON list of compute nodes" in new WithApplication(fakeApp) {
+    "list compute nodes" in new WithApplication(fakeApp) {
       val dao = injector.getInstance(classOf[ComputeNodeDAO])
       val controller = injector.getInstance(classOf[ComputeNodeController])
       val session = new UserSession(db)
@@ -63,7 +63,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       }
     }
 
-    "redeem an access token" in new WithApplication(fakeApp) {
+    "redeem access token" in new WithApplication(fakeApp) {
       val atDao = injector.getInstance(classOf[AccessTokenDAO])
       val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
       val controller = injector.getInstance(classOf[ComputeNodeController])
@@ -94,7 +94,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       updatedCN.userIDs must contain(redeemingSession.user.id)
     }
 
-    "create an access token" in new WithApplication(fakeApp) {
+    "create access token" in new WithApplication(fakeApp) {
       val atDao = injector.getInstance(classOf[AccessTokenDAO])
       val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
       val controller = injector.getInstance(classOf[ComputeNodeController])
@@ -116,7 +116,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       json \ "type" must_== JsString("share")
     }
 
-    "provide JSON list of access tokens" in new WithApplication(fakeApp) {
+    "list access tokens" in new WithApplication(fakeApp) {
       val atDao = injector.getInstance(classOf[AccessTokenDAO])
       val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
       val controller = injector.getInstance(classOf[ComputeNodeController])
@@ -140,6 +140,107 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
           json \ "code" must_== JsString(token.code)
           json \ "type" must_== JsString("share")
       }
+    }
+
+    "list owners" in new WithApplication(fakeApp) {
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val cn = await(cnDao.create(session.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+
+      val response = controller.listOwners(cn.id)(session.newRequest)
+      status(response) must_== 200
+      val json = contentAsJson(response).as[List[JsObject]]
+      json must haveSize(1)
+      json match {
+        case Seq(json) =>
+          val user = session.user
+          (json \ "id").as[String] must_== user.id
+          (json \ "name").as[Option[String]] must_== user.name
+          (json \ "email").as[Option[String]] must_== user.email
+      }
+    }
+
+    "remove owner" in new WithApplication(fakeApp) {
+      val userDao = injector.getInstance(classOf[UserDAO])
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val newOwner = await(userDao.createWith(MockIdentity(
+        "test:new-owner",
+        Some("Tommy Atkins"),
+        Some("t.atkins@example.test")
+      )))
+      val cn = await(cnDao.create(session.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+
+      // Should not be able to remove last owner
+      val forbiddenResponse =
+        controller.removeOwner(cn.id, session.user.id)(session.newRequest)
+      status(forbiddenResponse) must_== 403
+
+      await(cn.addOwner(newOwner))
+
+      val okResponse =
+        controller.removeOwner(cn.id, session.user.id)(session.newRequest)
+      status(okResponse) must_== 204
+
+      val updatedCn = await(cnDao.get(cn.id)).get
+      updatedCn.ownerIDs must not contain(session.user.id)
+      updatedCn.userIDs must contain(session.user.id)
+    }
+
+    "list users" in new WithApplication(fakeApp) {
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val cn = await(cnDao.create(session.user,
+          "test", "fakeid", "http://example.test/",
+          Hipache.Backend("example.test", 80, "https")))
+
+      val response = controller.listUsers(cn.id)(session.newRequest)
+      status(response) must_== 200
+      val json = contentAsJson(response).as[List[JsObject]]
+      json must haveSize(1)
+      json match {
+        case Seq(json) =>
+          val user = session.user
+          (json \ "id").as[String] must_== user.id
+          (json \ "name").as[Option[String]] must_== user.name
+          (json \ "email").as[Option[String]] must_== user.email
+      }
+    }
+
+    "remove user" in new WithApplication(fakeApp) {
+      val userDao = injector.getInstance(classOf[UserDAO])
+      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
+      val controller = injector.getInstance(classOf[ComputeNodeController])
+      val session = new UserSession(db)
+      val newUser = await(userDao.createWith(MockIdentity(
+        "test:new-user",
+        Some("Tommy Atkins"),
+        Some("t.atkins@example.test")
+      )))
+      val cn = await(
+        for {
+          cn <- cnDao.create(session.user,
+            "test", "fakeid", "http://example.test/",
+            Hipache.Backend("example.test", 80, "https"))
+          cnWithUser <- cn.addUser(newUser)
+        } yield cnWithUser
+      )
+
+      cn.userIDs must contain(newUser.id)
+
+      val okResponse =
+        controller.removeUser(cn.id, newUser.id)(session.newRequest)
+      status(okResponse) must_== 204
+
+      val updatedCn = await(cnDao.get(cn.id)).get
+      updatedCn.userIDs must not contain(newUser.id)
     }
 
   }

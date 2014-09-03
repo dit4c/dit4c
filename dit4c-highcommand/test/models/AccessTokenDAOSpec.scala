@@ -98,6 +98,8 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
       override def addOwner(user: User) = ???
       override def addUser(user: User) = ???
+      override def removeOwner(userId: String) = ???
+      override def removeUser(userId: String) = ???
       override def delete = ???
     }
   }

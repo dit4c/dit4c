@@ -35,14 +35,9 @@ class ComputeNodeDAO @Inject() (
       serverId: String,
       managementUrl: String,
       backend: Hipache.Backend): Future[ComputeNode] =
-    db.newID.flatMap { id =>
-      val node = ComputeNodeImpl(id, None,
+    utils.create { id =>
+      ComputeNodeImpl(id, None,
           name, serverId, managementUrl, backend, Set(user.id), Set(user.id))
-      WS.url(s"${db.baseURL}/$id").put(Json.toJson(node)).map { response =>
-        response.status match {
-          case 201 => node
-        }
-      }
     }
 
   def list: Future[Seq[ComputeNode]] = {
@@ -100,6 +95,12 @@ class ComputeNodeDAO @Inject() (
     override def addUser(user: User) =
       utils.update(this.copy(userIDs = userIDs + user.id))
 
+    override def removeOwner(userId: String) =
+      utils.update(this.copy(ownerIDs = userIDs - userId))
+
+    override def removeUser(userId: String) =
+      utils.update(this.copy(userIDs = userIDs - userId))
+
     override def delete: Future[Unit] = utils.delete(this)
 
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
@@ -134,6 +135,9 @@ trait ComputeNode extends OwnableModel with UsableModel {
 
   def addOwner(user: User): Future[ComputeNode]
   def addUser(user: User): Future[ComputeNode]
+  def removeOwner(userId: String): Future[ComputeNode]
+  def removeUser(userId: String): Future[ComputeNode]
+
   def delete: Future[Unit]
 
 }

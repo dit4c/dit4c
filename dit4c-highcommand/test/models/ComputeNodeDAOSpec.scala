@@ -39,6 +39,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       val json = couchResponse.json
       (json \ "type").as[String] must_== "ComputeNode"
       (json \ "_id").as[String] must_== node.id
+      (json \ "_rev").as[Option[String]] must_== node._rev
       (json \ "name").as[String] must_== node.name
       (json \ "serverID").as[String] must_== node.serverId
       (json \ "managementURL").as[String] must_== node.managementUrl

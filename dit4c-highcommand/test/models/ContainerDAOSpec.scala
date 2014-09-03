@@ -38,6 +38,7 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
         cr.status must_== 200
         (cr.json \ "type").as[String] must_== "Container"
         (cr.json \ "_id").as[String] must_== container.id
+        (cr.json \ "_rev").as[Option[String]] must_== container._rev
         (cr.json \ "name").as[String] must_== container.name
         (cr.json \ "image").as[String] must_== container.image
         (cr.json \ "computeNodeId").as[String] must_== container.computeNodeId
@@ -82,6 +83,8 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
 
       override def addOwner(user: User) = ???
       override def addUser(user: User) = ???
+      override def removeOwner(userId: String) = ???
+      override def removeUser(userId: String) = ???
       override def delete = ???
     }
 
