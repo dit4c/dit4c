@@ -51,6 +51,12 @@ class ContainerDAO(protected val db: CouchDB.Database)
       }
   }
 
+  def listFor(node: ComputeNode): Future[Seq[Container]] =
+    for {
+      containers <- list
+    } yield containers.filter(_.computeNodeId == node.id)
+
+
   implicit val projectFormat: Format[ContainerImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and

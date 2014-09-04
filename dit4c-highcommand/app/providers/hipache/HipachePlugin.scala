@@ -42,10 +42,10 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 
   private var manager: Option[ActorRef] = None
 
-  def client: Future[Option[ActorRef]] = manager match {
+  def client: Future[Option[HipacheClient]] = manager match {
     case None => Future.successful(None)
     case Some(mgr) => (mgr ? "client").map {
-      case actorRef: ActorRef => Some(actorRef)
+      case client: HipacheClient => Some(client)
       case _ => None
     }
   }
@@ -75,9 +75,7 @@ class HipacheManagementActor(
   val tickSchedule = context.system.scheduler.schedule(
     tickInterval, tickInterval, self, "tick")
 
-  val client: ActorRef = context.actorOf(
-      Props(classOf[HipacheActor], config),
-      name = "hipacheClient")
+  val client = new HipacheClient(config)(context.system)
 
   def receive: Receive = {
     case "client" => {
@@ -86,9 +84,20 @@ class HipacheManagementActor(
     case "tick" => performMaintenance
   }
 
-  private def performMaintenance: Future[_] = Future {
-    // TODO: Implement later
+  override def postStop = {
+    client.disconnect
   }
+
+  // TODO: Actually check mappings, rather than just printing them
+  private def performMaintenance: Future[_] =
+    for {
+      map <- client.all
+    } yield {
+      val mappings = map.toSeq.sortBy(_._1.name).map { case (f, b) =>
+        s"$f → $b"
+      }.mkString("\n")
+      log.info("Current Hipache mappings:\n"+mappings)
+    }
 
 
 }

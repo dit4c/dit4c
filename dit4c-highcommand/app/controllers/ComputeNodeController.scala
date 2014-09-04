@@ -9,7 +9,6 @@ import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
-import providers.hipache.HipacheActor
 import providers.hipache.Hipache
 import akka.actor.ActorRef
 import akka.util.Timeout
@@ -92,6 +91,10 @@ class ComputeNodeController @Inject() (
           .withManagementUrl((json \ "managementUrl").as[String])
           .withBackend((json \ "backend").as[Hipache.Backend])
           .exec()
+        _ <- if (computeNode.backend == updated.backend)
+               Future.successful(())
+             else
+               HipacheInterface.remapAll(updated)
       } yield Ok(Json.toJson(updated))
     })
   }
@@ -102,9 +105,9 @@ class ComputeNodeController @Inject() (
         for {
           tokens <- accessTokenDao.listFor(computeNode)
           _ <- Future.sequence(tokens.map(_.delete))
-          allContainers <- containerDao.list
-          nodeContainers = allContainers.filter(_.computeNodeId == id)
+          nodeContainers <- containerDao.listFor(computeNode)
           _ <- Future.sequence(nodeContainers.map(_.delete))
+          _ <- Future.sequence(nodeContainers.map(HipacheInterface.delete(_)))
           _ <- computeNode.delete
         } yield NoContent
       })

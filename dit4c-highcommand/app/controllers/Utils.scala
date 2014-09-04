@@ -22,6 +22,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
 import models._
+import providers.hipache._
+import akka.util.Timeout
+import java.util.concurrent.TimeUnit
 
 trait Utils extends Results {
 
@@ -112,5 +115,51 @@ trait Utils extends Results {
       case None =>
         throw new RuntimeException("No valid private keys are available!")
     }
+
+
+  object HipacheInterface {
+    import Hipache._
+
+    implicit val timeout = Timeout(10, TimeUnit.SECONDS)
+
+    def remapAll(node: ComputeNode)(implicit req: Request[_]) =
+      withHipache { hipache =>
+        for {
+          containers <- containerDao.listFor(node)
+          _ <- Future.sequence(containers.map(hipache.put(_, node)))
+        } yield ()
+      }
+
+    def put(container: Container, node: ComputeNode)(implicit req: Request[_]) =
+      withHipache { hipache =>
+        hipache.put(container, node)
+      }
+
+    def delete(container: Container)(implicit req: Request[_]) =
+      withHipache { hipache =>
+        hipache.delete(container)
+      }
+
+    private def withHipache[A](f: HipacheClient => Future[A]): Future[Unit] =
+      hipacheClient.map {
+        case Some(client) => f(client).map(_ => ())
+        case None => Future.successful(())
+      }
+
+    private def hipacheClient: Future[Option[HipacheClient]] =
+      Play.current.plugin[HipachePlugin] match {
+        case Some(plugin) => plugin.client
+        case None => Future.successful(None)
+      }
+
+    private implicit def asFrontend(
+        c: Container)(implicit req: Request[_]): Frontend =
+      Frontend(c.name, s"${c.name}.${req.host}")
+
+    private implicit def asBackend(
+        node: ComputeNode)(implicit req: Request[_]): Backend =
+      node.backend
+
+  }
 
 }
