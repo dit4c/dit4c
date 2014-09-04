@@ -9,6 +9,7 @@ import redis._
 import scala.util.Random
 import akka.actor.Props
 import akka.pattern.ask
+import scala.concurrent.Future
 
 @RunWith(classOf[JUnitRunner])
 class HipacheActorSpec extends RedisStandaloneServer {
@@ -21,6 +22,9 @@ class HipacheActorSpec extends RedisStandaloneServer {
       RedisServer("127.0.0.1", port, None, None),
       prefix
     )
+
+  def await[A](f: Future[A]) = Await.result(f, timeOut)
+  def idxKey(prefix: String) = s"${prefix}frontends"
 
   import Hipache._
   import HipacheActor._
@@ -36,11 +40,12 @@ class HipacheActorSpec extends RedisStandaloneServer {
         Backend("example.test")
       )
 
-      val result = Await.result(actor ask request, timeOut)
-      result must_== HipacheActor.OK
+      val result = await(actor ask request)
+      result must_== HipacheActor.OK(())
 
       val key = s"${c.prefix}frontend:${request.frontend.domain}"
-      Await.result(redis.lrange[String](key, 0, -1), timeOut) match {
+      await(redis.sismember[String](idxKey(c.prefix), key)) must beTrue
+      await(redis.lrange[String](key, 0, -1)) match {
         case Seq(name, backend) =>
           name must_== request.frontend.name
           backend must_== request.backend.toString
@@ -55,13 +60,15 @@ class HipacheActorSpec extends RedisStandaloneServer {
       val key = s"${c.prefix}frontend:${frontend.domain}"
 
       val setup = for {
+        _ <- redis.sadd(idxKey(c.prefix), key)
         _ <- redis.rpush(key, frontend.name)
         _ <- redis.rpush(key, backend.toString)
       } yield "done"
+      await(setup)
 
-      Await.result(redis.exists(key), timeOut) must beTrue
+      await(redis.exists(key)) must beTrue
 
-      Await.result(redis.lrange[String](key, 0, -1), timeOut) match {
+      await(redis.lrange[String](key, 0, -1)) match {
         case Seq(name, backend) =>
           name must_== frontend.name
           backend must_== backend.toString
@@ -69,10 +76,11 @@ class HipacheActorSpec extends RedisStandaloneServer {
 
       val actor = system.actorOf(Props(classOf[HipacheActor], c))
 
-      val result = Await.result(actor ask Delete(frontend), timeOut)
-      result must_== HipacheActor.OK
+      val result = await(actor ask Delete(frontend))
+      result must_== HipacheActor.OK(())
 
-      Await.result(redis.exists(key), timeOut) must beFalse
+      await(redis.sismember[String](idxKey(c.prefix), key)) must beFalse
+      await(redis.exists(key)) must beFalse
     }
 
     "replaces mappings" >> {
@@ -86,21 +94,46 @@ class HipacheActorSpec extends RedisStandaloneServer {
           Put(frontend, Backend("example1.test")),
           Put(frontend, Backend("example2.test")))
 
-      Await.result(redis.exists(key), timeOut) must beFalse
+      await(redis.exists(key)) must beFalse
 
       requests.foreach { request =>
-        val result = Await.result(actor ask request, timeOut)
-        result must_== HipacheActor.OK
+        val result = await(actor ask request)
+        result must_== HipacheActor.OK(())
 
-        Await.result(redis.exists(key), timeOut) must beTrue
+        await(redis.sismember[String](idxKey(c.prefix), key)) must beTrue
+        await(redis.exists(key)) must beTrue
 
-        Await.result(redis.lrange[String](key, 0, -1), timeOut) match {
+        await(redis.lrange[String](key, 0, -1)) match {
           case Seq(name, backend) =>
             name must_== request.frontend.name
             backend must_== request.backend.toString
         }
       }
       done
+    }
+
+    "retrieves mappings" >> {
+      val c = config("testretrieve:")
+      val actor = system.actorOf(Props(classOf[HipacheActor], c))
+
+      val frontend = Frontend("test", "test.example.test")
+      val backend = Backend("example.test")
+      val key = s"${c.prefix}frontend:${frontend.domain}"
+
+      val setup = for {
+        _ <- redis.sadd(idxKey(c.prefix), key)
+        _ <- redis.rpush(key, frontend.name)
+        _ <- redis.rpush(key, backend.toString)
+      } yield "done"
+      await(setup)
+
+      await(actor ask Get(frontend)).asInstanceOf[OK[Option[Backend]]]
+        .value.get must_== backend
+
+      val map = await(actor ? All).asInstanceOf[OK[Map[Frontend,Backend]]].value
+      map.size must_== 1
+      map must haveKey(frontend)
+      map(frontend) must_== backend
     }
 
   }
