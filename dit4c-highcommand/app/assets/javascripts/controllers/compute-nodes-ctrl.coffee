@@ -27,13 +27,15 @@ define(['./module'], (controllers) ->
         scheme: 'http'
     
     $scope.keyCodeFilter = (e, max, chunkSize) ->
+      # Only apply to printable characters
+      return if (e.which < 32 || e.ctrlKey || e.altKey)
       e.preventDefault()
       # Work on access form
       obj = $scope.accessForm
       # Only allow [A-Z0-9], and insert dashes appropriately
-      numeric = e.keyCode >= 48 && e.keyCode <= 57
-      upperAlpha = e.keyCode >= 65 && e.keyCode <= 90
-      lowerAlpha = e.keyCode >= 97 && e.keyCode <= 122
+      numeric = e.which >= 48 && e.which <= 57
+      upperAlpha = e.which >= 65 && e.which <= 90
+      lowerAlpha = e.which >= 97 && e.which <= 122
       isMax = (str) ->
         str.replace(/-/g,'').length >= max
       dashNext = (str) ->
@@ -45,9 +47,9 @@ define(['./module'], (controllers) ->
       return if isMax(obj.code)
       switch
         when (numeric || upperAlpha)
-          addChar(e.keyCode)
+          addChar(e.which)
         when lowerAlpha
-          addChar(e.keyCode - 32)
+          addChar(e.which - 32)
     
     refreshComputeNodes = () ->
       $http
