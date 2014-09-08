@@ -170,7 +170,8 @@ class ContainerController @Inject() (
       Future[Seq[(Container, Option[MachineShop.Container])]] = {
     containerDao.list.flatMap { containers =>
       val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
-      val r = cnpHelper.resolver // Use a single resolver instance
+      // Use a single resolver instance, and catch errors in resolution
+      val r = fallbackToMissing(cnpHelper.resolver)
       Future.sequence(
         // For each container do a lookup with the resolver
         userContainers.map(r)
@@ -180,5 +181,17 @@ class ContainerController @Inject() (
       }
     }
   }
+
+  // Given a function which returns a future optional object, catch any
+  // errors with the future and resolve with "None" instead.
+  private def fallbackToMissing[A, B](f: A => Future[Option[B]]) =
+    { ft: Future[Option[B]] =>
+      ft.recover {
+        case e =>
+          Logger.warn(s"${e.getMessage} ⇒ resolving to None")
+          None
+      }
+    } compose f
+
 
 }
