@@ -1,26 +1,22 @@
 package providers.auth
 
 import java.net.URL
-
 import scala.util.Random
-
 import org.junit.runner.RunWith
-import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-
 import com.nimbusds.jose._
 import com.nimbusds.jose.crypto.MACSigner
-
 import play.api.test.FakeRequest
+import play.api.test.PlaySpecification
 
 @RunWith(classOf[JUnitRunner])
-class AAFAuthProviderSpec extends Specification {
+class AAFAuthProviderSpec extends PlaySpecification {
 
   "AAF Auth Provider" should {
 
     val authProviderKey = Random.nextString(20)
-    val authProvider = new RapidAAFAuthProvider(RapidAAFAuthProviderConfig(
-      "RapidAAF", new URL("http://example.test/login"), authProviderKey
+    val authProvider = new RapidAAFAuthProvider(RapidAAFAuthProvider.Config(
+      new URL("http://example.test/login"), authProviderKey
     ))
 
     "should produce an identity from a properly formatted request" in {
@@ -59,7 +55,8 @@ class AAFAuthProviderSpec extends Specification {
       }
       val request = FakeRequest("POST", "/auth/callback")
         .withFormUrlEncodedBody("assertion" -> serializedToken)
-      val callbackResult = authProvider.callbackHandler(request)
+
+      val callbackResult = await(authProvider.callbackHandler(request))
       println(callbackResult)
       callbackResult must beAnInstanceOf[CallbackResult.Success]
       val res = callbackResult.asInstanceOf[CallbackResult.Success]
