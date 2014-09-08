@@ -10,6 +10,8 @@ import play.twirl.api.Html
 
 class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvider {
 
+  override def name = "rapidaaf"
+
   lazy val verifier = new JWSVerifier(config.key)
 
   override val callbackHandler = { request: Request[AnyContent] =>
@@ -67,3 +69,17 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvi
 }
 
 case class RapidAAFAuthProviderConfig(id: String, url: java.net.URL, key: String)
+
+object RapidAAFAuthProvider extends AuthProviderFactory {
+
+  def apply(config: play.api.Configuration) =
+    for {
+      c <- config.getConfig("rapidaaf")
+      id = c.getString("id").getOrElse("RapidAAF")
+      urlStr <- c.getString("url")
+      url = new java.net.URL(urlStr)
+      key <- c.getString("key")
+    } yield new RapidAAFAuthProvider(
+        new RapidAAFAuthProviderConfig(id, url, key))
+
+}

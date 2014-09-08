@@ -1,4 +1,4 @@
-@(loginButton: String => Html)
+@(authProviders: Seq[providers.auth.AuthProvider])
 
 @import helpers.AppVersion
 
@@ -73,7 +73,13 @@
     <div ng-include src="'navbar.html'"></div>
     <div class="container">
       <h1>Authenticate your identity</h1>
-      @loginButton("/login/redirect")
+      <div class="row">
+      @for(provider <- authProviders) {
+        <div class="col-xs-12 col-sm-6 col-lg-4">
+          @provider.loginButton(routes.AuthController.login(provider.name).url)
+        </div>
+      }
+      </div>
     </div>
     </script>
 
@@ -135,7 +141,7 @@
             </td>
             <td>
               <div class="btn-group" ng-if="container.active != null">
-                <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
+                <button ng-if="container.active" clascol-md-4 s="btn btn-primary disabled active" role="button">On</button>
                 <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
                 <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
                 <button ng-if="!container.active" class="btn btn-primary disabled active" role="button">Off</button>

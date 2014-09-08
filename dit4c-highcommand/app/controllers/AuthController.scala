@@ -24,7 +24,7 @@ import play.mvc.Http.RequestHeader
 import models._
 
 class AuthController @Inject() (
-    authProvider: AuthProvider,
+    authProviders: AuthProviders,
     val db: CouchDB.Database)
     extends Controller with Utils {
 
@@ -37,8 +37,13 @@ class AuthController @Inject() (
     }
   }
 
-  def login = Action { implicit request =>
-    Redirect(authProvider.loginURL)
+  def login(name: String) = Action { implicit request =>
+    authProviders.providers.find(_.name == name) match {
+      case Some(provider) =>
+        Redirect(provider.loginURL)
+      case None =>
+        BadRequest("Login method doesn't exist.")
+    }
   }
 
   def logout = Action.async { implicit request =>
@@ -49,9 +54,16 @@ class AuthController @Inject() (
   }
 
   def callback = Action.async { implicit request =>
-    import CallbackResult.{Success, Failure, Invalid}
+    import CallbackResult._
     import Future.successful
-    authProvider.callbackHandler(request) match {
+
+    val result: CallbackResult =
+      authProviders.providers
+        .map(_.callbackHandler(request))
+        .find(_ != Invalid) // Keep going until it's not invalid
+        .getOrElse(Invalid) // or we exhaust all the options
+
+    result match {
       case Success(identity) =>
         userDao.findWith(identity).flatMap {
           case Some(user) => successful(user)
