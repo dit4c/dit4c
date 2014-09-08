@@ -32,7 +32,7 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
           val name = "none"
           val errorMsg = "AuthProvider not configured"
           override def callbackHandler = { _ =>
-            CallbackResult.Failure(errorMsg)
+            Future.successful(CallbackResult.Failure(errorMsg))
           }
           override def loginURL = ???
           override def loginButton = _ => Html(
@@ -43,6 +43,7 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
         lazy val authProviders = AuthProviders(
           Some(
             RapidAAFAuthProvider(appConfig) ++
+            GitHubProvider(appConfig) ++
             DummyProvider(appConfig)
           ).filter(_.size > 0).getOrElse(noProviders))
 

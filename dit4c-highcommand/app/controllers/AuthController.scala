@@ -38,7 +38,7 @@ class AuthController @Inject() (
   }
 
   def login(name: String) = Action { implicit request =>
-    authProviders.providers.find(_.name == name) match {
+    providerWithName(name) match {
       case Some(provider) =>
         Redirect(provider.loginURL)
       case None =>
@@ -53,29 +53,37 @@ class AuthController @Inject() (
     }.withNewSession.withClearedJwt
   }
 
-  def callback = Action.async { implicit request =>
-    import CallbackResult._
-    import Future.successful
+  def namedCallback(name: String) = callback(providerWithName(name))
 
-    val result: CallbackResult =
-      authProviders.providers
-        .map(_.callbackHandler(request))
-        .find(_ != Invalid) // Keep going until it's not invalid
-        .getOrElse(Invalid) // or we exhaust all the options
+  def unnamedCallback = callback(authProviders.providers)
 
-    result match {
-      case Success(identity) =>
-        userDao.findWith(identity).flatMap {
-          case Some(user) => successful(user)
-          case None => userDao.createWith(identity)
-        }.flatMap { user =>
-          Redirect(routes.Application.main("login").url)
-            .withSession(request.session + ("userId" -> user.id))
-            .withUpdatedJwt(user)
+  protected def callback(providers: Iterable[AuthProvider]) =
+    Action.async { implicit request =>
+      import CallbackResult._
+      import Future.successful
+
+      Future.sequence(providers.map(_.callbackHandler(request)))
+        .map { result =>
+          result
+            .find(_ != Invalid) // Keep going until it's not invalid
+            .getOrElse(Invalid) // or we exhaust all the options
         }
-      case Failure(msg) => successful(Forbidden(msg))
-      case Invalid => successful(BadRequest)
+        .flatMap {
+          case Success(identity) =>
+            userDao.findWith(identity).flatMap {
+              case Some(user) => successful(user)
+              case None => userDao.createWith(identity)
+            }.flatMap { user =>
+              Redirect(routes.Application.main("login").url)
+                .withSession(request.session + ("userId" -> user.id))
+                .withUpdatedJwt(user)
+            }
+          case Failure(msg) => successful(Forbidden(msg))
+          case Invalid => successful(BadRequest)
+        }
     }
-  }
+
+  protected def providerWithName(name: String): Option[AuthProvider] =
+    authProviders.providers.find(_.name == name)
 
 }

@@ -4,7 +4,8 @@
 
 GET     /login/:name/redirect       @controllers.AuthController.login(name)
 POST    /logout                     @controllers.AuthController.logout
-POST    /auth/callback              @controllers.AuthController.callback
+GET     /login/:name/callback       @controllers.AuthController.namedCallback(name)
+POST    /auth/callback              @controllers.AuthController.unnamedCallback
 GET     /public-keys                @controllers.AuthController.publicKeys
 
 GET     /users/current              @controllers.UserController.currentUser

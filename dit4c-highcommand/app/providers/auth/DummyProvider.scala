@@ -1,20 +1,23 @@
 package providers.auth
 
 import play.twirl.api.Html
+import scala.concurrent.Future
 
 class DummyProvider extends AuthProvider {
   override def name = "dummy"
   override def callbackHandler = { request =>
-    request.body.asFormUrlEncoded.map { params =>
-      val username: String =
-        params.get("username").map(_.head).getOrElse("anonymous")
-      CallbackResult.Success(new Identity {
-        override val uniqueId = "dummy:"+username
-        override val name = Some(username)
-        override val emailAddress = None
-      })
-    }.getOrElse {
-      CallbackResult.Failure("Form not posted.")
+    Future.successful {
+      request.body.asFormUrlEncoded.map { params =>
+        val username: String =
+          params.get("username").map(_.head).getOrElse("anonymous")
+        CallbackResult.Success(new Identity {
+          override val uniqueId = "dummy:"+username
+          override val name = Some(username)
+          override val emailAddress = None
+        })
+      }.getOrElse {
+          CallbackResult.Failure("Form not posted.")
+      }
     }
   }
   override def loginURL = ??? // Should never be called

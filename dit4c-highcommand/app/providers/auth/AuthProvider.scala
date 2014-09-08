@@ -3,10 +3,11 @@ package providers.auth
 import play.api.mvc.Request
 import play.api.mvc.AnyContent
 import play.twirl.api.Html
+import scala.concurrent.Future
 
 trait AuthProvider {
   def name: String
-  def callbackHandler: Request[AnyContent] => CallbackResult
+  def callbackHandler: Request[AnyContent] => Future[CallbackResult]
   def loginURL: String
   def loginButton: String => Html
 }

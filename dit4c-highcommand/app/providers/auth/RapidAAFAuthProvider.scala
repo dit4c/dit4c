@@ -7,25 +7,28 @@ import scala.util.Try
 import com.nimbusds.jwt.JWTParser
 import play.api.libs.json._
 import play.twirl.api.Html
+import scala.concurrent.Future
 
-class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvider {
+class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProvider {
 
   override def name = "rapidaaf"
 
   lazy val verifier = new JWSVerifier(config.key)
 
   override val callbackHandler = { request: Request[AnyContent] =>
-    extractPayload(request).flatMap[CallbackResult] { payload =>
-      val optAttrs = (payload \ "https://aaf.edu.au/attributes").asOpt[JsObject]
-      optAttrs.flatMap { attrs =>
-        Json.fromJson[Identity](attrs)(AttributeReader) match {
-          case JsSuccess(identity, _) =>
-            Some(CallbackResult.Success(identity))
-          case _: JsError =>
-            None
+    Future.successful {
+      extractPayload(request).flatMap[CallbackResult] { payload =>
+        val optAttrs = (payload \ "https://aaf.edu.au/attributes").asOpt[JsObject]
+        optAttrs.flatMap { attrs =>
+          Json.fromJson[Identity](attrs)(AttributeReader) match {
+            case JsSuccess(identity, _) =>
+              Some(CallbackResult.Success(identity))
+            case _: JsError =>
+              None
+          }
         }
-      }
-    }.getOrElse(CallbackResult.Invalid)
+      }.getOrElse(CallbackResult.Invalid)
+    }
   }
 
   override val loginURL = config.url.toString
@@ -57,29 +60,27 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProviderConfig) extends AuthProvi
         val attrs = obj.fieldSet.map(p => (p._1, p._2.as[String])).toMap
         val providerUserId = attrs.get("edupersontargetedid").get
         JsSuccess(new Identity {
-          val uniqueId = s"${config.id}:${providerUserId}"
+          val uniqueId = s"RapidAAF:${providerUserId}"
           val emailAddress = attrs.get("mail")
           val name = attrs.get("cn")
         })
-      case _ =>
-        JsError(Nil)
+      case _ => JsError(Nil)
     }
 
   }
 }
 
-case class RapidAAFAuthProviderConfig(id: String, url: java.net.URL, key: String)
 
 object RapidAAFAuthProvider extends AuthProviderFactory {
+  case class Config(url: java.net.URL, key: String)
 
   def apply(config: play.api.Configuration) =
     for {
       c <- config.getConfig("rapidaaf")
-      id = c.getString("id").getOrElse("RapidAAF")
       urlStr <- c.getString("url")
       url = new java.net.URL(urlStr)
       key <- c.getString("key")
     } yield new RapidAAFAuthProvider(
-        new RapidAAFAuthProviderConfig(id, url, key))
+        RapidAAFAuthProvider.Config(url, key))
 
 }
