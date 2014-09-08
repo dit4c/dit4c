@@ -21,11 +21,12 @@ class AAFAuthProviderSpec extends PlaySpecification {
 
     "should produce an identity from a properly formatted request" in {
       val targetedId = {
+        import java.net.URLEncoder.encode
         val prefix = "https://rapid.aaf.edu.au!http://example.test!"
         // From: http://wiki.aaf.edu.au/tech-info/attributes/edupersontargetedid
         // "The eduPersonTargetedID value is an opaque string of no more
         //  than 256 characters."
-        prefix + Random.nextString(256-prefix.length)
+        prefix + encode(Random.nextString(256-prefix.length), "utf-8")
       }
       val content =
         s"""|{
@@ -57,7 +58,6 @@ class AAFAuthProviderSpec extends PlaySpecification {
         .withFormUrlEncodedBody("assertion" -> serializedToken)
 
       val callbackResult = await(authProvider.callbackHandler(request))
-      println(callbackResult)
       callbackResult must beAnInstanceOf[CallbackResult.Success]
       val res = callbackResult.asInstanceOf[CallbackResult.Success]
       res.identity.uniqueId must_== s"RapidAAF:$targetedId"
