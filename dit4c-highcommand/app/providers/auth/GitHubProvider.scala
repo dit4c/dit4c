@@ -41,8 +41,10 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
 
   override val loginButton = (url: String) => Html(
     s"""|<a target="_self" href="$url">
-        |  <img class="img-responsive center-block" alt="Login with GitHub"
-        |       src="https://octodex.github.com/images/original.png"/>
+        |  <img class="img-responsive center-block"
+        |     alt="Login with GitHub"
+        |     src="https://assets-cdn.github.com/images/modules/logos_page/GitHub-Logo.png"
+        |     style="width: 75%" />
         |</a>
         |""".stripMargin
   )
