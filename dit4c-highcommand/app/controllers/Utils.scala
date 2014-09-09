@@ -27,6 +27,7 @@ import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 
 trait Utils extends Results {
+  import scala.language.implicitConversions
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext

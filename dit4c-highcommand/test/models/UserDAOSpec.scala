@@ -56,6 +56,19 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.get(user.id)) must beSome
     }
 
+    "update name & email" in new WithApplication(fakeApp) {
+      val dao = new UserDAO(db)
+      val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
+
+      val update = user.update
+        .withName(Some("Foo Bar"))
+        .withEmail(Some("foo@bar.test"))
+
+      val updatedUser = await(update.exec())
+      updatedUser.name must beSome
+      updatedUser.email must beSome
+    }
+
   }
 
 }

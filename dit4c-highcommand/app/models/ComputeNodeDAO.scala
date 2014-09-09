@@ -78,6 +78,7 @@ class ComputeNodeDAO @Inject() (
       extends ComputeNode
       with DAOModel[ComputeNodeImpl]
       with UpdatableModel[ComputeNode.UpdateOp] {
+    import scala.language.implicitConversions
 
     import play.api.Play.current
 
@@ -85,7 +86,7 @@ class ComputeNodeDAO @Inject() (
       managementUrl,
       () => keyDao.bestSigningKey.map(_.get.toJWK))
 
-    override def update = UpdateOp(this)
+    override def update = updateOp(this)
 
     override def addOwner(user: User) =
       utils.update(this.copy(
@@ -106,18 +107,17 @@ class ComputeNodeDAO @Inject() (
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
     // Used to update multiple attributes at once
-    implicit class UpdateOp(model: ComputeNodeImpl)
-        extends utils.UpdateOp(model)
-        with ComputeNode.UpdateOp {
-      override def withName(name: String) =
-        model.copy(name = name)
+    implicit def updateOp(model: ComputeNodeImpl): ComputeNode.UpdateOp =
+      new utils.UpdateOp(model) with ComputeNode.UpdateOp {
+        override def withName(name: String) =
+          model.copy(name = name)
 
-      override def withManagementUrl(url: String) =
-        model.copy(managementUrl = url)
+        override def withManagementUrl(url: String) =
+          model.copy(managementUrl = url)
 
-      override def withBackend(backend: Hipache.Backend) =
-        model.copy(backend = backend)
-    }
+        override def withBackend(backend: Hipache.Backend) =
+          model.copy(backend = backend)
+      }
 
   }
 

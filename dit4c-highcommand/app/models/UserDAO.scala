@@ -7,7 +7,7 @@ import providers.auth._
 import scala.concurrent.ExecutionContext
 import play.api.libs.json._
 import scala.concurrent.Future
-import play.api.templates.JavaScript
+import play.twirl.api.JavaScript
 
 class UserDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
@@ -17,17 +17,9 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
   import play.api.Play.current
 
   def createWith(identity: Identity): Future[User] =
-    db.newID.flatMap { id =>
-      val user =
-        UserImpl(id, None,
-            identity.name, identity.emailAddress, Seq(identity.uniqueId))
-      val data = Json.toJson(user)
-      val holder = WS.url(s"${db.baseURL}/$id")
-      holder.put(data).map { response =>
-        response.status match {
-          case 201 => user
-        }
-      }
+    utils.create { id =>
+      UserImpl(id, None,
+          identity.name, identity.emailAddress, Seq(identity.uniqueId))
     }
 
   def findWith(identity: Identity): Future[Option[User]] = {
@@ -42,13 +34,7 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
       }
   }
 
-  def get(id: String): Future[Option[User]] =
-    WS.url(s"${db.baseURL}/$id").get.map { response =>
-      (response.status match {
-        case 200 => Some(response.json)
-        case _ => None
-      }).flatMap(fromJson[UserImpl])
-    }
+  def get(id: String): Future[Option[User]] = utils.get(id)
 
   implicit val userFormat: Format[UserImpl] = (
     (__ \ "_id").format[String] and
@@ -70,11 +56,32 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
   }
 
   case class UserImpl(
-    val id: String,
-    val _rev: Option[String],
-    val name: Option[String],
-    val email: Option[String],
-    val identities: Seq[String]) extends User
+      val id: String,
+      val _rev: Option[String],
+      val name: Option[String],
+      val email: Option[String],
+      val identities: Seq[String]
+      )(implicit ec: ExecutionContext)
+      extends User
+      with DAOModel[UserImpl]
+      with UpdatableModel[User.UpdateOp] {
+    import scala.language.implicitConversions
+
+    override def revUpdate(rev: String) = this.copy(_rev = Some(rev))
+
+    override def update = updateOp(this)
+
+    // Used to update multiple attributes at once
+    implicit def updateOp(model: UserImpl): User.UpdateOp =
+      new utils.UpdateOp(model) with User.UpdateOp {
+        override def withName(name: Option[String]) =
+          model.copy(name = name)
+
+        override def withEmail(email: Option[String]) =
+          model.copy(email = email)
+      }
+
+  }
 
 }
 
@@ -82,4 +89,13 @@ trait User extends BaseModel {
   def name: Option[String]
   def email: Option[String]
   def identities: Seq[String]
+
+  def update: User.UpdateOp
+}
+
+object User {
+  trait UpdateOp extends UpdateOperation[User] {
+    def withName(name: Option[String]): UpdateOp
+    def withEmail(email: Option[String]): UpdateOp
+  }
 }

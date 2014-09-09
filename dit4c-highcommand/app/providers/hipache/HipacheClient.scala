@@ -11,6 +11,7 @@ import redis.commands.TransactionBuilder
 import akka.actor.ActorSystem
 
 class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) {
+  import scala.language.implicitConversions
 
   import system.dispatcher
 

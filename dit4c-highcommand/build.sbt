@@ -30,6 +30,8 @@ version <<= version in ThisBuild
 
 crossScalaVersions := Nil
 
+scalacOptions ++= Seq("-feature")
+
 // Produce scala object that knows the app version
 sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirectory) map { (dir, v, cacheDir) =>
   val cache =
