@@ -15,6 +15,7 @@ import play.api.libs.ws.WSResponse
 
 class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
 
+  import play.api.libs.functional.syntax._
   import Play.current
   import Execution.Implicits.defaultContext
 
@@ -36,7 +37,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
   }
 
   override val loginURL =
-    s"https://github.com/login/oauth/authorize?client_id=${config.id}"
+    s"https://github.com/login/oauth/authorize?client_id=${config.id}&scope=user%3Aemail"
 
   override val loginButton = (url: String) => Html(
     s"""|<a target="_self" href="$url">
@@ -47,7 +48,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
   )
 
   protected def resolveIdentity(code: String): Future[Identity] =
-    tokenRequest(code).flatMap(retrieveIdentity)
+    tokenRequest(code).flatMap(retreiveIdentityWithEmail)
 
   protected def tokenRequest(code: String): Future[String] =
     WS.url("https://github.com/login/oauth/access_token")
@@ -61,7 +62,34 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
         (response.json \ "access_token").as[String]
       }
 
-  protected def retrieveIdentity(token: String): Future[Identity] =
+  protected def retreiveIdentityWithEmail(token: String) =
+    for {
+      identity <- retrieveIdentity(token)
+      emails <- retrieveEmails(token)
+    } yield {
+      if (identity.emailAddress.isDefined)
+        identity
+      else
+        identity.copy(emailAddress = emails.headOption)
+    }
+
+
+  protected def retrieveEmails(token: String): Future[Seq[String]] =
+    WS.url("https://api.github.com/user/emails")
+      .withHeaders(
+          "Authorization" -> s"token $token",
+          "Accept" -> "application/json")
+      .get
+      .map { response =>
+        throwIfError(response)
+        val json = response.json
+        val emails = json.as[List[GitHubEmail]]
+        // Priority: verified, preferably primary
+        emails.sortBy(e => (!e.verified, !e.primary, e.email))
+              .map(_.email)
+      }
+
+  protected def retrieveIdentity(token: String): Future[GitHubIdentity] =
     WS.url("https://api.github.com/user")
       .withHeaders(
           "Authorization" -> s"token $token",
@@ -90,6 +118,17 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
     def uniqueId = s"github:$username"
 
   }
+
+  case class GitHubEmail(
+      val email: String,
+      val primary: Boolean,
+      val verified: Boolean)
+
+  implicit private val githubEmailFormat: Reads[GitHubEmail] = (
+      (__ \ "email").read[String] and
+      (__ \ "primary").read[Boolean] and
+      (__ \ "verified").read[Boolean]
+  )(GitHubEmail)
 
 
 }
