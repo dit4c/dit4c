@@ -26,16 +26,20 @@ define(['./module'], (controllers) ->
       "//"+name+"."+$location.host()
     
     $scope.create = () ->
-      $http
-        .post('/containers',
+      request =
           name: $scope.newContainer.name
           computeNodeId: ($scope.newContainer.computeNode||{}).id,
           image: $scope.newContainer.image
           active: $scope.newContainer.active
-        )
-        .then (response) ->
-          $scope.newContainer.name = ""
-          $scope.containers.push(response.data)
+      $scope.newContainer.name = ""
+      $scope.containers.push(request)
+      $http
+        .post('/containers', request)
+        .success (response) ->
+          $scope.containers[$scope.containers.indexOf(request)] = response
+        .error (response) ->
+          alert(response)
+          $scope.containers.splice($scope.containers.indexOf(request), 1)
     
     containerById = (id) ->
       $scope.containers.filter((container) -> container.id == id)[0]
@@ -61,7 +65,10 @@ define(['./module'], (controllers) ->
     $scope.delete = (id) ->
       $http
         .delete("/containers/"+id)
-        .then refreshContainers
+        .success (response) ->
+          refreshContainers()
+        .error (response) ->
+          alert(response)
     
     $scope.checkName = (name) ->
       if (name == "")

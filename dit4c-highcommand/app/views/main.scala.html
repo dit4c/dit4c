@@ -140,7 +140,7 @@
               </span>
             </td>
             <td>
-              <div class="btn-group" ng-if="container.active != null">
+              <div class="btn-group" ng-if="container.id && container.active != null">
                 <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
                 <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
                 <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
@@ -149,9 +149,12 @@
               <span class="text-muted" ng-if="container.active == null">
                 status unknown
               </span>
+              <span class="text-muted" ng-if="!container.id">
+                creating....
+              </span>
             </td>
             <td>
-              <button class="btn btn-danger"
+              <button class="btn btn-danger" ng-if="container.id"
                 ng-click="delete(container.id)">Delete</button>
             </td>
           </tr>

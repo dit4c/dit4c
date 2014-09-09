@@ -63,6 +63,10 @@ class ContainerController @Inject() (
           ))
           resultWithJwt <- result.withUpdatedJwt(request.user)
         } yield resultWithJwt
+    }.recover {
+      case e: java.net.ConnectException =>
+        Logger.warn(e.getMessage)
+        InternalServerError("Unable to contact compute node.")
     }
   }
 
@@ -111,16 +115,28 @@ class ContainerController @Inject() (
         case None =>
           Future.successful(NotFound)
         case Some(container) =>
-          cnpHelper.resolver(container).flatMap {
-            case None =>
-              // TODO: Improve this handling
-              Future.successful(NotFound)
-            case Some(cnp) =>
-              for {
-                _ <- container.delete
-                _ <- cnp.delete
-                _ <- HipacheInterface.delete(container)
-              } yield NoContent
+          // If resolution is successful, but doesn't return a container, then
+          // we know the container doesn't exist where it should be. It's safe
+          // to delete our record for it under those circumstances, so we want
+          // to silently ignore it.
+          def deleteOrIgnore(possibleContainer: Option[MachineShop.Container]) =
+            possibleContainer.map(_.delete).getOrElse {
+              Logger.warn(
+                s"${container.name} missing on compute node. Deleting anyway."
+              )
+              Future.successful(())
+            }
+          // Delete the container record and the actual container.
+          cnpHelper.resolver(container).flatMap { possibleContainer =>
+            for {
+              _ <- container.delete
+              _ <- deleteOrIgnore(possibleContainer)
+              _ <- HipacheInterface.delete(container)
+            } yield NoContent
+          }.recover {
+            case e: java.net.ConnectException =>
+              Logger.warn(s"${e.getMessage} ⇒ aborting delete")
+              InternalServerError("Unable to contact compute node.")
           }
       }
   }
