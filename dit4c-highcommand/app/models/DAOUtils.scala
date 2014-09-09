@@ -109,7 +109,11 @@ trait DAOUtils {
 
     class UpdateOp[M <: DAOModel[M]](model: M)(
         implicit wjs: Writes[M]) extends UpdateOperation[M] {
-      def exec(): Future[M] = update(model)
+      override def exec() = update(model)
+
+      // Used to avoid updates that don't change anything
+      override def execIfDifferent[N >: M](other: N) =
+        if (model == other) Future.successful(other) else exec()
     }
   }
 
@@ -140,4 +144,5 @@ trait UpdatableModel[U] {
 
 trait UpdateOperation[+M] {
   def exec(): Future[M]
+  def execIfDifferent[N >: M](other: N): Future[N]
 }

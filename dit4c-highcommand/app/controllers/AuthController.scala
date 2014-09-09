@@ -71,7 +71,12 @@ class AuthController @Inject() (
         .flatMap {
           case Success(identity) =>
             userDao.findWith(identity).flatMap {
-              case Some(user) => successful(user)
+              case Some(user) =>
+                // If name & email are not populated, populate them
+                user.update
+                  .withName(user.name.orElse(identity.name))
+                  .withEmail(user.email.orElse(identity.emailAddress))
+                  .execIfDifferent(user)
               case None => userDao.createWith(identity)
             }.flatMap { user =>
               Redirect(routes.Application.main("login").url)

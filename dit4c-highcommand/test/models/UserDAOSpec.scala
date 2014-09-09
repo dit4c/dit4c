@@ -64,7 +64,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         .withName(Some("Foo Bar"))
         .withEmail(Some("foo@bar.test"))
 
-      val updatedUser = await(update.exec())
+      val updatedUser = await(update.execIfDifferent(user))
       updatedUser.name must beSome
       updatedUser.email must beSome
     }
