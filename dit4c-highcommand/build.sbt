@@ -9,7 +9,8 @@ libraryDependencies ++= Seq(
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
   "com.etaty.rediscala" %%  "rediscala"       % "1.3.1",
-  "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.4"   % "test",
+  "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.4"     % "test",
+  "org.specs2"          %%  "specs2-scalacheck" % "2.3.12"  % "test",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS
@@ -65,6 +66,8 @@ val closureOptions = {
 pipelineStages := Seq(rjs, digest, gzip)
 
 sbtdocker.Plugin.dockerSettings
+
+net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 // Make docker depend on the package task, which generates a jar file of the application code
 docker <<= docker.dependsOn(com.typesafe.sbt.packager.universal.Keys.stage)
