@@ -41,7 +41,9 @@
             </ul>
             <ul class="nav navbar-nav navbar-right">
               <li class="dropdown">
-                <a href="#" class="dropdown-toggle" title="{{currentUser.id}}">
+                <a href="#" class="dropdown-toggle"
+                    data-id="{{currentUser.id}}"
+                    title="{{currentUser.email}}">
                   <span ng-if="currentUser.name">{{currentUser.name}}</span>
                   <span ng-if="!currentUser.name">Unknown</span>
                   <b class="caret"></b>
