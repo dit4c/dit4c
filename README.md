@@ -20,7 +20,7 @@ The primary focus of DIT4C is [Software Carpentry Bootcamps][swc]. Having a work
 
 DIT4C separates the portal environment which manages user access and containers from the compute nodes that provide them.
 
-![DIT4C Architecture Diagram](architecture.svg)
+![DIT4C Architecture Diagram](docs/architecture.png)
 
 ### Components
 
