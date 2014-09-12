@@ -23,5 +23,11 @@ define([
     $locationProvider.html5Mode(true).hashPrefix('!')
   ])
   
+  # Adapted from http://stackoverflow.com/a/19417858/701439
+  app.run(['$rootScope', '$location', '$window', ($rootScope, $location, $window) ->
+    $rootScope.$on '$routeChangeSuccess', () ->
+      $window.ga('send', 'pageview', $location.path()) if ($window.ga)
+  ])
+  
   app
 )
