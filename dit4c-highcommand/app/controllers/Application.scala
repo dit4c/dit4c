@@ -10,11 +10,15 @@ class Application @Inject() (authProviders: AuthProviders)
     extends Controller {
 
   def main(path: String) = Action { implicit request =>
-    Ok(views.html.main(authProviders.providers.toSeq))
+    Ok(views.html.main(authProviders.providers.toSeq, googleAnalyticsCode))
   }
 
   def waiting = Action { implicit request =>
     Ok(views.html.waiting()).withHeaders("max-age" -> "3600")
   }
+
+
+  private def googleAnalyticsCode: Option[String] =
+    Play.current.configuration.getString("ga.code")
 
 }
