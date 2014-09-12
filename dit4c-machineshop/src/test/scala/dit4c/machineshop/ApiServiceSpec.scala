@@ -51,6 +51,11 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
     }
 
+    override val images = new DockerImages {
+      override def list = ???
+      override def pull(imageName: String, tagName: String) = ???
+    }
+
     override val containers = new DockerContainers {
       override def create(name: String, image: DockerImage) = Future.successful({
         val newContainer =

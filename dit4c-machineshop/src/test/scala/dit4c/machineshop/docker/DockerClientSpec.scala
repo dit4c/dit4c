@@ -34,9 +34,27 @@ class DockerClientSpec extends Specification {
   def beRunning = beTrue ^^ ((_: DockerContainer).isRunning aka "is running")
   def beStopped = beRunning.not
 
+  def haveImageName(n: String) =
+    contain(beTypedEqualTo(n)) ^^ ((_:DockerImage).names aka "names")
+
+
   val image = "dit4c/dit4c-container-ipython"
 
   "DockerClient" >> {
+
+    "images" >> {
+      "pull and list" in {
+        withTape("DockerClient.images.pull") {
+          val client = newDockerClient
+          client.images.pull("busybox").await(Timeout(5, TimeUnit.MINUTES))
+        }
+        withTape("DockerClient.images.list") {
+          val client = newDockerClient
+          val images = client.images.list.await
+          images must contain(haveImageName("busybox:latest"))
+        }
+      }
+    }
 
     "containers" >> {
       "create" in {

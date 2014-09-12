@@ -23,7 +23,75 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
     spray.client.pipelining.sendReceive
 
+  override val images = ImagesImpl
   override val containers = ContainersImpl
+
+  case class ImageImpl(
+      val id: String,
+      val names: Set[String]) extends DockerImage
+
+  object ImagesImpl extends DockerImages {
+
+    def list = {
+      import spray.httpx.ResponseTransformation._
+
+      def parseJsonResponse: HttpResponse => List[DockerImage] = { res =>
+        import spray.json._
+        import DefaultJsonProtocol._
+
+        for {
+          obj <- JsonParser(res.entity.asString).convertTo[List[JsObject]]
+          dockerImage = obj match {
+            case JsObject(fields) =>
+              ImageImpl(
+                  fields("Id").convertTo[String],
+                  fields("RepoTags").convertTo[Set[String]]
+                    .filter(_ != "<none>:<none>"))
+          }
+          namedImage <- Some(dockerImage).filter(!_.names.isEmpty)
+        } yield namedImage
+      }
+
+      val pipeline: HttpRequest => Future[Seq[DockerImage]] =
+        sendAndReceive ~>
+        logResponse(log, Logging.DebugLevel) ~>
+        parseJsonResponse
+
+      pipeline({
+        import spray.httpx.RequestBuilding._
+        Get(baseUrl + "images/json")
+      })
+    }
+
+    def pull(imageName: String, tagName: String) = {
+      import spray.httpx.ResponseTransformation._
+
+      def urlEncode(s: String) = java.net.URLEncoder.encode(s, "utf-8")
+
+      def parseResponse: HttpResponse => Unit = { res =>
+        res.status match {
+          case StatusCodes.InternalServerError =>
+            throw new Exception(
+                "Pull failed due to server error:\n\n"+res.entity.asString)
+          case _: StatusCode =>
+            Unit
+        }
+      }
+
+      val pipeline: HttpRequest => Future[Unit] =
+        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+
+      pipeline({
+        import spray.httpx.RequestBuilding._
+        Post(baseUrl + ("images/create?fromImage=%s&tag=%s".format(
+          urlEncode(imageName), urlEncode(tagName)
+        )))
+      })
+    }
+
+  }
+
+
 
   class ContainerImpl(val id: String, val name: String, val status: ContainerStatus) extends DockerContainer {
 
