@@ -23,7 +23,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
 
-  implicit val timeout = Timeout(250.millis)
+  implicit val timeout = Timeout(750.millis)
 
   val AUTH_TOKEN_COOKIE = "dit4c-jwt"
 
