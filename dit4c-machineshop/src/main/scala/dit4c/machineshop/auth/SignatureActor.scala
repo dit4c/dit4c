@@ -97,7 +97,7 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
       }
     } else {
       // It's a file, so fetch directly
-      future {
+      Future {
         try {
           val fileInput = new FileInputStream(publicKeySource.getPath())
           val content = scala.io.Source.fromInputStream(fileInput).mkString

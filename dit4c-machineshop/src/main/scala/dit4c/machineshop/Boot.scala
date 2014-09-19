@@ -11,14 +11,6 @@ import java.util.concurrent.TimeUnit
 
 object Boot extends App {
 
-  override def main(args: Array[String]) {
-    ArgParser.parse(args, Config()) map { config =>
-      start(config)
-    } getOrElse {
-      // arguments are bad, error message will have been displayed
-    }
-  }
-
   def start(config: Config) {
     // we need an ActorSystem to host our application in
     implicit val system = ActorSystem("on-spray-can")
@@ -32,6 +24,12 @@ object Boot extends App {
     IO(Http) ? Http.Bind(service,
         interface = config.interface,
         port = config.port)
+  }
+  
+  ArgParser.parse(args, Config()) map { config =>
+    start(config)
+  } getOrElse {
+    // arguments are bad, error message will have been displayed
   }
 
 }
@@ -79,7 +77,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
       c.copy(serverId = sha1(readFileBytes(file)))
     }
     .validate { file =>
-      if (file.isFile) Right() else Left("server ID file must exist")
+      if (file.isFile) Right(()) else Left("server ID file must exist")
     }
     .text("file containing seed data for server ID")
   checkConfig { c =>
