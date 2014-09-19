@@ -42,6 +42,14 @@ class ApplicationSpec
         call.method must_== "GET"
         call.url must_== "/login"
       }
+      
+      "waiting" >> {
+        val call = controllers.routes.Application.waiting(
+          "https", "example.test", "foo?a=1&b=2")
+        call.method must_== "GET"
+        call.url must_== "/waiting/https/example.test/foo?a=1&b=2"
+      }
+      
     }
 
     "send 404 on a bad request" in new WithApplication(fakeApp) {

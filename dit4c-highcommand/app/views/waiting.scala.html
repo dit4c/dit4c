@@ -1,9 +1,10 @@
+@(targetHref: java.net.URL)
 <html>
 <script>
   setTimeout(function() {
     document.getElementById("retrying").innerHTML = "Retrying";
     setTimeout(function() {
-      window.location.reload();
+      window.location.href = '@Html(JavaScript(targetHref.toString).toString)';
     }, 500);
   }, 4500);
 </script>
