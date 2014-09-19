@@ -30,7 +30,7 @@ class SignatureVerifier(publicKeys: JWKSet) {
           info.algorithm.update(info.signingString(request).getBytes)
           // Perform the validation
           if (info.algorithm.verify(info.signature)) {
-            Right()
+            Right(())
           } else {
             Left("HTTP Signature was invalid.")
           }
