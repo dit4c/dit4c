@@ -62,6 +62,34 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       }
     }
 
+    "create containers" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
+      val controller = getMockedController
+      val keyDao = new KeyDAO(db)
+      val key = keyDao.create("localhost.localdomain",512)
+      val computeNodeDao = new ComputeNodeDAO(db, keyDao)
+      val containerDao = new ContainerDAO(db)
+      val computeNode = 
+        await(computeNodeDao.create(
+            session.user, "Local", "fakeid", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
+      val badRequestResponse  = 
+        controller.create(session.newRequest[JsValue](Json.obj(
+          "name"->"",
+          "image" -> "test",
+          "computeNodeId"->computeNode.id,
+          "active"->true))) 
+      status(badRequestResponse) must_== 400
+      val okResponse  = 
+        controller.create(session.newRequest[JsValue](Json.obj(
+          "name"->"test",
+          "image" -> "test",
+          "computeNodeId"->computeNode.id,
+          "active"->true))) 
+      status(okResponse) must_== 201
+    }
+
     "check names for new containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
       val controller = getMockedController

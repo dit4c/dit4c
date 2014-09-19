@@ -5,7 +5,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 import models.UserDAO
 import play.api.mvc.AnyContentAsEmpty
-import play.api.test.FakeRequest
+import play.api.test.{FakeHeaders, FakeRequest}
 import providers.auth.Identity
 import providers.db.CouchDB
 import org.specs2.matcher.ConcurrentExecutionContext
@@ -30,6 +30,10 @@ trait SpecUtils extends ConcurrentExecutionContext {
 
     def newRequest: FakeRequest[AnyContentAsEmpty.type] = {
       FakeRequest().withSession("userId" -> user.id)
+    }
+    
+    def newRequest[A](body: A): FakeRequest[A] = {
+      FakeRequest[A]("GET", "", FakeHeaders(), body).withSession("userId" -> user.id)
     }
   }
 

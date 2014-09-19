@@ -40,33 +40,38 @@ class ContainerController @Inject() (
     val image = (json \ "image").as[String]
     val computeNodeId = (json \ "computeNodeId").as[String]
     val shouldBeActive = (json \ "active").as[Boolean]
-    val fNode: Future[Option[ComputeNode]] =
-      for {
-        nodes <- computeNodeDao.get(computeNodeId)
-        node = nodes.find(_.usableBy(request.user))
-      } yield node
-
-    fNode.flatMap {
-      case None => Future.successful(BadRequest("Invalid compute node."))
-      case Some(node) =>
+    
+    if (name.isEmpty) {
+      Future.successful(BadRequest("Name cannot be blank."))
+    } else {
+      val fNode: Future[Option[ComputeNode]] =
         for {
-          container <- containerDao.create(request.user, name, image, node)
-          p <- cnpHelper.creator(container)
-          _ <- HipacheInterface.put(container, node)
-          cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
-          result = Created(Json.obj(
-            "id" -> container.id,
-            "name" -> container.name,
-            "computeNodeId" -> container.computeNodeId,
-            "image" -> container.image,
-            "active" -> cnContainer.active
-          ))
-          resultWithJwt <- result.withUpdatedJwt(request.user)
-        } yield resultWithJwt
-    }.recover {
-      case e: java.net.ConnectException =>
-        Logger.warn(e.getMessage)
-        InternalServerError("Unable to contact compute node.")
+          nodes <- computeNodeDao.get(computeNodeId)
+          node = nodes.find(_.usableBy(request.user))
+        } yield node
+
+      fNode.flatMap {
+        case None => Future.successful(BadRequest("Invalid compute node."))
+        case Some(node) =>
+          for {
+            container <- containerDao.create(request.user, name, image, node)
+            p <- cnpHelper.creator(container)
+            _ <- HipacheInterface.put(container, node)
+            cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
+            result = Created(Json.obj(
+              "id" -> container.id,
+              "name" -> container.name,
+              "computeNodeId" -> container.computeNodeId,
+              "image" -> container.image,
+              "active" -> cnContainer.active
+            ))
+            resultWithJwt <- result.withUpdatedJwt(request.user)
+          } yield resultWithJwt
+      }.recover {
+        case e: java.net.ConnectException =>
+          Logger.warn(e.getMessage)
+          InternalServerError("Unable to contact compute node.")
+      }
     }
   }
 
