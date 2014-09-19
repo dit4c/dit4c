@@ -45,9 +45,9 @@ class ApplicationSpec
       
       "waiting" >> {
         val call = controllers.routes.Application.waiting(
-          "https", "example.test", "foo?a=1&b=2")
+          "https", "example.test", "foo")
         call.method must_== "GET"
-        call.url must_== "/waiting/https/example.test/foo?a=1&b=2"
+        call.url must_== "/waiting/https/example.test/foo"
       }
       
     }
@@ -56,10 +56,20 @@ class ApplicationSpec
       route(FakeRequest(GET, "/boum")) must beNone
     }
 
-    "index page to Ember app" in new WithApplication(fakeApp) {
+    "index page" in new WithApplication(fakeApp) {
       val home = route(FakeRequest(GET, "/")).get
 
       status(home) must_== 200
+    }
+    
+    "waiting" in new WithApplication(fakeApp) {
+      val urlStr = "/waiting/https/example.test/foo?a=1&b=2"
+      val waiting = route(FakeRequest(GET, urlStr)
+        .withHeaders("Accept" -> "text/html"))
+        .get
+
+      status(waiting) must_== 200
+      contentAsString(waiting) must contain("https://example.test/foo?a=1&b=2")
     }
 
     "callback" in new WithApplication(fakeApp) {

@@ -21,7 +21,8 @@ class Application @Inject() (authProviders: AuthProviders)
 
   def waiting(scheme: String, host: String, uri: String) =
     Action.async { implicit request =>
-      val url = new java.net.URL(scheme, host, "/" + uri)
+      val url = new java.net.URL(
+        scheme, host, "/" + uri + Option(request.rawQueryString).filter(!_.isEmpty).map("?"+_).getOrElse(""))
       request.acceptedTypes match {
         // HTML should get waiting HTML page which refreshes with JavaScript
         case range :: _ if Accepts.Html.unapply(range) =>
