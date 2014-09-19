@@ -23,7 +23,7 @@ trait SignatureCheckerProvider {
       }
     } else {
       // It's a file, so fetch directly
-      future {
+      Future {
         try {
           val fileInput = new FileInputStream(publicKeyLocation.getPath())
           new SignatureChecker(KeyLoader(fileInput))

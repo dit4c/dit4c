@@ -33,7 +33,7 @@ class SignatureChecker(val publicKeys: Iterable[RSAPublicKey]) {
   // If any verifier succeeds, then they all have
   def apply(jws: SignedJWT): Either[String, Unit] =
     if (verifiers.exists(f => f(jws)))
-      Right()
+      Right(())
     else
       Left(s"Signature failed verification for all public keys: ${jws.serialize}")
 }

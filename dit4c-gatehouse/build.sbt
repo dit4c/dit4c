@@ -3,24 +3,24 @@ import DockerKeys._
 
 name := "dit4c-gatehouse"
 
-scalaVersion  := "2.10.4" // Stuck until spray-json updates
+scalaVersion  := "2.11.2" // Stuck until spray-json updates
 
 crossScalaVersions := Nil
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaV = "2.3.0"
+  val akkaV = "2.3.5"
   val sprayV = "1.3.1"
   Seq(
-    "io.spray"            %   "spray-can"       % sprayV,
-    "io.spray"            %   "spray-client"    % sprayV,
+    "io.spray"            %%  "spray-can"       % sprayV,
+    "io.spray"            %%  "spray-client"    % sprayV,
     "io.spray"            %%  "spray-json"      % "1.2.6",
-    "io.spray"            %   "spray-routing"   % sprayV,
-    "io.spray"            %   "spray-testkit"   % sprayV  % "test",
+    "io.spray"            %%  "spray-routing"   % sprayV,
+    "io.spray"            %%  "spray-testkit"   % sprayV  % "test",
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
-    "org.specs2"          %%  "specs2-core"     % "2.3.7" % "test",
+    "org.specs2"          %%  "specs2-core"     % "2.4.2" % "test",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0"
   )

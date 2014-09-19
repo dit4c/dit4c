@@ -10,15 +10,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 object Boot extends App {
-
-  override def main(args: Array[String]) {
-    ArgParser.parse(args, Config()) map { config =>
-      start(config)
-    } getOrElse {
-      // arguments are bad, error message will have been displayed
-    }
-  }
-
+  
   def start(config: Config) {
     // we need an ActorSystem to host our application in
     implicit val system = ActorSystem("on-spray-can")
@@ -33,6 +25,12 @@ object Boot extends App {
         interface = config.interface,
         port = config.port)
   }
+ 
+   ArgParser.parse(args, Config()) map { config =>
+     start(config)
+   } getOrElse {
+     // arguments are bad, error message will have been displayed
+   }
 
 }
 

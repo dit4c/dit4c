@@ -16,7 +16,7 @@ class AuthorizationChecker {
           val authorizedContainers =
             list.asInstanceOf[java.util.List[String]].toList.toSet[String]
           if (authorizedContainers.contains(containerName))
-            Right()
+            Right(())
           else
             Left("Container not present in authorization list")
         case notAList: Object =>
