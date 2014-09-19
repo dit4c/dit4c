@@ -20,6 +20,7 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 # Home page
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
+GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
 
 # Compute Nodes

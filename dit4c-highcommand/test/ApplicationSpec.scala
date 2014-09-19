@@ -63,13 +63,15 @@ class ApplicationSpec
     }
     
     "waiting" in new WithApplication(fakeApp) {
-      val urlStr = "/waiting/https/example.test/foo?a=1&b=2"
-      val waiting = route(FakeRequest(GET, urlStr)
-        .withHeaders("Accept" -> "text/html"))
-        .get
-
-      status(waiting) must_== 200
-      contentAsString(waiting) must contain("https://example.test/foo?a=1&b=2")
+      Seq("", "foo", "foo?a=1&b=2").foreach { path =>
+        val urlStr = s"/waiting/https/example.test/$path"
+        val waiting = route(FakeRequest(GET, urlStr)
+          .withHeaders("Accept" -> "text/html"))
+          .get
+  
+        status(waiting) must_== 200
+        contentAsString(waiting) must contain(s"https://example.test/$path")
+      }
     }
 
     "callback" in new WithApplication(fakeApp) {
