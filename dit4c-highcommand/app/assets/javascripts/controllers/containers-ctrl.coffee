@@ -4,6 +4,7 @@ define(['./module'], (controllers) ->
   controllers.controller('ContainersCtrl', ($scope, $route, $http, $location, $filter) ->
     $scope.images = [
       { value: "dit4c/dit4c-container-base", label: "Base" },
+      { value: "dit4c/dit4c-container-ijulia", label: "IJulia" },
       { value: "dit4c/dit4c-container-ipython", label: "iPython" },
       { value: "dit4c/dit4c-container-rstudio", label: "RStudio" }
     ]
