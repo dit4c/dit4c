@@ -12,7 +12,10 @@ scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 libraryDependencies ++= {
   val akkaV = "2.3.5"
   val sprayV = "1.3.1"
+  val scalaioV = "0.4.3-1"
   Seq(
+    "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
+    "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
     "io.spray"            %%  "spray-can"       % sprayV,
     "io.spray"            %%  "spray-client"    % sprayV,
     "io.spray"            %%  "spray-json"      % "1.2.6",
