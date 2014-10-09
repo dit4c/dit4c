@@ -14,27 +14,30 @@ class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
 
   if (!backingFile.exists) {
     backingFile.createFile()
-    write(Set.empty)
+    write(Map.empty)
   }
 
   def +=(image: KnownImage): KnownImages = {
-    write(read + image)
+    write(read + (image.displayName -> image))
     this
   }
 
   def -=(image: KnownImage): KnownImages = {
-    write(read - image)
+    write(read - image.displayName)
     this
   }
 
-  def iterator = read.toIterator
+  def iterator = read.values.toList.sortBy(_.displayName).toIterator
 
-  private def write(images: Set[KnownImage]) = {
+  private def write(imageMap: Map[String,KnownImage]) = {
+    val images = imageMap.values
     backingFile.outputStream().write(images.toJson.prettyPrint)
   }
 
-  private def read: Set[KnownImage] = {
-    backingFile.inputStream().string.parseJson.convertTo[Set[KnownImage]]
+  private def read: Map[String,KnownImage] = {
+    val images =
+      backingFile.inputStream().string.parseJson.convertTo[List[KnownImage]]
+    images.map(i => (i.displayName -> i)).toMap
   }
 
 }

@@ -30,8 +30,22 @@ class KnownImagesSpec extends Specification {
       knownImages must beEmpty
       knownImages += KnownImage("test", "dit4c/test")
       knownImages must haveSize(1)
+
       knownImages.head.displayName must_== "test"
       knownImages.head.tagName must_== "dit4c/test"
+
+      {
+        import spray.json._
+        import DefaultJsonProtocol._
+        val l = file.inputStream().string
+          .parseJson.convertTo[List[Map[String,String]]]
+        l.head("displayName") must_== "test"
+        l.head("tagName") must_== "dit4c/test"
+      }
+
+
+
+
       knownImages -= knownImages.head
       knownImages must beEmpty
     }
