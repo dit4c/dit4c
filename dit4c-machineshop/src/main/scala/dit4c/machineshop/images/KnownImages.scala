@@ -1,4 +1,4 @@
-package dit4c.machineshop.models
+package dit4c.machineshop.images
 
 import scalax.file.Path
 

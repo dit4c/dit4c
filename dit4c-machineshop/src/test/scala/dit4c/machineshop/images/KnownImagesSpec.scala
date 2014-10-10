@@ -1,7 +1,9 @@
-package dit4c.machineshop.models
+package dit4c.machineshop.images
 
 import java.util.concurrent.TimeUnit
+
 import org.specs2.mutable.Specification
+
 import akka.util.Timeout
 import scalax.file.FileSystem
 import scalax.file.ramfs.RamFileSystem
@@ -42,9 +44,6 @@ class KnownImagesSpec extends Specification {
         l.head("displayName") must_== "test"
         l.head("tagName") must_== "dit4c/test"
       }
-
-
-
 
       knownImages -= knownImages.head
       knownImages must beEmpty
