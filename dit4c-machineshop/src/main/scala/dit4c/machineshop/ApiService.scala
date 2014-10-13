@@ -12,6 +12,7 @@ import MediaTypes._
 import scala.collection.JavaConversions._
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerContainer
+import dit4c.machineshop.images._
 import scala.util._
 import spray.httpx.marshalling.Marshaller
 import spray.httpx.marshalling.ToResponseMarshaller
@@ -26,16 +27,18 @@ import shapeless.HNil
 class ApiService(
     arf: ActorRefFactory,
     client: DockerClient,
+    imageMonitor: ActorRef,
     signatureActor: Option[ActorRef]) extends HttpService with RouteProvider {
   import scala.concurrent.duration._
+  import dit4c.machineshop.images.ImageMonitoringActor._
 
   implicit val timeout = Timeout(10.seconds)
 
   import dit4c.machineshop.auth.SignatureActor._
   import scala.concurrent.ExecutionContext.Implicits.global
   import ApiService.NewContainerRequest
+  import ApiService.NewImageRequest
   import ApiService.marshallers._
-  import ApiService.marshallers.newContainerRequestUnmarshaller
 
   implicit val actorRefFactory = arf
 
@@ -140,6 +143,37 @@ class ApiService(
           }
         }
       }
+    } ~
+    pathPrefix("images") {
+      pathEndOrSingleSlash {
+        get {
+          onSuccess(imageMonitor ? ListImages()) {
+            case ImageList(images) =>
+              complete {
+                images
+              }
+          }
+        }
+      } ~
+      path("new") {
+        post {
+          entity(as[NewImageRequest]) { nir =>
+            signatureCheck {
+              val addReq = AddImage(nir.displayName, nir.repository, nir.tag)
+              onSuccess(imageMonitor ? addReq) {
+                case AddingImage(image) =>
+                  respondWithStatus(StatusCodes.Created) {
+                    complete(image)
+                  }
+                case ConflictingImages(images) =>
+                  respondWithStatus(StatusCodes.Conflict) {
+                    complete(images)
+                  }
+              }
+            }
+          }
+        }
+      }
     }
 
 }
@@ -147,15 +181,23 @@ class ApiService(
 object ApiService {
 
   case class NewContainerRequest(val name: String, val image: String)
+  
+  case class NewImageRequest(
+    val displayName: String,
+    val repository: String,
+    val tag: String)
 
   def apply(
         client: DockerClient,
+        imageMonitor: ActorRef,
         signatureActor: Option[ActorRef]
       )(implicit actorRefFactory: ActorRefFactory) =
-    new ApiService(actorRefFactory, client, signatureActor)
+    new ApiService(actorRefFactory, client, imageMonitor, signatureActor)
 
   object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
     implicit val newContainerRequestReader = jsonFormat2(NewContainerRequest)
+    implicit val newImageRequestReader = jsonFormat3(NewImageRequest)
+    implicit val knownImageFormatter = jsonFormat3(KnownImage)
 
     implicit val containerWriter = new RootJsonWriter[DockerContainer] {
       def write(c: DockerContainer) = {
@@ -170,15 +212,29 @@ object ApiService {
       def write(cs: Seq[DockerContainer]) =
         JsArray(cs.map(containerWriter.write(_)).toSeq: _*)
     }
+    
+    implicit val knownImagesWriter = new RootJsonWriter[Seq[KnownImage]] {
+      def write(cs: Seq[KnownImage]) =
+        JsArray(cs.map(knownImageFormatter.write(_)).toSeq: _*)
+    }
 
     implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
       fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader)))
+    
+    implicit val newImageRequestUnmarshaller: FromRequestUnmarshaller[NewImageRequest] =
+      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newImageRequestReader)))
 
     implicit val containerJsonMarshaller: ToResponseMarshaller[DockerContainer] =
       sprayJsonMarshaller(containerWriter)
 
     implicit val containersJsonMarshaller: ToResponseMarshaller[Seq[DockerContainer]] =
       sprayJsonMarshaller(containersWriter)
+      
+    implicit val imageJsonMarshaller: ToResponseMarshaller[KnownImage] =
+      sprayJsonMarshaller(knownImageFormatter)
+      
+    implicit val imagesJsonMarshaller: ToResponseMarshaller[Seq[KnownImage]] =
+      sprayJsonMarshaller(knownImagesWriter)
 
   }
 

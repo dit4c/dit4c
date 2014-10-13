@@ -9,13 +9,16 @@ import StatusCodes._
 import spray.routing.HttpService
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models._
+import dit4c.machineshop.images._
 import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import dit4c.machineshop.auth.SignatureActor
 import akka.testkit.TestProbe
 import akka.testkit.TestActor
+import scala.util.Random
+import scalax.file.ramfs.RamFileSystem
 
 class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService {
   implicit val actorRefFactory = system
@@ -23,8 +26,12 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
   import spray.util.pimpFuture
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
+  def ephemeralKnownImages = new KnownImages(
+    RamFileSystem().fromString("/known_images.json"))
+  
   def mockDockerClient = new DockerClient {
     var containerList: Seq[DockerContainer] = Nil
+    var imageList: Seq[DockerImage] = Nil
 
     case class MockDockerContainer(
         val id: String,
@@ -50,10 +57,19 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         changed
       }
     }
+    
+    case class MockDockerImage(
+        val id: String,
+        val names: Set[String]) extends DockerImage
 
     override val images = new DockerImages {
-      override def list = ???
-      override def pull(imageName: String, tagName: String) = ???
+      override def list = Future.successful(imageList)
+      override def pull(imageName: String, tagName: String) =
+        Future.successful({
+          imageList = imageList ++ Seq(MockDockerImage(
+            Random.nextString(20),
+            Set(s"$imageName:$tagName")))
+        })
     }
 
     override val containers = new DockerContainers {
@@ -63,7 +79,6 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         containerList = containerList ++ Seq(newContainer)
         newContainer
       })
-
       override def list = Future.successful(containerList)
     }
   }
@@ -83,8 +98,14 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
 
   val image = "dit4c/dit4c-container-ipython"
 
-  def route(implicit client: DockerClient, signatureActor: Option[ActorRef] = None) =
-    ApiService(client, signatureActor).route
+  def route(implicit
+      client: DockerClient,
+      knownImages: KnownImages = ephemeralKnownImages,
+      signatureActor: Option[ActorRef] = None) = {
+    val imageMonitor = actorRefFactory.actorOf(
+        Props(classOf[ImageMonitoringActor], knownImages, client))
+    ApiService(client, imageMonitor, signatureActor).route
+  }
 
   "ApiService" should {
 
@@ -146,13 +167,14 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       val client = mockDockerClient
+      val knownImages = ephemeralKnownImages
       client.containers.list.await must beEmpty
       val requestJson = JsObject(
           "name" -> JsString("foobar"),
           "image" -> JsString(image))
       // Check a challenge is issued
       Post("/containers/new", requestJson) ~>
-          route(client, Some(mockSignatureActor(
+          route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessDenied("Just 'cause")))) ~>
           check {
         status must_== StatusCodes.Unauthorized
@@ -166,7 +188,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       // Check that signature failure works
       Post("/containers/new", requestJson) ~>
           addHeader(authHeader) ~>
-          route(client, Some(mockSignatureActor(
+          route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessDenied("Just 'cause")))) ~>
           check {
         status must_== StatusCodes.Forbidden
@@ -174,7 +196,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       client.containers.list.await must beEmpty
       Post("/containers/new", requestJson) ~>
           addHeader(authHeader) ~>
-          route(client, Some(mockSignatureActor(
+          route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessGranted))) ~>
           check {
         contentType must_== ContentTypes.`application/json`
@@ -194,7 +216,6 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       Delete("/containers/foobar") ~> route ~> check {
         status must_== StatusCodes.NoContent
       }
-      client.containers.list.await must beEmpty
     }
 
     "start containers with POST requests to /containers/:name/start" in {
@@ -232,5 +253,26 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         responseAs[String] === "HTTP method not allowed, supported methods: GET"
       }
     }
+    
+    "create new known image with POST requests to /images/new" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      implicit val client = mockDockerClient
+      client.images.list.await must beEmpty
+      val requestJson = JsObject(
+          "displayName" -> JsString("BusyBox"),
+          "repository" -> JsString("busybox"),
+          "tag" -> JsString("latest"))
+      Post("/images/new", requestJson) ~> route ~> check {
+        contentType must_== ContentTypes.`application/json`
+        val json = JsonParser(responseAs[String]).convertTo[JsObject]
+        json.fields("displayName").convertTo[String] must_== "BusyBox"
+        json.fields("repository").convertTo[String] must_== "busybox"
+        json.fields("tag").convertTo[String] must_== "latest"
+      }
+      client.images.list.await must haveSize(1)
+    }
+    
   }
 }
