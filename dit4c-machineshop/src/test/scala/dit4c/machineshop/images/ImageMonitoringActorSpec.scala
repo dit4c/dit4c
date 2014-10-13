@@ -1,0 +1,137 @@
+package dit4c.machineshop.images
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
+import org.specs2.mutable.Specification
+import akka.util.Timeout
+import akka.testkit.TestActorRef
+import dit4c.machineshop.docker.DockerClient
+import scalax.file.ramfs.RamFileSystem
+import dit4c.machineshop.docker.models.DockerImages
+import akka.actor.ActorSystem
+import dit4c.machineshop.docker.models.DockerContainers
+import akka.pattern.ask
+import scala.concurrent.Future
+import scala.util.Success
+import org.specs2.mock._
+import java.util.UUID
+import dit4c.machineshop.docker.models._
+import scala.util.Random.shuffle
+import scala.concurrent.Await.result
+
+class ImageMonitoringActorSpec extends Specification with Mockito {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+  implicit val system = ActorSystem()
+  implicit val timeoutDuration = new FiniteDuration(5, TimeUnit.SECONDS)
+  implicit val timeout = Timeout(timeoutDuration)
+
+  import ImageMonitoringActor._
+
+  "ImageMonitoringActor" >> {
+
+    "adds images" >> {
+      val actorRef = newActor
+
+      val future = actorRef ? AddImage("Fedora", "fedora", "20")
+      future.value.get must_== Success(
+        AddingImage(KnownImage("Fedora", "fedora", "20")))
+    }
+    
+    "declines duplicate images" >> {
+      val knownImages = ephemeralKnownImages
+      val actorRef = newActor(knownImages)
+      knownImages += KnownImage("Fedora", "fedora", "20")
+
+      {
+        val future = actorRef ? AddImage("Fedora 20", "fedora", "20")
+        future.value.get must_== Success(
+          ConflictingImages(Seq(KnownImage("Fedora", "fedora", "20"))))
+      }
+        
+      {
+        val future = actorRef ? AddImage("Fedora", "fedora", "latest")
+        future.value.get must_== Success(
+          ConflictingImages(Seq(KnownImage("Fedora", "fedora", "20"))))
+      }
+    }
+    
+    "pulls images" >> {
+      val knownImages = ephemeralKnownImages
+      val dockerClient = spy(new MockDockerClient(knownImages))
+      val actorRef = newActor(knownImages, dockerClient)
+      knownImages += KnownImage("Fedora", "fedora", "20")
+
+      val future = actorRef ? PullImage("fedora", "20")
+      future.value.get must_== Success(
+        PullingImage(KnownImage("Fedora", "fedora", "20")))
+      
+      there was one(dockerClient.images).pull("fedora", "20")
+    }
+    
+    "lists images" >> {
+      val knownImages = ephemeralKnownImages
+      val actorRef = newActor(knownImages)
+      val images = Seq(
+        KnownImage("CentOS", "centos", "centos7"),
+        KnownImage("Fedora 19", "fedora", "19"),
+        KnownImage("Fedora 20", "fedora", "20"))
+      shuffle(images).foreach(knownImages += _)
+
+      val future = actorRef ? ListImages()
+      result(future, timeoutDuration) must_== ImageList(images)
+    }
+    
+    "removes images" >> {
+      val knownImages = ephemeralKnownImages
+      val actorRef = newActor(knownImages)
+      knownImages += KnownImage("Fedora", "fedora", "20")
+
+      val future = actorRef ? RemoveImage("fedora", "20")
+      future.value.get must_== Success(
+        RemovingImage(KnownImage("Fedora", "fedora", "20")))
+    }
+
+  }
+
+  def newActor: TestActorRef[ImageMonitoringActor] =
+    newActor(ephemeralKnownImages)
+
+  def newActor(knownImages: KnownImages): TestActorRef[ImageMonitoringActor] =
+    newActor(knownImages, new MockDockerClient(knownImages))
+
+  def newActor(
+      knownImages: KnownImages,
+      dockerClient: DockerClient): TestActorRef[ImageMonitoringActor] =
+    TestActorRef(new ImageMonitoringActor(knownImages, dockerClient))
+
+  def ephemeralKnownImages =
+    new KnownImages(RamFileSystem().fromString("/known_images.json"))
+
+  class MockDockerClient(knownImages: KnownImages) extends DockerClient {
+    override val images = spy(new MockDockerImages(knownImages))
+    override val containers = spy(new MockDockerContainers)
+  }
+  
+  class MockDockerImages(knownImages: KnownImages) extends DockerImages {
+    class MockDockerImage(val id: String, val names: Set[String])
+      extends DockerImage
+    
+    override def list = Future.successful(knownImages.map { image =>
+      spy(new MockDockerImage(UUID.randomUUID.toString, Set(
+        s"${image.repository}:${image.tag}"
+      ))).asInstanceOf[DockerImage]
+    }.toSeq)
+    
+    override def pull(imageName: String, tagName: String) =
+      Future.successful(())
+  }
+  
+  class MockDockerContainers extends DockerContainers {
+    override def create(name: String, image: String) = ???
+    override def list = ???
+  }
+  
+}
+
+

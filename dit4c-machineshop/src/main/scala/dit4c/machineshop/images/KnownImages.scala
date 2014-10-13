@@ -4,42 +4,47 @@ import scalax.file.Path
 
 class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
 
+  type ImageRef = (String, String)
+
   import spray.json._
 
   object KnownImageProtocol extends DefaultJsonProtocol {
-    implicit val knownImageFormat = jsonFormat2(KnownImage)
+    implicit val knownImageFormat = jsonFormat3(KnownImage)
   }
 
   import KnownImageProtocol._
 
   if (!backingFile.exists) {
     backingFile.createFile()
-    write(Map.empty)
+    write(Set.empty)
   }
 
   def +=(image: KnownImage): KnownImages = {
-    write(read + (image.displayName -> image))
+    write(read + image)
     this
   }
 
   def -=(image: KnownImage): KnownImages = {
-    write(read - image.displayName)
+    write(read - image)
     this
   }
 
-  def iterator = read.values.toList.sortBy(_.displayName).toIterator
+  def iterator = read.toList.sortBy(_.displayName).toIterator
 
-  private def write(imageMap: Map[String,KnownImage]) = {
-    val images = imageMap.values
+  private def write(images: Set[KnownImage]) = {
     backingFile.outputStream().write(images.toJson.prettyPrint)
   }
 
-  private def read: Map[String,KnownImage] = {
+  private def read: Set[KnownImage] = {
     val images =
       backingFile.inputStream().string.parseJson.convertTo[List[KnownImage]]
-    images.map(i => (i.displayName -> i)).toMap
+    images.toSet
   }
 
 }
 
-case class KnownImage(displayName: String, tagName: String)
+case class KnownImage(displayName: String, repository: String, tag: String) {
+  
+  def ref = (repository, tag)
+  
+}

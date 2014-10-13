@@ -30,11 +30,12 @@ class KnownImagesSpec extends Specification {
       val knownImages = new KnownImages(file)
 
       knownImages must beEmpty
-      knownImages += KnownImage("test", "dit4c/test")
+      knownImages += KnownImage("test", "dit4c/test", "latest")
       knownImages must haveSize(1)
 
       knownImages.head.displayName must_== "test"
-      knownImages.head.tagName must_== "dit4c/test"
+      knownImages.head.repository  must_== "dit4c/test"
+      knownImages.head.tag         must_== "latest"
 
       {
         import spray.json._
@@ -42,7 +43,8 @@ class KnownImagesSpec extends Specification {
         val l = file.inputStream().string
           .parseJson.convertTo[List[Map[String,String]]]
         l.head("displayName") must_== "test"
-        l.head("tagName") must_== "dit4c/test"
+        l.head("repository")  must_== "dit4c/test"
+        l.head("tag")         must_== "latest"
       }
 
       knownImages -= knownImages.head
