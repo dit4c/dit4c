@@ -49,6 +49,14 @@ class ApiService(
         case None => complete(StatusCodes.NotFound)
       }
     }
+    
+  def withImage(id: String)(f: KnownImage => RequestContext => Unit) =
+    onSuccess(imageMonitor ? ListImages()) {
+      case ImageList(images) => images.find(_.id == id) match {
+        case Some(c) => f(c)
+        case None => complete(StatusCodes.NotFound)
+      }
+    }
 
   def signatureCheck: Directive0 =
     signatureActor
@@ -169,6 +177,24 @@ class ApiService(
                   respondWithStatus(StatusCodes.Conflict) {
                     complete(images)
                   }
+              }
+            }
+          }
+        }
+      } ~
+      path("[a-f0-9]+".r) { (id: String) =>
+        get {
+          withImage(id) { image =>
+            complete(image)
+          }
+        } ~
+        delete {
+          signatureCheck {
+            withImage(id) { image =>
+              val remReq = RemoveImage(image.repository, image.tag)
+              onSuccess(imageMonitor ? remReq) {
+                case _: RemovingImage => complete(StatusCodes.NoContent)
+                case _: UnknownImage => complete(StatusCodes.NotFound)
               }
             }
           }

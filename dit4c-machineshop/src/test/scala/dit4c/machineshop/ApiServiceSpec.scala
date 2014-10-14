@@ -275,5 +275,29 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       client.images.list.await must haveSize(1)
     }
     
+    "list images with GET request to /images" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      implicit val knownImages = ephemeralKnownImages
+      implicit val client = mockDockerClient
+      Get("/images") ~> route ~> check {
+        contentType must_== ContentTypes.`application/json`
+        val json = JsonParser(responseAs[String])
+        json must beAnInstanceOf[JsArray]
+        json.asInstanceOf[JsArray].elements must beEmpty
+      }
+      17.to(20).foreach { i =>
+        knownImages += KnownImage(s"Fedora $i", "fedora", i.toString)
+        client.images.pull("fedora", i.toString).await
+      }
+      Get("/images") ~> route ~> check {
+        contentType must_== ContentTypes.`application/json`
+        val json = JsonParser(responseAs[String])
+        json must beAnInstanceOf[JsArray]
+        json.asInstanceOf[JsArray].elements must haveSize(4)
+      }
+    }
+    
   }
 }
