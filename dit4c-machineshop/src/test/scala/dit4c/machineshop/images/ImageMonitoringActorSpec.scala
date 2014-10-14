@@ -60,9 +60,10 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       val knownImages = ephemeralKnownImages
       val dockerClient = spy(new MockDockerClient(knownImages))
       val actorRef = newActor(knownImages, dockerClient)
-      knownImages += KnownImage("Fedora", "fedora", "20")
+      val knownImage = KnownImage("Fedora", "fedora", "20")
+      knownImages += knownImage
 
-      val future = actorRef ? PullImage("fedora", "20")
+      val future = actorRef ? PullImage(knownImage.id)
       future.value.get must_== Success(
         PullingImage(KnownImage("Fedora", "fedora", "20")))
       
@@ -72,22 +73,33 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
     "lists images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
-      val images = Seq(
+      val knownImageList = IndexedSeq(
         KnownImage("CentOS", "centos", "centos7"),
         KnownImage("Fedora 19", "fedora", "19"),
         KnownImage("Fedora 20", "fedora", "20"))
-      shuffle(images).foreach(knownImages += _)
+      shuffle(knownImageList).foreach(knownImages += _)
 
       val future = actorRef ? ListImages()
-      result(future, timeoutDuration) must_== ImageList(images)
+      result(future, timeoutDuration) match {
+        case ImageList(images) => images.zipWithIndex.foreach {
+          case (image, i) =>
+            image.id          must beMatching("[a-z0-9]+")
+            image.displayName must_== knownImageList(i).displayName
+            image.repository  must_== knownImageList(i).repository
+            image.tag         must_== knownImageList(i).tag
+            image.metadata    must beSome
+        }
+      }
+      done
     }
     
     "removes images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
-      knownImages += KnownImage("Fedora", "fedora", "20")
+      val knownImage = KnownImage("Fedora", "fedora", "20")
+      knownImages += knownImage
 
-      val future = actorRef ? RemoveImage("fedora", "20")
+      val future = actorRef ? RemoveImage(knownImage.id)
       future.value.get must_== Success(
         RemovingImage(KnownImage("Fedora", "fedora", "20")))
     }

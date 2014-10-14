@@ -50,7 +50,7 @@ class ApiService(
       }
     }
     
-  def withImage(id: String)(f: KnownImage => RequestContext => Unit) =
+  def withImage(id: String)(f: Image => RequestContext => Unit) =
     onSuccess(imageMonitor ? ListImages()) {
       case ImageList(images) => images.find(_.id == id) match {
         case Some(c) => f(c)
@@ -190,12 +190,9 @@ class ApiService(
         } ~
         delete {
           signatureCheck {
-            withImage(id) { image =>
-              val remReq = RemoveImage(image.repository, image.tag)
-              onSuccess(imageMonitor ? remReq) {
-                case _: RemovingImage => complete(StatusCodes.NoContent)
-                case _: UnknownImage => complete(StatusCodes.NotFound)
-              }
+            onSuccess(imageMonitor ? RemoveImage(id)) {
+              case _: RemovingImage => complete(StatusCodes.NoContent)
+              case _: UnknownImage => complete(StatusCodes.NotFound)
             }
           }
         }
@@ -232,13 +229,20 @@ object ApiService {
         )
     }
     
-    implicit val knownImageWriter = new RootJsonWriter[KnownImage] {
-      def write(i: KnownImage) =
+    implicit val imageWriter = new RootJsonWriter[Image] {
+      def write(i: Image) =
         JsObject(
-          "id" -> JsString(i.id),
-          "displayName" -> JsString(i.displayName),
-          "repository" -> JsString(i.repository),
-          "tag" -> JsString(i.tag)
+          Map(
+            "id" -> JsString(i.id),
+            "displayName" -> JsString(i.displayName),
+            "repository" -> JsString(i.repository),
+            "tag" -> JsString(i.tag)
+          ) ++ (i.metadata match {
+            case Some(metadata) => Map("metadata" -> JsObject(
+              "id" -> JsString(i.id)
+            ))
+            case None => Map.empty
+          })
         )
     }
 
@@ -247,9 +251,9 @@ object ApiService {
         JsArray(cs.map(containerWriter.write(_)).toSeq: _*)
     }
     
-    implicit val knownImagesWriter = new RootJsonWriter[Seq[KnownImage]] {
-      def write(cs: Seq[KnownImage]) =
-        JsArray(cs.map(knownImageWriter.write(_)).toSeq: _*)
+    implicit val imagesWriter = new RootJsonWriter[Seq[Image]] {
+      def write(cs: Seq[Image]) =
+        JsArray(cs.map(imageWriter.write(_)).toSeq: _*)
     }
 
     implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
@@ -264,11 +268,11 @@ object ApiService {
     implicit val containersJsonMarshaller: ToResponseMarshaller[Seq[DockerContainer]] =
       sprayJsonMarshaller(containersWriter)
       
-    implicit val imageJsonMarshaller: ToResponseMarshaller[KnownImage] =
-      sprayJsonMarshaller(knownImageWriter)
+    implicit val imageJsonMarshaller: ToResponseMarshaller[Image] =
+      sprayJsonMarshaller(imageWriter)
       
-    implicit val imagesJsonMarshaller: ToResponseMarshaller[Seq[KnownImage]] =
-      sprayJsonMarshaller(knownImagesWriter)
+    implicit val imagesJsonMarshaller: ToResponseMarshaller[Seq[Image]] =
+      sprayJsonMarshaller(imagesWriter)
 
   }
 
