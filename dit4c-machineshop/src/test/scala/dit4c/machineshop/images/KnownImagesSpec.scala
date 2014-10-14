@@ -51,6 +51,18 @@ class KnownImagesSpec extends Specification {
       knownImages must beEmpty
     }
 
+    "images have IDs based on repository & tag" >> {
+      val kiId = Function.untupled((KnownImage.apply _).tupled.andThen(_.id))
+      
+      kiId("Fedora", "fedora", "20") must beMatching("[a-z0-9]+")
+      kiId("Foo", "foo/bar", "latest") must beMatching("[a-z0-9]+")
+      
+      kiId("Fedora 20", "fedora", "20") must_== kiId("Fedora", "fedora", "20")
+      kiId("Fedora", "fedora", "20") must_!= kiId("Fedora", "fedora", "latest")
+      
+      kiId("Foo", "foo/bar", "latest") must_== kiId("Bar", "foo/bar", "latest")
+      kiId("Foo", "foo/bar", "latest") must_!= kiId("Foo", "foo/baz", "latest")
+    }
 
   }
 }

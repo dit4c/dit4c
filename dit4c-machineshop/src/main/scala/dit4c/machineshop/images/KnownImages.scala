@@ -1,5 +1,6 @@
 package dit4c.machineshop.images
 
+import java.security.MessageDigest
 import scalax.file.Path
 
 class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
@@ -45,6 +46,13 @@ class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
 
 case class KnownImage(displayName: String, repository: String, tag: String) {
   
+  def id: String = asHex(digest(s"$repository:$tag"))
   def ref = (repository, tag)
+  
+  private def digest(text: String): Array[Byte] =
+    MessageDigest.getInstance("SHA-1").digest(text.getBytes("UTF-8"))
+    
+  private def asHex(bytes: Array[Byte]): String =
+    bytes.map("%02x" format _).mkString
   
 }

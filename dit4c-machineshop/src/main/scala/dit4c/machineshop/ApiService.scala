@@ -197,15 +197,23 @@ object ApiService {
   object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
     implicit val newContainerRequestReader = jsonFormat2(NewContainerRequest)
     implicit val newImageRequestReader = jsonFormat3(NewImageRequest)
-    implicit val knownImageFormatter = jsonFormat3(KnownImage)
 
     implicit val containerWriter = new RootJsonWriter[DockerContainer] {
-      def write(c: DockerContainer) = {
+      def write(c: DockerContainer) =
         JsObject(
           "name" -> JsString(c.name),
           "active" -> JsBoolean(c.isRunning)
         )
-      }
+    }
+    
+    implicit val knownImageWriter = new RootJsonWriter[KnownImage] {
+      def write(i: KnownImage) =
+        JsObject(
+          "id" -> JsString(i.id),
+          "displayName" -> JsString(i.displayName),
+          "repository" -> JsString(i.repository),
+          "tag" -> JsString(i.tag)
+        )
     }
 
     implicit val containersWriter = new RootJsonWriter[Seq[DockerContainer]] {
@@ -215,7 +223,7 @@ object ApiService {
     
     implicit val knownImagesWriter = new RootJsonWriter[Seq[KnownImage]] {
       def write(cs: Seq[KnownImage]) =
-        JsArray(cs.map(knownImageFormatter.write(_)).toSeq: _*)
+        JsArray(cs.map(knownImageWriter.write(_)).toSeq: _*)
     }
 
     implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
@@ -231,7 +239,7 @@ object ApiService {
       sprayJsonMarshaller(containersWriter)
       
     implicit val imageJsonMarshaller: ToResponseMarshaller[KnownImage] =
-      sprayJsonMarshaller(knownImageFormatter)
+      sprayJsonMarshaller(knownImageWriter)
       
     implicit val imagesJsonMarshaller: ToResponseMarshaller[Seq[KnownImage]] =
       sprayJsonMarshaller(knownImagesWriter)

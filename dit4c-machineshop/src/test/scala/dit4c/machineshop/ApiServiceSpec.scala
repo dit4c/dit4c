@@ -267,6 +267,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       Post("/images/new", requestJson) ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
+        json.fields("id").convertTo[String] must beMatching("[a-z0-9]+")
         json.fields("displayName").convertTo[String] must_== "BusyBox"
         json.fields("repository").convertTo[String] must_== "busybox"
         json.fields("tag").convertTo[String] must_== "latest"
