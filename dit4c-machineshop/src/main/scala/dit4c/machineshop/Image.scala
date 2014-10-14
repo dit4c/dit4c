@@ -1,5 +1,7 @@
 package dit4c.machineshop
 
+import java.util.Calendar
+
 trait Image {
   def id: String
   def displayName: String
@@ -10,4 +12,5 @@ trait Image {
 
 trait ImageMetadata {
   def id: String
+  def created: Calendar
 }

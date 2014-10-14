@@ -23,6 +23,8 @@ import spray.httpx.unmarshalling.UnmarshallerLifting
 import scala.concurrent.Future
 import akka.util.Timeout
 import shapeless.HNil
+import java.util.Calendar
+import java.text.SimpleDateFormat
 
 class ApiService(
     arf: ActorRefFactory,
@@ -229,6 +231,14 @@ object ApiService {
         )
     }
     
+    implicit val calendarWriter = new RootJsonWriter[Calendar] {
+      def write(c: Calendar) = {
+        val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'")
+        df.setTimeZone(c.getTimeZone)
+        JsString(df.format(c.getTime))
+      }
+    }
+    
     implicit val imageWriter = new RootJsonWriter[Image] {
       def write(i: Image) =
         JsObject(
@@ -239,7 +249,8 @@ object ApiService {
             "tag" -> JsString(i.tag)
           ) ++ (i.metadata match {
             case Some(metadata) => Map("metadata" -> JsObject(
-              "id" -> JsString(i.id)
+              "id" -> JsString(metadata.id),
+              "created" -> calendarWriter.write(metadata.created)
             ))
             case None => Map.empty
           })

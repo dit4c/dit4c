@@ -36,7 +36,7 @@ libraryDependencies ++= {
 
 fork := true
 
-javaOptions += "-Dfoo=bar"
+scalacOptions ++= Seq("-feature")
 
 // Set Jetty in Betamax to use java logging
 javaOptions += "-Dorg.eclipse.jetty.util.log.class=org.eclipse.jetty.util.log.JavaUtilLog"

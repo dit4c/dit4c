@@ -5,6 +5,7 @@ import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerImage
 import akka.actor.Actor
 import akka.event.Logging
+import java.util.Calendar
 
 class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
     extends Actor {
@@ -21,9 +22,10 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
                               knownImages.find(_.ref == (repository, tag))
       sender ! (conflictingImages match {
         case Nil =>
-          knownImages += KnownImage(displayName, repository, tag)
+          val newKnownImage = KnownImage(displayName, repository, tag)
+          knownImages += newKnownImage
           dockerClient.images.pull(repository, tag)
-          AddingImage(KnownImage(displayName, repository, tag))
+          AddingImage(new ImageImpl(newKnownImage))
         case images =>
           ConflictingImages(images.map(new ImageImpl(_)).toSeq)
       })
@@ -32,7 +34,7 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
       knownImages.find(i => i.id == id) match {
         case Some(knownImage: KnownImage) =>
           dockerClient.images.pull(knownImage.repository, knownImage.tag)
-          sender ! PullingImage(knownImage)
+          sender ! PullingImage(new ImageImpl(knownImage))
         case None =>
           sender ! UnknownImage(id)
       }
@@ -46,7 +48,7 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
         def imageMetadata(i: KnownImage): Option[ImageMetadata] = 
           dockerImages.find {
             _.names.exists(_ == i.repository+":"+i.tag)
-          }.map(di2imi)
+          }.map(new ImageMetadataImpl(_))
         def toImage(ki: KnownImage) =
           new ImageImpl(ki, imageMetadata(ki))
         backTo ! ImageList(ki.map(toImage))
@@ -57,7 +59,7 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
       knownImages.find(i => i.id == id) match {
         case Some(knownImage: KnownImage) =>
           knownImages -= knownImage
-          sender ! RemovingImage(knownImage)
+          sender ! RemovingImage(new ImageImpl(knownImage))
         case None =>
           sender ! UnknownImage(id)
       }
@@ -67,25 +69,25 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
 
 object ImageMonitoringActor {
   
-  implicit def ki2ii(ki: KnownImage): Image = new ImageImpl(ki)
-  
-  implicit def di2imi(di: DockerImage): ImageMetadata =
-    ImageMetadataImpl(di.id)
-  
   case class ImageImpl(
       val id: String,
       val displayName: String,
       val repository: String,
       val tag: String,
       val metadata: Option[ImageMetadata]) extends Image {
-    
+
     def this(ki: KnownImage, metadata: Option[ImageMetadata] = None) =
       this(ki.id, ki.displayName, ki.repository, ki.tag, metadata)
-      
+
   }
   
   case class ImageMetadataImpl(
-    val id:String) extends ImageMetadata
+      val id: String,
+      val created: Calendar) extends ImageMetadata {
+
+    def this(di: DockerImage) = this(di.id, di.created)
+
+  }
   
   case class AddImage(displayName: String, repository: String, tag: String)
   case class PullImage(id: String)

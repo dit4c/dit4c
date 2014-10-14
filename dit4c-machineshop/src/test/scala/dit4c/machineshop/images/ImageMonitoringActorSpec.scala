@@ -35,8 +35,14 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       val actorRef = newActor
 
       val future = actorRef ? AddImage("Fedora", "fedora", "20")
-      future.value.get must_== Success(
-        AddingImage(KnownImage("Fedora", "fedora", "20")))
+      future.value.get match {
+        case Success(AddingImage(image)) =>
+          image.displayName must_== "Fedora"
+          image.repository must_== "fedora"
+          image.tag must_== "20"
+        case other => failure("Unexpected: "+other)
+      }
+      done
     }
     
     "declines duplicate images" >> {
@@ -46,14 +52,22 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
 
       {
         val future = actorRef ? AddImage("Fedora 20", "fedora", "20")
-        future.value.get must_== Success(
-          ConflictingImages(Seq(KnownImage("Fedora", "fedora", "20"))))
+        future.value.get match {
+          case Success(ConflictingImages(Seq(image))) =>
+            image.displayName must_== "Fedora"
+            image.repository must_== "fedora"
+            image.tag must_== "20"
+        }
       }
         
       {
         val future = actorRef ? AddImage("Fedora", "fedora", "latest")
-        future.value.get must_== Success(
-          ConflictingImages(Seq(KnownImage("Fedora", "fedora", "20"))))
+        future.value.get match {
+          case Success(ConflictingImages(Seq(image))) =>
+            image.displayName must_== "Fedora"
+            image.repository must_== "fedora"
+            image.tag must_== "20"
+        }
       }
     }
     
@@ -65,8 +79,13 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       knownImages += knownImage
 
       val future = actorRef ? PullImage(knownImage.id)
-      future.value.get must_== Success(
-        PullingImage(KnownImage("Fedora", "fedora", "20")))
+      future.value.get match {
+        case Success(PullingImage(image)) =>
+          image.displayName must_== knownImage.displayName
+          image.repository must_== knownImage.repository
+          image.tag must_== knownImage.tag
+        case other => failure("Unexpected: "+other)
+      }
       
       there was one(dockerClient.images).pull("fedora", "20")
     }
@@ -101,8 +120,14 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       knownImages += knownImage
 
       val future = actorRef ? RemoveImage(knownImage.id)
-      future.value.get must_== Success(
-        RemovingImage(KnownImage("Fedora", "fedora", "20")))
+      future.value.get match {
+        case Success(RemovingImage(image)) =>
+          image.displayName must_== "Fedora"
+          image.repository must_== "fedora"
+          image.tag must_== "20"
+        case other => failure("Unexpected: "+other)
+      }
+      done
     }
 
   }
