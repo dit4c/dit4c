@@ -18,6 +18,7 @@ import java.util.UUID
 import dit4c.machineshop.docker.models._
 import scala.util.Random.shuffle
 import scala.concurrent.Await.result
+import java.util.Calendar
 
 class ImageMonitoringActorSpec extends Specification with Mockito {
 
@@ -127,7 +128,10 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
   
   class MockDockerImages(knownImages: KnownImages) extends DockerImages {
     class MockDockerImage(val id: String, val names: Set[String])
-      extends DockerImage
+      extends DockerImage {
+      
+      val created = Calendar.getInstance
+    }
     
     override def list = Future.successful(knownImages.map { image =>
       spy(new MockDockerImage(UUID.randomUUID.toString, Set(

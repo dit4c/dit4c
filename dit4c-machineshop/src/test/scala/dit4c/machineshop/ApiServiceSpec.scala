@@ -19,6 +19,7 @@ import akka.testkit.TestProbe
 import akka.testkit.TestActor
 import scala.util.Random
 import scalax.file.ramfs.RamFileSystem
+import java.util.Calendar
 
 class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService {
   implicit val actorRefFactory = system
@@ -60,7 +61,8 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
     
     case class MockDockerImage(
         val id: String,
-        val names: Set[String]) extends DockerImage
+        val names: Set[String],
+        val created: Calendar) extends DockerImage
 
     override val images = new DockerImages {
       override def list = Future.successful(imageList)
@@ -68,7 +70,8 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         Future.successful({
           imageList = imageList ++ Seq(MockDockerImage(
             Random.nextString(20),
-            Set(s"$imageName:$tagName")))
+            Set(s"$imageName:$tagName"),
+            Calendar.getInstance()))
         })
     }
 

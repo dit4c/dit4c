@@ -9,6 +9,7 @@ import spray.http._
 import spray.http.ContentTypes._
 import spray.json._
 import dit4c.machineshop.docker.models._
+import java.util.{Calendar, TimeZone}
 
 class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
@@ -28,7 +29,8 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
   case class ImageImpl(
       val id: String,
-      val names: Set[String]) extends DockerImage
+      val names: Set[String],
+      val created: Calendar) extends DockerImage
 
   object ImagesImpl extends DockerImages {
 
@@ -46,7 +48,13 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
               ImageImpl(
                   fields("Id").convertTo[String],
                   fields("RepoTags").convertTo[Set[String]]
-                    .filter(_ != "<none>:<none>"))
+                    .filter(_ != "<none>:<none>"),
+                  {
+                    val c = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+                    val epochSeconds = fields("Created").convertTo[Long]
+                    c.setTimeInMillis(epochSeconds * 1000)
+                    c
+                  })
           }
           namedImage <- Some(dockerImage).filter(!_.names.isEmpty)
         } yield namedImage
