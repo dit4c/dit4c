@@ -28,6 +28,9 @@ GET     /compute-nodes              @controllers.ComputeNodeController.index
 POST    /compute-nodes              @controllers.ComputeNodeController.create
 PUT     /compute-nodes/:id          @controllers.ComputeNodeController.update(id)
 DELETE  /compute-nodes/:id          @controllers.ComputeNodeController.delete(id)
+# Compute Nodes - images
+POST    /compute-nodes/:id/images   @controllers.ComputeNodeController.createImage(id)
+GET     /compute-nodes/:id/images   @controllers.ComputeNodeController.listImages(id)
 # Compute Nodes - tokens
 POST    /compute-nodes/:id/redeem-token @controllers.ComputeNodeController.redeemToken(id, code)
 POST    /compute-nodes/:id/tokens       @controllers.ComputeNodeController.createToken(id)

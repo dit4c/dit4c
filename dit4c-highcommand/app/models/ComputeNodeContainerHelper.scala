@@ -3,7 +3,6 @@ package models
 import com.google.inject._
 import scala.concurrent._
 import scala.util.{Try, Success, Failure}
-import providers.machineshop.ContainerProvider
 import providers.machineshop.MachineShop
 
 trait ComputeNodeContainerHelper {

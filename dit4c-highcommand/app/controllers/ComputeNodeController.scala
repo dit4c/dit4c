@@ -164,6 +164,35 @@ class ComputeNodeController @Inject() (
       })
     }
 
+  // Images
+  def createImage(nodeId: String) =
+    Authenticated.async(parse.json) { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        import play.api.libs.ws._
+        client(computeNode)("images/new")
+          .signed { ws =>
+            ws.withMethod("POST")
+              .withHeaders("Content-Type" -> "application/json; charset=utf-8")
+              .withBody(InMemoryBody(
+                Json.prettyPrint(request.body).getBytes("utf-8")))
+          }
+          .map { response =>
+            Status(response.status)(response.json)
+          }
+      })
+    }
+  
+  def listImages(nodeId: String) = Authenticated.async { implicit request =>
+    withComputeNode(nodeId) { computeNode => 
+      client(computeNode)("images")
+        .signed(_.withMethod("GET"))
+        .map { response =>
+          Ok(response.json)
+        }
+    }
+  }
+  
+  // Owners & Users
   def listOwners(nodeId: String) = userListAction(nodeId, _.ownerIDs)
 
   def removeOwner(nodeId: String, userId: String) =
@@ -205,6 +234,10 @@ class ComputeNodeController @Inject() (
         } yield Ok(JsArray(owners.flatten.toSeq.map(Json.toJson(_))))
       })
     }
+
+  protected def client(computeNode: ComputeNode) = new MachineShop.Client(
+      computeNode.managementUrl,
+      () => keyDao.bestSigningKey.map(_.get.toJWK))
 
   protected def sync2async[A](obj: A) = Future.successful(obj)
 
