@@ -21,3 +21,4 @@ activator-*.sbt
 /keys.json
 /db/
 **/karma/node_modules/
+/dit4c-machineshop/known_images.json
