@@ -184,17 +184,31 @@ class ApiService(
           }
         }
       } ~
-      path("[a-f0-9]+".r) { (id: String) =>
-        get {
-          withImage(id) { image =>
-            complete(image)
+      pathPrefix("[a-f0-9]+".r) { (id: String) =>
+        pathEnd {
+          get {
+            withImage(id) { image =>
+              complete(image)
+            }
+          } ~
+          delete {
+            signatureCheck {
+              onSuccess(imageMonitor ? RemoveImage(id)) {
+                case _: RemovingImage => complete(StatusCodes.NoContent)
+                case _: UnknownImage => complete(StatusCodes.NotFound)
+              }
+            }
           }
         } ~
-        delete {
-          signatureCheck {
-            onSuccess(imageMonitor ? RemoveImage(id)) {
-              case _: RemovingImage => complete(StatusCodes.NoContent)
-              case _: UnknownImage => complete(StatusCodes.NotFound)
+        path("pull") {
+          post {
+            signatureCheck {
+              withImage(id) { image =>
+                onSuccess(imageMonitor ? PullImage(id)) {
+                  case _: PullingImage => complete(StatusCodes.Accepted)
+                  case _: UnknownImage => complete(StatusCodes.NotFound)
+                }
+              }
             }
           }
         }

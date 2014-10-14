@@ -302,5 +302,18 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
     }
     
+    "pull images with POST request to /images/:id/pull" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      implicit val knownImages = ephemeralKnownImages
+      implicit val client = mockDockerClient
+      val knownImage = KnownImage("Fedora 20", "fedora", "20")
+      knownImages += knownImage
+      Post(s"/images/${knownImage.id}/pull") ~> route ~> check {
+        status must_== StatusCodes.Accepted
+      }
+    }
+    
   }
 }
