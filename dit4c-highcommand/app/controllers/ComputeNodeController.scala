@@ -192,6 +192,18 @@ class ComputeNodeController @Inject() (
     }
   }
   
+  def removeImage(nodeId: String, imageId: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        import play.api.libs.ws._
+        client(computeNode)(s"images/$imageId")
+          .signed(_.withMethod("DELETE"))
+          .map { response =>
+            Status(response.status)("")
+          }
+      })
+    }
+  
   // Owners & Users
   def listOwners(nodeId: String) = userListAction(nodeId, _.ownerIDs)
 

@@ -19,8 +19,7 @@ class MainServiceActor(config: Config) extends Actor with HttpService {
   // connects the services environment to the enclosing actor or test
   def actorRefFactory = context
 
-  val knownImages = new KnownImages(
-    FileSystem.default.fromString("known_images.json"))
+  val knownImages = new KnownImages(config.knownImageFile)
   val dockerClient = new DockerClientImpl(Uri("http://127.0.0.1:4243/"))
   val signatureActor: Option[ActorRef] =
     config.publicKeyLocation.map { loc =>

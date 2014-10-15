@@ -118,9 +118,10 @@
           </div>
           <select class="form-control" ng-model="newContainer.computeNode"
           	required="true"
+            ng-change="selectFirstImage()"
             ng-options="node.name for node in usableComputeNodes() track by node.id"></select>
           <select class="form-control" ng-model="newContainer.image"
-            ng-init="newContainer.image = imageName(newContainer.computeNode.images[0])"
+            ng-init="selectFirstImage()"
             ng-options="imageName(image) as image.displayName for image in newContainer.computeNode.images"></select>
           <div class="checkbox">
             <label>

@@ -8,6 +8,7 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
 import java.util.concurrent.TimeUnit
+import scalax.file.{FileSystem,Path}
 
 object Boot extends App {
 
@@ -39,7 +40,9 @@ case class Config(
     val port: Int = 8080,
     val serverId: String = null,
     val publicKeyLocation: Option[java.net.URI] = None,
-    val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
+    val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS),
+    val knownImageFile: scalax.file.Path =
+      FileSystem.default.fromString("known_images.json"))
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   // Courtesy of https://gist.github.com/mayoYamasaki/4085712
@@ -70,9 +73,9 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   opt[java.io.File]("server-id-seed-file")
     .action { (file, c) =>
       def readFileBytes(file: java.io.File) = {
-        import java.io._
-        val bis = new BufferedInputStream(new FileInputStream(file))
-        Stream.continually(bis.read).takeWhile(-1 != _).map(_.toByte).toArray
+        FileSystem.default
+          .fromString(file.getAbsolutePath)
+          .inputStream.byteArray
       }
       c.copy(serverId = sha1(readFileBytes(file)))
     }
@@ -80,6 +83,12 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
       if (file.isFile) Right(()) else Left("server ID file must exist")
     }
     .text("file containing seed data for server ID")
+  opt[java.io.File]("known-images-file")
+    .action { (file, c) =>
+      c.copy(knownImageFile = 
+        FileSystem.default.fromString(file.getAbsolutePath))
+    }
+    .text("file to track known images in")
   checkConfig { c =>
     if (c.serverId == null) failure("server ID must be set")
     else success

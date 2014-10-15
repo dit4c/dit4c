@@ -49,7 +49,8 @@ define(['./app'], (app) ->
                       image.metadata
               $q.all(reqs)
                 .then () ->
-                  nodes
+                  nodes.filter (node) ->
+                    node.images.length > 0
     )
     
     $routeProvider.when('/compute-nodes',

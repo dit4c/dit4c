@@ -2,6 +2,7 @@ define(['./module'], (controllers) ->
   'use strict'
   
   controllers.controller('ContainersCtrl', ($scope, $route, $http, $location, $filter) ->
+    
     $scope.imageName = (image) ->
       image.repository+":"+image.tag
     
@@ -76,5 +77,8 @@ define(['./module'], (controllers) ->
           .then (response) ->
             $scope.nameCheck = response.data
     
+    $scope.selectFirstImage = (computeNode) ->
+      $scope.newContainer.image =
+        $scope.imageName($scope.newContainer.computeNode.images[0])
   )
 )
