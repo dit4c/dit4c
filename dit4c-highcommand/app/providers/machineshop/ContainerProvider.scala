@@ -20,7 +20,7 @@ class ContainerProvider(
   val client = new Client(managementUrl, privateKeyProvider)
 
   def create(name: String, image: String) =
-    client("containers/new")
+    client("containers")
       .signed { ws: WSRequestHolder =>
         ws.withMethod("POST")
           .withHeaders("Content-Type" -> "application/json; charset=utf-8")

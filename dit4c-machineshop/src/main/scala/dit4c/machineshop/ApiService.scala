@@ -94,9 +94,7 @@ class ApiService(
               containers
             }
           }
-        }
-      } ~
-      path("new") {
+        } ~
         post {
           entity(as[NewContainerRequest]) { npr =>
             signatureCheck {
@@ -163,9 +161,7 @@ class ApiService(
                 images
               }
           }
-        }
-      } ~
-      path("new") {
+        } ~
         post {
           entity(as[NewImageRequest]) { nir =>
             signatureCheck {

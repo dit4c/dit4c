@@ -169,7 +169,7 @@ class ComputeNodeController @Inject() (
     Authenticated.async(parse.json) { implicit request =>
       withComputeNode(nodeId)(asOwner { computeNode =>
         import play.api.libs.ws._
-        client(computeNode)("images/new")
+        client(computeNode)("images")
           .signed { ws =>
             ws.withMethod("POST")
               .withHeaders("Content-Type" -> "application/json; charset=utf-8")

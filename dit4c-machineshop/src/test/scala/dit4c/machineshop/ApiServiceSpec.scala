@@ -148,7 +148,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
     }
 
-    "create containers with POST requests to /containers/new" in {
+    "create containers with POST requests to /containers" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
@@ -157,7 +157,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       val requestJson = JsObject(
           "name" -> JsString("foobar"),
           "image" -> JsString(image))
-      Post("/containers/new", requestJson) ~> route ~> check {
+      Post("/containers", requestJson) ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
         json.fields("name").convertTo[String] must_== "foobar"
@@ -165,7 +165,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       client.containers.list.await must haveSize(1)
     }
 
-    "require HTTP Signatures for POST requests to /containers/new" in {
+    "require HTTP Signatures for POST requests to /containers" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
@@ -176,7 +176,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
           "name" -> JsString("foobar"),
           "image" -> JsString(image))
       // Check a challenge is issued
-      Post("/containers/new", requestJson) ~>
+      Post("/containers", requestJson) ~>
           route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessDenied("Just 'cause")))) ~>
           check {
@@ -189,7 +189,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
               GenericHttpCredentials("Signature", "",
                   Map(/* Parameters don't matter - using mock */ )))
       // Check that signature failure works
-      Post("/containers/new", requestJson) ~>
+      Post("/containers", requestJson) ~>
           addHeader(authHeader) ~>
           route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessDenied("Just 'cause")))) ~>
@@ -197,7 +197,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         status must_== StatusCodes.Forbidden
       }
       client.containers.list.await must beEmpty
-      Post("/containers/new", requestJson) ~>
+      Post("/containers", requestJson) ~>
           addHeader(authHeader) ~>
           route(client, ephemeralKnownImages, Some(mockSignatureActor(
               SignatureActor.AccessGranted))) ~>
@@ -253,11 +253,12 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       implicit val client = mockDockerClient
       Put("/containers") ~> sealRoute(route) ~> check {
         status === MethodNotAllowed
-        responseAs[String] === "HTTP method not allowed, supported methods: GET"
+        responseAs[String] ===
+          "HTTP method not allowed, supported methods: GET, POST"
       }
     }
     
-    "create new known image with POST requests to /images/new" in {
+    "create new known image with POST requests to /images" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
@@ -267,7 +268,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
           "displayName" -> JsString("BusyBox"),
           "repository" -> JsString("busybox"),
           "tag" -> JsString("latest"))
-      Post("/images/new", requestJson) ~> route ~> check {
+      Post("/images", requestJson) ~> route ~> check {
         contentType must_== ContentTypes.`application/json`
         val json = JsonParser(responseAs[String]).convertTo[JsObject]
         json.fields("id").convertTo[String] must beMatching("[a-z0-9]+")
