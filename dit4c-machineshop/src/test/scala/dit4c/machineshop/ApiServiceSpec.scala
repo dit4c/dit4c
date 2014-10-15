@@ -106,7 +106,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       knownImages: KnownImages = ephemeralKnownImages,
       signatureActor: Option[ActorRef] = None) = {
     val imageMonitor = actorRefFactory.actorOf(
-        Props(classOf[ImageMonitoringActor], knownImages, client, None))
+        Props(classOf[ImageManagementActor], knownImages, client, None))
     ApiService(client, imageMonitor, signatureActor).route
   }
 

@@ -32,7 +32,7 @@ class ApiService(
     imageMonitor: ActorRef,
     signatureActor: Option[ActorRef]) extends HttpService with RouteProvider {
   import scala.concurrent.duration._
-  import dit4c.machineshop.images.ImageMonitoringActor._
+  import dit4c.machineshop.images.ImageManagementActor._
 
   implicit val timeout = Timeout(10.seconds)
 

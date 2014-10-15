@@ -6,7 +6,7 @@ import spray.http.Uri
 import spray.routing.HttpService
 import spray.routing.RequestContext
 import dit4c.machineshop.docker.DockerClientImpl
-import dit4c.machineshop.images.{ImageMonitoringActor, KnownImages}
+import dit4c.machineshop.images.{ImageManagementActor, KnownImages}
 import dit4c.machineshop.auth.SignatureActor
 import akka.actor.ActorRef
 import scalax.file.FileSystem
@@ -28,7 +28,7 @@ class MainServiceActor(config: Config) extends Actor with HttpService {
     }
   
   val imageMonitor = actorRefFactory.actorOf(
-      Props(classOf[ImageMonitoringActor],
+      Props(classOf[ImageManagementActor],
         knownImages, dockerClient, config.imageUpdateInterval),
       "image-monitor")
 

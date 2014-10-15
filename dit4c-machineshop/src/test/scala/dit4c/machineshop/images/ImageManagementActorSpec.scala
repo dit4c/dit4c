@@ -24,7 +24,7 @@ import akka.testkit.TestKit
 import org.specs2.time.{Duration => SpecsDuration}
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-class ImageMonitoringActorSpec extends Specification with Mockito {
+class ImageManagementActorSpec extends Specification with Mockito {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val system = ActorSystem()
@@ -34,9 +34,9 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
   private implicit def specsDuration2scala(d: SpecsDuration): FiniteDuration =
     Duration.create(d.inMilliseconds, "millis")
 
-  import ImageMonitoringActor._
+  import ImageManagementActor._
 
-  "ImageMonitoringActor" >> {
+  "ImageManagementActor" >> {
 
     "adds images" >> {
       val actorRef = newActor
@@ -51,7 +51,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       }
       done
     }
-    
+
     "declines duplicate images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
@@ -66,7 +66,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
             image.tag must_== "20"
         }
       }
-        
+
       {
         val future = actorRef ? AddImage("Fedora", "fedora", "latest")
         future.value.get match {
@@ -77,7 +77,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
         }
       }
     }
-    
+
     "pulls images" >> {
       val knownImages = ephemeralKnownImages
       val dockerClient = spy(new MockDockerClient(knownImages))
@@ -93,10 +93,10 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
           image.tag must_== knownImage.tag
         case other => failure("Unexpected: "+other)
       }
-      
+
       there was one(dockerClient.images).pull("fedora", "20")
     }
-    
+
     "lists images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
@@ -119,7 +119,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       }
       done
     }
-    
+
     "removes images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
@@ -136,16 +136,16 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       }
       done
     }
-    
+
     "ImageUpdateActor" >> {
-      
+
       case class MockImage(id: String) extends Image {
         def displayName: String = ???
         def metadata: Option[dit4c.machineshop.ImageMetadata] = ???
         def repository: String = ???
         def tag: String = ???
       }
-      
+
       "on \"tick\" it requests image list from manager" >> {
         new TestKit(ActorSystem()) {
           try {
@@ -161,7 +161,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
         }
         done
       }
-      
+
       "on ImageList(images) it requests from manager a pull for each image" >> {
         new TestKit(ActorSystem()) {
           try {
@@ -184,20 +184,20 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
         done
       }
     }
-    
+
 
   }
 
-  def newActor: TestActorRef[ImageMonitoringActor] =
+  def newActor: TestActorRef[ImageManagementActor] =
     newActor(ephemeralKnownImages)
 
-  def newActor(knownImages: KnownImages): TestActorRef[ImageMonitoringActor] =
+  def newActor(knownImages: KnownImages): TestActorRef[ImageManagementActor] =
     newActor(knownImages, new MockDockerClient(knownImages))
 
   def newActor(
       knownImages: KnownImages,
-      dockerClient: DockerClient): TestActorRef[ImageMonitoringActor] =
-    TestActorRef(new ImageMonitoringActor(knownImages, dockerClient, None))
+      dockerClient: DockerClient): TestActorRef[ImageManagementActor] =
+    TestActorRef(new ImageManagementActor(knownImages, dockerClient, None))
 
   def ephemeralKnownImages =
     new KnownImages(RamFileSystem().fromString("/known_images.json"))
@@ -206,29 +206,27 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
     override val images = spy(new MockDockerImages(knownImages))
     override val containers = spy(new MockDockerContainers)
   }
-  
+
   class MockDockerImages(knownImages: KnownImages) extends DockerImages {
     class MockDockerImage(val id: String, val names: Set[String])
       extends DockerImage {
-      
+
       val created = Calendar.getInstance
     }
-    
+
     override def list = Future.successful(knownImages.map { image =>
       spy(new MockDockerImage(UUID.randomUUID.toString, Set(
         s"${image.repository}:${image.tag}"
       ))).asInstanceOf[DockerImage]
     }.toSeq)
-    
+
     override def pull(imageName: String, tagName: String) =
       Future.successful(())
   }
-  
+
   class MockDockerContainers extends DockerContainers {
     override def create(name: String, image: String) = ???
     override def list = ???
   }
-  
+
 }
-
-

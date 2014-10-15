@@ -8,7 +8,7 @@ import akka.event.Logging
 import java.util.Calendar
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-class ImageMonitoringActor(
+class ImageManagementActor(
       knownImages: KnownImages, 
       dockerClient: DockerClient,
       imagePullInterval: Option[FiniteDuration])
@@ -18,7 +18,7 @@ class ImageMonitoringActor(
   implicit val executionContext = context.system.dispatcher
   implicit val actorRefFactory = context.system
 
-  import ImageMonitoringActor._
+  import ImageManagementActor._
 
   val pullScheduler: Option[Cancellable] = imagePullInterval.map { interval =>
     val updateActor = context.actorOf(Props(classOf[ImageUpdateActor], self))
@@ -81,7 +81,7 @@ class ImageMonitoringActor(
 
 }
 
-object ImageMonitoringActor {
+object ImageManagementActor {
   
   class ImageUpdateActor(manager: ActorRef) extends Actor {
     val log = Logging(context.system, this)
