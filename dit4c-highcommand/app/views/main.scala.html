@@ -120,7 +120,8 @@
           	required="true"
             ng-options="node.name for node in usableComputeNodes() track by node.id"></select>
           <select class="form-control" ng-model="newContainer.image"
-            ng-options="image.value as image.label for image in images"></select>
+            ng-init="newContainer.image = imageName(newContainer.computeNode.images[0])"
+            ng-options="imageName(image) as image.displayName for image in newContainer.computeNode.images"></select>
           <div class="checkbox">
             <label>
               Start?

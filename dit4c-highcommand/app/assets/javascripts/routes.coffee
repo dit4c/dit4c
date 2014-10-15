@@ -35,11 +35,21 @@ define(['./app'], (app) ->
             .get('/containers')
             .then (response) ->
               response.data
-        computeNodes: ($http) ->
+        computeNodes: ($http, $q) ->
           $http
             .get('/compute-nodes')
             .then (response) ->
-              response.data
+              nodes = response.data
+              reqs = nodes.map (node) ->
+                $http
+                  .get('/compute-nodes/'+node.id+'/images')
+                  .then (response) ->
+                    node.images = response.data.filter (image) ->
+                      # Only include downloaded images
+                      image.metadata
+              $q.all(reqs)
+                .then () ->
+                  nodes
     )
     
     $routeProvider.when('/compute-nodes',
