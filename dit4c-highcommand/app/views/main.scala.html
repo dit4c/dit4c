@@ -184,7 +184,7 @@
       </table>
     </div>
     </script>
-    
+
     <script type="text/ng-template" id="compute-nodes.html">
     <div ng-include src="'navbar.html'"></div>
     <div class="container">
@@ -324,7 +324,7 @@
           <tr ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
             <td>
               <span>{{node.name}}</span>
-              
+
               <form class="form form-horizontal" ng-if="node.editForm" role="form">
                 <div class="form-group">
                   <label for="editForm-{{node.id}}-name" class="col-sm-2 control-label">
@@ -431,7 +431,7 @@
                   </tr>
                 </tbody>
               </table>
-              
+
               <table class="table" ng-if="node.owned">
                 <thead>
                   <tr>
@@ -491,6 +491,33 @@
                       <button class="btn btn-default" ng-click="addImage(node, newImage)">
                         <i class="fa fa-plus"></i>
                         Add Image
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <table class="table" ng-if="node.owned">
+                <thead>
+                  <tr>
+                    <th>Containers</th>
+                    <th></th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr ng-repeat="container in containers[node.id]">
+                    <td>{{container.name}}</td>
+                    <td>
+                      <div ng-repeat="ownerId in container.ownerIds">
+                        {{ownerId}}
+                      </div>
+                    </td>
+                    <td>
+                      <button class="btn btn-danger"
+                          ng-click="removeContainer(node, container)"
+                          title="Remove Container">
+                        <i class="fa fa-remove"></i>
                       </button>
                     </td>
                   </tr>

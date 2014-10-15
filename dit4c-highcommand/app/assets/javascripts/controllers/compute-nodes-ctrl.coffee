@@ -1,23 +1,23 @@
 define(['./module'], (controllers) ->
   'use strict'
-  
+
   controllers.controller('ComputeNodesCtrl', ($scope, $route, $http, $location, $filter, $q) ->
-    
+
     $scope.tokens = {}
     $scope.images = {}
+    $scope.containers = {}
     $scope.owners = {}
     $scope.users = {}
-    
+
     $scope.computeNodes = $route.current.locals.computeNodes
-    
-    $scope.containers = $route.current.locals.containers
+
     $scope.relevantComputeNode = (node) ->
       node.usable or node.owned
-    
+
     $scope.accessFormError = null
     $scope.accessForm =
       code: ''
-      
+
     $scope.addFormError = null
     $scope.addForm =
       name: ''
@@ -26,7 +26,7 @@ define(['./module'], (controllers) ->
         host: ''
         port: 80
         scheme: 'http'
-    
+
     $scope.keyCodeFilter = (e, max, chunkSize) ->
       # Only apply to printable characters
       return if (e.which < 32 || e.ctrlKey || e.altKey)
@@ -51,7 +51,7 @@ define(['./module'], (controllers) ->
           addChar(e.which)
         when lowerAlpha
           addChar(e.which - 32)
-    
+
     refreshComputeNodes = () ->
       $http
         .get('/compute-nodes')
@@ -59,7 +59,7 @@ define(['./module'], (controllers) ->
           $scope.computeNodes.length = 0
           response.data.forEach (computeNode) ->
             $scope.computeNodes.push(computeNode)
-    
+
     $scope.addNode = () ->
       $http
         .post('/compute-nodes', $scope.addForm)
@@ -67,16 +67,16 @@ define(['./module'], (controllers) ->
           refreshComputeNodes()
         .error (response) ->
           $scope.addFormError = response
-  
+
     $scope.populateEditForm = (node) ->
       node.editForm =
         name: node.name
         managementUrl: node.managementUrl
         backend: node.backend
-  
+
     $scope.clearEditForm = (node) ->
       node.editForm = undefined
-  
+
     $scope.updateNode = (node) ->
       $http
         .put('/compute-nodes/'+node.id, node.editForm)
@@ -88,7 +88,7 @@ define(['./module'], (controllers) ->
         .delete('/compute-nodes/'+node.id)
         .then (response) ->
           refreshComputeNodes()
-      
+
     $scope.claimNode = () ->
       nodeId = $scope.accessForm.node.id
       code = $scope.accessForm.code.replace(/-/g,'')
@@ -102,7 +102,7 @@ define(['./module'], (controllers) ->
               .forEach refreshAssociatedCollections
         .error (response) ->
           $scope.accessFormError = response
-      
+
     $scope.addToken = (node, type) ->
       $http
         .post('/compute-nodes/'+node.id+"/tokens",
@@ -111,7 +111,7 @@ define(['./module'], (controllers) ->
         .success (token) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id].push(token)
-          
+
     $scope.addImage = (node, newImage) ->
       $http
         .post('/compute-nodes/'+node.id+"/images", newImage)
@@ -134,7 +134,7 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id] = $scope.tokens[node.id].filter (t) ->
             t.code != token.code
-    
+
     $scope.removeImage = (node, image) ->
       $http
         .delete('/compute-nodes/'+node.id+"/images/"+image.id)
@@ -142,6 +142,14 @@ define(['./module'], (controllers) ->
           $scope.images[node.id] ||= []
           $scope.images[node.id] = $scope.images[node.id].filter (i) ->
             i.id != image.id
+
+    $scope.removeContainer = (node, container) ->
+      $http
+        .delete('/compute-nodes/'+node.id+"/containers/"+container.id)
+        .success () ->
+          $scope.containers[node.id] ||= []
+          $scope.containers[node.id] = $scope.containers[node.id].filter (c) ->
+            c.id != container.id
 
     $scope.removeOwner = (node, owner) ->
       $http
@@ -166,7 +174,7 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] = []
           response.data.forEach (token) ->
             $scope.tokens[node.id].push(token)
-            
+
     refreshImages = (node) ->
       $http
         .get('/compute-nodes/'+node.id+"/images")
@@ -174,7 +182,15 @@ define(['./module'], (controllers) ->
           $scope.images[node.id] = []
           response.data.forEach (image) ->
             $scope.images[node.id].push(image)
-    
+
+    refreshContainers = (node) ->
+      $http
+        .get('/compute-nodes/'+node.id+"/containers")
+        .then (response) ->
+          $scope.containers[node.id] = []
+          response.data.forEach (container) ->
+            $scope.containers[node.id].push(container)
+
     refreshOwners = (node) ->
       $http
         .get('/compute-nodes/'+node.id+"/owners")
@@ -190,14 +206,15 @@ define(['./module'], (controllers) ->
           $scope.users[node.id] = []
           response.data.forEach (user) ->
             $scope.users[node.id].push(user)
-    
+
     refreshAssociatedCollections = (node) ->
       $q.all([
         refreshTokens(node),
         refreshImages(node),
+        refreshContainers(node),
         refreshOwners(node),
         refreshUsers(node)])
-    
+
     $route.current.locals.computeNodes
       .filter (node) ->
         node.owned

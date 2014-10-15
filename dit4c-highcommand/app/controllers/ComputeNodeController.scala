@@ -14,7 +14,7 @@ import akka.actor.ActorRef
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import providers.hipache.HipachePlugin
-import providers.machineshop.MachineShop
+import providers.machineshop.{MachineShop, ContainerProvider}
 import scala.util.Try
 import java.net.ConnectException
 import models.AccessToken.AccessType
@@ -181,9 +181,9 @@ class ComputeNodeController @Inject() (
           }
       })
     }
-  
+
   def listImages(nodeId: String) = Authenticated.async { implicit request =>
-    withComputeNode(nodeId) { computeNode => 
+    withComputeNode(nodeId) { computeNode =>
       client(computeNode)("images")
         .signed(_.withMethod("GET"))
         .map { response =>
@@ -191,7 +191,7 @@ class ComputeNodeController @Inject() (
         }
     }
   }
-  
+
   def pullImage(nodeId: String, imageId: String) =
     Authenticated.async { implicit request =>
       withComputeNode(nodeId)(asOwner { computeNode =>
@@ -203,7 +203,7 @@ class ComputeNodeController @Inject() (
           }
       })
     }
-  
+
   def removeImage(nodeId: String, imageId: String) =
     Authenticated.async { implicit request =>
       withComputeNode(nodeId)(asOwner { computeNode =>
@@ -215,7 +215,52 @@ class ComputeNodeController @Inject() (
           }
       })
     }
-  
+
+  // Containers
+  def listContainers(nodeId: String) = Authenticated.async { implicit request =>
+    withComputeNode(nodeId)(asOwner { computeNode =>
+      for {
+        containers <- containerDao.list
+        dockerContainers <- containerProvider(computeNode).list
+        dcMap = dockerContainers.map(c => (c.name -> c)).toMap
+      } yield Ok(JsArray(containers.map { c =>
+        val cnc = dcMap.get(c.name)
+        Json.obj(
+          "id" -> c.id,
+          "name" -> c.name,
+          "computeNodeId" -> c.computeNodeId,
+          "image" -> c.image,
+          "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
+        )
+      }))
+    })
+  }
+
+  def deleteContainer(nodeId: String, containerId: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        containerDao.get(containerId).flatMap {
+          case None =>
+            // Doesn't exist
+            Future.successful(NotFound)
+          case Some(container) if container.computeNodeId != nodeId =>
+            // Doesn't belong to this compute node
+            Future.successful(NotFound)
+          case Some(container) =>
+            // Exists and belongs to this compute node
+            for {
+              dockerContainer <- containerProvider(computeNode)
+                                    .get(container.name)
+              _ <- container.delete
+              _ <- dockerContainer
+                    .map(_.delete)
+                    .getOrElse(Future.successful(()))
+              _ <- HipacheInterface.delete(container)
+            } yield NoContent
+        }
+      })
+    }
+
   // Owners & Users
   def listOwners(nodeId: String) = userListAction(nodeId, _.ownerIDs)
 
@@ -247,6 +292,11 @@ class ComputeNodeController @Inject() (
           } yield NoContent
       })
     }
+
+  protected def containerProvider(computeNode: ComputeNode): ContainerProvider =
+      new ContainerProvider(
+        computeNode.managementUrl,
+        () => keyDao.bestSigningKey.map(_.get.toJWK))
 
   protected def userListAction(
       nodeId: String,

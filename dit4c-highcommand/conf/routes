@@ -33,6 +33,9 @@ POST    /compute-nodes/:nodeId/images               @controllers.ComputeNodeCont
 GET     /compute-nodes/:nodeId/images               @controllers.ComputeNodeController.listImages(nodeId)
 DELETE  /compute-nodes/:nodeId/images/:imageId      @controllers.ComputeNodeController.removeImage(nodeId, imageId)
 POST    /compute-nodes/:nodeId/images/:imageId/pull @controllers.ComputeNodeController.pullImage(nodeId, imageId)
+# Compute Nodes - containers
+GET     /compute-nodes/:nodeId/containers               @controllers.ComputeNodeController.listContainers(nodeId)
+DELETE  /compute-nodes/:nodeId/containers/:containerId  @controllers.ComputeNodeController.deleteContainer(nodeId, containerId)
 # Compute Nodes - tokens
 POST    /compute-nodes/:id/redeem-token @controllers.ComputeNodeController.redeemToken(id, code)
 POST    /compute-nodes/:id/tokens       @controllers.ComputeNodeController.createToken(id)

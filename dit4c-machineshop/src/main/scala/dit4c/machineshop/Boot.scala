@@ -26,7 +26,7 @@ object Boot extends App {
         interface = config.interface,
         port = config.port)
   }
-  
+
   ArgParser.parse(args, Config()) map { config =>
     start(config)
   } getOrElse {
@@ -82,7 +82,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
     .text("file containing seed data for server ID")
   opt[java.io.File]("known-images-file")
     .action { (file, c) =>
-      c.copy(knownImageFile = 
+      c.copy(knownImageFile =
         FileSystem.default.fromString(file.getAbsolutePath))
     }
     .text("file to track known images in")

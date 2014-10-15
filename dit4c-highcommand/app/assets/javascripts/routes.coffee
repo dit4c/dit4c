@@ -5,7 +5,7 @@ define(['./app'], (app) ->
       templateUrl: 'index.html'
       controller: 'IndexCtrl'
     )
-    
+
     $routeProvider.when('/login',
       templateUrl: 'login.html'
       controller: 'LoginCtrl',
@@ -17,7 +17,7 @@ define(['./app'], (app) ->
           )
       }
     )
-    
+
     $routeProvider.when('/logout',
       redirectTo: '/',
       resolve: {
@@ -25,7 +25,7 @@ define(['./app'], (app) ->
           AuthSrv.logout()
       }
     )
-    
+
     $routeProvider.when('/containers',
       templateUrl: 'containers.html'
       controller: 'ContainersCtrl',
@@ -52,7 +52,7 @@ define(['./app'], (app) ->
                   nodes.filter (node) ->
                     node.images.length > 0
     )
-    
+
     $routeProvider.when('/compute-nodes',
       templateUrl: 'compute-nodes.html'
       controller: 'ComputeNodesCtrl',
@@ -63,7 +63,7 @@ define(['./app'], (app) ->
             .then (response) ->
               response.data
     )
-    
+
     $routeProvider.when('/notfound',
       templateUrl: 'notfound.html'
     )

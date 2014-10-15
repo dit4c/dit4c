@@ -40,7 +40,7 @@ class ContainerController @Inject() (
     val image = (json \ "image").as[String]
     val computeNodeId = (json \ "computeNodeId").as[String]
     val shouldBeActive = (json \ "active").as[Boolean]
-    
+
     if (name.isEmpty) {
       Future.successful(BadRequest("Name cannot be blank."))
     } else {
