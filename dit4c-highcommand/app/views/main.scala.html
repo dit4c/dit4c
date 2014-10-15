@@ -501,7 +501,7 @@
                 <thead>
                   <tr>
                     <th>Containers</th>
-                    <th></th>
+                    <th>Owned By</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -509,8 +509,11 @@
                   <tr ng-repeat="container in containers[node.id]">
                     <td>{{container.name}}</td>
                     <td>
-                      <div ng-repeat="ownerId in container.ownerIds">
-                        {{ownerId}}
+                      <div ng-repeat="user in resolveUsers(node, container.ownerIDs)">
+                        {{user.name}}
+                        <span ng-if="user.email">
+                          <a href="mailto:{{user.email}}">{{user.email}}</a>
+                        </span>
                       </div>
                     </td>
                     <td>

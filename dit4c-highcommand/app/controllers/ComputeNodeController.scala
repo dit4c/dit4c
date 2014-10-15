@@ -230,6 +230,7 @@ class ComputeNodeController @Inject() (
           "name" -> c.name,
           "computeNodeId" -> c.computeNodeId,
           "image" -> c.image,
+          "ownerIDs" -> c.ownerIDs,
           "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
         )
       }))

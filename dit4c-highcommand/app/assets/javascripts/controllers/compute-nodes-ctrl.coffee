@@ -77,6 +77,10 @@ define(['./module'], (controllers) ->
     $scope.clearEditForm = (node) ->
       node.editForm = undefined
 
+    $scope.resolveUsers = (node, userIds) ->
+      $scope.users[node.id].filter (user) ->
+        userIds.indexOf(user.id) != -1
+
     $scope.updateNode = (node) ->
       $http
         .put('/compute-nodes/'+node.id, node.editForm)
