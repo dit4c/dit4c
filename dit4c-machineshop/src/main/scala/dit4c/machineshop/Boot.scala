@@ -41,6 +41,7 @@ case class Config(
     val serverId: String = null,
     val publicKeyLocation: Option[java.net.URI] = None,
     val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS),
+    val imageUpdateInterval: Option[FiniteDuration] = None,
     val knownImageFile: scalax.file.Path =
       FileSystem.default.fromString("known_images.json"))
 
@@ -62,10 +63,6 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
     .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }
     .text("URL/file of JWK RSA keyset used to sign privileged requests")
   opt[Int]('k', "key-refresh")
-    .optional()
-    .action { (x, c) =>
-      c.copy(keyUpdateInterval = Duration.create(x, TimeUnit.SECONDS))
-     }
     .text("second interval to use when polling keys")
   opt[String]("server-id-seed")
     .action { (x, c) => c.copy(serverId = sha1(x.getBytes)) }
@@ -89,6 +86,11 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
         FileSystem.default.fromString(file.getAbsolutePath))
     }
     .text("file to track known images in")
+  opt[Int]("image-update-interval")
+    .action { (x, c) =>
+      c.copy(imageUpdateInterval = Some(Duration.create(x, "seconds")))
+    }
+    .text("pull image updates every <n> seconds")
   checkConfig { c =>
     if (c.serverId == null) failure("server ID must be set")
     else success

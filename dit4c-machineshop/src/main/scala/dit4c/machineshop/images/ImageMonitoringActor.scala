@@ -3,11 +3,15 @@ package dit4c.machineshop.images
 import dit4c.machineshop.{Image, ImageMetadata}
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerImage
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.event.Logging
 import java.util.Calendar
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
-class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
+class ImageMonitoringActor(
+      knownImages: KnownImages, 
+      dockerClient: DockerClient,
+      imagePullInterval: Option[FiniteDuration])
     extends Actor {
   val log = Logging(context.system, this)
 
@@ -15,6 +19,16 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
   implicit val actorRefFactory = context.system
 
   import ImageMonitoringActor._
+
+  val pullScheduler: Option[Cancellable] = imagePullInterval.map { interval =>
+    val updateActor = context.actorOf(Props(classOf[ImageUpdateActor], self))
+    context.system.scheduler.schedule(
+      Duration.Zero, interval, updateActor, "tick")
+  }
+
+  override def postStop() {
+    pullScheduler.foreach(_.cancel)
+  }
 
   val receive: Receive = {
     case AddImage(displayName, repository, tag) =>
@@ -68,6 +82,21 @@ class ImageMonitoringActor(knownImages: KnownImages, dockerClient: DockerClient)
 }
 
 object ImageMonitoringActor {
+  
+  class ImageUpdateActor(manager: ActorRef) extends Actor {
+    val log = Logging(context.system, this)
+    
+    override def receive = {
+      case "tick" => 
+        manager ! ListImages()
+      case ImageList(images) => images.foreach { image =>
+        manager ! PullImage(image.id)
+      }
+      case PullingImage(image) =>
+        log.info(s"Pulling image: $image")
+    }
+  }
+  
   
   case class ImageImpl(
       val id: String,

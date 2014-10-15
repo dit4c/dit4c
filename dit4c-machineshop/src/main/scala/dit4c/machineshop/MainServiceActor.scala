@@ -28,7 +28,8 @@ class MainServiceActor(config: Config) extends Actor with HttpService {
     }
   
   val imageMonitor = actorRefFactory.actorOf(
-      Props(classOf[ImageMonitoringActor], knownImages, dockerClient),
+      Props(classOf[ImageMonitoringActor],
+        knownImages, dockerClient, config.imageUpdateInterval),
       "image-monitor")
 
   // this actor only runs our route, but you could add

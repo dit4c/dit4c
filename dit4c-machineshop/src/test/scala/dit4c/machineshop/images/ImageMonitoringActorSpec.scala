@@ -8,7 +8,8 @@ import akka.testkit.TestActorRef
 import dit4c.machineshop.docker.DockerClient
 import scalax.file.ramfs.RamFileSystem
 import dit4c.machineshop.docker.models.DockerImages
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
+import dit4c.machineshop.Image
 import dit4c.machineshop.docker.models.DockerContainers
 import akka.pattern.ask
 import scala.concurrent.Future
@@ -19,6 +20,9 @@ import dit4c.machineshop.docker.models._
 import scala.util.Random.shuffle
 import scala.concurrent.Await.result
 import java.util.Calendar
+import akka.testkit.TestKit
+import org.specs2.time.{Duration => SpecsDuration}
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 class ImageMonitoringActorSpec extends Specification with Mockito {
 
@@ -26,6 +30,9 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
   implicit val system = ActorSystem()
   implicit val timeoutDuration = new FiniteDuration(5, TimeUnit.SECONDS)
   implicit val timeout = Timeout(timeoutDuration)
+
+  private implicit def specsDuration2scala(d: SpecsDuration): FiniteDuration =
+    Duration.create(d.inMilliseconds, "millis")
 
   import ImageMonitoringActor._
 
@@ -129,6 +136,55 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
       }
       done
     }
+    
+    "ImageUpdateActor" >> {
+      
+      case class MockImage(id: String) extends Image {
+        def displayName: String = ???
+        def metadata: Option[dit4c.machineshop.ImageMetadata] = ???
+        def repository: String = ???
+        def tag: String = ???
+      }
+      
+      "on \"tick\" it requests image list from manager" >> {
+        new TestKit(ActorSystem()) {
+          try {
+            val test = system.actorOf(Props(
+              classOf[ImageUpdateActor], testActor))
+            within (1.second) {
+              test.tell("tick", null)
+              expectMsg(ListImages())
+            }
+          } finally {
+            system.shutdown()
+          }
+        }
+        done
+      }
+      
+      "on ImageList(images) it requests from manager a pull for each image" >> {
+        new TestKit(ActorSystem()) {
+          try {
+            val test = system.actorOf(Props(
+              classOf[ImageUpdateActor], testActor))
+            val images = Seq(
+              MockImage("foo"),
+              MockImage("bar")
+            )
+            within (1.second) {
+              test.tell(ImageList(images), null)
+              images.foreach { image =>
+                expectMsg(PullImage(image.id))
+              }
+            }
+          } finally {
+            system.shutdown()
+          }
+        }
+        done
+      }
+    }
+    
 
   }
 
@@ -141,7 +197,7 @@ class ImageMonitoringActorSpec extends Specification with Mockito {
   def newActor(
       knownImages: KnownImages,
       dockerClient: DockerClient): TestActorRef[ImageMonitoringActor] =
-    TestActorRef(new ImageMonitoringActor(knownImages, dockerClient))
+    TestActorRef(new ImageMonitoringActor(knownImages, dockerClient, None))
 
   def ephemeralKnownImages =
     new KnownImages(RamFileSystem().fromString("/known_images.json"))
