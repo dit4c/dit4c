@@ -119,6 +119,8 @@ class ContainerController @Inject() (
       .flatMap[Result] {
         case None =>
           Future.successful(NotFound)
+        case Some(container) if !container.ownerIDs.contains(request.user.id) =>
+          Future.successful(Forbidden)
         case Some(container) =>
           // If resolution is successful, but doesn't return a container, then
           // we know the container doesn't exist where it should be. It's safe
