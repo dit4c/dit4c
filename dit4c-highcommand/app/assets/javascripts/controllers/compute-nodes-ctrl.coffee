@@ -119,6 +119,14 @@ define(['./module'], (controllers) ->
           $scope.images[node.id] ||= []
           $scope.images[node.id].push(token)
 
+    $scope.pullImage = (node, image) ->
+      $http
+        .post('/compute-nodes/'+node.id+"/images/"+image.id+"/pull")
+        .success () ->
+          $scope.images[node.id]
+            .filter (i) -> i.id == image.id
+            .forEach (i) -> i.pulling = true
+
     $scope.removeToken = (node, token) ->
       $http
         .delete('/compute-nodes/'+node.id+"/tokens/"+token.code)

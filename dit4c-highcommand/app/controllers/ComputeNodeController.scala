@@ -192,6 +192,18 @@ class ComputeNodeController @Inject() (
     }
   }
   
+  def pullImage(nodeId: String, imageId: String) =
+    Authenticated.async { implicit request =>
+      withComputeNode(nodeId)(asOwner { computeNode =>
+        import play.api.libs.ws._
+        client(computeNode)(s"images/$imageId/pull")
+          .signed(_.withMethod("POST"))
+          .map { response =>
+            Status(response.status)("")
+          }
+      })
+    }
+  
   def removeImage(nodeId: String, imageId: String) =
     Authenticated.async { implicit request =>
       withComputeNode(nodeId)(asOwner { computeNode =>

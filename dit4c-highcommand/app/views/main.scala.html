@@ -448,9 +448,17 @@
                       <span ng-if="image.metadata" title="{{image.metadata.id}}">
                         {{image.metadata.created}}
                       </span>
+                      <span ng-if="image.pulling">
+                        (pulling)
+                      </span>
                     </td>
                     <td>
-                      <button class="btn btn-danger" ng-click="removeImage(node, image)">
+                      <button class="btn btn-info" ng-click="pullImage(node, image)"
+                              title="Pull Image">
+                        <i class="fa fa-cloud-download"></i>
+                      </button>
+                      <button class="btn btn-danger" ng-click="removeImage(node, image)"
+                              title="Remove Image">
                         <i class="fa fa-remove"></i>
                       </button>
                     </td>
