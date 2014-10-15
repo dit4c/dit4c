@@ -4,6 +4,7 @@ define(['./module'], (controllers) ->
   controllers.controller('ComputeNodesCtrl', ($scope, $route, $http, $location, $filter, $q) ->
     
     $scope.tokens = {}
+    $scope.images = {}
     $scope.owners = {}
     $scope.users = {}
     
@@ -110,6 +111,13 @@ define(['./module'], (controllers) ->
         .success (token) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id].push(token)
+          
+    $scope.addImage = (node, newImage) ->
+      $http
+        .post('/compute-nodes/'+node.id+"/images", newImage)
+        .success (token) ->
+          $scope.images[node.id] ||= []
+          $scope.images[node.id].push(token)
 
     $scope.removeToken = (node, token) ->
       $http
@@ -118,6 +126,14 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id] = $scope.tokens[node.id].filter (t) ->
             t.code != token.code
+    
+    $scope.removeImage = (node, image) ->
+      $http
+        .delete('/compute-nodes/'+node.id+"/images/"+image.id)
+        .success () ->
+          $scope.images[node.id] ||= []
+          $scope.images[node.id] = $scope.images[node.id].filter (i) ->
+            i.id != image.id
 
     $scope.removeOwner = (node, owner) ->
       $http
@@ -142,6 +158,14 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] = []
           response.data.forEach (token) ->
             $scope.tokens[node.id].push(token)
+            
+    refreshImages = (node) ->
+      $http
+        .get('/compute-nodes/'+node.id+"/images")
+        .then (response) ->
+          $scope.images[node.id] = []
+          response.data.forEach (image) ->
+            $scope.images[node.id].push(image)
     
     refreshOwners = (node) ->
       $http
@@ -162,6 +186,7 @@ define(['./module'], (controllers) ->
     refreshAssociatedCollections = (node) ->
       $q.all([
         refreshTokens(node),
+        refreshImages(node),
         refreshOwners(node),
         refreshUsers(node)])
     

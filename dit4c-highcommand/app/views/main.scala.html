@@ -431,6 +431,63 @@
                   </tr>
                 </tbody>
               </table>
+              
+              <table class="table" ng-if="node.owned">
+                <thead>
+                  <tr>
+                    <th>Images</th>
+                    <th></th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr ng-repeat="image in images[node.id]" ng-class="{'text-muted': !image.metadata}">
+                    <td>{{image.displayName}}</td>
+                    <td>{{image.repository}}:{{image.tag}}</td>
+                    <td>
+                      <span ng-if="image.metadata" title="{{image.metadata.id}}">
+                        {{image.metadata.created}}
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-danger" ng-click="removeImage(node, image)">
+                        <i class="fa fa-remove"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <input type="text" class="form-control"
+                        ng-model="newImage.displayName"
+                        placeholder="display name for users"
+                      />
+                    </td>
+                    <td>
+                      <div class="input-group">
+                        <input type="text" class="form-control"
+                          style="width: 15em"
+                          ng-model="newImage.repository"
+                          placeholder="docker repository"
+                        />
+                        <span class="input-group-addon"
+                              style="width: 1ex">:</span>
+                        <input type="text" class="form-control"
+                          style="width: 5em"
+                          ng-init="newImage.tag = 'latest'"
+                          ng-model="newImage.tag"
+                          placeholder="tag"
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <button class="btn btn-default" ng-click="addImage(node, newImage)">
+                        <i class="fa fa-plus"></i>
+                        Add Image
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
               <table class="table" ng-if="node.owned">
                 <thead>
