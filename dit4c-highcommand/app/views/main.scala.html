@@ -402,6 +402,7 @@
                   <tr>
                     <th>Access Token</th>
                     <th>Type</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,7 +412,7 @@
                       <span ng-if="token.type == 'share'">Sharing</span>
                       <span ng-if="token.type == 'own'">Ownership</span>
                     </td>
-                    <td>
+                    <td class="text-right">
                       <button class="btn btn-danger" ng-click="removeToken(node, token)">
                         <i class="fa fa-remove"></i>
                       </button>
@@ -428,6 +429,8 @@
                         New Ownership Token
                       </button>
                     </td>
+                    <td></td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
@@ -438,6 +441,7 @@
                     <th>Images</th>
                     <th></th>
                     <th>Created</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -452,7 +456,7 @@
                         (pulling)
                       </span>
                     </td>
-                    <td>
+                    <td class="text-right">
                       <button class="btn btn-info" ng-click="pullImage(node, image)"
                               title="Pull Image">
                         <i class="fa fa-cloud-download"></i>
@@ -493,6 +497,7 @@
                         Add Image
                       </button>
                     </td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
@@ -518,7 +523,7 @@
                         </span>
                       </div>
                     </td>
-                    <td>
+                    <td class="text-right">
                       <button class="btn btn-warning"
                           ng-disabled="!container.active"
                           ng-click="stopContainer(node, container)"
@@ -555,7 +560,7 @@
                         <a href="mailto:{{user.email}}">{{user.email}}</a>
                       </span>
                     </td>
-                    <td>
+                    <td class="text-right">
                       <button class="btn btn-danger" ng-click="removeUser(node, user)">
                         <i class="fa fa-remove"></i>
                       </button>
@@ -579,7 +584,7 @@
                         <a href="mailto:{{owner.email}}">{{owner.email}}</a>
                       </span>
                     </td>
-                    <td>
+                    <td class="text-right">
                       <button class="btn btn-danger"
                         ng-if="owners[node.id].length > 1"
                         ng-click="removeOwner(node, owner)">
