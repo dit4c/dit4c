@@ -104,7 +104,7 @@
       <h1>Containers</h1>
 
       <div>
-        <form class="form-inline" ng-if="usableComputeNodes().length > 0">
+        <form class="form-inline" ng-if="computeNodes.length > 0">
           <div class="form-group has-feedback"
                ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
                title="{{nameCheck.reason}}">
@@ -118,10 +118,10 @@
           </div>
           <select class="form-control" ng-model="newContainer.computeNode"
           	required="true"
-            ng-change="selectFirstImage()"
-            ng-options="node.name for node in usableComputeNodes() track by node.id"></select>
+            ng-change="selectFirstImage(newContainer.computeNode)"
+            ng-options="node.name for node in computeNodes track by node.id"></select>
           <select class="form-control" ng-model="newContainer.image"
-            ng-init="selectFirstImage()"
+            ng-init="selectFirstImage(newContainer.computeNode)"
             ng-options="imageName(image) as image.displayName for image in newContainer.computeNode.images"></select>
           <div class="checkbox">
             <label>

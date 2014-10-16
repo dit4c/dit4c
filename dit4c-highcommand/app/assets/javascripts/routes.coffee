@@ -40,17 +40,23 @@ define(['./app'], (app) ->
             .get('/compute-nodes')
             .then (response) ->
               nodes = response.data
-              reqs = nodes.map (node) ->
-                $http
-                  .get('/compute-nodes/'+node.id+'/images')
-                  .then (response) ->
-                    node.images = response.data.filter (image) ->
-                      # Only include downloaded images
-                      image.metadata
-              $q.all(reqs)
-                .then () ->
-                  nodes.filter (node) ->
-                    node.images.length > 0
+              usableNodes = []
+              insertInOrder = (node) ->
+                i = usableNodes
+                  .filter (n) -> n.name < node.name
+                  .length
+                usableNodes.splice(i, 0, node)
+              nodes
+                .filter (node) -> node.usable
+                .forEach (node) ->
+                  $http
+                    .get('/compute-nodes/'+node.id+'/images')
+                    .then (response) ->
+                      node.images = response.data.filter (image) ->
+                        # Only include downloaded images
+                        image.metadata
+                      insertInOrder(node)
+              usableNodes
     )
 
     $routeProvider.when('/compute-nodes',
