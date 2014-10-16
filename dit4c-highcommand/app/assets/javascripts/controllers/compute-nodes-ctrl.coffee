@@ -131,6 +131,14 @@ define(['./module'], (controllers) ->
             .filter (i) -> i.id == image.id
             .forEach (i) -> i.pulling = true
 
+    $scope.stopContainer = (node, container) ->
+      $http
+        .post('/compute-nodes/'+node.id+"/containers/"+container.id+"/stop")
+        .success () ->
+          $scope.containers[node.id]
+            .filter (c) -> c.id == container.id
+            .forEach (c) -> c.active = false
+
     $scope.removeToken = (node, token) ->
       $http
         .delete('/compute-nodes/'+node.id+"/tokens/"+token.code)

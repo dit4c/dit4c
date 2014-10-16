@@ -241,6 +241,40 @@ class ComputeNodeController @Inject() (
     })
   }
 
+  def stopContainer(nodeId: String, containerId: String) =
+  Authenticated.async { implicit request =>
+    withComputeNode(nodeId)(asOwner { computeNode =>
+      containerDao.get(containerId).flatMap {
+        case None =>
+          // Doesn't exist
+          Future.successful(NotFound)
+        case Some(container) if container.computeNodeId != nodeId =>
+          // Doesn't belong to this compute node
+          Future.successful(NotFound)
+        case Some(container) =>
+          // Exists and belongs to this compute node
+          for {
+            dockerContainer <- containerProvider(computeNode)
+                                  .get(container.name)
+            _ <- dockerContainer
+                  .map(_.stop)
+                  .getOrElse(Future.successful(()))
+          } yield dockerContainer match {
+            case Some(dockerContainer) =>
+              Ok(Json.obj(
+                "id" -> container.id,
+                "name" -> container.name,
+                "computeNodeId" -> container.computeNodeId,
+                "image" -> container.image,
+                "ownerIDs" -> container.ownerIDs,
+                "active" -> JsBoolean(false)
+              ))
+            case None => NotFound
+          }
+      }
+    })
+  }
+
   def deleteContainer(nodeId: String, containerId: String) =
     Authenticated.async { implicit request =>
       withComputeNode(nodeId)(asOwner { computeNode =>

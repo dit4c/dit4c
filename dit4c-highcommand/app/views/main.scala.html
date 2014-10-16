@@ -517,6 +517,12 @@
                       </div>
                     </td>
                     <td>
+                      <button class="btn btn-warning"
+                          ng-disabled="!container.active"
+                          ng-click="stopContainer(node, container)"
+                          title="Stop Container">
+                        <i class="fa fa-stop"></i>
+                      </button>
                       <button class="btn btn-danger"
                           ng-click="removeContainer(node, container)"
                           title="Remove Container">
