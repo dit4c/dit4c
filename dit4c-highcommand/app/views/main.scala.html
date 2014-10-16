@@ -501,6 +501,7 @@
                 <thead>
                   <tr>
                     <th>Containers</th>
+                    <th></th>
                     <th>Owned By</th>
                     <th></th>
                   </tr>
@@ -508,6 +509,7 @@
                 <tbody>
                   <tr ng-repeat="container in containers[node.id]">
                     <td>{{container.name}}</td>
+                    <td>{{container.image}}</td>
                     <td>
                       <div ng-repeat="user in resolveUsers(node, container.ownerIDs)">
                         {{user.name}}
@@ -528,6 +530,11 @@
                           title="Remove Container">
                         <i class="fa fa-remove"></i>
                       </button>
+                    </td>
+                  </tr>
+                  <tr ng-if="containers[node.id].length == 0">
+                    <td class="text-muted">
+                      No containers currently exist
                     </td>
                   </tr>
                 </tbody>

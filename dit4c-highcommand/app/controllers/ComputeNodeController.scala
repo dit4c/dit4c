@@ -224,7 +224,8 @@ class ComputeNodeController @Inject() (
   def listContainers(nodeId: String) = Authenticated.async { implicit request =>
     withComputeNode(nodeId)(asOwner { computeNode =>
       for {
-        containers <- containerDao.list
+        allContainers <- containerDao.list
+        containers = allContainers.filter(_.computeNodeId == computeNode.id)
         dockerContainers <- containerProvider(computeNode).list
         dcMap = dockerContainers.map(c => (c.name -> c)).toMap
       } yield Ok(JsArray(containers.map { c =>
