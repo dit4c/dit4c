@@ -122,6 +122,8 @@ define(['./module'], (controllers) ->
         .success (token) ->
           $scope.images[node.id] ||= []
           $scope.images[node.id].push(token)
+          # Add response doesn't include metadata, kick off refresh
+          refreshImages(node)
 
     $scope.pullImage = (node, image) ->
       $http
