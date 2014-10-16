@@ -189,6 +189,10 @@ class ComputeNodeController @Inject() (
         .map { response =>
           Ok(response.json)
         }
+        .recover {
+          // Best response when compute node is down?
+          case e: ConnectException => Ok(JsArray())
+        }
     }
   }
 
