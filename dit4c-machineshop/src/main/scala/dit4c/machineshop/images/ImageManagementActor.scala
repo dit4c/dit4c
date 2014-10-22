@@ -100,11 +100,9 @@ class ImageManagementActor(
   protected def replyWithAddedImage(sender: ActorRef, addedImage: Image) {
     refetchImages.map(_.find(_.id == addedImage.id)).onComplete {
       case Success(Some(image)) =>
-        println("found image")
         // Return image as found by fetch
         sender ! AddedImage(image)
       case _ =>
-        println("missing image")
         // Failed to fetch a new list, but most likely the image was added
         sender ! AddedImage(addedImage)
     }
