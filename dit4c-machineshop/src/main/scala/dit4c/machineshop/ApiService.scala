@@ -54,7 +54,7 @@ class ApiService(
 
   def withImage(id: String)(f: Image => RequestContext => Unit) =
     onSuccess(imageMonitor ? ListImages()) {
-      case ImageList(images) => images.find(_.id == id) match {
+      case ImageList(images, _) => images.find(_.id == id) match {
         case Some(c) => f(c)
         case None => complete(StatusCodes.NotFound)
       }
@@ -156,9 +156,16 @@ class ApiService(
       pathEndOrSingleSlash {
         get {
           onSuccess(imageMonitor ? ListImages()) {
-            case ImageList(images) =>
-              complete {
-                images
+            case ImageList(images, stateId) =>
+              val etag = EntityTag(stateId)
+              optionalHeaderValueByType[HttpHeaders.`If-None-Match`]() {
+                case Some(HttpHeaders.`If-None-Match`(EntityTagRange.Default(tags)))
+                    if tags.contains(etag) =>
+                  complete(StatusCodes.NotModified)
+                case etag =>
+                  respondWithHeader(HttpHeaders.ETag(EntityTag(stateId))) {
+                    complete(images)
+                  }
               }
           }
         } ~

@@ -10,7 +10,6 @@ import spray.routing.HttpService
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models._
 import dit4c.machineshop.images._
-import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import akka.actor.{ActorRef, Props}
@@ -20,6 +19,7 @@ import akka.testkit.TestActor
 import scala.util.Random
 import scalax.file.ramfs.RamFileSystem
 import java.util.Calendar
+import java.security.MessageDigest
 
 class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService {
   implicit val actorRefFactory = system
@@ -29,7 +29,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
 
   def ephemeralKnownImages = new KnownImages(
     RamFileSystem().fromString("/known_images.json"))
-  
+
   def mockDockerClient = new DockerClient {
     var containerList: Seq[DockerContainer] = Nil
     var imageList: Seq[DockerImage] = Nil
@@ -58,7 +58,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         changed
       }
     }
-    
+
     case class MockDockerImage(
         val id: String,
         val names: Set[String],
@@ -69,21 +69,27 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       override def pull(imageName: String, tagName: String) =
         Future.successful({
           imageList = imageList ++ Seq(MockDockerImage(
-            Random.nextString(20),
+            sha1(s"$imageName:$tagName"),
             Set(s"$imageName:$tagName"),
-            Calendar.getInstance()))
+            dummyCreationDate))
         })
+      protected val dummyCreationDate = Calendar.getInstance()
     }
 
     override val containers = new DockerContainers {
       override def create(name: String, image: DockerImage) = Future.successful({
         val newContainer =
-          new MockDockerContainer(UUID.randomUUID.toString, name, image)
+          new MockDockerContainer(sha1(s"$name:$image"), name, image)
         containerList = containerList ++ Seq(newContainer)
         newContainer
       })
       override def list = Future.successful(containerList)
     }
+
+    protected def sha1(text: String) =
+      MessageDigest.getInstance("SHA-1")
+        .digest(text.getBytes("UTF-8"))
+        .map("%02x".format(_)).mkString
   }
 
   def mockSignatureActor(response: SignatureActor.AuthResponse): ActorRef = {
@@ -257,7 +263,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
           "HTTP method not allowed, supported methods: GET, POST"
       }
     }
-    
+
     "create new known image with POST requests to /images" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
@@ -278,7 +284,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
       }
       client.images.list.await must haveSize(1)
     }
-    
+
     "list images with GET request to /images" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
@@ -295,14 +301,22 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         knownImages += KnownImage(s"Fedora $i", "fedora", i.toString)
         client.images.pull("fedora", i.toString).await
       }
-      Get("/images") ~> route ~> check {
+      var etag: EntityTag = null
+      val sameRoute = route(client, knownImages)
+      Get("/images") ~> sameRoute ~> check {
         contentType must_== ContentTypes.`application/json`
+        header[HttpHeaders.ETag] must beSome[HttpHeaders.ETag]
+        etag = header[HttpHeaders.ETag].get.etag
         val json = JsonParser(responseAs[String])
         json must beAnInstanceOf[JsArray]
         json.asInstanceOf[JsArray].elements must haveSize(4)
       }
+      val ifNoneMatch = HttpHeaders.`If-None-Match`(EntityTagRange(Seq(etag)))
+      Get("/images") ~> addHeaders(ifNoneMatch) ~> sameRoute ~> check {
+        status must_== StatusCodes.NotModified
+      }
     }
-    
+
     "pull images with POST request to /images/:id/pull" in {
       import spray.json._
       import spray.httpx.SprayJsonSupport._
@@ -315,6 +329,6 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         status must_== StatusCodes.Accepted
       }
     }
-    
+
   }
 }

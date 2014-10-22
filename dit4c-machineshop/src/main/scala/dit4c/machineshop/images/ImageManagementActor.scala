@@ -8,7 +8,7 @@ import akka.event.Logging
 import java.util.Calendar
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.util.{Success,Failure}
+import scala.util.{Success, Failure, Random}
 
 class ImageManagementActor(
       knownImages: KnownImages,
@@ -54,7 +54,8 @@ class ImageManagementActor(
 
   def usingImages(images: Seq[Image]): Receive = {
     // Initialization
-    log.info(s"Currently managing ${images.size} images.")
+    val stateId = Random.alphanumeric.take(20).mkString
+    log.info(s"Currently managing ${images.size} images. (state: $stateId)")
     // Receive handler
     fetchImagesHandler orElse
     fetchedImagesHandler(Some(images)) orElse
@@ -83,7 +84,7 @@ class ImageManagementActor(
         }
 
       case ListImages() => {
-        sender ! ImageList(images)
+        sender ! ImageList(images, stateId)
       }
 
       case RemoveImage(id) =>
@@ -166,7 +167,7 @@ object ImageManagementActor {
     override def receive = {
       case "tick" =>
         manager ! ListImages()
-      case ImageList(images) => images.foreach { image =>
+      case ImageList(images, _) => images.foreach { image =>
         manager ! PullImage(image.id)
       }
       case PullingImage(image) =>
@@ -204,7 +205,7 @@ object ImageManagementActor {
   case class ConflictingImages(images: Seq[Image])
   case class PullingImage(image: Image)
   case class RemovedImage(image: Image)
-  case class ImageList(images: Seq[Image])
+  case class ImageList(images: Seq[Image], stateId: String)
   case class UnknownImage(id: String)
 
 }

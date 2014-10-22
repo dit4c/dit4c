@@ -4,11 +4,10 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import org.specs2.mutable.Specification
 import akka.util.Timeout
-import akka.testkit.TestActorRef
 import dit4c.machineshop.docker.DockerClient
 import scalax.file.ramfs.RamFileSystem
 import dit4c.machineshop.docker.models.DockerImages
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorSystem, ActorRef, Props}
 import dit4c.machineshop.Image
 import dit4c.machineshop.docker.models.DockerContainers
 import akka.pattern.ask
@@ -54,13 +53,13 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
     "declines duplicate images" >> {
       val knownImages = ephemeralKnownImages
-      val actorRef = newActor(knownImages)
       knownImages += KnownImage("Fedora", "fedora", "20")
+      val actorRef = newActor(knownImages)
 
       {
         val future = actorRef ? AddImage("Fedora 20", "fedora", "20")
-        future.value.get match {
-          case Success(ConflictingImages(Seq(image))) =>
+        result(future, timeoutDuration) match {
+          case ConflictingImages(Seq(image)) =>
             image.displayName must_== "Fedora"
             image.repository must_== "fedora"
             image.tag must_== "20"
@@ -69,8 +68,8 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
       {
         val future = actorRef ? AddImage("Fedora", "fedora", "latest")
-        future.value.get match {
-          case Success(ConflictingImages(Seq(image))) =>
+        result(future, timeoutDuration) match {
+          case ConflictingImages(Seq(image)) =>
             image.displayName must_== "Fedora"
             image.repository must_== "fedora"
             image.tag must_== "20"
@@ -86,8 +85,8 @@ class ImageManagementActorSpec extends Specification with Mockito {
       knownImages += knownImage
 
       val future = actorRef ? PullImage(knownImage.id)
-      future.value.get match {
-        case Success(PullingImage(image)) =>
+      result(future, timeoutDuration) match {
+        case PullingImage(image) =>
           image.displayName must_== knownImage.displayName
           image.repository must_== knownImage.repository
           image.tag must_== knownImage.tag
@@ -108,7 +107,7 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
       val future = actorRef ? ListImages()
       result(future, timeoutDuration) match {
-        case ImageList(images) => images.zipWithIndex.foreach {
+        case ImageList(images, _) => images.zipWithIndex.foreach {
           case (image, i) =>
             image.id          must beMatching("[a-z0-9]+")
             image.displayName must_== knownImageList(i).displayName
@@ -172,7 +171,7 @@ class ImageManagementActorSpec extends Specification with Mockito {
               MockImage("bar")
             )
             within (1.second) {
-              test.tell(ImageList(images), null)
+              test.tell(ImageList(images, "testStateId"), null)
               images.foreach { image =>
                 expectMsg(PullImage(image.id))
               }
@@ -188,16 +187,17 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
   }
 
-  def newActor: TestActorRef[ImageManagementActor] =
+  def newActor: ActorRef =
     newActor(ephemeralKnownImages)
 
-  def newActor(knownImages: KnownImages): TestActorRef[ImageManagementActor] =
+  def newActor(knownImages: KnownImages): ActorRef =
     newActor(knownImages, new MockDockerClient(knownImages))
 
   def newActor(
       knownImages: KnownImages,
-      dockerClient: DockerClient): TestActorRef[ImageManagementActor] =
-    TestActorRef(new ImageManagementActor(knownImages, dockerClient, None))
+      dockerClient: DockerClient): ActorRef =
+    system.actorOf(
+      Props(classOf[ImageManagementActor], knownImages, dockerClient, None))
 
   def ephemeralKnownImages =
     new KnownImages(RamFileSystem().fromString("/known_images.json"))
