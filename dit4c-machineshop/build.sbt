@@ -10,16 +10,16 @@ crossScalaVersions := Nil
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaV = "2.3.5"
-  val sprayV = "1.3.1"
+  val akkaV = "2.3.6"
+  val sprayV = "1.3.2"
   val scalaioV = "0.4.3-1"
-  val specs2V = "2.4.6"
+  val specs2V = "2.4.6-scalaz-7.0.6"
   Seq(
     "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
     "io.spray"            %%  "spray-can"       % sprayV,
     "io.spray"            %%  "spray-client"    % sprayV,
-    "io.spray"            %%  "spray-json"      % "1.2.6",
+    "io.spray"            %%  "spray-json"      % "1.3.0",
     "io.spray"            %%  "spray-routing"   % sprayV,
     "io.spray"            %%  "spray-testkit"   % sprayV  % "test",
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
