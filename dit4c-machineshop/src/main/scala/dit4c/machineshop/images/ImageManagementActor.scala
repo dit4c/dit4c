@@ -8,6 +8,7 @@ import akka.event.Logging
 import java.util.Calendar
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.util.{Success,Failure}
 
 class ImageManagementActor(
       knownImages: KnownImages,
@@ -42,6 +43,7 @@ class ImageManagementActor(
   }
 
   override def postStop() {
+    fetchImagesScheduler.cancel
     pullScheduler.foreach(_.cancel)
   }
 
@@ -65,8 +67,7 @@ class ImageManagementActor(
             val newKnownImage = KnownImage(displayName, repository, tag)
             knownImages += newKnownImage
             dockerClient.images.pull(repository, tag)
-            sender ! AddingImage(new ImageImpl(newKnownImage))
-            refetchImages
+            replyWithAddedImage(sender, new ImageImpl(newKnownImage))
           case images =>
             sender ! ConflictingImages(images.map(new ImageImpl(_)).toSeq)
         }
@@ -89,19 +90,39 @@ class ImageManagementActor(
         knownImages.find(i => i.id == id) match {
           case Some(knownImage: KnownImage) =>
             knownImages -= knownImage
-            sender ! RemovingImage(new ImageImpl(knownImage))
-            refetchImages
+            replyWithRemovedImage(sender, new ImageImpl(knownImage))
           case None =>
             sender ! UnknownImage(id)
         }
     }
   }
 
+  protected def replyWithAddedImage(sender: ActorRef, addedImage: Image) {
+    refetchImages.map(_.find(_.id == addedImage.id)).onComplete {
+      case Success(Some(image)) =>
+        println("found image")
+        // Return image as found by fetch
+        sender ! AddedImage(image)
+      case _ =>
+        println("missing image")
+        // Failed to fetch a new list, but most likely the image was added
+        sender ! AddedImage(addedImage)
+    }
+  }
+
+  protected def replyWithRemovedImage(sender: ActorRef, removedImage: Image) {
+    refetchImages.onComplete {
+      case _ => sender ! RemovedImage(removedImage)
+    }
+  }
+
   // Typically triggered when we know the existing image list is incorrect
-  protected def refetchImages {
-    fetchImages.onSuccess {
+  protected def refetchImages: Future[Seq[Image]] = {
+    val f = fetchImages
+    f.onSuccess {
       case images => self ! FetchedImages(images)
     }
+    f
   }
 
   protected val fetchImagesHandler: Receive = {
@@ -181,10 +202,10 @@ object ImageManagementActor {
   case class ListImages()
   case class RemoveImage(id: String)
 
-  case class AddingImage(image: Image)
+  case class AddedImage(image: Image)
   case class ConflictingImages(images: Seq[Image])
   case class PullingImage(image: Image)
-  case class RemovingImage(image: Image)
+  case class RemovedImage(image: Image)
   case class ImageList(images: Seq[Image])
   case class UnknownImage(id: String)
 

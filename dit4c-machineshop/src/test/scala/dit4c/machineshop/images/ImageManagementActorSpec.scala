@@ -42,8 +42,8 @@ class ImageManagementActorSpec extends Specification with Mockito {
       val actorRef = newActor
 
       val future = actorRef ? AddImage("Fedora", "fedora", "20")
-      future.value.get match {
-        case Success(AddingImage(image)) =>
+      result(future, timeoutDuration) match {
+        case AddedImage(image) =>
           image.displayName must_== "Fedora"
           image.repository must_== "fedora"
           image.tag must_== "20"
@@ -127,8 +127,8 @@ class ImageManagementActorSpec extends Specification with Mockito {
       knownImages += knownImage
 
       val future = actorRef ? RemoveImage(knownImage.id)
-      future.value.get match {
-        case Success(RemovingImage(image)) =>
+      result(future, timeoutDuration) match {
+        case RemovedImage(image) =>
           image.displayName must_== "Fedora"
           image.repository must_== "fedora"
           image.tag must_== "20"
