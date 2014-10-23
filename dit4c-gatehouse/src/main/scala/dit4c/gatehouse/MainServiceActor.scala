@@ -15,7 +15,7 @@ class MainServiceActor(config: Config) extends Actor with MiscService {
   // connects the services environment to the enclosing actor or test
   def actorRefFactory = context
 
-  val dockerClient = new DockerClient(Uri("http://127.0.0.1:4243/"))
+  val dockerClient = new DockerClient(Uri("http://127.0.0.1:2375/"))
   val dockerIndex = actorRefFactory.actorOf(
       Props(classOf[DockerIndexActor], dockerClient), "docker-index")
   val auth = actorRefFactory.actorOf(

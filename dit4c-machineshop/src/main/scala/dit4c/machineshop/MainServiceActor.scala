@@ -20,13 +20,13 @@ class MainServiceActor(config: Config) extends Actor with HttpService {
   def actorRefFactory = context
 
   val knownImages = new KnownImages(config.knownImageFile)
-  val dockerClient = new DockerClientImpl(Uri("http://127.0.0.1:4243/"))
+  val dockerClient = new DockerClientImpl(Uri("http://127.0.0.1:2375/"))
   val signatureActor: Option[ActorRef] =
     config.publicKeyLocation.map { loc =>
       actorRefFactory.actorOf(
         Props(classOf[SignatureActor], loc, config.keyUpdateInterval))
     }
-  
+
   val imageMonitor = actorRefFactory.actorOf(
       Props(classOf[ImageManagementActor],
         knownImages, dockerClient, config.imageUpdateInterval),
