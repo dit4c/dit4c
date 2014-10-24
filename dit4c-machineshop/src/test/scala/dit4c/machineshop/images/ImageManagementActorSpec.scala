@@ -80,9 +80,9 @@ class ImageManagementActorSpec extends Specification with Mockito {
     "pulls images" >> {
       val knownImages = ephemeralKnownImages
       val dockerClient = spy(new MockDockerClient(knownImages))
-      val actorRef = newActor(knownImages, dockerClient)
       val knownImage = KnownImage("Fedora", "fedora", "20")
       knownImages += knownImage
+      val actorRef = newActor(knownImages, dockerClient)
 
       val future = actorRef ? PullImage(knownImage.id)
       result(future, timeoutDuration) match {
@@ -98,12 +98,12 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
     "lists images" >> {
       val knownImages = ephemeralKnownImages
-      val actorRef = newActor(knownImages)
       val knownImageList = IndexedSeq(
         KnownImage("CentOS", "centos", "centos7"),
         KnownImage("Fedora 19", "fedora", "19"),
         KnownImage("Fedora 20", "fedora", "20"))
       shuffle(knownImageList).foreach(knownImages += _)
+      val actorRef = newActor(knownImages)
 
       val future = actorRef ? ListImages()
       result(future, timeoutDuration) match {
