@@ -55,7 +55,8 @@ define(['./app'], (app) ->
                       node.images = response.data.filter (image) ->
                         # Only include downloaded images
                         image.metadata
-                      insertInOrder(node)
+                      if (node.images.length > 0)
+                        insertInOrder(node)
               usableNodes
     )
 
