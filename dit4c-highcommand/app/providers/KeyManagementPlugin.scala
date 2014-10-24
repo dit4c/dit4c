@@ -87,10 +87,10 @@ class KeyManagementActor(
       .flatMap(deleteOldKeys(_))
 
   /**
-   * Create a new key if all keys are older than the creation age.
+   * Create a new key if all non-retired keys are older than the creation age.
    */
   def createKeyIfRequired(keys: Seq[Key]): Future[Seq[Key]] =
-    if (keys.forall(_.isOlderThan(config.creationWait)))
+    if (keys.filter(!_.retired).forall(_.isOlderThan(config.creationWait)))
       createNewKey.flatMap(_ => keyDao.list)
     else
       Future.successful(keys)
