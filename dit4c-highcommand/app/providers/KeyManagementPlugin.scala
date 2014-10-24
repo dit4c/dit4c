@@ -29,7 +29,7 @@ class KeyManagementPlugin(app: play.api.Application) extends Plugin {
       .getOrElse("DIT4C"),
     app.configuration
       .getInt("keys.length")
-      .getOrElse(4096),
+      .getOrElse(1024),
     Period.hours(3),
     Period.hours(24),
     Period.days(7)
