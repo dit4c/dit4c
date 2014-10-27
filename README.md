@@ -6,13 +6,15 @@ DIT4C is a scalable platform for providing containerized web-based programming a
  * No local credentials: use your [GitHub][github] or [AAF][aaf] account
  * Based on Docker - runs on bare metal or cloud computing
 
-All authentication is via federated identity providers - all a user needs is a modern web browser. 
+All authentication is via federated identity providers - all a user needs is a modern web browser.
 
 Current environments available are:
  * [Base][dit4c-container-base] - web-based TTY sessions and basic file management
  * [iPython Notebooks + Base][dit4c-container-ipython]
  * [RStudio + Base][dit4c-container-rstudio]
-
+ * [IJulia + Base][dit4c-container-ijulia]
+ * [X11][dit4c-container-x11] - Base + X11 sessions via HTML5 VNC client
+ * [Octave + X11][dit4c-container-octave]
 
 ## Motivation
 
@@ -41,7 +43,7 @@ Similarly, _machineshop_ also fetches _highcommand_ keys, and uses them to authe
 
 To install DIT4C, you will need:
 
- * a domain name with DNS that allows you to create wildcard entries. 
+ * a domain name with DNS that allows you to create wildcard entries.
  * a SSL certificate for the domain and its wildcard. eg. `my.domain.example.test` & `*.my.domain.example.test`
  * at least one Linux host with Docker installed. ([CoreOS][coreos] is ideal.)
  * for authentication, at least one of:
@@ -102,5 +104,8 @@ docker run --name dit4c_deploy_compute --rm \
 [dit4c-container-base]: https://registry.hub.docker.com/u/dit4c/dit4c-container-base/
 [dit4c-container-ipython]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ipython/
 [dit4c-container-rstudio]: https://registry.hub.docker.com/u/dit4c/dit4c-container-rstudio/
+[dit4c-container-ijulia]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ijulia/
+[dit4c-container-x11]: https://registry.hub.docker.com/u/dit4c/dit4c-container-x11/
+[dit4c-container-octave]: https://registry.hub.docker.com/u/dit4c/dit4c-container-octave/
 [dit4c-deploy-portal]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-portal/
 [dit4c-deploy-compute]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-compute/
