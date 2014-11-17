@@ -24,32 +24,52 @@ body {
       color: @light-grad-color;
     }
   }
+  .btn-outline {
+    color: @light-grad-color;
+    background-color: transparent;
+    border-color: @light-grad-color;
+    font-weight: bold;
+    &:hover {
+      color: white;
+      background-color: @light-grad-color;
+    }
+  }
   &.front-page {
     background: linear-gradient(to bottom, @dark-grad-color 0%, @light-grad-color 100%);
     .navbar, .nav .open {
       background: transparent;
-  	  a, p, .dropdown-menu {
-  		  color: white;
-  		  background: transparent;
-  		  &:hover, &:focus {
-  		    background: transparent;
-  		  }
-  		}
-  		.icon-bar {
-  		  background-color: white;
-  		}
+      a, p, .dropdown-menu {
+        color: white;
+        background: transparent;
+        &:hover, &:focus {
+          background: transparent;
+        }
+      }
+      .icon-bar {
+        background-color: white;
+      }
+    }
+    .btn-outline, .navbar .btn-outline {
+      color: white;
+      background-color: transparent;
+      border-color: white;
+      font-weight: bold;
+      &:hover {
+        color: @light-grad-color;
+        background-color: white;
+      }
     }
   }
 }
 
 #home-jumbo {
   background: transparent;
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	margin-bottom: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin-bottom: 0;
   text-align: center;
   overflow: hidden;
   .icon-dit4c-logo {
