@@ -12,8 +12,7 @@ define(['./app'], (app) ->
       resolve: {
         notLoggedIn: (AuthSrv, $location) ->
           AuthSrv.updateUser().then((user) ->
-            if user
-              $location.path('/containers').replace()
+            $location.path('/containers').replace() if user
           )
       }
     )
@@ -30,11 +29,14 @@ define(['./app'], (app) ->
       templateUrl: 'containers.html'
       controller: 'ContainersCtrl',
       resolve:
-        containers: ($http) ->
+        containers: ($http, $location) ->
           $http
             .get('/containers')
             .then (response) ->
               response.data
+            .catch (e) ->
+              $location.path('/login').replace() if e.status == 403
+              []
         computeNodes: ($http, $q) ->
           $http
             .get('/compute-nodes')
@@ -64,11 +66,14 @@ define(['./app'], (app) ->
       templateUrl: 'compute-nodes.html'
       controller: 'ComputeNodesCtrl',
       resolve:
-        computeNodes: ($http) ->
+        computeNodes: ($http, $location) ->
           $http
             .get('/compute-nodes')
             .then (response) ->
               response.data
+            .catch (e) ->
+              $location.path('/login').replace() if e.status == 403
+              []
     )
 
     $routeProvider.when('/notfound',

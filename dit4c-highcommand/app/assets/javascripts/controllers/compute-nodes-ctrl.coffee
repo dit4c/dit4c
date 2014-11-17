@@ -229,6 +229,7 @@ define(['./module'], (controllers) ->
         refreshOwners(node),
         refreshUsers(node)])
 
+    # On load, refresh associated collections
     $route.current.locals.computeNodes
       .filter (node) ->
         node.owned
