@@ -1,19 +1,37 @@
-@primary-color: #e0675f;
-  
+@dark-grad-color: rgba(0,23,105,1);
+@light-grad-color: rgba(21,78,166,1);
+
 body {
   padding-top: 70px;
   .navbar {
-  	background-color: white;
-	  a, p {
-		  color: @primary-color;
-		}
-		.icon-bar {
-		  background-color: @primary-color;
-		}
+    background: white;
+    .icon-bar {
+      background-color: #ddd;
+    }
+    .navbar-brand {
+      color: @light-grad-color;
+    }
+  }
+  &.front-page {
+    background: linear-gradient(to bottom, @dark-grad-color 0%, @light-grad-color 100%);
+    .navbar, .nav .open {
+      background: transparent;
+  	  a, p, .dropdown-menu {
+  		  color: white;
+  		  background: transparent;
+  		  &:hover, &:focus {
+  		    background: transparent;
+  		  }
+  		}
+  		.icon-bar {
+  		  background-color: white;
+  		}
+    }
   }
 }
 
 #home-jumbo {
+  background: transparent;
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -27,7 +45,6 @@ body {
 }
 
 .jumbotron {
-  background-color: @primary-color;
   color: white;
   a {
     color: white;
