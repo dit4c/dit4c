@@ -230,7 +230,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
           "Tty" -> JsBoolean(true),
           "AttachStdout" -> JsBoolean(true),
           "AttachStderr" -> JsBoolean(true),
-          "Dns" -> JsNull,
+          "CpuShares" -> JsNumber(1),
           "Image" -> JsString(image),
           "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
         )
