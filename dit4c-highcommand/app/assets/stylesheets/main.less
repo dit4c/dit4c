@@ -1,6 +1,17 @@
 @dark-grad-color: rgba(0,23,105,1);
 @light-grad-color: rgba(21,78,166,1);
 
+@font-face {
+  font-family: 'dit4c';
+  src:url('../fonts/dit4c.eot?-ct28a0');
+  src:url('../fonts/dit4c.eot?#iefix-ct28a0') format('embedded-opentype'),
+    url('../fonts/dit4c.woff?-ct28a0') format('woff'),
+    url('../fonts/dit4c.ttf?-ct28a0') format('truetype'),
+    url('../fonts/dit4c.svg?-ct28a0#icomoon') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+
 body {
   padding-top: 70px;
   .navbar {
@@ -38,10 +49,14 @@ body {
 	right: 0;
 	bottom: 0;
 	margin-bottom: 0;
-	img {
-		max-width: 100%;
-		margin-top: 80px;
-	}
+  text-align: center;
+  overflow: hidden;
+  .icon-dit4c-logo {
+    display: inline-block;
+    margin-top: 50px;
+    max-width: 100%;
+    font-size: 500px;
+  }
 }
 
 .jumbotron {
@@ -49,4 +64,25 @@ body {
   a {
     color: white;
   }
+}
+
+[class^="icon-dit4c"], [class*=" icon-dit4c"] {
+  font-family: 'dit4c';
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-dit4c-logo:before {
+  content: "\e600";
+}
+
+.icon-dit4c-cloud:before {
+  content: "\e601";
 }
