@@ -143,7 +143,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       val pipeline: HttpRequest => Future[Unit] =
         sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
 
-      val createRequest =
+      val startRequest =
         JsObject(
           "PortBindings" -> JsObject(),
           "PublishAllPorts" -> JsBoolean(true)
@@ -152,7 +152,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       pipeline({
         import spray.httpx.RequestBuilding._
         Post(baseUrl + s"containers/$id/start")
-          .withEntity(HttpEntity(`application/json`, createRequest.compactPrint))
+          .withEntity(HttpEntity(`application/json`, startRequest.compactPrint))
       }).flatMap({
         case _: Unit => this.refresh
       })
@@ -242,7 +242,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
         }
         import spray.httpx.RequestBuilding._
         Post(baseUrl + s"containers/create?name=$name")
-          .withEntity(HttpEntity(createRequest.compactPrint))
+          .withEntity(HttpEntity(`application/json`, createRequest.compactPrint))
       }
     }
 
