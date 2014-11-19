@@ -109,7 +109,7 @@
 
       <div ng-if="computeNodes.length > 0">
         <section ng-show="isAddFormOpen" class="well">
-          <button type="button" class="close pull-right" ng-click="isAddFormOpen = false" style="z-index: 1">
+          <button type="button" class="close pull-right" ng-click="isAddFormOpen = false">
             <span aria-hidden="true">&times;</span>
             <span class="sr-only">Close</span>
           </button>
@@ -244,13 +244,17 @@
 
       <br/>
 
-      <div ng-show="isAccessFormOpen">
+      <div ng-show="isAccessFormOpen" class="well">
+        <button type="button" class="close pull-right" ng-click="isAccessFormOpen = false">
+          <span aria-hidden="true">&times;</span>
+          <span class="sr-only">Close</span>
+        </button>
         <form class="form-horizontal" role="form">
           <div class="form-group">
             <label for="accessform-node" class="col-sm-2 control-label">
               Compute Node
             </label>
-            <div class="col-sm-10">
+            <div class="col-sm-9">
             <select id="accessform-node"
             	class="form-control" ng-model="accessForm.node"
             	ng-options="node.name for node in computeNodes track by node.id"
@@ -281,13 +285,17 @@
         </form>
       </div>
 
-      <div ng-show="isAddFormOpen">
+      <div ng-show="isAddFormOpen" class="well">
+        <button type="button" class="close pull-right" ng-click="isAddFormOpen = false">
+          <span aria-hidden="true">&times;</span>
+          <span class="sr-only">Close</span>
+        </button>
         <form class="form-horizontal" role="form">
           <div class="form-group">
             <label for="addform-name" class="col-sm-2 control-label">
               Name
             </label>
-            <div class="col-sm-10">
+            <div class="col-sm-9">
             <input id="addform-name" type="text"
               class="form-control" ng-model="addForm.name"
               ></select>
@@ -354,19 +362,23 @@
         </form>
       </div>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Compute Node</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
-            <td>
-              <span>{{node.name}}</span>
+      <accordion close-others="oneAtATime">
+          <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
+              <accordion-heading>
+                {{node.name}}
+              </accordion-heading>
+              <div class="pull-right">
+                <button class="btn btn-default" ng-disabled="node.editForm" ng-if="node.owned" ng-click="populateEditForm(node)">
+                  Edit
+                </button>
+                <button class="btn btn-danger"
+                  ng-if="node.owned" ng-click="removeNode(node)">
+                  Delete
+                </button>
+              </div>
 
-              <form class="form form-horizontal" ng-if="node.editForm" role="form">
+              <div class="well" ng-if="node.editForm">
+              <form class="form form-horizontal" role="form">
                 <div class="form-group">
                   <label for="editForm-{{node.id}}-name" class="col-sm-2 control-label">
                     Name
@@ -437,6 +449,7 @@
                   </div>
                 </div>
               </form>
+              </div>
 
               <table class="table" ng-if="node.owned">
                 <thead>
@@ -635,19 +648,9 @@
                   </tr>
                 </tbody>
               </table>
-            </td>
-            <td>
-              <button class="btn btn-default" ng-disabled="node.editForm" ng-if="node.owned" ng-click="populateEditForm(node)">
-                Edit
-              </button>
-              <button class="btn btn-danger"
-                ng-if="node.owned" ng-click="removeNode(node)">
-                Delete
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+
+          </accordion-group>
+      </accordion>
     </div>
     </script>
 
