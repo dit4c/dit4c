@@ -1,30 +1,51 @@
 package dit4c.machineshop
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.event.Logging
 import akka.io.IO
 import spray.can.Http
+import spray.http.Uri
+import spray.routing.SimpleRoutingApp
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
 import java.util.concurrent.TimeUnit
 import scalax.file.{FileSystem,Path}
+import scala.util.{Success,Failure}
+import dit4c.machineshop.docker.DockerClientImpl
+import dit4c.machineshop.images.{ImageManagementActor, KnownImages}
+import dit4c.machineshop.auth.SignatureActor
 
-object Boot extends App {
+object Boot extends App with SimpleRoutingApp {
+  implicit val system = ActorSystem("dit4c-machineshop")
+  val log = Logging.getLogger(system, this)
+  import system.dispatcher
 
   def start(config: Config) {
-    // we need an ActorSystem to host our application in
-    implicit val system = ActorSystem("on-spray-can")
+    startServer(interface = config.interface, port = config.port) {
+      val knownImages = new KnownImages(config.knownImageFile)
+      val dockerClient = new DockerClientImpl(Uri("http://127.0.0.1:2375/"))
+      val signatureActor: Option[ActorRef] =
+        config.publicKeyLocation.map { loc =>
+          actorRefFactory.actorOf(
+            Props(classOf[SignatureActor], loc, config.keyUpdateInterval))
+        }
+      val imageMonitor = actorRefFactory.actorOf(
+          Props(classOf[ImageManagementActor],
+            knownImages, dockerClient, config.imageUpdateInterval),
+          "image-monitor")
 
-    val service = system.actorOf(
-        Props(classOf[MainServiceActor], config),
-        "main-service")
-
-    implicit val timeout = Timeout(5.seconds)
-    // start a new HTTP server on specified interface and port
-    IO(Http) ? Http.Bind(service,
-        interface = config.interface,
-        port = config.port)
+      MiscService(config.serverId).route ~
+        ApiService(dockerClient, imageMonitor, signatureActor).route
+    } onComplete {
+      case Success(b) =>
+        log.info(s"Successfully bound to ${b.localAddress}")
+      case Failure(msg) =>
+        system.shutdown()
+        log.error(msg.getMessage)
+        System.exit(1)
+    }
   }
 
   ArgParser.parse(args, Config()) map { config =>

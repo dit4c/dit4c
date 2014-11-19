@@ -22,8 +22,6 @@ object Boot extends App with SimpleRoutingApp {
   import system.dispatcher
 
   def start(config: Config) {
-    // we need an ActorSystem to host our application in
-
     startServer(interface = config.interface, port = config.port) {
       val dockerClient = new DockerClient(Uri("http://127.0.0.1:2375/"))
       val dockerIndex = actorRefFactory.actorOf(
