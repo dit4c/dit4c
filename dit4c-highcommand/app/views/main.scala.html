@@ -107,36 +107,73 @@
     <div class="container">
       <h1>Containers</h1>
 
-      <div>
-        <form class="form-inline" ng-if="computeNodes.length > 0">
-          <div class="form-group has-feedback"
-               ng-class="{'has-success': nameCheck.valid === true, 'has-error': nameCheck.valid === false}"
-               title="{{nameCheck.reason}}">
-            <input type="text" class="form-control"
-              ng-model="newContainer.name"
-              ng-change="checkName(newContainer.name)"
-              placeholder="Container Name"
-              />
-            <span class="glyphicon form-control-feedback"
-              ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span>
-          </div>
-          <select class="form-control" ng-model="newContainer.computeNode"
-          	required="true"
-            ng-change="selectFirstImage(newContainer.computeNode)"
-            ng-options="node.name for node in computeNodes track by node.id"></select>
-          <select class="form-control" ng-model="newContainer.image"
-            ng-init="selectFirstImage(newContainer.computeNode)"
-            ng-options="imageName(image) as image.displayName for image in newContainer.computeNode.images"></select>
-          <div class="checkbox">
-            <label>
-              Start?
-              <input type="checkbox" ng-model="newContainer.active"/>
-            </label>
-          </div>
-          <button class="btn btn-primary" ng-click="create()">
-            Create
+      <div ng-if="computeNodes.length > 0">
+        <section ng-show="isAddFormOpen" class="well">
+          <button type="button" class="close pull-right" ng-click="isAddFormOpen = false" style="z-index: 1">
+            <span aria-hidden="true">&times;</span>
+            <span class="sr-only">Close</span>
           </button>
-        </form>
+          <form class="form-horizontal" role="form">
+            <div class="form-group"
+                ng-class="{'has-error': nameCheck.valid === false}">
+              <label class="col-sm-3 control-label">
+                Container Name
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control"
+                  ng-model="newContainer.name"
+                  ng-change="checkName(newContainer.name)"
+                  placeholder="Container Name"/>
+                <!--span class="glyphicon form-control-feedback"
+                  ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span-->
+                <p class="help-block text-danger">{{nameCheck.reason}}</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="col-sm-3 control-label">Compute Node</label>
+              <div class="col-sm-5">
+                <select class="form-control"
+                  ng-model="newContainer.computeNode"
+                	required="true"
+                  ng-change="selectFirstImage(newContainer.computeNode)"
+                  ng-options="node.name for node in computeNodes track by node.id"></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="col-sm-3 control-label">Image</label>
+              <div class="col-sm-5">
+                <select class="form-control" ng-model="newContainer.image"
+                  ng-init="selectFirstImage(newContainer.computeNode)"
+                  ng-options="imageName(image) as image.displayName for image in newContainer.computeNode.images"></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="col-sm-3 control-label">Initial State</label>
+              <div class="col-sm-9">
+                <div class="btn-group">
+                  <span ng-if="newContainer.active" class="btn btn-success active disabled" style="opacity: 1">On</span>
+                  <button ng-if="newContainer.active" class="btn btn-default" ng-click="newContainer.active = false">&nbsp;</button>
+                  <button ng-if="!newContainer.active" class="btn btn-default" ng-click="newContainer.active = true">&nbsp;</button>
+                  <span ng-if="!newContainer.active" class="btn btn-default active disabled" style="opacity: 1">Off</span>
+                </div>
+                <input type="hidden" ng-model="newContainer.active"/>
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="col-sm-offset-3 col-sm-10">
+                <button class="btn btn-primary" ng-click="create()" ng-class="{ disabled: nameCheck.valid !== true }">
+                  Create
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+        <div class="text-right" ng-show="!isAddFormOpen">
+          <button class="btn btn-default" ng-click="isAddFormOpen = true">
+            <i class="fa fa-plus"></i>
+            Add Container
+          </button>
+        </div>
       </div>
 
       <table class="table">
@@ -144,7 +181,7 @@
           <tr>
             <th>Container Name</th>
             <th>Compute Node</th>
-            <th>Active?</th>
+            <th>State</th>
             <th></th>
           </tr>
         </thead>
@@ -162,10 +199,10 @@
             </td>
             <td>
               <div class="btn-group" ng-if="container.id && container.active != null">
-                <button ng-if="container.active" class="btn btn-primary disabled active" role="button">On</button>
-                <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">Off</button>
-                <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">On</button>
-                <button ng-if="!container.active" class="btn btn-primary disabled active" role="button">Off</button>
+                <span ng-if="container.active" class="btn btn-success active disabled" style="opacity: 1">On</span>
+                <button ng-if="container.active" class="btn btn-default" ng-click="turnOff(container.id)">&nbsp;</button>
+                <button ng-if="!container.active" class="btn btn-default" ng-click="turnOn(container.id)">&nbsp;</button>
+                <span ng-if="!container.active" class="btn btn-default active disabled" style="opacity: 1">Off</span>
               </div>
               <span class="text-muted" ng-if="container.active == null">
                 status unknown

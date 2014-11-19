@@ -14,12 +14,12 @@ libraryDependencies ++= Seq(
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS
-  "org.webjars" % "angular-ui-bootstrap" % "0.11.0-2",
+  "org.webjars" % "angular-ui-bootstrap" % "0.12.0",
   // Bootstrap & Font Awesome
-  "org.webjars" % "bootstrap" % "3.2.0",
+  "org.webjars" % "bootstrap" % "3.3.1",
   "org.webjars" % "font-awesome" % "4.2.0",
   // domReady
-  "org.webjars" % "requirejs-domready" % "2.0.1-1"
+  "org.webjars" % "requirejs-domready" % "2.0.1-2"
 )
 
 resolvers ++= Seq(
@@ -40,7 +40,7 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirecto
       val file = in.toSeq.head
       val content =
         s"""|package helpers
-            |object AppVersion { 
+            |object AppVersion {
             |  override def toString = "$v"
             |}""".stripMargin
       IO.write(file, content);

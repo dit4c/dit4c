@@ -16,6 +16,9 @@ define(['./module'], (controllers) ->
       image: ""
       active: false
 
+    $scope.closeAddForm = () ->
+      isAddFormOpen = false
+
     $scope.$watch("computeNodes",
       (newValue, oldValue) ->
         if (!$scope.newContainer.computeNode)
