@@ -363,293 +363,341 @@
       </div>
 
       <accordion close-others="oneAtATime">
-          <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
-              <accordion-heading>
-                {{node.name}}
-              </accordion-heading>
-              <div class="pull-right">
-                <button class="btn btn-default" ng-disabled="node.editForm" ng-if="node.owned" ng-click="populateEditForm(node)">
-                  Edit
-                </button>
-                <button class="btn btn-danger"
-                  ng-if="node.owned" ng-click="removeNode(node)">
-                  Delete
-                </button>
+        <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
+          <accordion-heading>
+            {{node.name}}
+          </accordion-heading>
+
+          <div class="well" ng-if="node.confirmingDelete">
+            <p class="lead">
+            Are you really, really sure?
+            </p>
+
+            <p>
+            There is <strong>no undo</strong>, and this will remove the compute
+            node and all containers associated with the compute node.
+            </p>
+
+            <p>
+            If you really want to, type the name of the compute node below:
+            </p>
+
+            <form>
+              <input class="form-control" ng-model="node.confirmingDeleteText">
+            </form>
+
+            <p>
+              <button class="btn btn-danger"
+                ng-click="removeNode(node); node.confirmingDelete = false"
+                ng-disabled="node.confirmingDeleteText != node.name">
+                Delete compute node
+              </button>
+
+              <button class="btn btn-default"
+                ng-click="node.confirmingDelete = false">
+                I've changed my mind
+              </button>
+            </p>
+          </div>
+
+          <div class="well" ng-if="node.editForm">
+            <form class="form form-horizontal" role="form">
+              <div class="form-group">
+                <label for="editForm-{{node.id}}-name" class="col-sm-2 control-label">
+                  Name
+                </label>
+                <div class="col-sm-10">
+                <input id="editForm-{{node.id}}-name" type="text"
+                  class="form-control" ng-model="node.editForm.name"
+                  ></select>
+                </div>
               </div>
-
-              <div class="well" ng-if="node.editForm">
-              <form class="form form-horizontal" role="form">
-                <div class="form-group">
-                  <label for="editForm-{{node.id}}-name" class="col-sm-2 control-label">
-                    Name
-                  </label>
-                  <div class="col-sm-10">
-                  <input id="editForm-{{node.id}}-name" type="text"
-                    class="form-control" ng-model="node.editForm.name"
-                    ></select>
-                  </div>
+              <div class="form-group">
+                <label for="editForm-{{node.id}}-url" class="col-sm-2 control-label">
+                  Management URL
+                </label>
+                <div class="col-sm-10">
+                <input id="editForm-{{node.id}}-url" type="text"
+                  class="form-control" ng-model="node.editForm.managementUrl"
+                  ></select>
                 </div>
-                <div class="form-group">
-                  <label for="editForm-{{node.id}}-url" class="col-sm-2 control-label">
-                    Management URL
-                  </label>
-                  <div class="col-sm-10">
-                  <input id="editForm-{{node.id}}-url" type="text"
-                    class="form-control" ng-model="node.editForm.managementUrl"
-                    ></select>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="col-sm-2 control-label">
-                    Backend
-                  </label>
-                  <div class="col-sm-10">
-                    <div class="form-group">
-                      <label for="editForm-{{node.id}}-backend-scheme" class="col-sm-2 control-label">
-                        Scheme
-                      </label>
-                      <div class="col-sm-10">
-                        <select id="editForm-{{node.id}}-backend-scheme"
-                          class="form-control" ng-model="node.editForm.backend.scheme">
-                          <option value="http">HTTP</option>
-                          <option value="https">HTTPS</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label for="editForm-{{node.id}}-backend-host" class="col-sm-2 control-label">
-                        Host
-                      </label>
-                      <div class="col-sm-10">
-                        <input id="editForm-{{node.id}}-backend-host" type="text"
-                          class="form-control" ng-model="node.editForm.backend.host"
-                          ></select>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label for="editForm-{{node.id}}-backend-port" class="col-sm-2 control-label">
-                        Port
-                      </label>
-                      <div class="col-sm-10">
-                        <input id="editForm-{{node.id}}-backend-port"
-                          class="form-control" ng-model="node.editForm.backend.port"
-                          type="number" min="1" max="65525">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <div class="col-sm-offset-2 col-sm-10">
-                    <button class="btn btn-default" ng-click="updateNode(node)">
-                      Update
-                    </button>
-                    <button class="btn btn-default" ng-click="clearEditForm(node)">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </form>
               </div>
+              <div class="form-group">
+                <label class="col-sm-2 control-label">
+                  Backend
+                </label>
+                <div class="col-sm-10">
+                  <div class="form-group">
+                    <label for="editForm-{{node.id}}-backend-scheme" class="col-sm-2 control-label">
+                      Scheme
+                    </label>
+                    <div class="col-sm-10">
+                      <select id="editForm-{{node.id}}-backend-scheme"
+                        class="form-control" ng-model="node.editForm.backend.scheme">
+                        <option value="http">HTTP</option>
+                        <option value="https">HTTPS</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="editForm-{{node.id}}-backend-host" class="col-sm-2 control-label">
+                      Host
+                    </label>
+                    <div class="col-sm-10">
+                      <input id="editForm-{{node.id}}-backend-host" type="text"
+                        class="form-control" ng-model="node.editForm.backend.host"
+                        ></select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="editForm-{{node.id}}-backend-port" class="col-sm-2 control-label">
+                      Port
+                    </label>
+                    <div class="col-sm-10">
+                      <input id="editForm-{{node.id}}-backend-port"
+                        class="form-control" ng-model="node.editForm.backend.port"
+                        type="number" min="1" max="65525">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                  <button class="btn btn-primary" ng-click="updateNode(node)">
+                    Update
+                  </button>
+                  <button class="btn btn-default" ng-click="clearEditForm(node)">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
 
-              <table class="table" ng-if="node.owned">
-                <thead>
-                  <tr>
-                    <th>Access Token</th>
-                    <th>Type</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr ng-repeat="token in tokens[node.id]">
-                    <td>{{token.code | accessToken:3}}</td>
-                    <td>
-                      <span ng-if="token.type == 'share'">Sharing</span>
-                      <span ng-if="token.type == 'own'">Ownership</span>
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-danger" ng-click="removeToken(node, token)">
-                        <i class="fa fa-remove"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <button class="btn btn-default" ng-click="addToken(node, 'share')">
-                        <i class="fa fa-plus"></i>
-                        New Sharing Token
-                      </button>
-                      <button class="btn btn-link btn-muted" ng-click="addToken(node, 'own')">
-                        <i class="fa fa-plus"></i>
-                        New Ownership Token
-                      </button>
-                    </td>
-                    <td></td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
+          <div ng-if="!(node.editForm || node.confirmingDelete)">
+            <div class="pull-right clear">
+              <button class="btn btn-default" ng-if="node.owned" ng-click="populateEditForm(node)">
+                Edit
+              </button>
+              <button class="btn btn-danger"
+                ng-if="node.owned" ng-click="node.confirmingDelete = true">
+                Delete
+              </button>
+            </div>
+            <tabset>
+              <tab>
+                <tab-heading>Access Tokens</tab-heading>
 
-              <table class="table" ng-if="node.owned">
-                <thead>
-                  <tr>
-                    <th>Images</th>
-                    <th></th>
-                    <th>Created</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr ng-repeat="image in images[node.id]" ng-class="{'text-muted': !image.metadata}">
-                    <td>{{image.displayName}}</td>
-                    <td>{{image.repository}}:{{image.tag}}</td>
-                    <td>
-                      <span ng-if="image.metadata" title="{{image.metadata.id}}">
-                        {{image.metadata.created}}
-                      </span>
-                      <span ng-if="image.pulling">
-                        (pulling)
-                      </span>
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-info" ng-click="pullImage(node, image)"
-                              title="Pull Image">
-                        <i class="fa fa-cloud-download"></i>
-                      </button>
-                      <button class="btn btn-danger" ng-click="removeImage(node, image)"
-                              title="Remove Image">
-                        <i class="fa fa-remove"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <input type="text" class="form-control"
-                        ng-model="newImage.displayName"
-                        placeholder="display name for users"
-                      />
-                    </td>
-                    <td>
-                      <div class="input-group">
+                <table class="table" ng-if="node.owned">
+                  <thead>
+                    <tr>
+                      <th>Access Code</th>
+                      <th>Type</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr ng-repeat="token in tokens[node.id]">
+                      <td>{{token.code | accessToken:3}}</td>
+                      <td>
+                        <span ng-if="token.type == 'share'">Sharing</span>
+                        <span ng-if="token.type == 'own'">Ownership</span>
+                      </td>
+                      <td class="text-right">
+                        <button class="btn btn-danger" ng-click="removeToken(node, token)">
+                          <i class="fa fa-remove"></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <button class="btn btn-default" ng-click="addToken(node, 'share')">
+                          <i class="fa fa-plus"></i>
+                          New Sharing Token
+                        </button>
+                        <button class="btn btn-link btn-muted" ng-click="addToken(node, 'own')">
+                          <i class="fa fa-plus"></i>
+                          New Ownership Token
+                        </button>
+                      </td>
+                      <td></td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </tab>
+              <tab>
+                <tab-heading>Images</tab-heading>
+
+                <table class="table" ng-if="node.owned">
+                  <thead>
+                    <tr>
+                      <th>Display Name</th>
+                      <th>Image Name</th>
+                      <th>Created</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr ng-repeat="image in images[node.id]" ng-class="{'text-muted': !image.metadata}">
+                      <td>{{image.displayName}}</td>
+                      <td>{{image.repository}}:{{image.tag}}</td>
+                      <td>
+                        <span ng-if="image.metadata" title="{{image.metadata.id}}">
+                          {{image.metadata.created}}
+                        </span>
+                        <span ng-if="image.pulling">
+                          (pulling)
+                        </span>
+                      </td>
+                      <td class="text-right">
+                        <button class="btn btn-info" ng-click="pullImage(node, image)"
+                                title="Pull Image">
+                          <i class="fa fa-cloud-download"></i>
+                        </button>
+                        <button class="btn btn-danger" ng-click="removeImage(node, image)"
+                                title="Remove Image">
+                          <i class="fa fa-remove"></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
                         <input type="text" class="form-control"
-                          style="width: 15em"
-                          ng-model="newImage.repository"
-                          placeholder="docker repository"
+                          ng-model="newImage.displayName"
+                          placeholder="display name for users"
                         />
-                        <span class="input-group-addon"
-                              style="width: 1ex">:</span>
-                        <input type="text" class="form-control"
-                          style="width: 5em"
-                          ng-init="newImage.tag = 'latest'"
-                          ng-model="newImage.tag"
-                          placeholder="tag"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <button class="btn btn-default" ng-click="addImage(node, newImage)">
-                        <i class="fa fa-plus"></i>
-                        Add Image
-                      </button>
-                    </td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
+                      </td>
+                      <td>
+                        <div class="input-group">
+                          <input type="text" class="form-control"
+                            style="width: 15em"
+                            ng-model="newImage.repository"
+                            placeholder="docker repository"
+                          />
+                          <span class="input-group-addon"
+                                style="width: 1ex">:</span>
+                          <input type="text" class="form-control"
+                            style="width: 5em"
+                            ng-init="newImage.tag = 'latest'"
+                            ng-model="newImage.tag"
+                            placeholder="tag"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <button class="btn btn-default" ng-click="addImage(node, newImage)">
+                          <i class="fa fa-plus"></i>
+                          Add Image
+                        </button>
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </tab>
+              <tab>
+                <tab-heading>Containers</tab-heading>
 
-              <table class="table" ng-if="node.owned">
-                <thead>
-                  <tr>
-                    <th>Containers</th>
-                    <th></th>
-                    <th>Owned By</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr ng-repeat="container in containers[node.id]">
-                    <td>{{container.name}}</td>
-                    <td>{{container.image}}</td>
-                    <td>
-                      <div ng-repeat="user in resolveUsers(node, container.ownerIDs)">
+                <table class="table" ng-if="node.owned">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Image</th>
+                      <th>Owned By</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr ng-repeat="container in containers[node.id]">
+                      <td>{{container.name}}</td>
+                      <td>{{container.image}}</td>
+                      <td>
+                        <div ng-repeat="user in resolveUsers(node, container.ownerIDs)">
+                          {{user.name}}
+                          <span ng-if="user.email">
+                            <a href="mailto:{{user.email}}">{{user.email}}</a>
+                          </span>
+                        </div>
+                      </td>
+                      <td class="text-right">
+                        <button class="btn btn-warning"
+                            ng-disabled="!container.active"
+                            ng-click="stopContainer(node, container)"
+                            title="Stop Container">
+                          <i class="fa fa-stop"></i>
+                        </button>
+                        <button class="btn btn-danger"
+                            ng-click="removeContainer(node, container)"
+                            title="Remove Container">
+                          <i class="fa fa-remove"></i>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr ng-if="containers[node.id].length == 0">
+                      <td class="text-muted">
+                        No containers currently exist
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </tab>
+              <tab>
+                <tab-heading>Users/Owners</tab-heading>
+
+                <table class="table" ng-if="node.owned">
+                  <thead>
+                    <tr>
+                      <th>Users</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr ng-repeat="user in users[node.id]">
+                      <td>
                         {{user.name}}
                         <span ng-if="user.email">
                           <a href="mailto:{{user.email}}">{{user.email}}</a>
                         </span>
-                      </div>
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-warning"
-                          ng-disabled="!container.active"
-                          ng-click="stopContainer(node, container)"
-                          title="Stop Container">
-                        <i class="fa fa-stop"></i>
-                      </button>
-                      <button class="btn btn-danger"
-                          ng-click="removeContainer(node, container)"
-                          title="Remove Container">
-                        <i class="fa fa-remove"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr ng-if="containers[node.id].length == 0">
-                    <td class="text-muted">
-                      No containers currently exist
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      </td>
+                      <td class="text-right">
+                        <button class="btn btn-danger" ng-click="removeUser(node, user)">
+                          <i class="fa fa-remove"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-              <table class="table" ng-if="node.owned">
-                <thead>
-                  <tr>
-                    <th>Users</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr ng-repeat="user in users[node.id]">
-                    <td>
-                      {{user.name}}
-                      <span ng-if="user.email">
-                        <a href="mailto:{{user.email}}">{{user.email}}</a>
-                      </span>
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-danger" ng-click="removeUser(node, user)">
-                        <i class="fa fa-remove"></i>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <table class="table" ng-if="node.owned">
-                <thead>
-                  <tr>
-                    <th>Owners</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr ng-repeat="owner in owners[node.id]">
-                    <td>
-                      {{owner.name}}
-                      <span ng-if="owner.email">
-                        <a href="mailto:{{owner.email}}">{{owner.email}}</a>
-                      </span>
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-danger"
-                        ng-if="owners[node.id].length > 1"
-                        ng-click="removeOwner(node, owner)">
-                        <i class="fa fa-remove"></i>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-          </accordion-group>
+                <table class="table" ng-if="node.owned">
+                  <thead>
+                    <tr>
+                      <th>Owners</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr ng-repeat="owner in owners[node.id]">
+                      <td>
+                        {{owner.name}}
+                        <span ng-if="owner.email">
+                          <a href="mailto:{{owner.email}}">{{owner.email}}</a>
+                        </span>
+                      </td>
+                      <td class="text-right">
+                        <button class="btn btn-danger"
+                          ng-if="owners[node.id].length > 1"
+                          ng-click="removeOwner(node, owner)">
+                          <i class="fa fa-remove"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </tab>
+            </tabset>
+          </div>
+        </accordion-group>
       </accordion>
     </div>
     </script>
