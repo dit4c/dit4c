@@ -1,6 +1,6 @@
 package dit4c.gatehouse
 
-import akka.actor.Actor
+import akka.actor.{Actor,ActorRefFactory}
 
 import spray.util.LoggingContext
 import spray.routing._
@@ -10,9 +10,10 @@ import MediaTypes._
 import scala.collection.JavaConversions._
 
 // this trait defines our service behavior independently from the service actor
-trait MiscService extends HttpService {
+class MiscService(implicit val actorRefFactory: ActorRefFactory)
+    extends HttpService {
 
-  val miscRoute =
+  val route =
     //logRequestResponse("") {
       path("") {
         get {
@@ -37,4 +38,9 @@ trait MiscService extends HttpService {
         }
       }
     //}
+}
+
+object MiscService {
+  def route(implicit actorRefFactory: ActorRefFactory) =
+    new MiscService().route
 }

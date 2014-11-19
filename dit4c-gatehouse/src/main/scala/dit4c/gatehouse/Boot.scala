@@ -1,36 +1,52 @@
 package dit4c.gatehouse
 
 import akka.actor.{ActorSystem, Props}
+import akka.event.Logging
 import akka.io.IO
 import spray.can.Http
+import spray.routing.SimpleRoutingApp
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
 import java.util.concurrent.TimeUnit
+import spray.http.Uri
+import dit4c.gatehouse.docker.DockerClient
+import dit4c.gatehouse.docker.DockerIndexActor
+import dit4c.gatehouse.auth.AuthActor
+import scala.util.{Success,Failure}
 
-object Boot extends App {
-  
+object Boot extends App with SimpleRoutingApp {
+  implicit val system = ActorSystem("dit4c-gatehouse")
+  val log = Logging.getLogger(system, this)
+  import system.dispatcher
+
   def start(config: Config) {
     // we need an ActorSystem to host our application in
-    implicit val system = ActorSystem("on-spray-can")
 
-    val service = system.actorOf(
-        Props(classOf[MainServiceActor], config),
-        "main-service")
-
-    implicit val timeout = Timeout(5.seconds)
-    // start a new HTTP server on specified interface and port
-    IO(Http) ? Http.Bind(service,
-        interface = config.interface,
-        port = config.port)
+    startServer(interface = config.interface, port = config.port) {
+      val dockerClient = new DockerClient(Uri("http://127.0.0.1:2375/"))
+      val dockerIndex = actorRefFactory.actorOf(
+          Props(classOf[DockerIndexActor], dockerClient), "docker-index")
+      val auth = actorRefFactory.actorOf(
+          Props(classOf[AuthActor], config.keyLocation, config.keyUpdateInterval),
+          "auth")
+      AuthService(actorRefFactory, dockerIndex, auth).route ~ MiscService.route
+    } onComplete {
+      case Success(b) =>
+        log.info(s"Successfully bound to ${b.localAddress}")
+      case Failure(msg) =>
+        system.shutdown()
+        log.error(msg.getMessage)
+        System.exit(1)
+    }
   }
- 
-   ArgParser.parse(args, Config()) map { config =>
-     start(config)
-   } getOrElse {
-     // arguments are bad, error message will have been displayed
-   }
+
+  ArgParser.parse(args, Config()) map { config =>
+    start(config)
+  } getOrElse {
+    // arguments are bad, error message will have been displayed
+  }
 
 }
 

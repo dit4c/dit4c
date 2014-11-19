@@ -9,6 +9,8 @@ crossScalaVersions := Nil
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
+fork in run := true
+
 libraryDependencies ++= {
   val akkaV = "2.3.5"
   val sprayV = "1.3.1"

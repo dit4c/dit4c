@@ -3,10 +3,13 @@ package dit4c.gatehouse
 import org.specs2.mutable.Specification
 import spray.testkit.Specs2RouteTest
 import spray.http._
+import spray.routing.HttpService
 import StatusCodes._
 
-class MiscServiceSpec extends Specification with Specs2RouteTest with MiscService {
+class MiscServiceSpec extends Specification with Specs2RouteTest with HttpService {
   def actorRefFactory = system
+
+  def miscRoute = MiscService.route
 
   "MiscService" should {
 
