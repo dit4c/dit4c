@@ -10,7 +10,7 @@ All authentication is via federated identity providers - all a user needs is a m
 
 Current environments available are:
  * [Base][dit4c-container-base] - web-based TTY sessions and basic file management
- * [iPython Notebooks + Base][dit4c-container-ipython]
+ * [IPython Notebook + Base][dit4c-container-ipython]
  * [RStudio + Base][dit4c-container-rstudio]
  * [IJulia + Base][dit4c-container-ijulia]
  * [X11][dit4c-container-x11] - Base + X11 sessions via HTML5 VNC client
