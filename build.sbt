@@ -1,5 +1,6 @@
 import sbtrelease._
 import ReleaseStateTransformations._
+import DockerKeys._
 
 name := "dit4c"
 
@@ -32,6 +33,7 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,                      // : ReleaseStep
   commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
   tagRelease,                             // : ReleaseStep
+  releaseTask(dockerBuildAndPush),
   setNextVersion,                         // : ReleaseStep
   commitNextVersion,                      // : ReleaseStep
   pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured

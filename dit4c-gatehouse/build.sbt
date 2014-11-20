@@ -1,7 +1,5 @@
 import sbtdocker.{ImageName, Dockerfile}
 import DockerKeys._
-import sbtrelease._
-import ReleaseStateTransformations._
 
 name := "dit4c-gatehouse"
 
@@ -91,40 +89,3 @@ imageName in docker := {
     repository = "dit4c-platform-gatehouse",
     tag = Some(version.value))
 }
-
-lazy val dockerTagAsLatestAndPush: TaskKey[String] = taskKey[String]("Tag docker image as latest and push")
-
-dockerTagAsLatestAndPush <<= (streams, dockerPath in docker, imageName in docker) map { (streams, dockerPath, imageName) =>
-  import scala.sys.process.{Process, ProcessLogger}
-  val log = streams.log
-  val latestImageName = imageName.copy(tag=Some("latest"))
-  log.info(s"Tagging docker image '$imageName' as '$latestImageName'")
-  val processLog = ProcessLogger({ line =>
-    log.info(line)
-  }, { line =>
-    log.info(line)
-  })
-  val command = dockerPath :: "tag" :: imageName.toString :: latestImageName.toString :: Nil
-  log.debug(s"Running command: '${command.mkString(" ")}'")
-  val processOutput = Process(command).lines(processLog)
-  processOutput.foreach { line =>
-    log.info(line)
-  }
-  sbtdocker.DockerPush(dockerPath, latestImageName, log)
-  latestImageName.toString
-}
-
-ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-  checkSnapshotDependencies,              // : ReleaseStep
-  inquireVersions,                        // : ReleaseStep
-  runTest,                                // : ReleaseStep
-  setReleaseVersion,                      // : ReleaseStep
-  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
-  tagRelease,                             // : ReleaseStep
-  publishArtifacts,                       // : ReleaseStep, checks whether `publishTo` is properly set up
-  releaseTask(dockerBuildAndPush),
-  releaseTask(dockerTagAsLatestAndPush),
-  setNextVersion,                         // : ReleaseStep
-  commitNextVersion,                      // : ReleaseStep
-  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
-)
