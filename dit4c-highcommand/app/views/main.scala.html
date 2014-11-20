@@ -55,8 +55,9 @@
               <li><a href="/compute-nodes">Compute Nodes</a></li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
-              <li class="dropdown">
+              <li class="dropdown" dropdown>
                 <a href="#" class="dropdown-toggle"
+                    dropdown-toggle
                     data-id="{{currentUser.id}}"
                     title="{{currentUser.email}}">
                   <span ng-if="currentUser.name">{{currentUser.name}}</span>
