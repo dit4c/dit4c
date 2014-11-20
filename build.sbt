@@ -1,8 +1,10 @@
 import sbtrelease._
 import ReleaseStateTransformations._
-import DockerKeys._
 
 name := "dit4c"
+
+// Overriding publishArtifactsAction, so unnecessary for actual operation
+publishTo := Some(Resolver.file("file",  new File( "/tmp" )) )
 
 scalaVersion in ThisBuild := "2.11.2"
 
@@ -24,17 +26,3 @@ lazy val machineshop = project in file("dit4c-machineshop")
 releaseSettings
 
 crossScalaVersions := Nil
-
-ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-  checkSnapshotDependencies,              // : ReleaseStep
-  inquireVersions,                        // : ReleaseStep
-  runClean,                               // : ReleaseStep
-  runTest,                                // : ReleaseStep
-  setReleaseVersion,                      // : ReleaseStep
-  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
-  tagRelease,                             // : ReleaseStep
-  releaseTask(dockerBuildAndPush),
-  setNextVersion,                         // : ReleaseStep
-  commitNextVersion,                      // : ReleaseStep
-  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
-)

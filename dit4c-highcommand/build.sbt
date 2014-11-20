@@ -98,3 +98,5 @@ imageName in docker := {
    repository = "dit4c-platform-highcommand",
    tag = Some(version.value))
 }
+
+ReleaseKeys.publishArtifactsAction := dockerBuildAndPush.value
