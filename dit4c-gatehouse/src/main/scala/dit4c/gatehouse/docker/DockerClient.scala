@@ -17,7 +17,7 @@ class DockerClient(val baseUrl: spray.http.Uri) {
   import system.dispatcher // implicit execution context
   val log = Logging(system, getClass)
 
-  val SERVICE_PORT = 80
+  val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
   // Overridden in unit tests
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
@@ -52,16 +52,20 @@ class DockerClient(val baseUrl: spray.http.Uri) {
           nameWithSlash.stripPrefix("/")
       }
 
-      def hasRightPort(portObj: JsObject) = {
-        val fields = portObj.fields
-        fields.contains("PrivatePort") &&
-        fields.contains("PublicPort") &&
-        fields("PrivatePort").convertTo[Int] == SERVICE_PORT
+      def toPortMapping(portObj: JsObject): Option[(Int,Int)] = {
+        def getInt(fieldName: String) = portObj.fields.get(fieldName).collect {
+          case JsNumber(port) => port.intValue
+        }
+        for {
+          publicPort <- getInt("PublicPort")
+          privatePort <- getInt("PrivatePort")
+        } yield (privatePort -> publicPort)
       }
 
-      var port: Option[Int] = portArr.asInstanceOf[JsArray].elements collectFirst {
-        case jsObj: JsObject if hasRightPort(jsObj) =>
-          jsObj.fields("PublicPort").convertTo[Int]
+      var port: Option[Int] = {
+        val mappings =
+          portArr.convertTo[Seq[JsObject]].flatMap(toPortMapping).toMap
+        POTENTIAL_SERVICE_PORTS.flatMap(mappings.get).headOption
       }
 
       port.map((name, _))
@@ -84,4 +88,3 @@ class DockerClient(val baseUrl: spray.http.Uri) {
   }
 
 }
-

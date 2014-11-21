@@ -146,7 +146,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       val startRequest =
         JsObject(
           "PortBindings" -> JsObject(),
-          "PublishAllPorts" -> JsBoolean(true)
+          "PublishAllPorts" -> JsTrue
         )
 
       pipeline({
@@ -232,7 +232,9 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
           "AttachStderr" -> JsBoolean(true),
           "CpuShares" -> JsNumber(1),
           "Image" -> JsString(image),
-          "ExposedPorts" -> JsObject("80/tcp" -> JsObject())
+          "HostConfig" -> JsObject(
+            "PublishAllPorts" -> JsTrue
+          )
         )
 
       pipeline {
