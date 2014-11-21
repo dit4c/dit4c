@@ -116,6 +116,10 @@ define(['./module'], (controllers) ->
           $scope.tokens[node.id] ||= []
           $scope.tokens[node.id].push(token)
 
+    $scope.isValidNewImage = (ni) ->
+      [ni.displayName, ni.repository, ni.tag].every (s) ->
+        s && s.length > 0
+
     $scope.addImage = (node, newImage) ->
       $http
         .post('/compute-nodes/'+node.id+"/images", newImage)

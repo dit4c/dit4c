@@ -587,7 +587,8 @@
                         </div>
                       </td>
                       <td>
-                        <button class="btn btn-default" ng-click="addImage(node, newImage)">
+                        <button class="btn btn-default" ng-click="addImage(node, newImage)"
+                                ng-disabled="!isValidNewImage(newImage)"
                           <i class="fa fa-plus"></i>
                           Add Image
                         </button>
