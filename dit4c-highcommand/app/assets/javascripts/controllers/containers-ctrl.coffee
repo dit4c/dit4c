@@ -10,14 +10,16 @@ define(['./module'], (controllers) ->
 
     $scope.containers = $route.current.locals.containers
 
+    $scope.isAddFormOpen = false
+
+    $scope.toggleAddForm = (state) ->
+      $scope.isAddFormOpen = state
+
     $scope.newContainer =
       name: ""
       computeNode: null
       image: ""
       active: false
-
-    $scope.closeAddForm = () ->
-      isAddFormOpen = false
 
     $scope.$watch("computeNodes",
       (newValue, oldValue) ->
@@ -36,6 +38,7 @@ define(['./module'], (controllers) ->
           image: $scope.newContainer.image
           active: $scope.newContainer.active
       $scope.newContainer.name = ""
+      $scope.toggleAddForm(false)
       $scope.containers.push(request)
       $http
         .post('/containers', request)

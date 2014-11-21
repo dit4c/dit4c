@@ -110,7 +110,7 @@
 
       <div ng-if="computeNodes.length > 0">
         <section ng-show="isAddFormOpen" class="well">
-          <button type="button" class="close pull-right" ng-click="isAddFormOpen = false">
+          <button type="button" class="close pull-right" ng-click="toggleAddForm(false)">
             <span aria-hidden="true">&times;</span>
             <span class="sr-only">Close</span>
           </button>
@@ -170,7 +170,7 @@
           </form>
         </section>
         <div class="text-right" ng-show="!isAddFormOpen">
-          <button class="btn btn-default" ng-click="isAddFormOpen = true">
+          <button class="btn btn-default" ng-click="toggleAddForm(true)">
             <i class="fa fa-plus"></i>
             Add Container
           </button>
