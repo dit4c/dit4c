@@ -124,6 +124,8 @@ define(['./module'], (controllers) ->
           $scope.images[node.id].push(token)
           # Add response doesn't include metadata, kick off refresh
           refreshImages(node)
+        .error (response, status) ->
+          alert("Conflicting image: "+response[0].displayName) if status == 409
 
     $scope.pullImage = (node, image) ->
       $http
