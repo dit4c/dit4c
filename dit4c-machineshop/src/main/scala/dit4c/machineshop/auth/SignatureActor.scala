@@ -93,7 +93,9 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
     log.info(s"Retrieving keys from $publicKeySource")
     if (publicKeySource.isAbsolute()) {
       pipeline(Get(publicKeySource.toASCIIString)).map { content =>
-        new SignatureVerifier(JWKSet.parse(content))
+        val keySet = JWKSet.parse(content)
+        log.info(s"Retrieved ${keySet.getKeys.size} keys from $publicKeySource")
+        new SignatureVerifier(keySet)
       }
     } else {
       // It's a file, so fetch directly

@@ -19,6 +19,7 @@ import dit4c.machineshop.auth.SignatureActor
 
 object Boot extends App with SimpleRoutingApp {
   implicit val system = ActorSystem("dit4c-machineshop")
+  implicit val timeout = Timeout(10, TimeUnit.SECONDS)
   val log = Logging.getLogger(system, this)
   import system.dispatcher
 
@@ -29,7 +30,8 @@ object Boot extends App with SimpleRoutingApp {
       val signatureActor: Option[ActorRef] =
         config.publicKeyLocation.map { loc =>
           actorRefFactory.actorOf(
-            Props(classOf[SignatureActor], loc, config.keyUpdateInterval))
+            Props(classOf[SignatureActor], loc, config.keyUpdateInterval),
+            "signature-checker")
         }
       val imageMonitor = actorRefFactory.actorOf(
           Props(classOf[ImageManagementActor],

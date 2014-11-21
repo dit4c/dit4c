@@ -18,6 +18,7 @@ import scala.util.{Success,Failure}
 
 object Boot extends App with SimpleRoutingApp {
   implicit val system = ActorSystem("dit4c-gatehouse")
+  implicit val timeout = Timeout(10, TimeUnit.SECONDS)
   val log = Logging.getLogger(system, this)
   import system.dispatcher
 

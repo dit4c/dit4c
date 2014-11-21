@@ -19,7 +19,9 @@ trait SignatureCheckerProvider {
     log.info(s"Retrieving keys from $publicKeyLocation")
     if (publicKeyLocation.isAbsolute()) {
       pipeline(Get(publicKeyLocation.toASCIIString)).map { content =>
-        new SignatureChecker(KeyLoader(content))
+        val keys = KeyLoader(content)
+        log.info(s"Retrieved ${keys.size} keys from $publicKeyLocation")
+        new SignatureChecker(keys)
       }
     } else {
       // It's a file, so fetch directly
