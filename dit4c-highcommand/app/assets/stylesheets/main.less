@@ -35,7 +35,9 @@ body {
     }
   }
   &.front-page {
-    background: linear-gradient(to bottom, @dark-grad-color 0%, @light-grad-color 100%);
+    background-image: linear-gradient(0deg, @light-grad-color 0%, @dark-grad-color 100%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     .navbar, .nav .open {
       background: transparent;
       a, p, .dropdown-menu {
