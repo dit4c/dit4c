@@ -187,6 +187,9 @@ define(['./module'], (controllers) ->
           $scope.users[node.id] = $scope.users[node.id].filter (u) ->
             u.id != user.id
 
+    markAsOffline = (node) ->
+      node.offline = true
+
     refreshTokens = (node) ->
       $http
         .get('/compute-nodes/'+node.id+"/tokens")
@@ -202,6 +205,9 @@ define(['./module'], (controllers) ->
           $scope.images[node.id] = []
           response.data.forEach (image) ->
             $scope.images[node.id].push(image)
+        .catch (e) ->
+          markAsOffline(node) if e.status == 500
+          $scope.images[node.id] = []
 
     refreshContainers = (node) ->
       $http
@@ -210,6 +216,9 @@ define(['./module'], (controllers) ->
           $scope.containers[node.id] = []
           response.data.forEach (container) ->
             $scope.containers[node.id].push(container)
+        .catch (e) ->
+          markAsOffline(node) if e.status == 500
+          $scope.containers[node.id] = []
 
     refreshOwners = (node) ->
       $http

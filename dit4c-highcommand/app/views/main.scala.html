@@ -367,6 +367,14 @@
         <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
           <accordion-heading>
             {{node.name}}
+            <div class="pull-right">
+              <i class="fa fa-circle text-danger"
+                title="Offline"
+                ng-show="node.offline"/>
+              <i class="fa fa-circle text-success"
+                title="Online"
+                ng-show="!node.offline"/>
+            </div>
           </accordion-heading>
 
           <div class="well" ng-if="node.confirmingDelete">
@@ -527,7 +535,7 @@
                   </tbody>
                 </table>
               </tab>
-              <tab>
+              <tab disabled="node.offline">
                 <tab-heading>Images</tab-heading>
 
                 <table class="table" ng-if="node.owned">
@@ -598,7 +606,7 @@
                   </tbody>
                 </table>
               </tab>
-              <tab>
+              <tab disabled="node.offline">
                 <tab-heading>Containers</tab-heading>
 
                 <table class="table" ng-if="node.owned">
