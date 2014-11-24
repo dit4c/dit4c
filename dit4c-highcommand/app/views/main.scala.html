@@ -364,7 +364,7 @@
       </div>
 
       <accordion close-others="oneAtATime">
-        <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
+        <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'" is-disabled="!node.owned">
           <accordion-heading>
             {{node.name}}
             <div class="pull-right">
