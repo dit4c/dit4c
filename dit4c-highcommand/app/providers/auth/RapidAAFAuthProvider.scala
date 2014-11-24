@@ -33,15 +33,6 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProv
 
   override val loginURL = config.url.toString
 
-  override val loginButton = (url: String) => Html(
-    s"""|<a target="_self" href="$url">
-        |  <img class="img-responsive center-block" alt="Login with AAF"
-        |       src="https://rapid.aaf.edu.au/aaf_service_866x193.png"/>
-        |</a>
-        |""".stripMargin
-  )
-
-
   private def extractPayload(request: Request[AnyContent]): Option[JsValue] =
     request.body.asFormUrlEncoded.flatMap { form =>
       // Extract assertion

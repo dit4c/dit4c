@@ -21,14 +21,6 @@ class DummyProvider extends AuthProvider {
     }
   }
   override def loginURL = ??? // Should never be called
-  override def loginButton = _ => Html(
-    s"""|<form class="form-inline" action="/auth/callback" method="post">
-        |  <input class="form-control" type="text"
-        |         name="username" value="anonymous"/>
-        |  <button class="btn btn-primary" type="submit">Login</button>
-        |</form>
-        |""".stripMargin
-  )
 }
 
 object DummyProvider extends AuthProviderFactory {

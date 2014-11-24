@@ -28,24 +28,10 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
       Guice.createInjector(new AbstractModule {
         val appConfig = app.configuration
 
-        val noProviders = Seq(new AuthProvider {
-          val name = "none"
-          val errorMsg = "AuthProvider not configured"
-          override def callbackHandler = { _ =>
-            Future.successful(CallbackResult.Failure(errorMsg))
-          }
-          override def loginURL = ???
-          override def loginButton = _ => Html(
-            s"""<div class="alert alert-danger">$errorMsg</div>"""
-          )
-        })
-
         lazy val authProviders = AuthProviders(
-          Some(
             RapidAAFAuthProvider(appConfig) ++
             GitHubProvider(appConfig) ++
-            DummyProvider(appConfig)
-          ).filter(_.size > 0).getOrElse(noProviders))
+            DummyProvider(appConfig))
 
         val dbName = "dit4c-highcommand"
 

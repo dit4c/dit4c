@@ -39,16 +39,6 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
   override val loginURL =
     s"https://github.com/login/oauth/authorize?client_id=${config.id}&scope=user%3Aemail"
 
-  override val loginButton = (url: String) => Html(
-    s"""|<a target="_self" href="$url">
-        |  <img class="img-responsive center-block"
-        |     alt="Login with GitHub"
-        |     src="https://assets-cdn.github.com/images/modules/logos_page/GitHub-Logo.png"
-        |     style="width: 75%" />
-        |</a>
-        |""".stripMargin
-  )
-
   protected def resolveIdentity(code: String): Future[Identity] =
     tokenRequest(code).flatMap(retreiveIdentityWithEmail)
 

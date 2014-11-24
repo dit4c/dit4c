@@ -1,5 +1,6 @@
 @(authProviders: Seq[providers.auth.AuthProvider], googleAnalyticsCode: Option[String])
 
+@import providers.auth._
 @import helpers.AppVersion
 
 <!DOCTYPE html5>
@@ -90,16 +91,52 @@
     <script type="text/ng-template" id="login.html">
     <div ng-include src="'navbar.html'"></div>
     <div class="container">
-      <h1>Authenticate your identity</h1>
-      @for(provider <- authProviders) {
+      <h1 class="text-center">Authenticate your identity</h1>
+
       <div class="row">
-        <div class="col-xs-offset-1 col-xs-10 col-sm-offset-0 col-sm-6">
-          <br/>
-          @provider.loginButton(routes.AuthController.login(provider.name).url)
-          <br/>
+        <div class="col-xs-offset-1 col-xs-10 col-sm-offset-2 col-sm-8 col-md-offset-4 col-md-4">
+          @for(provider <- authProviders) {
+            @provider match {
+              case _: RapidAAFAuthProvider => {
+                <a target="_self" class="btn btn-default btn-block btn-lg"
+                  href="@{routes.AuthController.login(provider.name).url}">
+                  <img src="https://rapid.aaf.edu.au/aaf.png" style="height: 1.33333333em"/>
+                  <abbr title="Australian Access Federation">AAF</abbr>
+                </a>
+              }
+              case _: GitHubProvider => {
+                <a target="_self" class="btn btn-default btn-block btn-lg"
+                  alt="Login with GitHub"
+                  href="@{routes.AuthController.login(provider.name).url}">
+                  <i class="fa fa-github fa-lg"></i>
+                  GitHub
+                </a>
+              }
+              case _: DummyProvider => {
+                <br/>
+                <form class="form text-center"
+                  action="@{routes.AuthController.unnamedCallback.url}"
+                  method="POST">
+                  <div class="input-group">
+                    <input class="form-control" type="text"
+                      name="username" value="anonymous"/>
+                    <span class="input-group-btn">
+                      <button class="btn btn-primary" type="submit">Login</button>
+                    </span>
+                  </div>
+                </form>
+                <br/>
+              }
+            }
+          }
+          @if(authProviders.isEmpty) {
+            <div class="alert alert-danger">
+              No authentication provider has been configured.
+            </div>
+          }
         </div>
       </div>
-      }
+
     </div>
     </script>
 

@@ -9,7 +9,6 @@ trait AuthProvider {
   def name: String
   def callbackHandler: Request[AnyContent] => Future[CallbackResult]
   def loginURL: String
-  def loginButton: String => Html
 }
 
 trait AuthProviderFactory {
