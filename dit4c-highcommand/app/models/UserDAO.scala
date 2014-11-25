@@ -32,6 +32,30 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
 
   def get(id: String): Future[Option[User]] = utils.get(id)
 
+  def createMergeOrUpdate(
+      currentUser: Option[User],
+      loginIdentity: Identity): Future[User] =
+    findWith(loginIdentity).map((currentUser, _)).flatMap {
+      case (Some(user1), Some(user2)) if user1 != user2 =>
+        // TODO: Merge users
+        // This is likely to be quite tricky, as user2 might own compute nodes
+        // and containers.
+        ???
+      case (Some(user), _) =>
+        updateWithIdentity(user, loginIdentity)
+      case (None, Some(user)) =>
+        updateWithIdentity(user, loginIdentity)
+      case (None, None) =>
+        createWith(loginIdentity)
+    }
+
+  protected def updateWithIdentity(user: User, identity: Identity) =
+    user.update
+      .withName(user.name.orElse(identity.name))
+      .withEmail(user.email.orElse(identity.emailAddress))
+      .withIdentities((user.identities :+ identity.uniqueId).distinct)
+      .execIfDifferent(user)
+
   implicit val userFormat: Format[UserImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
@@ -75,6 +99,9 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
 
         override def withEmail(email: Option[String]) =
           model.copy(email = email)
+
+        override def withIdentities(identities: Seq[String]) =
+          model.copy(identities = identities)
       }
 
   }
@@ -93,5 +120,6 @@ object User {
   trait UpdateOp extends UpdateOperation[User] {
     def withName(name: Option[String]): UpdateOp
     def withEmail(email: Option[String]): UpdateOp
+    def withIdentities(identities: Seq[String]): UpdateOp
   }
 }

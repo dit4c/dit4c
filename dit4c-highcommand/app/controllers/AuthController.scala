@@ -50,6 +50,16 @@ class AuthController @Inject() (
     }
   }
 
+  def merge(name: String) = Authenticated.async { implicit request =>
+    providerWithName(name) match {
+      case Some(provider) =>
+        provider.loginHandler(request)
+          .map(_.addingToSession("mergeTo" -> request.user.id))
+      case None =>
+        Future.successful(BadRequest("Login method doesn't exist."))
+    }
+  }
+
   def logout = Action.async { implicit request =>
     render {
       case Accepts.Html() => Redirect(routes.Application.main("").url)
@@ -94,6 +104,16 @@ class AuthController @Inject() (
           case Failure(msg) => successful(Forbidden(msg))
           case Invalid => successful(BadRequest)
         }
+    }
+
+  protected def mergeOrLogin(identity: Identity)(implicit request: Request[_]) =
+    for {
+      requestUser <- fetchUser
+      user <- userDao.createMergeOrUpdate(requestUser, identity)
+    } yield {
+      Redirect(routes.Application.main("login").url)
+        .withSession(request.session + ("userId" -> user.id))
+        .withUpdatedJwt(user, containerResolver)
     }
 
   protected def providerWithName(name: String): Option[AuthProvider] =

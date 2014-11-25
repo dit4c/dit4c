@@ -25,6 +25,14 @@ define(['./app'], (app) ->
       }
     )
 
+    $routeProvider.when('/account',
+      templateUrl: 'account.html'
+      controller: 'AccountCtrl',
+      resolve:
+        user: (AuthSrv) ->
+          AuthSrv.updateUser()
+    )
+
     $routeProvider.when('/containers',
       templateUrl: 'containers.html'
       controller: 'ContainersCtrl',

@@ -21,6 +21,7 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 # Home page
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
+GET     /account                    @controllers.Application.main(path="account")
 GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
 HEAD    /health                     @controllers.Application.health(isHeadRequest: Boolean = true)

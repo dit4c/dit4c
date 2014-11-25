@@ -71,6 +71,88 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
       updatedUser.email must beSome
     }
 
+    "create, merge or update" >> {
+
+      "without current user" >> {
+
+        "creates new user for unknown identities" in new WithApplication(fakeApp) {
+          val dao = new UserDAO(db)
+          val identity = MockIdentity("foo:bar", None, None)
+          val resultingUser = await(dao.createMergeOrUpdate(None, identity))
+          resultingUser.name must_== identity.name
+          resultingUser.email must_== identity.emailAddress
+          resultingUser.identities must contain(identity.uniqueId)
+        }
+
+        "updates existing user for known identities" in new WithApplication(fakeApp) {
+          val dao = new UserDAO(db)
+          val user =
+            await(dao.createWith(MockIdentity("foo:bar", None, None)))
+          val identity =
+            MockIdentity("foo:bar", Some("Foo Bar"), Some("foo@bar.test"))
+          val resultingUser = await(dao.createMergeOrUpdate(None, identity))
+          resultingUser.id must_== user.id
+          resultingUser.name must_== identity.name
+          resultingUser.email must_== identity.emailAddress
+          resultingUser.identities must contain(identity.uniqueId)
+        }
+
+      }
+
+      "with current user" >> {
+
+        "updates user for unknown identities" in new WithApplication(fakeApp) {
+          val dao = new UserDAO(db)
+          val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
+          val identity =
+            MockIdentity("foo:baz", Some("Foo Baz"), Some("foo@baz.test"))
+          val resultingUser = await {
+            dao.createMergeOrUpdate(Some(user), identity)
+          }
+          resultingUser.id must_== user.id
+          resultingUser.name must_== identity.name
+          resultingUser.email must_== identity.emailAddress
+          user.identities.foreach { uniqueId =>
+            resultingUser.identities must contain(uniqueId)
+          }
+          resultingUser.identities must contain(identity.uniqueId)
+        }
+
+        "updates user for known connected identities" in new WithApplication(fakeApp) {
+          val dao = new UserDAO(db)
+          val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
+          val identity =
+            MockIdentity("foo:bar", Some("Foo Bar"), Some("foo@bar.test"))
+          val resultingUser = await {
+            dao.createMergeOrUpdate(Some(user), identity)
+          }
+          resultingUser.id must_== user.id
+          resultingUser.name must_== identity.name
+          resultingUser.email must_== identity.emailAddress
+          resultingUser.identities must contain(identity.uniqueId)
+          resultingUser.identities must haveSize(1)
+        }
+
+        "merges users for known unconnected identities" in new WithApplication(fakeApp) {
+          val dao = new UserDAO(db)
+          val user1 = await(dao.createWith(MockIdentity("foo:bar", None, None)))
+          val user2 = await(dao.createWith(MockIdentity("foo:baz",
+            Some("Foo Bar"), Some("foo@bar.test"))))
+          val identity =
+            MockIdentity("foo:baz", None, None)
+          val resultingUser = await {
+            dao.createMergeOrUpdate(Some(user1), identity)
+          }
+          resultingUser.id must_== user1.id
+          resultingUser.name must_== user2.name
+          resultingUser.email must_== user2.email
+          resultingUser.identities must contain("foo:bar", "foo:baz")
+          resultingUser.identities must haveSize(2)
+        }
+      }
+
+    }
+
   }
 
 }
