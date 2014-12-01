@@ -3,8 +3,6 @@ import DockerKeys._
 
 name  := "dit4c-machineshop"
 
-scalaVersion  := "2.11.2" // Stuck until spray-json updates
-
 crossScalaVersions := Nil
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")

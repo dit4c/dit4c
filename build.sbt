@@ -6,7 +6,7 @@ name := "dit4c"
 // Overriding publishArtifactsAction, so unnecessary for actual operation
 publishTo := Some(Resolver.file("file",  new File( "/tmp" )) )
 
-scalaVersion in ThisBuild := "2.11.2"
+scalaVersion in ThisBuild := "2.11.4"
 
 // Target JDK 1.7
 scalacOptions in ThisBuild += "-target:jvm-1.7"
