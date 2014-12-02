@@ -11,8 +11,8 @@ import scala.concurrent.Await
 import akka.pattern.ask
 import akka.actor.Actor
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-import models.ContainerDAO
+import scala.concurrent.duration.{Duration, FiniteDuration}
+import models._
 
 class HipachePlugin(app: play.api.Application) extends Plugin {
 
@@ -39,6 +39,10 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
       prefix
     )
 
+  def baseDomain =
+    app.configuration.getString("application.baseUrl")
+      .map(new java.net.URI(_))
+      .map(_.getHost)
 
   private var manager: Option[ActorRef] = None
 
@@ -54,7 +58,8 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 
   override def onStart {
     manager = serverConfig.map { config =>
-      system.actorOf(Props(classOf[HipacheManagementActor], config, db))
+      system.actorOf(Props(classOf[HipacheManagementActor],
+        config, db, baseDomain))
     }
   }
 
@@ -62,7 +67,8 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 
 class HipacheManagementActor(
     config: Hipache.ServerConfig,
-    db: CouchDB.Database) extends Actor {
+    db: CouchDB.Database,
+    baseDomain: Option[String]) extends Actor {
 
   import context.dispatcher
 
@@ -73,7 +79,7 @@ class HipacheManagementActor(
   val tickInterval = new FiniteDuration(1, TimeUnit.HOURS)
 
   val tickSchedule = context.system.scheduler.schedule(
-    tickInterval, tickInterval, self, "tick")
+    Duration.Zero, tickInterval, self, "tick")
 
   val client = new HipacheClient(config)(context.system)
 
@@ -92,12 +98,45 @@ class HipacheManagementActor(
   private def performMaintenance: Future[_] =
     for {
       map <- client.all
+      computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
+      containerDao = new ContainerDAO(db)
+      computeNodes <- computeNodeDao.list
+      containers <- containerDao.list
     } yield {
       val mappings = map.toSeq.sortBy(_._1.name).map { case (f, b) =>
         s"$f → $b"
       }.mkString("\n")
       log.info("Current Hipache mappings:\n"+mappings)
+      val putOps: Seq[Future[String]] = containers.flatMap { c =>
+        computeNodes.find(_.id == c.computeNodeId).map { node =>
+          baseDomain match {
+            case Some(domain) =>
+              val frontend = Hipache.Frontend(c.name, s"${c.name}.${domain}")
+              map.get(frontend) match {
+                case Some(b) if b == node.backend =>
+                  Future.successful {
+                    s"Confirmed Hipache mapping of ${c.name} to ${node.name}."
+                  }
+                case _ =>
+                  client.put(frontend, node.backend).map { _ =>
+                    s"Created Hipache mapping of ${c.name} to ${node.name}."
+                  }
+              }
+            case None =>
+              Future.successful {
+                s"Unable to check Hipache Mapping of ${c.name}. App domain unknown."
+              }
+          }
+        }
+      }
+      val containerExists = containers.map(_.name).toSet.contains _
+      val deleteOps: Seq[Future[String]] = map.keys
+        .filterNot(frontend => containerExists(frontend.name))
+        .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))
+        .toSeq
+      (putOps ++ deleteOps).foreach { op =>
+        op.foreach(log.info(_))
+      }
     }
-
 
 }
