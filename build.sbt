@@ -10,6 +10,7 @@ scalaVersion in ThisBuild := "2.11.4"
 
 // Target JDK 1.7
 scalacOptions in ThisBuild += "-target:jvm-1.7"
+javacOptions in ThisBuild ++= Seq("-source", "1.7",  "-target", "1.7")
 
 // Project definitions (automatically aggregated)
 
