@@ -1,81 +1,63 @@
 package providers.hipache
 
 import akka.actor.Actor
-import redis.RedisServer
-import redis.RedisClient
+
 import scala.concurrent.Future
-import redis.protocol.MultiBulk
+import scala.util._
 import akka.actor.ActorRef
 import akka.event.Logging
-import redis.commands.TransactionBuilder
 import akka.actor.ActorSystem
+import net.nikore.etcd._
 
 class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) {
   import scala.language.implicitConversions
+  import play.api.libs.json._
+  import play.api.libs.functional.syntax._
+  import EtcdJsonProtocol._
 
   import system.dispatcher
 
   def all: Future[Map[Hipache.Frontend,Hipache.Backend]] =
-    for {
-      keys <- client.smembers[String](indexKey)
-      results: Seq[Option[(Hipache.Frontend, Hipache.Backend)]] <-
-        Future.sequence(keys.map { k =>
-          client.lrange[String](k, 0, -1).map { v =>
-            (k, v) match {
-              case Entry(frontend, backend) => Some((frontend, backend))
-              case _ => None
-            }
+    client.listDir(indexKey) map { etcdListResponse =>
+      etcdListResponse.node.nodes.getOrElse(Nil).flatMap {
+        case NodeListElement(key, _, Some(value), _) =>
+          (key -> Json.parse(value).as[Seq[String]]) match {
+            case Entry(frontend, backend) => Some(frontend -> backend)
+            case _ => None
           }
-        })
-      map = results.flatten.toMap
-    } yield map
+        case _ =>
+          None
+      }.toMap
+    }
 
   def get(frontend: Hipache.Frontend): Future[Option[Hipache.Backend]] =
-    for {
-      value <- client.lrange[String](keyFor(frontend), 0, -1)
-      backend = (keyFor(frontend), value) match {
-        case Entry(`frontend`, backend) => Some(backend)
-        case _ => None
+    client.getKey(keyFor(frontend))
+      .map { etcdResponse =>
+        etcdResponse.node.value.flatMap { value => 
+          (keyFor(frontend) -> Json.parse(value).as[Seq[String]]) match {
+            case Entry(`frontend`, backend) => Some(backend)
+            case _ => None
+          }
+        }
+      }.recover {
+        case e: EtcdExceptions.KeyNotFoundException => None
       }
-    } yield backend
 
   def put(
       frontend: Hipache.Frontend,
-      backend: Hipache.Backend): Future[Unit] = inTransaction { t =>
-    val k = keyFor(frontend)
-    t.watch(k)
-    t.sadd(indexKey, k)
-    t.del(k)
-    t.rpush(k, frontend.name, backend.toString)
-  }
+      backend: Hipache.Backend): Future[Unit] = 
+   client.setKey(
+       keyFor(frontend), 
+       Json.stringify(Json.arr(frontend.name, backend.toString))) map (_ => ())
 
-  def delete(frontend: Hipache.Frontend): Future[Unit] = inTransaction { t =>
-    val k = keyFor(frontend)
-    t.srem(indexKey, k)
-    t.del(k)
-  }
+  def delete(frontend: Hipache.Frontend): Future[Unit] =
+    client.deleteKey(keyFor(frontend)) map (_ => ())
 
-  lazy val indexKey = s"${config.prefix}frontends"
-  lazy val keyPrefix = s"${config.prefix}frontend:"
+  lazy val indexKey = config.prefix
+  lazy val keyPrefix = s"${config.prefix}/frontend:"
   def keyFor(frontend: Hipache.Frontend) = keyPrefix + frontend.domain
 
-  def disconnect = {
-    client.stop
-  }
-
-  protected lazy val client = RedisClient(
-      config.server.host,
-      config.server.port,
-      config.server.password,
-      config.server.db)
-
-  type TransactionOp[A] = TransactionBuilder => Future[A]
-
-  protected def inTransaction[A](f: TransactionOp[A]): Future[A] = {
-    val t = client.transaction()
-    val v = f(t)
-    t.exec().flatMap(_ => v)
-  }
+  protected lazy val client = config.client
 
   object Entry {
     lazy val reBackend = """(\w+)://(.+):(\d+)""".r

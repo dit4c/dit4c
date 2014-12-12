@@ -13,6 +13,7 @@ import akka.actor.Actor
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import models._
+import net.nikore.etcd.EtcdClient
 
 class HipachePlugin(app: play.api.Application) extends Plugin {
 
@@ -25,17 +26,12 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 
   def serverConfig: Option[Hipache.ServerConfig] =
     for {
-      host <- app.configuration.getString("hipache.redis.host")
-      port = app.configuration
-        .getInt("hipache.redis.port")
-        .getOrElse(6379)
-      password = app.configuration.getString("hipache.redis.password")
-      db = app.configuration.getInt("hipache.redis.db")
+      url <- app.configuration.getString("hipache.etcd.url")
       prefix = app.configuration
-        .getString("hipache.redis.prefix")
-        .getOrElse("dit4c:hipache:")
+        .getString("hipache.etcd.prefix")
+        .getOrElse("dit4c/hipache")
     } yield Hipache.ServerConfig(
-      redis.RedisServer(host, port, password, db),
+      new EtcdClient(url),
       prefix
     )
 
@@ -88,10 +84,6 @@ class HipacheManagementActor(
       sender ! client
     }
     case "tick" => performMaintenance
-  }
-
-  override def postStop = {
-    client.disconnect
   }
 
   // TODO: Actually check mappings, rather than just printing them

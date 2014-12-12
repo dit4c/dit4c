@@ -1,13 +1,13 @@
 package providers.hipache
 
-import redis.RedisServer
+import net.nikore.etcd.EtcdClient
 import play.api.libs.json.Format
 import play.api.libs.json.JsPath
 
 object Hipache {
 
   case class ServerConfig(
-      server: RedisServer,
+      client: EtcdClient,
       prefix: String)
 
   case class Frontend(

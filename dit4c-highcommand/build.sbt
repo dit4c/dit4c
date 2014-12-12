@@ -8,9 +8,9 @@ libraryDependencies ++= Seq(
   ws,
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
-  "com.etaty.rediscala" %%  "rediscala"       % "1.3.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
-  "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.4"     % "test",
+  "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",
+  "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.6"     % "test",
   "org.specs2"          %%  "specs2-scalacheck" % "2.3.12"  % "test",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
@@ -24,7 +24,6 @@ libraryDependencies ++= Seq(
 )
 
 resolvers ++= Seq(
-  "rediscala" at "http://dl.bintray.com/etaty/maven",
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
   "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/")
 

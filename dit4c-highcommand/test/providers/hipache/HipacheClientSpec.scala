@@ -5,36 +5,104 @@ import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
-import redis._
 import scala.util.Random
 import akka.actor.Props
+import akka.actor.ActorSystem
 import akka.pattern.ask
+import akka.agent.Agent
 import scala.concurrent.Future
+import net.nikore.etcd._
+import play.api.libs.json.Json
 
 @RunWith(classOf[JUnitRunner])
-class HipacheClientSpec extends RedisStandaloneServer {
+class HipacheClientSpec extends Specification {
+  import scala.concurrent.duration._
+  
+  implicit val system = ActorSystem("hipacheClientTests")
 
-  import ByteStringDeserializer.String
-
+  class MockEtcdClient extends EtcdClient("") {
+    
+    import scala.concurrent.ExecutionContext.Implicits.global
+    import akka.agent.Agent
+    import EtcdJsonProtocol._
+    
+    val counter: Agent[Int] = Agent(0)
+    val m: Agent[Map[String, NodeResponse]] = Agent(Map.empty)
+        
+    override def getKey(key: String): Future[EtcdResponse] = 
+      for {
+        count <- counter alter (_ + 1)
+        lookup <- m.future
+        nr = lookup get key
+      } yield nr match {
+        case Some(nr) => EtcdResponse("get", nr, None)
+        case None =>
+          throw EtcdExceptions.KeyNotFoundException(
+              "Key not found", "not found", count)
+      }
+  
+    override def getKeyAndWait(key: String, wait: Boolean = true): Future[EtcdResponse] = ???
+  
+    override def setKey(key: String, value: String): Future[EtcdResponse] =
+      (counter alter (_ + 1)) flatMap { count =>
+        getKey(key)
+          .map(_.node)
+          .map(nr => nr.copy(value=Some(value), modifiedIndex=count))
+          .recover {
+            case _: EtcdExceptions.KeyNotFoundException =>
+              NodeResponse(key, Some(value), count, count)
+          }
+          .map { nr =>
+            m alter {_ + (key -> nr)}
+            EtcdResponse("set", nr, None)
+          }
+      }
+  
+    override def deleteKey(key: String): Future[EtcdResponse] = ???
+  
+    override def createDir(dir: String): Future[EtcdResponse] = ???
+  
+    // Dodgy implementation
+    override def listDir(dir: String, recursive: Boolean = false) =
+      if (recursive) ???
+      else
+        for {
+          count <- counter alter (_ + 1)
+          lookup <- m.future
+        } yield {
+          val matching = lookup.filterKeys(_.startsWith(dir))
+          if (!matching.isEmpty) {
+            EtcdListResponse(
+                "listDir",
+                NodeListElement(
+                    dir,
+                    Some(true),
+                    matching.get(dir).flatMap(_.value),
+                    Some((matching - dir).values.map { nr =>
+                      NodeListElement(nr.key, None, nr.value, None)
+                    }.toList)))
+          } else {
+            throw EtcdExceptions.KeyNotFoundException(
+              "Key not found", "not found", count)
+          }
+        }
+  
+    override def deleteDir(dir: String, recursive: Boolean = false) = ???
+      
+  }
+  
+  
   // Tests are separated by prefix
   def config(prefix: String): Hipache.ServerConfig =
     Hipache.ServerConfig(
-      RedisServer("127.0.0.1", port, None, None),
+      new MockEtcdClient,
       prefix
     )
 
-  def await[A](f: Future[A]) = Await.result(f, timeOut)
-  def idxKey(prefix: String) = s"${prefix}frontends"
-
-  def withClient[A](c: Hipache.ServerConfig)(f: HipacheClient => A) = {
-    val client = new HipacheClient(c)
-    val retval = f(client)
-    client.disconnect
-    retval
-  }
-
+  def await[A](f: Future[A]) = Await.result(f, Duration(5, "seconds"))
 
   import Hipache._
+  import EtcdJsonProtocol._
 
   "HipacheClient" >> {
 
@@ -46,17 +114,14 @@ class HipacheClientSpec extends RedisStandaloneServer {
       val backend = Backend("example.test")
 
       await(client.put(frontend, backend))
-      client.disconnect
 
-      val key = s"${c.prefix}frontend:${frontend.domain}"
-      await(redis.sismember[String](idxKey(c.prefix), key)) must beTrue
-      await(redis.lrange[String](key, 0, -1)) match {
-        case Seq(name, backend) =>
-          name must_== frontend.name
-          backend must_== backend.toString
+      val key = s"${c.prefix}/frontend:${frontend.domain}"
+      await(c.client.getKey(key)) match {
+        case EtcdResponse("get", NodeResponse(_, Some(value), _, _), None) =>
+          Json.parse(value) must_== Json.arr(frontend.name, backend.toString)
       }
     }
-
+/*
     "removes mappings" >> {
       val c = config("testremove:")
       val frontend = Frontend("test1", "test1.example.test")
@@ -140,7 +205,7 @@ class HipacheClientSpec extends RedisStandaloneServer {
         map(frontend) must_== backend
       }
     }
-
+*/
   }
 
 

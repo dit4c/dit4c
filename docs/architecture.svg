@@ -7,10 +7,34 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    version="1.1"
    width="682"
    height="541.125"
-   id="svg2">
+   id="svg2"
+   inkscape:version="0.48.5 r10040"
+   sodipodi:docname="architecture.svg">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1470"
+     inkscape:window-height="863"
+     id="namedview3711"
+     showgrid="false"
+     inkscape:zoom="2.0611852"
+     inkscape:cx="341.41557"
+     inkscape:cy="354.9504"
+     inkscape:window-x="67"
+     inkscape:window-y="925"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="g6" />
   <metadata
      id="metadata676">
     <rdf:RDF>
@@ -19,7 +43,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -546,7 +570,7 @@
          x="0"
          y="11"
          id="text276"
-         style="font-size:12px;font-style:normal;font-weight:normal;text-decoration:none;fill:#000000;stroke:none;font-family:Arial">redis</text>
+         style="font-size:12px;font-style:normal;font-weight:normal;text-decoration:none;fill:#000000;stroke:none;font-family:Arial">etcd</text>
     </g>
     <g
        transform="translate(120,262.5)"
@@ -629,7 +653,7 @@
          x="58.299999"
          y="11"
          id="text318"
-         style="font-size:12px;font-style:normal;font-weight:normal;text-decoration:none;fill:#000000;stroke:none;font-family:Arial">Redis</text>
+         style="font-size:12px;font-style:normal;font-weight:normal;text-decoration:none;fill:#000000;stroke:none;font-family:Arial">etcd</text>
       <text
          x="11.8"
          y="25"
