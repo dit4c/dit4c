@@ -47,18 +47,27 @@ class HipacheClientSpec extends Specification {
       (counter alter (_ + 1)) flatMap { count =>
         getKey(key)
           .map(_.node)
-          .map(nr => nr.copy(value=Some(value), modifiedIndex=count))
+          .map(nr => (nr.copy(value=Some(value), modifiedIndex=count), Some(nr)))
           .recover {
             case _: EtcdExceptions.KeyNotFoundException =>
-              NodeResponse(key, Some(value), count, count)
+              (NodeResponse(key, Some(value), count, count), None)
           }
-          .map { nr =>
+          .map { case (nr, pnr) =>
             m alter {_ + (key -> nr)}
-            EtcdResponse("set", nr, None)
+            EtcdResponse("set", nr, pnr)
           }
       }
   
-    override def deleteKey(key: String): Future[EtcdResponse] = ???
+    override def deleteKey(key: String): Future[EtcdResponse] =
+      (counter alter (_ + 1)) flatMap { count =>
+        getKey(key)
+          .map(_.node)
+          .map { nr =>
+            m alter {_ - key}
+            val dnr = nr.copy(value=None, modifiedIndex=count)
+            EtcdResponse("delete", dnr, Some(nr))
+          }
+      }
   
     override def createDir(dir: String): Future[EtcdResponse] = ???
   
@@ -121,91 +130,66 @@ class HipacheClientSpec extends Specification {
           Json.parse(value) must_== Json.arr(frontend.name, backend.toString)
       }
     }
-/*
+
     "removes mappings" >> {
       val c = config("testremove:")
       val frontend = Frontend("test1", "test1.example.test")
       val backend = Backend("example.test")
+      val client = new HipacheClient(c)
 
-      val key = s"${c.prefix}frontend:${frontend.domain}"
+      val key = s"${c.prefix}/frontend:${frontend.domain}"
 
-      val setup = for {
-        _ <- redis.sadd(idxKey(c.prefix), key)
-        _ <- redis.rpush(key, frontend.name)
-        _ <- redis.rpush(key, backend.toString)
-      } yield "done"
-      await(setup)
+      // Create key
+      await(c.client.setKey(
+            key,
+            Json.stringify(Json.arr(frontend.name, backend.toString))))
 
-      await(redis.exists(key)) must beTrue
+      await(c.client.getKey(key)).node.value must_==
+        Some(Json.stringify(Json.arr(frontend.name, backend.toString)))
 
-      await(redis.lrange[String](key, 0, -1)) match {
-        case Seq(name, backend) =>
-          name must_== frontend.name
-          backend must_== backend.toString
-      }
+      await(client.delete(frontend))
 
-
-      withClient(c) { client =>
-        await(client.delete(frontend))
-      }
-
-      await(redis.sismember[String](idxKey(c.prefix), key)) must beFalse
-      await(redis.exists(key)) must beFalse
+      await(c.client.getKey(key)) must
+        throwA[EtcdExceptions.KeyNotFoundException]
     }
 
     "replaces mappings" >> {
       val c = config("testreplace:")
-
+      val client = new HipacheClient(c)
       val frontend = Frontend("test", "test.example.test")
-      val key = s"${c.prefix}frontend:${frontend.domain}"
+      val key = s"${c.prefix}/frontend:${frontend.domain}"
       val requests =
         Seq(
           (frontend, Backend("example1.test")),
           (frontend, Backend("example2.test")))
 
-      await(redis.exists(key)) must beFalse
+      requests.foreach { case (frontend, backend) =>
+        await(client.put(frontend, backend))
 
-      withClient(c) { client =>
-        requests.foreach { case (frontend, backend) =>
-          await(client.put(frontend, backend))
-
-          await(redis.sismember[String](idxKey(c.prefix), key)) must beTrue
-          await(redis.exists(key)) must beTrue
-
-          await(redis.lrange[String](key, 0, -1)) match {
-            case Seq(name, backend) =>
-              name must_== frontend.name
-              backend must_== backend.toString
-          }
-        }
+        await(c.client.getKey(key)).node.value must_==
+          Some(Json.stringify(Json.arr(frontend.name, backend.toString)))
       }
       done
     }
 
     "retrieves mappings" >> {
       val c = config("testretrieve:")
-
+      val client = new HipacheClient(c)
       val frontend = Frontend("test", "test.example.test")
       val backend = Backend("example.test")
-      val key = s"${c.prefix}frontend:${frontend.domain}"
+      val key = s"${c.prefix}/frontend:${frontend.domain}"
 
-      val setup = for {
-        _ <- redis.sadd(idxKey(c.prefix), key)
-        _ <- redis.rpush(key, frontend.name)
-        _ <- redis.rpush(key, backend.toString)
-      } yield "done"
-      await(setup)
+      await(c.client.setKey(
+          key,
+          Json.stringify(Json.arr(frontend.name, backend.toString))))
 
-      withClient(c) { client =>
-        await(client.get(frontend)).get must_== backend
+      await(client.get(frontend)).get must_== backend
 
-        val map = await(client.all)
-        map.size must_== 1
-        map must haveKey(frontend)
-        map(frontend) must_== backend
-      }
+      val map = await(client.all)
+      map.size must_== 1
+      map must haveKey(frontend)
+      map(frontend) must_== backend
     }
-*/
   }
 
 
