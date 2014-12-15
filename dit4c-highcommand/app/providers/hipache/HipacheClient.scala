@@ -52,7 +52,7 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
   def delete(frontend: Hipache.Frontend): Future[Unit] =
     client.deleteKey(keyFor(frontend)) map (_ => ())
 
-  lazy val keyPrefix = s"/${config.prefix.stripPrefix("/")}/frontend:"
+  lazy val keyPrefix = s"${config.prefix.stripPrefix("/")}/frontend:"
   def keyFor(frontend: Hipache.Frontend) = keyPrefix + frontend.domain
 
   protected lazy val client = config.client
@@ -65,10 +65,10 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
     def unapply(kvPair: (String, Seq[String])): Option[HipachePair] =
       kvPair match {
         case (k: String, Seq(name: String, backendStr: String))
-            if k.startsWith(keyPrefix) =>
+            if k.startsWith("/"+keyPrefix) =>
           val frontend = Hipache.Frontend(
               name,
-              k.stripPrefix(keyPrefix))
+              k.stripPrefix("/"+keyPrefix))
           backendStr match {
             case reBackend(scheme, host, portStr) =>
               val backend =
