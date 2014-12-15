@@ -29,12 +29,14 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
         case _ =>
           None
       }.toMap
+    } recover {
+      case e: EtcdExceptions.KeyNotFoundException => Map.empty
     }
 
   def get(frontend: Hipache.Frontend): Future[Option[Hipache.Backend]] =
     client.getKey(keyFor(frontend))
       .map { etcdResponse =>
-        etcdResponse.node.value.flatMap { value => 
+        etcdResponse.node.value.flatMap { value =>
           (keyFor(frontend) -> Json.parse(value).as[Seq[String]]) match {
             case Entry(`frontend`, backend) => Some(backend)
             case _ => None
@@ -69,12 +71,12 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
     type HipachePair = (Hipache.Frontend, Hipache.Backend)
 
     def unapply(kvPair: (String, Seq[String])): Option[HipachePair] =
-      kvPair match {
+      kvPair.copy(_1 = kvPair._1.stripPrefix("/")) match {
         case (k: String, Seq(name: String, backendStr: String))
-            if k.startsWith("/"+keyPrefix) =>
+            if k.startsWith(keyPrefix) =>
           val frontend = Hipache.Frontend(
               name,
-              k.stripPrefix("/"+keyPrefix))
+              k.stripPrefix(keyPrefix))
           backendStr match {
             case reBackend(scheme, host, portStr) =>
               val backend =

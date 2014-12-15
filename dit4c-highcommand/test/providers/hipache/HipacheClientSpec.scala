@@ -82,7 +82,7 @@ class HipacheClientSpec extends Specification {
           val matching = lookup.filterKeys(_.startsWith(dir))
           if (!matching.isEmpty) {
             EtcdListResponse(
-                "listDir",
+                "get",
                 NodeListElement(
                     dir,
                     Some(true),
@@ -116,7 +116,7 @@ class HipacheClientSpec extends Specification {
   "HipacheClient" >> {
 
     "adds mappings" >> {
-      val c = config("testadd:")
+      val c = config("testadd")
       val client = new HipacheClient(c)
 
       val frontend = Frontend("test1", "test1.example.test")
@@ -132,7 +132,7 @@ class HipacheClientSpec extends Specification {
     }
 
     "removes mappings" >> {
-      val c = config("testremove:")
+      val c = config("testremove")
       val frontend = Frontend("test1", "test1.example.test")
       val backend = Backend("example.test")
       val client = new HipacheClient(c)
@@ -154,7 +154,7 @@ class HipacheClientSpec extends Specification {
     }
 
     "replaces mappings" >> {
-      val c = config("testreplace:")
+      val c = config("testreplace")
       val client = new HipacheClient(c)
       val frontend = Frontend("test", "test.example.test")
       val key = s"${c.prefix}/frontend:${frontend.domain}"
@@ -173,11 +173,13 @@ class HipacheClientSpec extends Specification {
     }
 
     "retrieves mappings" >> {
-      val c = config("testretrieve:")
+      val c = config("testretrieve")
       val client = new HipacheClient(c)
       val frontend = Frontend("test", "test.example.test")
       val backend = Backend("example.test")
       val key = s"${c.prefix}/frontend:${frontend.domain}"
+
+      await(client.all).size must_== 0
 
       await(c.client.setKey(
           key,

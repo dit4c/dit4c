@@ -89,8 +89,8 @@ class HipacheManagementActor(
     case "tick" => performMaintenance
   }
 
-  // TODO: Actually check mappings, rather than just printing them
-  private def performMaintenance: Future[_] =
+  private def performMaintenance: Future[_] = {
+    log.debug("Starting Hipache maintenance routine.")
     for {
       currentMappings <- client.all
       computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
@@ -109,7 +109,7 @@ class HipacheManagementActor(
                   client.put(frontend, node.backend).map(_ =>())
               }
             case None =>
-              log.warning(s"Unable to check Hipache Mapping of ${c.name}. App domain unknown.")
+              log.warning(s"Unable to check Hipache mapping of ${c.name}. App domain unknown.")
               Future.successful(())
           }
         }
@@ -121,5 +121,5 @@ class HipacheManagementActor(
         .toSeq
       opsDone <- Future.sequence(putOps ++ deleteOps)
     } yield opsDone
-
+  }
 }
