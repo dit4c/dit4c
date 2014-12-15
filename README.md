@@ -59,6 +59,7 @@ To deploy a portal:
  * Put your DIT4C portal configuration (`dit4c-highcommand.conf`) in `/opt/config`.
 
 ```
+application.baseUrl: "https://<your_domain_here>/"
 application.secret: "<your_really_super_secret_cookie_signing_key_here>"
 
 rapidaaf: {
