@@ -16,6 +16,8 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
   import EtcdJsonProtocol._
   import system.dispatcher
 
+  val log = akka.event.Logging.getLogger(system, this.getClass)
+
   def all: Future[Map[Hipache.Frontend,Hipache.Backend]] =
     client.listDir(config.prefix) map { etcdListResponse =>
       etcdListResponse.node.nodes.getOrElse(Nil).flatMap {
@@ -47,10 +49,14 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
       backend: Hipache.Backend): Future[Unit] = 
    client.setKey(
        keyFor(frontend), 
-       Json.stringify(Json.arr(frontend.name, backend.toString))) map (_ => ())
+       Json.stringify(Json.arr(frontend.name, backend.toString))).map { _ =>
+         log.info(s"Set Hipache mapping: ${frontend.name} → ${backend}")
+       }
 
   def delete(frontend: Hipache.Frontend): Future[Unit] =
-    client.deleteKey(keyFor(frontend)) map (_ => ())
+    client.deleteKey(keyFor(frontend)) map { _ =>
+      log.info(s"Removed Hipache mapping: ${frontend.name}")
+    }
 
   lazy val keyPrefix = s"${config.prefix.stripPrefix("/")}/frontend:"
   def keyFor(frontend: Hipache.Frontend) = keyPrefix + frontend.domain

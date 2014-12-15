@@ -92,46 +92,34 @@ class HipacheManagementActor(
   // TODO: Actually check mappings, rather than just printing them
   private def performMaintenance: Future[_] =
     for {
-      map <- client.all
+      currentMappings <- client.all
       computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
       containerDao = new ContainerDAO(db)
       computeNodes <- computeNodeDao.list
       containers <- containerDao.list
-    } yield {
-      val mappings = map.toSeq.sortBy(_._1.name).map { case (f, b) =>
-        s"${f.domain} → $b"
-      }.mkString("\n")
-      log.info("Current Hipache mappings:\n"+mappings)
-      val putOps: Seq[Future[String]] = containers.flatMap { c =>
+      putOps = containers.flatMap { c =>
         computeNodes.find(_.id == c.computeNodeId).map { node =>
           baseDomain match {
             case Some(domain) =>
               val frontend = Hipache.Frontend(c.name, s"${c.name}.${domain}")
-              map.get(frontend) match {
+              currentMappings.get(frontend) match {
                 case Some(b) if b == node.backend =>
-                  Future.successful {
-                    s"Confirmed Hipache mapping of ${c.name} to ${node.name}."
-                  }
+                  Future.successful(())
                 case _ =>
-                  client.put(frontend, node.backend).map { _ =>
-                    s"Created Hipache mapping of ${c.name} to ${node.name}."
-                  }
+                  client.put(frontend, node.backend).map(_ =>())
               }
             case None =>
-              Future.successful {
-                s"Unable to check Hipache Mapping of ${c.name}. App domain unknown."
-              }
+              log.warning(s"Unable to check Hipache Mapping of ${c.name}. App domain unknown.")
+              Future.successful(())
           }
         }
       }
-      val containerExists = containers.map(_.name).toSet.contains _
-      val deleteOps: Seq[Future[String]] = map.keys
+      containerExists = containers.map(_.name).toSet.contains _
+      deleteOps = currentMappings.keys
         .filterNot(frontend => containerExists(frontend.name))
         .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))
         .toSeq
-      (putOps ++ deleteOps).foreach { op =>
-        op.foreach(log.info(_))
-      }
-    }
+      opsDone <- Future.sequence(putOps ++ deleteOps)
+    } yield opsDone
 
 }
