@@ -14,11 +14,10 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
   import EtcdJsonProtocol._
-
   import system.dispatcher
 
   def all: Future[Map[Hipache.Frontend,Hipache.Backend]] =
-    client.listDir(indexKey) map { etcdListResponse =>
+    client.listDir(config.prefix) map { etcdListResponse =>
       etcdListResponse.node.nodes.getOrElse(Nil).flatMap {
         case NodeListElement(key, _, Some(value), _) =>
           (key -> Json.parse(value).as[Seq[String]]) match {
@@ -53,8 +52,7 @@ class HipacheClient(config: Hipache.ServerConfig)(implicit system: ActorSystem) 
   def delete(frontend: Hipache.Frontend): Future[Unit] =
     client.deleteKey(keyFor(frontend)) map (_ => ())
 
-  lazy val indexKey = config.prefix
-  lazy val keyPrefix = s"${config.prefix}/frontend:"
+  lazy val keyPrefix = s"/${config.prefix.stripPrefix("/")}/frontend:"
   def keyFor(frontend: Hipache.Frontend) = keyPrefix + frontend.domain
 
   protected lazy val client = config.client

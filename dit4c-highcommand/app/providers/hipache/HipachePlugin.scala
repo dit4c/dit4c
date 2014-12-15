@@ -30,10 +30,13 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
       prefix = app.configuration
         .getString("hipache.etcd.prefix")
         .getOrElse("dit4c/hipache")
-    } yield Hipache.ServerConfig(
-      new EtcdClient(url),
-      prefix
-    )
+      safeUrl = url.replaceFirst("/$", "")
+    } yield {
+      Hipache.ServerConfig(
+        new EtcdClient(safeUrl),
+        prefix
+      )
+    }
 
   def baseDomain =
     app.configuration.getString("application.baseUrl")
@@ -96,7 +99,7 @@ class HipacheManagementActor(
       containers <- containerDao.list
     } yield {
       val mappings = map.toSeq.sortBy(_._1.name).map { case (f, b) =>
-        s"$f → $b"
+        s"${f.domain} → $b"
       }.mkString("\n")
       log.info("Current Hipache mappings:\n"+mappings)
       val putOps: Seq[Future[String]] = containers.flatMap { c =>

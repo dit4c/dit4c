@@ -9,5 +9,5 @@
   "http": {
     "port": 6000
   },
-  "driver": "etcd://172.17.42.1:4001#dit4c/hipache"
+  "driver": "etcd://172.17.42.1:4001#dit4c/hipache/"
 }
