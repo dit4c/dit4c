@@ -70,10 +70,11 @@ dockerfile in docker := {
   val optFiles = dockerResources / "opt"
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-base")
-    .run("""
+    .run("bash", "-c",
+      """
       yum -y install java-1.7.0-openjdk-headless nginx socat &&
       rm /etc/nginx/conf.d/*.conf
-      """.trim.split("\\s+"): _*)
+      """)
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
     .add(configs, "/etc")
     .add(optFiles, "/opt")
