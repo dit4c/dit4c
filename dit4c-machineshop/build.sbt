@@ -98,4 +98,4 @@ imageName in docker := {
     tag = Some(version.value))
 }
 
-ReleaseKeys.publishArtifactsAction := dockerBuildAndPush.value
+ReleaseKeys.publishArtifactsAction := docker.value
