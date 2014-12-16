@@ -44,6 +44,10 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
                       }
                     case Success(PortReply(None)) =>
                       complete(404, HttpEntity.Empty)
+                    case Success(obj) =>
+                      logRequestResponse(s"query error - unknown reply: $obj") {
+                        complete(500, HttpEntity.Empty)
+                      }
                     case Failure(e)  =>
                       logRequestResponse(s"query error: $e") {
                         complete(500, HttpEntity.Empty)
