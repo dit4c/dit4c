@@ -21,33 +21,28 @@ object CouchDB {
 
     def url: java.net.URL
 
-    val client = new CouchClient(
+    lazy val client = new CouchClient(
         host = url.getHost,
         port = url.getPort,
         ssl = url.getProtocol == "https")
 
     object databases {
 
-      def create(name: String): Future[Database] = {
-        val holder = WS.url(s"${url}$name")
-        holder.put(EmptyContent()).map { response =>
-          response.status match {
-            case 201 => new Database(name)
-          }
+      def create(name: String): Future[Database] = 
+        client.database(name).create.map { _ =>
+          new Database(name)
         }
-      }
 
-      def list: Future[Seq[Database]] = {
-        val holder = WS.url(s"${url}_all_dbs")
-        holder.get.map { response =>
-          response.json.asInstanceOf[JsArray].value
-            .map(_.as[String])
-            .map(new Database(_))
+      def list: Future[Seq[Database]] =
+        client._all_dbs.map { databaseNames =>
+          databaseNames.map(name => new Database(name))
         }
-      }
 
       def get(name: String): Future[Option[Database]] =
-        list.map(_.find(_.name == name))
+        client.database(name).exists.map {
+          case true => Some(new Database(name))
+          case false => None
+        }
 
       // Aliases
       def apply() = list
