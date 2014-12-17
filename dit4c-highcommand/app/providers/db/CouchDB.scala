@@ -1,18 +1,30 @@
 package providers.db
 
-import scala.concurrent.{ExecutionContext, Future, future}
+import akka.actor.ActorSystem
+import akka.util.Timeout
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.DurationInt
 import play.api.Application
+import play.api.libs.concurrent.Akka
 import play.api.libs.ws.WS
 import play.api.mvc.Results.EmptyContent
 import play.api.libs.json._
+import gnieh.sohva.async.CouchClient
 
 object CouchDB {
 
   abstract class Instance(implicit ec: ExecutionContext, app: Application) {
 
+    implicit private val timeout: Timeout = Timeout(5.seconds)
+    implicit private def system: ActorSystem = Akka.system(app)
     implicit private val instance = this
 
     def url: java.net.URL
+
+    val client = new CouchClient(
+        host = url.getHost,
+        port = url.getPort,
+        ssl = url.getProtocol == "https")
 
     object databases {
 
@@ -42,16 +54,11 @@ object CouchDB {
       def apply(name: String) = get(name)
     }
 
-    def newID = {
-      val holder = WS.url(s"${url}_uuids")
-      holder.get.map { response =>
-        val uuids: Seq[String] = (response.json \ "uuids")
-          .asInstanceOf[JsArray].value.map(_.as[String])
-        uuids.head
-      }
+    def newID = client._uuid
+
+    def disconnect {
+      client.shutdown
     }
-    
-    def disconnect {}
 
   }
 
