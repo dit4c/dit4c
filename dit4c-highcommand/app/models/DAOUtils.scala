@@ -10,6 +10,7 @@ import providers.db.CouchDB
 import play.api.libs.ws._
 import scala.concurrent.ExecutionContext
 import gnieh.sohva.async.{Database => SohvaDatabase}
+import net.liftweb.{json => lift}
 
 trait DAOUtils {
   import scala.language.implicitConversions
@@ -26,6 +27,12 @@ trait DAOUtils {
       val _id = model.id
       withRev(model._rev)
     }
+
+  implicit def convertJsValue2JValue(v: JsValue): lift.JValue =
+    lift.parse(Json.stringify(v))
+
+  implicit def convertJValue2JsValue(v: lift.JValue): JsValue =
+    Json.parse(lift.compact(lift.render(v)))
 
   protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]) : Option[A] =
     Json.fromJson[A](json)(reads) match {
@@ -81,12 +88,9 @@ trait DAOUtils {
 
     def get[M <: DAOModel[M]](id: String)(
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =
-      WS.url(s"${db.baseURL}/$id").get.map { response =>
-        (response.status match {
-          case 200 => Some(response.json)
-          case _ => None
-        }).flatMap(fromJson[M])
-      }
+      for {
+        possibleRawDoc <- db.getRawDocById(id)
+      } yield possibleRawDoc.map(convertJValue2JsValue).flatMap(fromJson[M])
 
     def delete[M <: BaseModel](model: M): Future[Unit] = {
       db.deleteDoc(model).map( _ => ())
@@ -101,22 +105,16 @@ trait DAOUtils {
       }.map( _ => ())
 
     def update[M <: DAOModel[M]](changed: => M)(
-        implicit wjs: Writes[M]): Future[M] = {
+        implicit rjs: Reads[M], wjs: Writes[M]): Future[M] = {
       for {
-        response <- WS.url(s"${db.baseURL}/${changed.id}")
-                      .put(Json.toJson(changed))
+        response <- db.saveRawDoc(Json.toJson(changed))
       } yield {
-        response.status match {
-          case 201 =>
-            // Update with revision
-            val rev = (response.json \ "rev").as[String]
-            changed.revUpdate(rev)
-        }
+        fromJson[M](convertJValue2JsValue(response)).get
       }
     }
 
     class UpdateOp[M <: DAOModel[M]](model: M)(
-        implicit wjs: Writes[M]) extends UpdateOperation[M] {
+        implicit rjs: Reads[M], wjs: Writes[M]) extends UpdateOperation[M] {
       override def exec() = update(model)
 
       // Used to avoid updates that don't change anything

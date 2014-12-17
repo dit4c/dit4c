@@ -77,8 +77,8 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       key.retired must beFalse
       val retiredKey = await(key.retire)
       retiredKey.retired must beTrue
-      key.id must be(retiredKey.id)
-      key._rev must not be(retiredKey._rev)
+      key.id must_== retiredKey.id
+      key._rev must_!= retiredKey._rev
       await(dao.list) must haveSize(1)
     }
 
