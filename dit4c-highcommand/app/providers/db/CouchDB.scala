@@ -63,6 +63,8 @@ object CouchDB {
 
     def newID: Future[String] = instance.newID
 
+    def asSohvaDb = instance.client.database(name)
+
   }
 
 }

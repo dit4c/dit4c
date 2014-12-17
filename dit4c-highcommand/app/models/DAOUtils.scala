@@ -9,13 +9,23 @@ import scala.concurrent.Future
 import providers.db.CouchDB
 import play.api.libs.ws._
 import scala.concurrent.ExecutionContext
+import gnieh.sohva.async.{Database => SohvaDatabase}
 
 trait DAOUtils {
+  import scala.language.implicitConversions
+
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
   implicit protected def ec: ExecutionContext
   protected def db: CouchDB.Database
+
+  implicit def toSohvaDb(db: CouchDB.Database): SohvaDatabase = db.asSohvaDb
+  implicit def idRev[M <: BaseModel](model: M) =
+    new gnieh.sohva.IdRev {
+      val _id = model.id
+      withRev(model._rev)
+    }
 
   protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]) : Option[A] =
     Json.fromJson[A](json)(reads) match {
@@ -78,19 +88,17 @@ trait DAOUtils {
         }).flatMap(fromJson[M])
       }
 
-    def delete[M <: BaseModel](model: M): Future[Unit] =
-      delete(model.id, model._rev.get)
-
-    def delete(id: String, rev: String): Future[Unit] = {
-      WS.url(s"${db.baseURL}/$id")
-        .withHeaders("If-Match" -> rev)
-        .delete
-        .map { response =>
-          if (response.status == 200) Unit
-          else throw new Exception(
-              s"Unexpected return code for DELETE: ${response.status}")
-        }
+    def delete[M <: BaseModel](model: M): Future[Unit] = {
+      db.deleteDoc(model).map( _ => ())
     }
+
+    def delete(id: String, rev: String): Future[Unit] =
+      db.deleteDoc(id -> rev) {
+        case (id, rev) => new gnieh.sohva.IdRev {
+          val _id = id
+          withRev(Some(rev))
+        }
+      }.map( _ => ())
 
     def update[M <: DAOModel[M]](changed: => M)(
         implicit wjs: Writes[M]): Future[M] = {
