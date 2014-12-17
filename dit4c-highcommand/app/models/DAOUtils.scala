@@ -70,21 +70,12 @@ trait DAOUtils {
   object utils {
 
     def create[M <: DAOModel[M]](newModelFunc: String => M)(
-        implicit wjs: Writes[M]): Future[M] = {
+        implicit rjs: Reads[M], wjs: Writes[M]): Future[M] =
       for {
         id <- db.newID
         newModel = newModelFunc(id)
-        response <- WS.url(s"${db.baseURL}/${newModel.id}")
-                      .put(Json.toJson(newModel))
-      } yield {
-        response.status match {
-          case 201 =>
-            // Update with revision
-            val rev = (response.json \ "rev").as[String]
-            newModel.revUpdate(rev)
-        }
-      }
-    }
+        model <- update(newModel)
+      } yield model
 
     def get[M <: DAOModel[M]](id: String)(
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =

@@ -27,8 +27,8 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         MockIdentity("test:user3", Some("Test User"), Some("user@example.test"))
       ).foreach { identity =>
         val user = await(dao.createWith(identity))
-        user.name must be(identity.name)
-        user.email must be(identity.emailAddress)
+        user.name must_== identity.name
+        user.email must_== identity.emailAddress
         user.identities must contain(identity.uniqueId)
         // Check database has data
         val couchResponse = await(WS.url(s"${db.baseURL}/${user.id}").get)
