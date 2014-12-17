@@ -21,26 +21,13 @@ class ContainerDAO(protected val db: CouchDB.Database)
       if (containers.exists(_.name == name)) {
         throw new Exception("Container with that name already exists.")
       }
-      db.newID.flatMap { id =>
-        val node = ContainerImpl(id, None, name, image, computeNode.id,
+      utils.create { id =>
+        ContainerImpl(id, None, name, image, computeNode.id,
           Set(user.id))
-        WS.url(s"${db.baseURL}/$id")
-          .put(Json.toJson(node))
-          .flatMap { response =>
-            response.status match {
-              case 201 => get(id).map(_.get)
-            }
-          }
       }
     }
 
-  def get(id: String): Future[Option[Container]] =
-    WS.url(s"${db.baseURL}/$id").get.map { response =>
-      (response.status match {
-        case 200 => Some(response.json)
-        case _ => None
-      }).flatMap(fromJson[ContainerImpl])
-    }
+  def get(id: String): Future[Option[Container]] = utils.get(id)
 
   def list: Future[Seq[Container]] =
     utils.runView[ContainerImpl](
@@ -52,7 +39,7 @@ class ContainerDAO(protected val db: CouchDB.Database)
     } yield containers.filter(_.computeNodeId == node.id)
 
 
-  implicit val projectFormat: Format[ContainerImpl] = (
+  implicit val containerFormat: Format[ContainerImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
@@ -69,9 +56,11 @@ class ContainerDAO(protected val db: CouchDB.Database)
       name: String,
       image: String,
       computeNodeId: String,
-      ownerIDs: Set[String]) extends Container {
+      ownerIDs: Set[String]) extends Container with DAOModel[ContainerImpl] {
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
+
+    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
   }
 
