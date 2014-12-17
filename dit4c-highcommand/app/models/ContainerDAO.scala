@@ -42,14 +42,9 @@ class ContainerDAO(protected val db: CouchDB.Database)
       }).flatMap(fromJson[ContainerImpl])
     }
 
-  def list: Future[Seq[Container]] = {
-    val tempView = TemporaryView(views.js.models.Container_list_map())
-    WS.url(s"${db.baseURL}/_temp_view")
-      .post(Json.toJson(tempView))
-      .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[ContainerImpl])
-      }
-  }
+  def list: Future[Seq[Container]] =
+    utils.runView[ContainerImpl](
+        TemporaryView(views.js.models.Container_list_map()))
 
   def listFor(node: ComputeNode): Future[Seq[Container]] =
     for {

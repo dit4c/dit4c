@@ -103,6 +103,15 @@ trait DAOUtils {
         fromJson[M](convertJValue2JsValue(response)).get
       }
     }
+    
+    def runView[M](tempView: TemporaryView)(
+        implicit rjs: Reads[M], wjs: Writes[M]): Future[Seq[M]] = {
+      WS.url(s"${db.baseURL}/_temp_view")
+        .post(Json.toJson(tempView))
+        .map { response =>
+         (response.json \ "rows" \\ "value").flatMap(fromJson[M])
+        }
+    }
 
     class UpdateOp[M <: DAOModel[M]](model: M)(
         implicit rjs: Reads[M], wjs: Writes[M]) extends UpdateOperation[M] {

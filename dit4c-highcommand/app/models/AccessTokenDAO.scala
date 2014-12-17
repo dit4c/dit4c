@@ -41,15 +41,9 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
 
   def get(id: String): Future[Option[AccessToken]] = utils.get(id)
 
-  def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] = {
-    val tempView = TemporaryView(views.js.models.AccessToken_listFor_map(
-        computeNode.id))
-    WS.url(s"${db.baseURL}/_temp_view")
-      .post(Json.toJson(tempView))
-      .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[AccessTokenImpl])
-      }
-  }
+  def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] =
+    utils.runView[AccessTokenImpl](
+        TemporaryView(views.js.models.AccessToken_listFor_map(computeNode.id)))
 
   protected def newCode: String = codeChars.take(newCodeLength).mkString
   protected def codeChars: Stream[Char] = random(validCodeChars) #:: codeChars

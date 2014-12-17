@@ -40,14 +40,9 @@ class ComputeNodeDAO @Inject() (
           name, serverId, managementUrl, backend, Set(user.id), Set(user.id))
     }
 
-  def list: Future[Seq[ComputeNode]] = {
-    val tempView = TemporaryView(views.js.models.ComputeNode_list_map())
-    WS.url(s"${db.baseURL}/_temp_view")
-      .post(Json.toJson(tempView))
-      .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[ComputeNodeImpl])
-      }
-  }
+  def list: Future[Seq[ComputeNode]] =
+    utils.runView[ComputeNodeImpl](
+        TemporaryView(views.js.models.ComputeNode_list_map()))
 
   def get(id: String) = list.map(nodes => nodes.find(_.id == id))
 

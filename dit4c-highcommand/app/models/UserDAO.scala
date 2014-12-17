@@ -22,17 +22,11 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
           identity.name, identity.emailAddress, Seq(identity.uniqueId))
     }
 
-  def findWith(identity: Identity): Future[Option[User]] = {
-    val tempView =
-      TemporaryView(views.js.models.User_findWith_map(identity.uniqueId))
-    WS.url(s"${db.baseURL}/_temp_view")
-      .post(Json.toJson(tempView))
-      .map { response =>
-        (response.json \ "rows" \\ "value")
-          .headOption
-          .flatMap(fromJson[UserImpl])
-      }
-  }
+  def findWith(identity: Identity): Future[Option[User]] =
+    for {
+      users <- utils.runView[UserImpl](
+          TemporaryView(views.js.models.User_findWith_map(identity.uniqueId)))
+    } yield users.headOption
 
   def get(id: String): Future[Option[User]] = utils.get(id)
 

@@ -53,14 +53,9 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
     }
 
 
-  def list: Future[Seq[Key]] = {
-    val tempView = TemporaryView(views.js.models.Key_list_map())
-    WS.url(s"${db.baseURL}/_temp_view")
-      .post(Json.toJson(tempView))
-      .map { response =>
-        (response.json \ "rows" \\ "value").flatMap(fromJson[KeyImpl])
-      }
-  }
+  def list: Future[Seq[Key]] =
+    utils.runView[KeyImpl](
+        TemporaryView(views.js.models.Key_list_map()))
 
   // RSAKey isn't comparable by default, so we wrap it. (RSAKey is final.)
   private class WrappedRSAKey(val rsaKey: RSAKey) {
