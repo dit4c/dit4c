@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
+  "org.gnieh"           %%  "sohva-dm"        % "1.0.0",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",
   "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.6"     % "test",
   "org.specs2"          %%  "specs2-scalacheck" % "2.3.12"  % "test",
