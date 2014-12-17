@@ -33,7 +33,7 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
             GitHubProvider(appConfig) ++
             DummyProvider(appConfig))
 
-        val dbName = "dit4c-highcommand"
+        val dbName = app.configuration.getString("couchdb.database").get
 
         lazy val dbServerInstance = app.plugin[CouchDBPlugin].get.get
 
