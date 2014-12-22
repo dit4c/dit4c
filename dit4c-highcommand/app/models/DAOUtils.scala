@@ -9,6 +9,7 @@ import scala.concurrent.Future
 import providers.db.CouchDB
 import play.api.libs.ws._
 import scala.concurrent.ExecutionContext
+import gnieh.sohva.ViewDoc
 import gnieh.sohva.async.{Database => SohvaDatabase}
 import net.liftweb.{json => lift}
 
@@ -55,16 +56,8 @@ trait DAOUtils {
       }
   }
 
-  case class TemporaryView(val map: JavaScript)
-
-  implicit val temporaryViewWrites = new Writes[TemporaryView] {
-    override def writes(tv: TemporaryView) = Json.obj(
-      "map" -> Json.toJson(tv.map)
-    )
-  }
-
-  implicit val javascriptWrites: Writes[JavaScript] = new Writes[JavaScript] {
-    override def writes(js: JavaScript) = JsString(js.body)
+  case class TemporaryView(val map: JavaScript) {
+    def asViewDoc: ViewDoc = ViewDoc(map.body, None)
   }
 
   object utils {
@@ -105,13 +98,15 @@ trait DAOUtils {
     }
     
     def runView[M](tempView: TemporaryView)(
-        implicit rjs: Reads[M], wjs: Writes[M]): Future[Seq[M]] = {
-      WS.url(s"${db.baseURL}/_temp_view")
-        .post(Json.toJson(tempView))
-        .map { response =>
-         (response.json \ "rows" \\ "value").flatMap(fromJson[M])
-        }
-    }
+        implicit rjs: Reads[M], wjs: Writes[M]): Future[Seq[M]] =
+      for {
+        rawViewResult <- db.temporaryView(tempView.asViewDoc).queryRaw()
+      } yield {
+        rawViewResult.rows
+          .map(_.value)
+          .map(convertJValue2JsValue)
+          .flatMap(fromJson[M])
+      }
 
     class UpdateOp[M <: DAOModel[M]](model: M)(
         implicit rjs: Reads[M], wjs: Writes[M]) extends UpdateOperation[M] {
