@@ -9,7 +9,7 @@ libraryDependencies ++= Seq(
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
-  "org.gnieh"           %%  "sohva-dm"        % "1.0.0",
+  "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",
   "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.6"     % "test",
   "org.specs2"          %%  "specs2-scalacheck" % "2.3.12"  % "test",
@@ -25,6 +25,7 @@ libraryDependencies ++= Seq(
 )
 
 resolvers ++= Seq(
+  "DIT4C BinTray" at "http://dl.bintray.com/dit4c/repo/",
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
   "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/")
 
