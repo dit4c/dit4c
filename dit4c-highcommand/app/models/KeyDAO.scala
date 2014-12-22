@@ -4,14 +4,12 @@ import com.google.inject.Inject
 import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
 import scala.concurrent.Future
-import play.api.libs.ws.WS
 import play.api.libs.json._
 import play.api.mvc.Results.EmptyContent
 import scala.util.Try
 import java.security.interfaces.RSAPrivateKey
 import java.util.Date
 import java.util.TimeZone
-import play.api.libs.ws.WSRequestHolder
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.joda.time.format.ISODateTimeFormat

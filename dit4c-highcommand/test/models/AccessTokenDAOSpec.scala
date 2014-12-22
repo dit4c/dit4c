@@ -4,11 +4,11 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.concurrent.ExecutionContext
+import play.api.libs.json._
 import play.api.test._
 import java.util.UUID
 import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
-import play.api.libs.ws.WS
 import providers.db.CouchDB
 import java.util.Collections.EmptySet
 import providers.InjectorPlugin
@@ -26,9 +26,10 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
       val token = await(dao.create(AccessType.Share, computeNode))
       token.accessType must_== AccessType.Share
       // Check database has data
-      val couchResponse = await(WS.url(s"${db.baseURL}/${token.id}").get)
-      couchResponse.status must_== 200
-      val json = couchResponse.json
+      val couchResponse =
+        await(db.asSohvaDb.getDocById[JsValue](token.id, None))
+      couchResponse must beSome
+      val json = couchResponse.get
       (json \ "type").as[String] must_== "AccessToken"
       (json \ "_id").as[String] must_== token.id
       (json \ "_rev").as[String] must_== token._rev.get

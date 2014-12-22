@@ -3,7 +3,6 @@ package models
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
-import play.api.libs.ws._
 import play.api.libs.json._
 
 class ContainerDAO(protected val db: CouchDB.Database)

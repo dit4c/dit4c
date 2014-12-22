@@ -8,7 +8,7 @@ import play.api.test.PlaySpecification
 import java.util.UUID
 import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
-import play.api.libs.ws.WS
+import play.api.libs.json._
 import providers.db.CouchDB
 import play.api.test.WithApplication
 import utils.SpecUtils
@@ -33,16 +33,17 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       millisSinceCreation(key.createdAt) must beBetween(0, 2000L)
       key.publicId must_== s"$namespace ${key.createdAt} [${key.id}]"
       // Check database has data
-      val couchResponse = await(WS.url(s"${db.baseURL}/${key.id}").get)
-      couchResponse.status must_== 200
-      val json = couchResponse.json
+      val couchResponse =
+        await(db.asSohvaDb.getDocById[JsValue](key.id, None))
+      couchResponse must beSome
+      val json = couchResponse.get
       (json \ "type").as[String] must_== "Key"
       (json \ "_id").as[String] must_== key.id
       (json \ "_rev").as[Option[String]] must_== key._rev
       (json \ "namespace").as[String] must_== key.namespace
       (json \ "createdAt").as[String] must_== key.createdAt.toString()
       (json \ "retired").as[Boolean] must beFalse
-      val keyJson = couchResponse.json \ "keyPair"
+      val keyJson = json \ "keyPair"
       (keyJson \ "kty").as[String] must_== "RSA"
       (keyJson \ "n").as[String] must_== key.toJWK.getModulus.toString
       (keyJson \ "e").as[String] must_== key.toJWK.getPublicExponent.toString

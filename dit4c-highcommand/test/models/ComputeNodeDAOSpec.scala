@@ -4,11 +4,11 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.concurrent.ExecutionContext
+import play.api.libs.json._
 import play.api.test.PlaySpecification
 import java.util.UUID
 import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
-import play.api.libs.ws.WS
 import providers.db.CouchDB
 import play.api.test.WithApplication
 import utils.SpecUtils
@@ -34,9 +34,10 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       node.managementUrl must_== "http://localhost:8080/"
       node.backend must_== Hipache.Backend("localhost", 6000)
       // Check database has data
-      val couchResponse = await(WS.url(s"${db.baseURL}/${node.id}").get)
-      couchResponse.status must_== 200
-      val json = couchResponse.json
+      val couchResponse =
+        await(db.asSohvaDb.getDocById[JsValue](node.id, None))
+      couchResponse must beSome
+      val json = couchResponse.get
       (json \ "type").as[String] must_== "ComputeNode"
       (json \ "_id").as[String] must_== node.id
       (json \ "_rev").as[Option[String]] must_== node._rev

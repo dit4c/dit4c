@@ -8,7 +8,7 @@ import play.api.test._
 import java.util.UUID
 import providers.db.EphemeralCouchDBInstance
 import providers.auth.Identity
-import play.api.libs.ws.WS
+import play.api.libs.json._
 import providers.db.CouchDB
 import java.util.Collections.EmptySet
 import providers.InjectorPlugin
@@ -31,13 +31,15 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         user.email must_== identity.emailAddress
         user.identities must contain(identity.uniqueId)
         // Check database has data
-        val couchResponse = await(WS.url(s"${db.baseURL}/${user.id}").get)
-        couchResponse.status must_== 200
-        (couchResponse.json \ "type").as[String] must_== "User"
-        (couchResponse.json \ "_id").as[String] must_== user.id
-        (couchResponse.json \ "name").as[Option[String]] must_== user.name
-        (couchResponse.json \ "email").as[Option[String]] must_== user.email
-        (couchResponse.json \ "identities").as[Seq[String]] must_== user.identities
+        val couchResponse =
+          await(db.asSohvaDb.getDocById[JsValue](user.id, None))
+        couchResponse must beSome
+        val json = couchResponse.get
+        (json \ "type").as[String] must_== "User"
+        (json \ "_id").as[String] must_== user.id
+        (json \ "name").as[Option[String]] must_== user.name
+        (json \ "email").as[Option[String]] must_== user.email
+        (json \ "identities").as[Seq[String]] must_== user.identities
       }
       done
     }

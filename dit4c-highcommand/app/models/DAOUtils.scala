@@ -7,9 +7,8 @@ import play.api.Logger
 import play.twirl.api.JavaScript
 import scala.concurrent.Future
 import providers.db.CouchDB
-import play.api.libs.ws._
 import scala.concurrent.ExecutionContext
-import gnieh.sohva.ViewDoc
+import gnieh.sohva.{IdRev, ViewDoc}
 import gnieh.sohva.async.{Database => SohvaDatabase}
 import net.liftweb.{json => lift}
 
@@ -23,17 +22,18 @@ trait DAOUtils {
   protected def db: CouchDB.Database
 
   implicit def toSohvaDb(db: CouchDB.Database): SohvaDatabase = db.asSohvaDb
-  implicit def idRev[M <: BaseModel](model: M) =
-    new gnieh.sohva.IdRev {
+  
+  implicit def idRevJsValue[JsValue](json: play.api.libs.json.JsValue) =
+    new IdRev {
+      val _id = (json \ "_id").as[String]
+      withRev((json \ "_rev").asOpt[String])
+    }
+  
+  implicit def idRev[M <: BaseModel](model: M): IdRev =
+    new IdRev {
       val _id = model.id
       withRev(model._rev)
     }
-
-  implicit def convertJsValue2JValue(v: JsValue): lift.JValue =
-    lift.parse(Json.stringify(v))
-
-  implicit def convertJValue2JsValue(v: lift.JValue): JsValue =
-    Json.parse(lift.compact(lift.render(v)))
 
   protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]) : Option[A] =
     Json.fromJson[A](json)(reads) match {
@@ -73,38 +73,35 @@ trait DAOUtils {
     def get[M <: DAOModel[M]](id: String)(
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =
       for {
-        possibleRawDoc <- db.getRawDocById(id)
-      } yield possibleRawDoc.map(convertJValue2JsValue).flatMap(fromJson[M])
+        possibleDoc <- db.getDocById[JsValue](id)
+      } yield possibleDoc.flatMap(fromJson[M])
 
     def delete[M <: BaseModel](model: M): Future[Unit] = {
-      db.deleteDoc(model).map( _ => ())
+      db.deleteDoc(model).map(_ => ())
     }
 
     def delete(id: String, rev: String): Future[Unit] =
       db.deleteDoc(id -> rev) {
-        case (id, rev) => new gnieh.sohva.IdRev {
+        case (id, rev) => new IdRev {
           val _id = id
           withRev(Some(rev))
         }
-      }.map( _ => ())
+      }.map(_ => ())
 
     def update[M <: DAOModel[M]](changed: => M)(
-        implicit rjs: Reads[M], wjs: Writes[M]): Future[M] = {
+        implicit rjs: Reads[M], wjs: Writes[M]): Future[M] =
       for {
-        response <- db.saveRawDoc(Json.toJson(changed))
-      } yield {
-        fromJson[M](convertJValue2JsValue(response)).get
-      }
-    }
-    
+        response <- db.saveDoc(Json.toJson(changed))
+      } yield fromJson[M](response).get
+
     def runView[M](tempView: TemporaryView)(
         implicit rjs: Reads[M], wjs: Writes[M]): Future[Seq[M]] =
       for {
-        rawViewResult <- db.temporaryView(tempView.asViewDoc).queryRaw()
+        rawViewResult <-
+          db.temporaryView(tempView.asViewDoc).query[String, JsValue, Any]()
       } yield {
         rawViewResult.rows
           .map(_.value)
-          .map(convertJValue2JsValue)
           .flatMap(fromJson[M])
       }
 

@@ -2,7 +2,6 @@ package models
 
 import com.google.inject.Inject
 import providers.db.CouchDB
-import play.api.libs.ws.WS
 import providers.auth._
 import scala.concurrent.ExecutionContext
 import play.api.libs.json._

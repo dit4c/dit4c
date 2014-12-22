@@ -7,7 +7,7 @@ import scala.concurrent.ExecutionContext
 import play.api.test.PlaySpecification
 import java.util.UUID
 import providers.db.EphemeralCouchDBInstance
-import play.api.libs.ws.WS
+import play.api.libs.json._
 import providers.db.CouchDB
 import java.util.Collections.EmptySet
 import utils.SpecUtils
@@ -34,15 +34,17 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
         container.name must be(container.name)
         container.image must be(container.image)
         // Check database has data
-        val cr = await(WS.url(s"${db.baseURL}/${container.id}").get)
-        cr.status must_== 200
-        (cr.json \ "type").as[String] must_== "Container"
-        (cr.json \ "_id").as[String] must_== container.id
-        (cr.json \ "_rev").as[Option[String]] must_== container._rev
-        (cr.json \ "name").as[String] must_== container.name
-        (cr.json \ "image").as[String] must_== container.image
-        (cr.json \ "computeNodeId").as[String] must_== container.computeNodeId
-        (cr.json \ "ownerIDs").as[Set[String]] must contain(session.user.id)
+        val couchResponse =
+          await(db.asSohvaDb.getDocById[JsValue](container.id, None))
+        couchResponse must beSome
+        val json = couchResponse.get
+        (json \ "type").as[String] must_== "Container"
+        (json \ "_id").as[String] must_== container.id
+        (json \ "_rev").as[Option[String]] must_== container._rev
+        (json \ "name").as[String] must_== container.name
+        (json \ "image").as[String] must_== container.image
+        (json \ "computeNodeId").as[String] must_== container.computeNodeId
+        (json \ "ownerIDs").as[Set[String]] must contain(session.user.id)
       }
       done
     }
@@ -58,14 +60,15 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
 
     "delete containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db)
-      def getId(id: String) = await(WS.url(s"${db.baseURL}/$id").get)
+      def getId(id: String) =
+        await(db.asSohvaDb.getDocById[JsValue](container.id, None))
       val dao = new ContainerDAO(db)
       val cn = MockComputeNode("mockcontainerid")
       val container = await(dao.create(
           session.user, "test1", dummyImage, cn))
-      getId(container.id).status must_== 200
+      getId(container.id) must beSome
       await(container.delete)
-      getId(container.id).status must_== 404
+      getId(container.id) must beNone
     }
 
     case class MockComputeNode(val id: String) extends ComputeNode {

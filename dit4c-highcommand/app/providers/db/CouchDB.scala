@@ -6,10 +6,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 import play.api.Application
 import play.api.libs.concurrent.Akka
-import play.api.libs.ws.WS
 import play.api.mvc.Results.EmptyContent
 import play.api.libs.json._
+import gnieh.sohva.SohvaSerializer
 import gnieh.sohva.async.CouchClient
+import net.liftweb.{json => lift}
 
 object CouchDB {
 
@@ -24,7 +25,8 @@ object CouchDB {
     lazy val client = new CouchClient(
         host = url.getHost,
         port = url.getPort,
-        ssl = url.getProtocol == "https")
+        ssl = url.getProtocol == "https",
+        custom = List(allVersions(playJsValueSerializer)))
 
     object databases {
 
@@ -59,12 +61,22 @@ object CouchDB {
 
   class Database(val name: String)(implicit ec: ExecutionContext, instance: CouchDB.Instance) {
 
-    val baseURL = new java.net.URL(s"${instance.url}$name")
-
     def newID: Future[String] = instance.newID
 
     def asSohvaDb = instance.client.database(name)
 
   }
+
+  def allVersions[T](s: lift.CustomSerializer[T]): SohvaSerializer[T] =
+    new SohvaSerializer[T] { override def serializer(version: String) = s }
+
+  val playJsValueSerializer = new lift.CustomSerializer[JsValue]({ (formats) =>
+    import scala.language.implicitConversions
+    import net.liftweb.json.JValue
+    (
+      { case v: JValue => Json.parse(lift.compact(lift.render(v))) },
+      { case v: JsValue => lift.parse(Json.stringify(v)) }
+    )
+  })
 
 }
