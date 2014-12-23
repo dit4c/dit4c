@@ -18,6 +18,7 @@ import java.security.MessageDigest
 import providers.hipache.Hipache
 import providers.machineshop.ContainerProvider
 import providers.machineshop.MachineShop
+import gnieh.sohva.async.View
 
 class ComputeNodeDAO @Inject() (
     protected val db: CouchDB.Database,
@@ -26,6 +27,8 @@ class ComputeNodeDAO @Inject() (
   extends DAOUtils {
   import play.api.libs.functional.syntax._
   import play.api.Play.current
+
+  val typeValue = "ComputeNode"
 
   def create(
       user: User,
@@ -38,12 +41,9 @@ class ComputeNodeDAO @Inject() (
           name, serverId, managementUrl, backend, Set(user.id), Set(user.id))
     }
 
-  def list: Future[Seq[ComputeNode]] =
-    db.temporaryView(views.js.models.ComputeNode_list_map())
-      .query[String, JsValue, Any]()
-      .map(fromJson[ComputeNodeImpl])
+  def list: Future[Seq[ComputeNode]] = utils.list[ComputeNodeImpl](typeValue)
 
-  def get(id: String) = list.map(nodes => nodes.find(_.id == id))
+  def get(id: String) = utils.get(id)
 
   import Hipache.hipacheBackendFormat
 
@@ -57,7 +57,7 @@ class ComputeNodeDAO @Inject() (
     (__ \ "ownerIDs").format[Set[String]] and
     (__ \ "userIDs").format[Set[String]]
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
-    .withTypeAttribute("ComputeNode")
+    .withTypeAttribute(typeValue)
 
   case class ComputeNodeImpl(
       id: String,

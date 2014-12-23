@@ -65,6 +65,19 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.list) must haveSize(1)
     }
 
+    "get a particular compute node" in new WithApplication(fakeApp) {
+      val session = new UserSession(db)
+      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val node = await(dao.create(
+          session.user,
+          "Local",
+          "fakeid",
+          "http://localhost:8080/",
+          Hipache.Backend("localhost", 6000)
+      ))
+      await(dao.get(node.id)) must beSome(node)
+    }
+
   }
 
 }

@@ -25,6 +25,8 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
+  val typeValue = "Key"
+
   /**
    * @param namespace   Arbitrary string to include in key IDs
    * @param keyLength   Length of key to generate (default: 4096)
@@ -51,10 +53,7 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
     }
 
 
-  def list: Future[Seq[Key]] =
-    db.temporaryView(views.js.models.Key_list_map())
-      .query[String, JsValue, Any]()
-      .map(fromJson[KeyImpl])
+  def list: Future[Seq[Key]] = utils.list[KeyImpl](typeValue)
 
   // RSAKey isn't comparable by default, so we wrap it. (RSAKey is final.)
   private class WrappedRSAKey(val rsaKey: RSAKey) {
@@ -109,7 +108,7 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
     (__ \ "retired").format[Boolean] and
     (__ \ "keyPair").format[WrappedRSAKey]
   )(KeyImpl.apply _, unlift(KeyImpl.unapply))
-    .withTypeAttribute("Key")
+    .withTypeAttribute(typeValue)
 
   private case class KeyImpl(
       id: String,

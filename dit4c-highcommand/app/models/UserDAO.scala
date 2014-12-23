@@ -24,9 +24,10 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
   def findWith(identity: Identity): Future[Option[User]] =
     for {
       users <-
-        db.temporaryView(views.js.models.User_findWith_map(identity.uniqueId))
-          .query[String, JsValue, Any]()
-          .map(fromJson[UserImpl])
+        db.temporaryView(views.js.models.user_identities())
+          .query[String, JsValue, JsValue](
+              key=Some(identity.uniqueId), include_docs=true)
+          .map(result => fromJson[UserImpl](result.rows.flatMap(_.doc)))
     } yield users.headOption
 
   def get(id: String): Future[Option[User]] = utils.get(id)

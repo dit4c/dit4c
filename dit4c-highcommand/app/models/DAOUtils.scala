@@ -39,16 +39,16 @@ trait DAOUtils {
     Json.fromJson[A](json)(reads) match {
       case JsSuccess(obj, _) => Some(obj)
       case JsError(messages) =>
-        Logger.debug("Errors converting from JSON:\n"+messages.mkString("\n"))
+        Logger.debug((
+            "Errors converting from JSON:" ::
+            messages.toList :::
+            Json.prettyPrint(json) ::
+            Nil).mkString("\n"))
         None
     }
 
   protected def fromJson[A](json: Seq[JsValue])(implicit reads: Reads[A]): Seq[A] =
     json.flatMap(fromJson[A](_))
-
-  protected def fromJson[A](viewResult: ViewResult[_, JsValue, _])(
-      implicit reads: Reads[A]): Seq[A] =
-    fromJson[A](viewResult.rows.map(_.value))
 
   implicit def js2ViewDoc(map: JavaScript): ViewDoc = ViewDoc(map.body, None)
 
@@ -80,6 +80,15 @@ trait DAOUtils {
       for {
         possibleDoc <- db.getDocById[JsValue](id)
       } yield possibleDoc.flatMap(fromJson[M])
+      
+    def list[M <: DAOModel[M]](typeValue: String)(
+        implicit wjs: Writes[M], rjs: Reads[M]): Future[Seq[M]] =
+      for {
+        result <-
+          db.temporaryView(views.js.models.all_by_type())
+            .query[String, JsValue, JsValue](
+                key=Some(typeValue), include_docs=true)
+      } yield fromJson[M](result.rows.flatMap(_.doc))
 
     def delete[M <: BaseModel](model: M): Future[Unit] = {
       db.deleteDoc(model).map(_ => ())

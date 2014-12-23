@@ -4,6 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
 import play.api.libs.json._
+import gnieh.sohva.async.View
 
 class ContainerDAO(protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
@@ -11,6 +12,8 @@ class ContainerDAO(protected val db: CouchDB.Database)
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
+  val typeValue = "Container"
+  
   def create(
       user: User,
       name: String,
@@ -28,16 +31,12 @@ class ContainerDAO(protected val db: CouchDB.Database)
 
   def get(id: String): Future[Option[Container]] = utils.get(id)
 
-  def list: Future[Seq[Container]] =
-    db.temporaryView(views.js.models.Container_list_map())
-      .query[String, JsValue, Any]()
-      .map(fromJson[ContainerImpl])
+  def list: Future[Seq[Container]] = utils.list[ContainerImpl](typeValue)
 
   def listFor(node: ComputeNode): Future[Seq[Container]] =
     for {
       containers <- list
     } yield containers.filter(_.computeNodeId == node.id)
-
 
   implicit val containerFormat: Format[ContainerImpl] = (
     (__ \ "_id").format[String] and
@@ -47,7 +46,7 @@ class ContainerDAO(protected val db: CouchDB.Database)
     (__ \ "computeNodeId").format[String] and
     (__ \ "ownerIDs").format[Set[String]]
   )(ContainerImpl.apply _, unlift(ContainerImpl.unapply))
-    .withTypeAttribute("Container")
+    .withTypeAttribute(typeValue)
 
 
   case class ContainerImpl(

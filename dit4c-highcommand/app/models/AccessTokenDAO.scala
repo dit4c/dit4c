@@ -28,6 +28,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   import play.api.Play.current
   import AccessToken._
 
+  val typeValue = "AccessToken"
   val newCodeLength = 12
   val validCodeChars: IndexedSeq[Char] = ('0' to '9') ++ ('A' to 'Z')
 
@@ -41,9 +42,12 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   def get(id: String): Future[Option[AccessToken]] = utils.get(id)
 
   def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] =
-    db.temporaryView(views.js.models.AccessToken_listFor_map(computeNode.id))
-      .query[String, JsValue, Any]()
-      .map(fromJson[AccessTokenImpl])
+      for {
+        result <-
+          db.temporaryView(views.js.models.access_tokens())
+            .query[String, JsValue, JsValue](
+                key=Some(computeNode.id), include_docs=true)
+      } yield fromJson[AccessTokenImpl](result.rows.flatMap(_.doc))
 
   protected def newCode: String = codeChars.take(newCodeLength).mkString
   protected def codeChars: Stream[Char] = random(validCodeChars) #:: codeChars
@@ -85,7 +89,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
     (__ \ "accessType").format[AccessType.Value] and
     (__ \ "resource").format[Resource]
   )(AccessTokenImpl.apply _, unlift(AccessTokenImpl.unapply))
-    .withTypeAttribute("AccessToken")
+    .withTypeAttribute(typeValue)
 
   case class AccessTokenImpl(
       id: String,
