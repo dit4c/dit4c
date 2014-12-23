@@ -39,8 +39,9 @@ class ComputeNodeDAO @Inject() (
     }
 
   def list: Future[Seq[ComputeNode]] =
-    utils.runView[ComputeNodeImpl](
-        TemporaryView(views.js.models.ComputeNode_list_map()))
+    db.temporaryView(views.js.models.ComputeNode_list_map())
+      .query[String, JsValue, Any]()
+      .map(fromJson[ComputeNodeImpl])
 
   def get(id: String) = list.map(nodes => nodes.find(_.id == id))
 

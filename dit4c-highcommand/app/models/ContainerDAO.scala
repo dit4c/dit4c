@@ -29,8 +29,9 @@ class ContainerDAO(protected val db: CouchDB.Database)
   def get(id: String): Future[Option[Container]] = utils.get(id)
 
   def list: Future[Seq[Container]] =
-    utils.runView[ContainerImpl](
-        TemporaryView(views.js.models.Container_list_map()))
+    db.temporaryView(views.js.models.Container_list_map())
+      .query[String, JsValue, Any]()
+      .map(fromJson[ContainerImpl])
 
   def listFor(node: ComputeNode): Future[Seq[Container]] =
     for {

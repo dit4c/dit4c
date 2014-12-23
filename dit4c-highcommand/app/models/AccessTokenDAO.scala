@@ -19,6 +19,7 @@ import java.security.interfaces.RSAPublicKey
 import java.security.KeyPairGenerator
 import com.nimbusds.jose.JWSAlgorithm
 import scala.util.Random
+import gnieh.sohva.ViewDoc
 
 class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
@@ -40,8 +41,9 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   def get(id: String): Future[Option[AccessToken]] = utils.get(id)
 
   def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] =
-    utils.runView[AccessTokenImpl](
-        TemporaryView(views.js.models.AccessToken_listFor_map(computeNode.id)))
+    db.temporaryView(views.js.models.AccessToken_listFor_map(computeNode.id))
+      .query[String, JsValue, Any]()
+      .map(fromJson[AccessTokenImpl])
 
   protected def newCode: String = codeChars.take(newCodeLength).mkString
   protected def codeChars: Stream[Char] = random(validCodeChars) #:: codeChars

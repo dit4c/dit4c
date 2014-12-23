@@ -8,7 +8,7 @@ import play.twirl.api.JavaScript
 import scala.concurrent.Future
 import providers.db.CouchDB
 import scala.concurrent.ExecutionContext
-import gnieh.sohva.{IdRev, ViewDoc}
+import gnieh.sohva.{IdRev, ViewDoc, ViewResult}
 import gnieh.sohva.async.{Database => SohvaDatabase}
 import net.liftweb.{json => lift}
 
@@ -35,13 +35,22 @@ trait DAOUtils {
       withRev(model._rev)
     }
 
-  protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]) : Option[A] =
+  protected def fromJson[A](json: JsValue)(implicit reads: Reads[A]): Option[A] =
     Json.fromJson[A](json)(reads) match {
       case JsSuccess(obj, _) => Some(obj)
       case JsError(messages) =>
         Logger.debug("Errors converting from JSON:\n"+messages.mkString("\n"))
         None
     }
+
+  protected def fromJson[A](json: Seq[JsValue])(implicit reads: Reads[A]): Seq[A] =
+    json.flatMap(fromJson[A](_))
+
+  protected def fromJson[A](viewResult: ViewResult[_, JsValue, _])(
+      implicit reads: Reads[A]): Seq[A] =
+    fromJson[A](viewResult.rows.map(_.value))
+
+  implicit def js2ViewDoc(map: JavaScript): ViewDoc = ViewDoc(map.body, None)
 
   implicit class FormatWrapper[A](format: Format[A]) {
     def withTypeAttribute(typeName: String): Format[A] =
@@ -54,10 +63,6 @@ trait DAOUtils {
         // We need a type for searching
         _.as[JsObject] ++ Json.obj( "type" -> typeName )
       }
-  }
-
-  case class TemporaryView(val map: JavaScript) {
-    def asViewDoc: ViewDoc = ViewDoc(map.body, None)
   }
 
   object utils {
@@ -93,17 +98,6 @@ trait DAOUtils {
       for {
         response <- db.saveDoc(Json.toJson(changed))
       } yield fromJson[M](response).get
-
-    def runView[M](tempView: TemporaryView)(
-        implicit rjs: Reads[M], wjs: Writes[M]): Future[Seq[M]] =
-      for {
-        rawViewResult <-
-          db.temporaryView(tempView.asViewDoc).query[String, JsValue, Any]()
-      } yield {
-        rawViewResult.rows
-          .map(_.value)
-          .flatMap(fromJson[M])
-      }
 
     class UpdateOp[M <: DAOModel[M]](model: M)(
         implicit rjs: Reads[M], wjs: Writes[M]) extends UpdateOperation[M] {
