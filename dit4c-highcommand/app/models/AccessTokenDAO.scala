@@ -44,7 +44,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
   def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] =
       for {
         result <-
-          db.temporaryView(views.js.models.access_tokens())
+          db.design("main").view("access_tokens")
             .query[String, JsValue, JsValue](
                 key=Some(computeNode.id), include_docs=true)
       } yield fromJson[AccessTokenImpl](result.rows.flatMap(_.doc))

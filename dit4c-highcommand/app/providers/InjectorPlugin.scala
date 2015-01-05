@@ -36,10 +36,14 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
             GitHubProvider(appConfig) ++
             DummyProvider(appConfig))
 
-        val couchDbViews: Map[String, ViewDoc] = 
+        val couchDbViews: Map[String, ViewDoc] = {
+          import views.js.models._
           Map(
-            "all_by_type" -> ViewDoc(views.js.models.all_by_type().body, None)
+            "access_tokens" -> ViewDoc(access_tokens().body, None),
+            "all_by_type" -> ViewDoc(all_by_type().body, None),
+            "user_identities" -> ViewDoc(user_identities().body, None)
           )
+        }
 
         val dbName = app.configuration.getString("couchdb.database").get
 
