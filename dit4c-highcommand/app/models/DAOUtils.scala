@@ -85,7 +85,7 @@ trait DAOUtils {
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Seq[M]] =
       for {
         result <-
-          db.temporaryView(views.js.models.all_by_type())
+          db.design("main").view("all_by_type")
             .query[String, JsValue, JsValue](
                 key=Some(typeValue), include_docs=true)
       } yield fromJson[M](result.rows.flatMap(_.doc))

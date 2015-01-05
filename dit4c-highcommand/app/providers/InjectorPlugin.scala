@@ -16,11 +16,14 @@ import providers.auth.Identity
 import scala.concurrent.ExecutionContext
 import models.ComputeNodeContainerHelper
 import models.ComputeNodeContainerHelperImpl
+import gnieh.sohva.{DesignDoc,ViewDoc}
+import gnieh.sohva.async._
 
 class InjectorPlugin(app: play.api.Application) extends Plugin {
 
   implicit val ec = play.api.libs.concurrent.Execution.defaultContext
 
+  lazy val log = play.api.Logger
   var injector: Option[Injector] = None
 
   override def onStart {
@@ -33,17 +36,41 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
             GitHubProvider(appConfig) ++
             DummyProvider(appConfig))
 
+        val couchDbViews: Map[String, ViewDoc] = 
+          Map(
+            "all_by_type" -> ViewDoc(views.js.models.all_by_type().body, None)
+          )
+
         val dbName = app.configuration.getString("couchdb.database").get
 
         lazy val dbServerInstance = app.plugin[CouchDBPlugin].get.get
 
         // Make sure a database exists
         lazy val database = Await.result(
-          dbServerInstance.databases(dbName).flatMap {
-            case Some(db) => Future.successful(db)
-            case None => dbServerInstance.databases.create(dbName)
-          },
+          for {
+            maybeDb <- dbServerInstance.databases(dbName)
+            db <- maybeDb match {
+              case Some(db) => Future.successful(db)
+              case None => dbServerInstance.databases.create(dbName)
+            }
+            design = db.asSohvaDb.design("main", "javascript")
+            _ <- updateViews(design, couchDbViews)
+          } yield db,
           1.minute)
+
+        protected def updateViews(design: Design, views: Map[String, ViewDoc]) =
+          for {
+            designDoc <- design.getDesignDocument.flatMap {
+              case Some(doc) => Future.successful(doc)
+              case None => design.create
+            }
+            // Copy in view definitions
+            updatedDoc = designDoc.copy(views = views).withRev(designDoc._rev)
+            // Update view only if it will change
+            _ <-
+              if (updatedDoc == designDoc) Future.successful(())
+              else design.db.saveDoc(updatedDoc)
+          } yield design
 
         def configure {
           bind(classOf[AuthProviders]).toInstance(authProviders)
