@@ -221,10 +221,19 @@
         </thead>
         <tbody>
           <tr ng-repeat="container in containers | orderBy:'name'">
-            <td>
+            <td ng-show="!container.editing">
               <a ng-if="container.active" href="{{containerUrl(container.id)}}"
                  target="_blank">{{container.name}}</a>
               <span ng-if="!container.active" title="{{container.id}}">{{container.name}}</span>
+              <button class="btn btn-link" ng-click="container.editing = true">
+                <i class="fa fa-edit"></i>
+              </button>
+            </td>
+            <td ng-show="container.editing">
+              <input show-focus="container.editing"
+                  ng-model="container.name"
+                  ng-minlength="1"
+                  ng-blur="update(container)"/>
             </td>
             <td>
               <span ng-repeat="node in computeNodes | filter:container.computeNodeId:id">

@@ -48,8 +48,21 @@ define(['./module'], (controllers) ->
           alert(response)
           $scope.containers.splice($scope.containers.indexOf(request), 1)
 
+    $scope.update = (container) ->
+      if (container.name != '')
+        container.editing = false
+        $http
+          .put("/containers/"+container.id, container)
+          .then (response) ->
+            replaceContainer(response.data)
+      else
+        false
+
     containerById = (id) ->
       $scope.containers.filter((container) -> container.id == id)[0]
+
+    replaceContainer = (container) ->
+      angular.extend(containerById(container.id), container)
 
     updateActiveFn = (active) -> (id) ->
       container = containerById(id)
@@ -60,6 +73,12 @@ define(['./module'], (controllers) ->
 
     $scope.turnOn = updateActiveFn(true)
     $scope.turnOff = updateActiveFn(false)
+
+    refreshContainer = (id) ->
+      $http
+        .get('/containers/'+id)
+        .then (response) ->
+          replaceContainer(response.data)
 
     refreshContainers = () ->
       $http
