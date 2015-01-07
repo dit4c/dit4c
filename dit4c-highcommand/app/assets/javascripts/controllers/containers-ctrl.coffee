@@ -28,8 +28,8 @@ define(['./module'], (controllers) ->
               $scope.newContainer.computeNode = newValue[0]
       , true)
 
-    $scope.rootUrl = (name) ->
-      "//"+name+"."+$location.host()
+    $scope.containerUrl = (id) ->
+      "/containers/"+id+"/redirect"
 
     $scope.create = () ->
       request =

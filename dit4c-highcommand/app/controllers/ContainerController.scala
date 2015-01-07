@@ -91,6 +91,17 @@ class ContainerController @Inject() (
     }
   }
 
+  def redirect(id: String) = Authenticated.async { implicit request =>
+    containerDao.get(id).flatMap[Result] {
+      case None =>
+        Future.successful(NotFound)
+      case Some(container) =>
+        val scheme = if (request.secure) "https" else "http"
+        val host = container.computeNodeContainerName + "." + request.host
+        TemporaryRedirect(s"$scheme://$host/").withUpdatedJwt(request.user)
+    }
+  }
+
   def update(id: String) = Authenticated.async(parse.json) { implicit request =>
     val json = request.body
     val shouldBeActive: Boolean = (json \ "active").as[Boolean]

@@ -256,7 +256,7 @@ class ComputeNodeController @Inject() (
           // Exists and belongs to this compute node
           for {
             dockerContainer <- containerProvider(computeNode)
-                                  .get(container.name)
+                                  .get(container.computeNodeContainerName)
             _ <- dockerContainer
                   .map(_.stop)
                   .getOrElse(Future.successful(()))
@@ -290,7 +290,7 @@ class ComputeNodeController @Inject() (
             // Exists and belongs to this compute node
             for {
               dockerContainer <- containerProvider(computeNode)
-                                    .get(container.name)
+                                    .get(container.computeNodeContainerName)
               _ <- container.delete
               _ <- dockerContainer
                     .map(_.delete)

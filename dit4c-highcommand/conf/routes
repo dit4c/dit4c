@@ -55,3 +55,4 @@ GET     /containers/check-new       @controllers.ContainerController.checkNewNam
 POST    /containers                 @controllers.ContainerController.create
 PUT     /containers/:id             @controllers.ContainerController.update(id)
 DELETE  /containers/:id             @controllers.ContainerController.delete(id)
+GET     /containers/:id/redirect    @controllers.ContainerController.redirect(id)

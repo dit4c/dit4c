@@ -19,14 +19,15 @@ class ComputeNodeContainerHelperImpl @Inject() (dao: ComputeNodeDAO)
   override def creator = { container: Container =>
     for {
       node <- dao.get(container.computeNodeId)
-      c <- node.get.containers.create(container.name, container.image)
+      c <- node.get.containers.create(
+          container.computeNodeContainerName, container.image)
     } yield c
   }
 
   override def resolver = { container: Container =>
     for {
       node <- dao.get(container.computeNodeId)
-      c <- node.get.containers.get(container.name)
+      c <- node.get.containers.get(container.computeNodeContainerName)
     } yield c
   }
 
