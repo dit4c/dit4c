@@ -15,6 +15,8 @@ class ContainerController @Inject() (
     val db: CouchDB.Database,
     mainController: Application) extends Controller with Utils {
 
+  import ComputeNode.ContainerNameHelper
+
   implicit class CNCHelper(cnp: MachineShop.Container) {
     def makeActive(shouldBeActive: Boolean): Future[MachineShop.Container] =
       if (cnp.active != shouldBeActive)
