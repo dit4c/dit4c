@@ -90,41 +90,6 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       status(okResponse) must_== 201
     }
 
-    "check names for new containers" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val computeNode = 
-        await(computeNodeDao.create(
-            session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")));
-      // Check with valid name
-      {
-        val response = controller.checkNewName("test")(session.newRequest)
-        status(response) must_== 200
-        (contentAsJson(response) \ "valid").as[Boolean] must beTrue
-      }
-      // Check with invalid, but unused names
-      Seq("", "a"*64, "not_valid", "-prefix", "suffix-", "1337").foreach { n =>
-        val response = controller.checkNewName(n)(session.newRequest)
-        status(response) must_== 200
-        val json = contentAsJson(response)
-        (json \ "valid").as[Boolean] must beFalse
-        (json \ "reason").as[String] must not beEmpty
-      }
-      // Check with a used name
-      val containerDao = new ContainerDAO(db)
-      await(containerDao.create(session.user, "test", testImage, computeNode));
-      {
-        val response = controller.checkNewName("test")(session.newRequest)
-        status(response) must_== 200
-        val json = contentAsJson(response)
-        (json \ "valid").as[Boolean] must beFalse
-        (json \ "reason").as[String] must beMatching(".*exists.*")
-      }
-      done
-    }
-
     def getMockedController = {
       val db = injector.getInstance(classOf[CouchDB.Database])
       new ContainerController(

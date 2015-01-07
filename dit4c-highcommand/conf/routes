@@ -51,7 +51,6 @@ DELETE  /compute-nodes/:nodeId/users/:userId    @controllers.ComputeNodeControll
 
 # Containers
 GET     /containers                 @controllers.ContainerController.index
-GET     /containers/check-new       @controllers.ContainerController.checkNewName(name: String)
 POST    /containers                 @controllers.ContainerController.create
 PUT     /containers/:id             @controllers.ContainerController.update(id)
 DELETE  /containers/:id             @controllers.ContainerController.delete(id)

@@ -77,15 +77,6 @@ define(['./module'], (controllers) ->
         .error (response) ->
           alert(response)
 
-    $scope.checkName = (name) ->
-      if (name == "")
-        $scope.nameCheck = {}
-      else
-        $http
-          .get('/containers/check-new?name='+name)
-          .then (response) ->
-            $scope.nameCheck = response.data
-
     $scope.selectFirstImage = (computeNode) ->
       if (computeNode and computeNode.images and computeNode.images.length > 0)
         $scope.newContainer.image = $scope.imageName(computeNode.images[0])
