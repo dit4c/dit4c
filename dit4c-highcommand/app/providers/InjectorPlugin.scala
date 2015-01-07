@@ -14,8 +14,6 @@ import providers.db.{CouchDB, CouchDBPlugin}
 import models.ViewManager
 import providers.auth.Identity
 import scala.concurrent.ExecutionContext
-import models.ComputeNodeContainerHelper
-import models.ComputeNodeContainerHelperImpl
 import gnieh.sohva.{DesignDoc,ViewDoc}
 import gnieh.sohva.async._
 
@@ -58,8 +56,6 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
           bind(classOf[CouchDB.Database]).toInstance(database)
           bind(classOf[ExecutionContext]).toInstance(
               play.api.libs.concurrent.Execution.defaultContext)
-          bind(classOf[ComputeNodeContainerHelper])
-            .to(classOf[ComputeNodeContainerHelperImpl])
         }
       })
     )

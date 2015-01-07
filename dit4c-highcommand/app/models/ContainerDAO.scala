@@ -57,7 +57,6 @@ class ContainerDAO(protected val db: CouchDB.Database)
       computeNodeId: String,
       ownerIDs: Set[String]) extends Container with DAOModel[ContainerImpl] {
 
-    override def computeNodeContainerName = id
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
@@ -71,7 +70,6 @@ trait Container extends OwnableModel {
   def name: String
   def image: String
   def computeNodeId: String
-  def computeNodeContainerName: String
 
   def delete: Future[Unit]
 

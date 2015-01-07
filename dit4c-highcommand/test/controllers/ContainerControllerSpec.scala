@@ -129,15 +129,13 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val db = injector.getInstance(classOf[CouchDB.Database])
       new ContainerController(
           db,
-          new ComputeNodeContainerHelper {
-            override def creator = { container =>
-              Future.successful(MockMCC(container.name, false))
-            }
-            override def resolver = { container =>
-              Future.successful(Some(MockMCC(container.name, false)))
-            }
-          },
-          injector.getInstance(classOf[Application]))
+          injector.getInstance(classOf[Application])) {
+        override def createComputeNodeContainer(container: Container) =
+          Future.successful(MockMCC(container.name, false))
+
+        override def resolveComputeNodeContainer(container: Container) =
+          Future.successful(Some(MockMCC(container.name, false)))
+      }
     }
 
   }

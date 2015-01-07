@@ -13,7 +13,6 @@ import providers.machineshop.MachineShop
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
-    cnpHelper: ComputeNodeContainerHelper,
     mainController: Application) extends Controller with Utils {
 
   implicit class CNCHelper(cnp: MachineShop.Container) {
@@ -55,7 +54,7 @@ class ContainerController @Inject() (
         case Some(node) =>
           for {
             container <- containerDao.create(request.user, name, image, node)
-            p <- cnpHelper.creator(container)
+            p <- createComputeNodeContainer(container)
             _ <- HipacheInterface.put(container, node)
             cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
             result = Created(Json.obj(
@@ -109,7 +108,7 @@ class ContainerController @Inject() (
       case None =>
         Future.successful(NotFound)
       case Some(container) =>
-        cnpHelper.resolver(container).flatMap {
+        resolveComputeNodeContainer(container).flatMap {
           case None =>
             // TODO: Improve this handling
             Future.successful(NotFound)
@@ -145,7 +144,7 @@ class ContainerController @Inject() (
               Future.successful(())
             }
           // Delete the container record and the actual container.
-          cnpHelper.resolver(container).flatMap { possibleContainer =>
+          resolveComputeNodeContainer(container).flatMap { possibleContainer =>
             for {
               _ <- container.delete
               _ <- deleteOrIgnore(possibleContainer)
@@ -196,6 +195,19 @@ class ContainerController @Inject() (
     ).find(!_.expr(name)).map(_.msg).toLeft(Right(Unit))
   }
 
+  protected def createComputeNodeContainer(container: Container) =
+      for {
+        node <- computeNodeDao.get(container.computeNodeId)
+        c <- node.get.containers.create(
+            container.computeNodeContainerName, container.image)
+      } yield c
+
+  protected def resolveComputeNodeContainer(container: Container) =
+      for {
+        node <- computeNodeDao.get(container.computeNodeId)
+        c <- node.get.containers.get(container.computeNodeContainerName)
+      } yield c
+
   private case class ValidityCheck(
       val expr: String => Boolean,
       val msg: String)
@@ -205,7 +217,7 @@ class ContainerController @Inject() (
     containerDao.list.flatMap { containers =>
       val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
       // Use a single resolver instance, and catch errors in resolution
-      val r = fallbackToMissing(cnpHelper.resolver)
+      val r = fallbackToMissing(resolveComputeNodeContainer)
       Future.sequence(
         // For each container do a lookup with the resolver
         userContainers.map(r)

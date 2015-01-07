@@ -40,7 +40,13 @@ trait Utils extends Results {
   protected lazy val userDao = new UserDAO(db)
   protected lazy val computeNodeDao = new ComputeNodeDAO(db, keyDao)
 
+  implicit class ComputeNodeContainerNameHelper(container: Container) {
+    private val containerPrefix = "c-"
+    def computeNodeContainerName = containerPrefix + container.id
+  }
+  
   implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
+    
     def withUpdatedJwt(user: User): Future[Result] =
       for {
         containers <- userContainers(user)
