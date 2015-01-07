@@ -117,7 +117,7 @@ class HipacheManagementActor(
           }
         }
       }
-      containerExists = containers.map(_.name).toSet.contains _
+      containerExists = containers.map(_.computeNodeContainerName).toSet.contains _
       deleteOps = currentMappings.keys
         .filterNot(frontend => containerExists(frontend.name))
         .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))
