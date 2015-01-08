@@ -77,15 +77,12 @@ class ContainerController @Inject() (
   }
 
   def get(id: String) = Authenticated.async { implicit request =>
-    containerDao.get(id).flatMap[Result] {
-      case None =>
-        Future.successful(NotFound)
-      case Some(c) =>
-        for {
-          cnc <- fallbackToMissing(resolveComputeNodeContainer)(c)
-        } yield {
-          Ok(toJson(c, cnc))
-        }
+    withContainer(id) { container =>
+      for {
+        cnc <- fallbackToMissing(resolveComputeNodeContainer)(container)
+      } yield {
+        Ok(toJson(container, cnc))
+      }
     }
   }
 
@@ -98,36 +95,37 @@ class ContainerController @Inject() (
   }
 
   def redirect(id: String) = Authenticated.async { implicit request =>
-    containerDao.get(id).flatMap[Result] {
-      case None =>
-        Future.successful(NotFound)
-      case Some(container) =>
-        val scheme = if (request.secure) "https" else "http"
-        val host = container.computeNodeContainerName + "." + request.host
-        TemporaryRedirect(s"$scheme://$host/").withUpdatedJwt(request.user)
+    withContainer(id) { container =>
+      val scheme = if (request.secure) "https" else "http"
+      val host = container.computeNodeContainerName + "." + request.host
+      TemporaryRedirect(s"$scheme://$host/").withUpdatedJwt(request.user)
     }
   }
 
   def update(id: String) = Authenticated.async(parse.json) { implicit request =>
     val json = request.body
-    val shouldBeActive: Boolean = (json \ "active").as[Boolean]
-    containerDao.get(id).flatMap[Result] {
-      case None =>
-        Future.successful(NotFound)
-      case Some(container) =>
-        resolveComputeNodeContainer(container).flatMap {
+    val name = (json \ "name").as[String]
+    val shouldBeActive = (json \ "active").as[Boolean]
+    withContainer(id) { container =>
+      for {
+        updatedContainer <- container.update
+          .withName(name)
+          .execIfDifferent[Container](container)
+        maybeCnp <- resolveComputeNodeContainer(container)
+        maybeUpdatedCnp <- maybeCnp match {
           case None =>
-            // TODO: Improve this handling
-            Future.successful(NotFound)
+            Future.successful(None)
           case Some(cnp) =>
-            cnp.makeActive(shouldBeActive).map { updatedCnp =>
-              Ok(Json.obj(
-                "id" -> container.id,
-                "name" -> container.name,
-                "active" -> updatedCnp.active
-              ))
-            }
+            cnp.makeActive(shouldBeActive).map(Some(_))
         }
+      } yield {
+        Ok(Json.obj(
+          "id" -> updatedContainer.id,
+          "name" -> updatedContainer.name,
+          "active" ->
+            maybeUpdatedCnp.map[JsBoolean](cnc => JsBoolean(cnc.active))
+        ))
+      }
     }
   }
 
@@ -197,6 +195,19 @@ class ContainerController @Inject() (
       }
     }
   }
+
+  protected def withContainer(
+        containerId: String
+      )(
+        action: Container => Future[Result]
+      ): Future[Result] =
+    for {
+      possibleContainer <- containerDao.get(containerId)
+      result <- possibleContainer match {
+        case Some(node) => action(node)
+        case None => Future.successful(NotFound("Container does not exist."))
+      }
+    } yield result
 
   private def toJson(c: Container, cnc: Option[MachineShop.Container]) =
       Json.obj(

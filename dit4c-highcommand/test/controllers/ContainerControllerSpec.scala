@@ -85,6 +85,30 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       (json \ "active").as[Boolean] must beFalse
     }
 
+    "provide redirects for containers" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
+      val controller = getMockedController
+      val keyDao = new KeyDAO(db)
+      val key = keyDao.create("localhost.localdomain",512)
+      val computeNodeDao = new ComputeNodeDAO(db, keyDao)
+      val containerDao = new ContainerDAO(db)
+      val emptyResponse = controller.list(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode =
+        await(computeNodeDao.create(
+            session.user, "Local", "fakeid", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
+      val container =
+        await(containerDao.create(session.user, "test", testImage, computeNode))
+      val response = controller.redirect(container.id)(
+        session.newRequest.withHeaders("Host" -> "example.test"))
+      status(response) must_== 307
+      header("Location", response) must beSome
+      header("Location", response).get must endWith(".example.test/")
+    }
+
     "create containers" in new WithApplication(fakeApp) {
       val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
@@ -111,6 +135,34 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
           "computeNodeId"->computeNode.id,
           "active"->true))) 
       status(okResponse) must_== 201
+    }
+    
+    "update containers" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
+      val controller = getMockedController
+      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val containerDao = new ContainerDAO(db)
+      val emptyResponse = controller.list(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode =
+        await(computeNodeDao.create(
+            session.user, "Local", "fakeid", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
+      val container =
+        await(containerDao.create(session.user, "test", testImage, computeNode))
+      val response  = 
+        controller.update(container.id)(session.newRequest[JsValue](Json.obj(
+          "name" -> "changed",
+          "image" -> "test",
+          "computeNodeId" -> computeNode.id,
+          "active" -> true))) 
+      status(response) must_== 200
+      val json = contentAsJson(response).as[JsObject]
+      (json \ "id").as[String] must_== container.id
+      (json \ "name").as[String] must_== "changed"
+      (json \ "active").as[Boolean] must beTrue
     }
 
     def getMockedController = {
