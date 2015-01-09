@@ -152,19 +152,15 @@
             <span class="sr-only">Close</span>
           </button>
           <form class="form-horizontal" role="form">
-            <div class="form-group"
-                ng-class="{'has-error': nameCheck.valid === false}">
+            <div class="form-group">
               <label class="col-sm-3 control-label">
-                Container Name
+                Name
               </label>
               <div class="col-sm-8">
                 <input type="text" class="form-control"
                   ng-model="newContainer.name"
-                  ng-change="checkName(newContainer.name)"
+                  maxlength="64"
                   placeholder="Container Name"/>
-                <!--span class="glyphicon form-control-feedback"
-                  ng-class="{'glyphicon-ok': nameCheck.valid === true, 'glyphicon-remove': nameCheck.valid === false}"></span-->
-                <p class="help-block text-danger">{{nameCheck.reason}}</p>
               </div>
             </div>
             <div class="form-group">
@@ -199,7 +195,7 @@
             </div>
             <div class="form-group">
               <div class="col-sm-offset-3 col-sm-10">
-                <button class="btn btn-primary" ng-click="create()" ng-class="{ disabled: nameCheck.valid !== true }">
+                <button class="btn btn-primary" ng-click="create()" ng-class="{ disabled: newContainer.name.length == 0 }">
                   Create
                 </button>
               </div>
@@ -225,10 +221,19 @@
         </thead>
         <tbody>
           <tr ng-repeat="container in containers | orderBy:'name'">
-            <td>
-              <a ng-if="container.active" href="{{rootUrl(container.name)}}"
+            <td ng-show="!container.editing">
+              <a ng-if="container.active" href="{{containerUrl(container.id)}}"
                  target="_blank">{{container.name}}</a>
               <span ng-if="!container.active" title="{{container.id}}">{{container.name}}</span>
+              <button class="btn btn-link" ng-click="container.editing = true">
+                <i class="fa fa-edit"></i>
+              </button>
+            </td>
+            <td ng-show="container.editing">
+              <input show-focus="container.editing"
+                  ng-model="container.name"
+                  ng-minlength="1"
+                  ng-blur="update(container)"/>
             </td>
             <td>
               <span ng-repeat="node in computeNodes | filter:container.computeNodeId:id">

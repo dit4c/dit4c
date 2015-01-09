@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit
 
 trait Utils extends Results {
   import scala.language.implicitConversions
+  import ComputeNode.ContainerNameHelper
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
@@ -44,7 +45,7 @@ trait Utils extends Results {
     def withUpdatedJwt(user: User): Future[Result] =
       for {
         containers <- userContainers(user)
-        jwt <- createJWT(containers.map(_.name))
+        jwt <- createJWT(containers.map(_.computeNodeContainerName))
       } yield {
         response.withCookies(Cookie("dit4c-jwt", jwt, domain=getCookieDomain))
       }
@@ -155,7 +156,8 @@ trait Utils extends Results {
 
     private implicit def asFrontend(
         c: Container)(implicit req: Request[_]): Frontend =
-      Frontend(c.name, s"${c.name}.${req.host}")
+      Frontend(c.computeNodeContainerName,
+          s"${c.computeNodeContainerName}.${req.host}")
 
     private implicit def asBackend(
         node: ComputeNode)(implicit req: Request[_]): Backend =

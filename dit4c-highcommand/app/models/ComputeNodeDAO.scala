@@ -137,13 +137,16 @@ trait ComputeNode extends OwnableModel with UsableModel {
 }
 
 object ComputeNode {
-
   trait UpdateOp extends UpdateOperation[ComputeNode] {
     def withName(name: String): UpdateOp
     def withManagementUrl(url: String): UpdateOp
     def withBackend(backend: Hipache.Backend): UpdateOp
   }
 
+  implicit class ContainerNameHelper(container: Container) {
+    private val containerPrefix = "c-"
+    def computeNodeContainerName = containerPrefix + container.id
+  }
 }
 
 

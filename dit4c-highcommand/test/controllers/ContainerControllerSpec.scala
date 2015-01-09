@@ -62,6 +62,53 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       }
     }
 
+    "provide JSON of a single container" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
+      val controller = getMockedController
+      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val containerDao = new ContainerDAO(db)
+      val emptyResponse = controller.list(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode =
+        await(computeNodeDao.create(
+            session.user, "Local", "fakeid", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
+      val container =
+        await(containerDao.create(session.user, "name1", testImage, computeNode))
+      val response = controller.get(container.id)(session.newRequest)
+      status(response) must_== 200
+      val json = contentAsJson(response).as[JsObject]
+      (json \ "id").as[String] must_== container.id
+      (json \ "name").as[String] must_== container.name
+      (json \ "active").as[Boolean] must beFalse
+    }
+
+    "provide redirects for containers" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
+      val session = new UserSession(db)
+      val controller = getMockedController
+      val keyDao = new KeyDAO(db)
+      val key = keyDao.create("localhost.localdomain",512)
+      val computeNodeDao = new ComputeNodeDAO(db, keyDao)
+      val containerDao = new ContainerDAO(db)
+      val emptyResponse = controller.list(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode =
+        await(computeNodeDao.create(
+            session.user, "Local", "fakeid", "http://localhost:5000/",
+            Hipache.Backend("localhost", 8080, "https")))
+      val container =
+        await(containerDao.create(session.user, "test", testImage, computeNode))
+      val response = controller.redirect(container.id)(
+        session.newRequest.withHeaders("Host" -> "example.test"))
+      status(response) must_== 307
+      header("Location", response) must beSome
+      header("Location", response).get must endWith(".example.test/")
+    }
+
     "create containers" in new WithApplication(fakeApp) {
       val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
@@ -89,55 +136,46 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
           "active"->true))) 
       status(okResponse) must_== 201
     }
-
-    "check names for new containers" in new WithApplication(fakeApp) {
+    
+    "update containers" in new WithApplication(fakeApp) {
+      val db = injector.getInstance(classOf[CouchDB.Database])
       val session = new UserSession(db)
       val controller = getMockedController
       val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val computeNode = 
+      val containerDao = new ContainerDAO(db)
+      val emptyResponse = controller.list(session.newRequest)
+      status(emptyResponse) must_== 200
+      contentAsJson(emptyResponse) must_== JsArray()
+      val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")));
-      // Check with valid name
-      {
-        val response = controller.checkNewName("test")(session.newRequest)
-        status(response) must_== 200
-        (contentAsJson(response) \ "valid").as[Boolean] must beTrue
-      }
-      // Check with invalid, but unused names
-      Seq("", "a"*64, "not_valid", "-prefix", "suffix-", "1337").foreach { n =>
-        val response = controller.checkNewName(n)(session.newRequest)
-        status(response) must_== 200
-        val json = contentAsJson(response)
-        (json \ "valid").as[Boolean] must beFalse
-        (json \ "reason").as[String] must not beEmpty
-      }
-      // Check with a used name
-      val containerDao = new ContainerDAO(db)
-      await(containerDao.create(session.user, "test", testImage, computeNode));
-      {
-        val response = controller.checkNewName("test")(session.newRequest)
-        status(response) must_== 200
-        val json = contentAsJson(response)
-        (json \ "valid").as[Boolean] must beFalse
-        (json \ "reason").as[String] must beMatching(".*exists.*")
-      }
-      done
+            Hipache.Backend("localhost", 8080, "https")))
+      val container =
+        await(containerDao.create(session.user, "test", testImage, computeNode))
+      val response  = 
+        controller.update(container.id)(session.newRequest[JsValue](Json.obj(
+          "name" -> "changed",
+          "image" -> "test",
+          "computeNodeId" -> computeNode.id,
+          "active" -> true))) 
+      status(response) must_== 200
+      val json = contentAsJson(response).as[JsObject]
+      (json \ "id").as[String] must_== container.id
+      (json \ "name").as[String] must_== "changed"
+      (json \ "active").as[Boolean] must beTrue
     }
 
     def getMockedController = {
       val db = injector.getInstance(classOf[CouchDB.Database])
       new ContainerController(
           db,
-          new ComputeNodeContainerHelper {
-            override def creator = { container =>
-              Future.successful(MockMCC(container.name, false))
-            }
-            override def resolver = { container =>
-              Future.successful(Some(MockMCC(container.name, false)))
-            }
-          },
-          injector.getInstance(classOf[Application]))
+          injector.getInstance(classOf[Application])) {
+        override def createComputeNodeContainer(container: Container) =
+          Future.successful(MockMCC(container.name, false))
+
+        override def resolveComputeNodeContainer(container: Container) =
+          Future.successful(Some(MockMCC(container.name, false)))
+      }
     }
 
   }

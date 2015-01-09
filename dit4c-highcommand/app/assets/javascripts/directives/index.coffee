@@ -1,1 +1,3 @@
-define(['./module'], () -> {})
+define([
+  './show-focus'
+], () -> {})

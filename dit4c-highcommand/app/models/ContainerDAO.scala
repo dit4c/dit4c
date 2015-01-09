@@ -55,11 +55,24 @@ class ContainerDAO(protected val db: CouchDB.Database)
       name: String,
       image: String,
       computeNodeId: String,
-      ownerIDs: Set[String]) extends Container with DAOModel[ContainerImpl] {
+      ownerIDs: Set[String])
+      extends Container
+      with DAOModel[ContainerImpl]
+      with UpdatableModel[Container.UpdateOp] {
+    import scala.language.implicitConversions
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
     override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
+
+    override def update = updateOp(this)
+
+    // Used to update multiple attributes at once
+    implicit def updateOp(model: ContainerImpl): Container.UpdateOp =
+      new utils.UpdateOp(model) with Container.UpdateOp {
+        override def withName(name: String) =
+          model.copy(name = name)
+      }
 
   }
 
@@ -71,6 +84,13 @@ trait Container extends OwnableModel {
   def image: String
   def computeNodeId: String
 
+  def update: Container.UpdateOp
   def delete: Future[Unit]
 
+}
+
+object Container {
+  trait UpdateOp extends UpdateOperation[Container] {
+    def withName(name: String): UpdateOp
+  }
 }

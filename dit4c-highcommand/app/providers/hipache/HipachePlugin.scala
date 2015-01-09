@@ -90,6 +90,7 @@ class HipacheManagementActor(
   }
 
   private def performMaintenance: Future[_] = {
+    import models.ComputeNode.ContainerNameHelper
     log.debug("Starting Hipache maintenance routine.")
     for {
       currentMappings <- client.all
@@ -101,7 +102,9 @@ class HipacheManagementActor(
         computeNodes.find(_.id == c.computeNodeId).map { node =>
           baseDomain match {
             case Some(domain) =>
-              val frontend = Hipache.Frontend(c.name, s"${c.name}.${domain}")
+              val frontend =
+                Hipache.Frontend(c.computeNodeContainerName,
+                    s"${c.computeNodeContainerName}.${domain}")
               currentMappings.get(frontend) match {
                 case Some(b) if b == node.backend =>
                   Future.successful(())
@@ -109,12 +112,12 @@ class HipacheManagementActor(
                   client.put(frontend, node.backend).map(_ =>())
               }
             case None =>
-              log.warning(s"Unable to check Hipache mapping of ${c.name}. App domain unknown.")
+              log.warning(s"Unable to check Hipache mapping of ${c.id}. App domain unknown.")
               Future.successful(())
           }
         }
       }
-      containerExists = containers.map(_.name).toSet.contains _
+      containerExists = containers.map(_.computeNodeContainerName).toSet.contains _
       deleteOps = currentMappings.keys
         .filterNot(frontend => containerExists(frontend.name))
         .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))
