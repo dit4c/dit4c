@@ -1,5 +1,7 @@
 # DIT4C - Data Intensive Tools for the Cloud
 
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dit4c/dit4c?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 DIT4C is a scalable platform for providing containerized web-based programming and data analysis environments to researchers.
 
  * Client == Modern web browser
