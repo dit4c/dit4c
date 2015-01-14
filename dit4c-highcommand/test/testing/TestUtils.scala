@@ -6,6 +6,7 @@ object TestUtils {
 
   def fakeApp = FakeApplication(
       additionalConfiguration = Map(
+          "application.baseUrl" -> "http://localhost.localdomain/",
           "keys.manage" -> false,
           "keys.length" -> 512,
           "couchdb.testing" -> true,
