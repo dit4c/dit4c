@@ -88,7 +88,7 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       await(dao.list) must beEmpty
       val key = await(dao.create("localhost.localdomain", 512))
       await(dao.list) must haveSize(1)
-      key.delete
+      await(key.delete)
       await(dao.list) must beEmpty
     }
 
