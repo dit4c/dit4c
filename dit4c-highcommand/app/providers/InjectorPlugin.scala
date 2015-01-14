@@ -52,6 +52,7 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
           1.minute)
 
         def configure {
+          bind(classOf[play.api.Application]).toInstance(app)
           bind(classOf[AuthProviders]).toInstance(authProviders)
           bind(classOf[CouchDB.Database]).toInstance(database)
           bind(classOf[ExecutionContext]).toInstance(

@@ -23,6 +23,7 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 
   def injector = app.plugin[InjectorPlugin].get.injector.get
   def db = injector.getInstance(classOf[CouchDB.Database])
+  def containerResolver = injector.getInstance(classOf[ContainerResolver])
 
   def serverConfig: Option[Hipache.ServerConfig] =
     for {
@@ -37,11 +38,6 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
         prefix
       )
     }
-
-  def baseDomain =
-    app.configuration.getString("application.baseUrl")
-      .map(new java.net.URI(_))
-      .map(_.getHost)
 
   private var manager: Option[ActorRef] = None
 
@@ -58,7 +54,7 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
   override def onStart {
     manager = serverConfig.map { config =>
       system.actorOf(Props(classOf[HipacheManagementActor],
-        config, db, baseDomain))
+        config, db, containerResolver))
     }
   }
 
@@ -67,7 +63,7 @@ class HipachePlugin(app: play.api.Application) extends Plugin {
 class HipacheManagementActor(
     config: Hipache.ServerConfig,
     db: CouchDB.Database,
-    baseDomain: Option[String]) extends Actor {
+    resolver: ContainerResolver) extends Actor {
 
   import context.dispatcher
 
@@ -100,24 +96,20 @@ class HipacheManagementActor(
       containers <- containerDao.list
       putOps = containers.flatMap { c =>
         computeNodes.find(_.id == c.computeNodeId).map { node =>
-          baseDomain match {
-            case Some(domain) =>
-              val frontend =
-                Hipache.Frontend(c.computeNodeContainerName,
-                    s"${c.computeNodeContainerName}.${domain}")
-              currentMappings.get(frontend) match {
-                case Some(b) if b == node.backend =>
-                  Future.successful(())
-                case _ =>
-                  client.put(frontend, node.backend).map(_ =>())
-              }
-            case None =>
-              log.warning(s"Unable to check Hipache mapping of ${c.id}. App domain unknown.")
+          val frontend = resolver.asFrontend(c)
+          currentMappings.get(frontend) match {
+            case Some(b) if b == node.backend =>
               Future.successful(())
+            case _ =>
+              client.put(frontend, node.backend).map(_ =>())
           }
         }
       }
-      containerExists = containers.map(_.computeNodeContainerName).toSet.contains _
+      containerExists = containers
+        .map(resolver.asFrontend(_))
+        .filter(resolver.isContainerFrontend)
+        .toSet
+        .contains _
       deleteOps = currentMappings.keys
         .filterNot(frontend => containerExists(frontend.name))
         .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))

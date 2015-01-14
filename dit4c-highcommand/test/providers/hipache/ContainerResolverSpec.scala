@@ -44,6 +44,16 @@ class ContainerResolverSpec extends Specification with SpecUtils {
       frontend.domain must startWith("c-")
       frontend.domain must contain(container.id)
     }
+
+    "can determine if Hipache.Frontend is a Container" >> {
+      val resolver = new ContainerResolver(fakeApp)
+      resolver.isContainerFrontend(
+          resolver.asFrontend(container)) must beTrue
+      resolver.isContainerFrontend(
+          Hipache.Frontend("portal", "localhost.localdomain")) must beFalse
+      resolver.isContainerFrontend(
+          Hipache.Frontend("other", "c-foo.example.test")) must beFalse
+    }
   }
 
 }
