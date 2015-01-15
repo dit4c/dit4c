@@ -110,7 +110,7 @@ class HipacheManagementActor(
         .toSet
         .contains _
       deleteOps = currentMappings.keys
-        .filterNot(frontend => containerExists(frontend.name))
+        .filterNot(containerExists)
         .map(c => client.delete(c).map(_ => s"Deleted Hipache mapping for: $c"))
         .toSeq
       opsDone <- Future.sequence(putOps ++ deleteOps)
