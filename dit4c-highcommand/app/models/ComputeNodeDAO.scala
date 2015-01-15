@@ -142,11 +142,6 @@ object ComputeNode {
     def withManagementUrl(url: String): UpdateOp
     def withBackend(backend: Hipache.Backend): UpdateOp
   }
-
-  implicit class ContainerNameHelper(container: Container) {
-    private val containerPrefix = "c-"
-    def computeNodeContainerName = containerPrefix + container.id
-  }
 }
 
 

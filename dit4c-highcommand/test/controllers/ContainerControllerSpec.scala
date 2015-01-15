@@ -18,7 +18,7 @@ import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
 import utils.SpecUtils
 import providers.machineshop.MachineShop
-import providers.hipache.Hipache
+import providers.hipache.{ContainerResolver,Hipache}
 
 /**
  * Add your spec here.
@@ -102,11 +102,10 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
             Hipache.Backend("localhost", 8080, "https")))
       val container =
         await(containerDao.create(session.user, "test", testImage, computeNode))
-      val response = controller.redirect(container.id)(
-        session.newRequest.withHeaders("Host" -> "example.test"))
+      val response = controller.redirect(container.id)(session.newRequest)
       status(response) must_== 307
       header("Location", response) must beSome
-      header("Location", response).get must endWith(".example.test/")
+      header("Location", response).get must endWith(".localhost.localdomain/")
     }
 
     "create containers" in new WithApplication(fakeApp) {
@@ -169,7 +168,8 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val db = injector.getInstance(classOf[CouchDB.Database])
       new ContainerController(
           db,
-          injector.getInstance(classOf[Application])) {
+          injector.getInstance(classOf[Application]),
+          injector.getInstance(classOf[ContainerResolver])) {
         override def createComputeNodeContainer(container: Container) =
           Future.successful(MockMCC(container.name, false))
 

@@ -31,7 +31,7 @@ trait SpecUtils extends ConcurrentExecutionContext {
     def newRequest: FakeRequest[AnyContentAsEmpty.type] = {
       FakeRequest().withSession("userId" -> user.id)
     }
-    
+
     def newRequest[A](body: A): FakeRequest[A] = {
       FakeRequest[A]("GET", "", FakeHeaders(), body).withSession("userId" -> user.id)
     }

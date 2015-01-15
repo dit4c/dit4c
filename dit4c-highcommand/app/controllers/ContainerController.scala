@@ -10,12 +10,12 @@ import models._
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
 import providers.machineshop.MachineShop
+import providers.hipache.ContainerResolver
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
-    mainController: Application) extends Controller with Utils {
-
-  import ComputeNode.ContainerNameHelper
+    mainController: Application,
+    containerResolver: ContainerResolver) extends Controller with Utils {
 
   implicit class CNCHelper(cnp: MachineShop.Container) {
     def makeActive(shouldBeActive: Boolean): Future[MachineShop.Container] =
@@ -57,7 +57,7 @@ class ContainerController @Inject() (
           for {
             container <- containerDao.create(request.user, name, image, node)
             p <- createComputeNodeContainer(container)
-            _ <- HipacheInterface.put(container, node)
+            _ <- hipache.put(container, node)
             cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
             result = Created(Json.obj(
               "id" -> container.id,
@@ -66,7 +66,8 @@ class ContainerController @Inject() (
               "image" -> container.image,
               "active" -> cnContainer.active
             ))
-            resultWithJwt <- result.withUpdatedJwt(request.user)
+            resultWithJwt <- result.withUpdatedJwt(
+                request.user, containerResolver)
           } yield resultWithJwt
       }.recover {
         case e: java.net.ConnectException =>
@@ -96,9 +97,8 @@ class ContainerController @Inject() (
 
   def redirect(id: String) = Authenticated.async { implicit request =>
     withContainer(id) { container =>
-      val scheme = if (request.secure) "https" else "http"
-      val host = container.computeNodeContainerName + "." + request.host
-      TemporaryRedirect(s"$scheme://$host/").withUpdatedJwt(request.user)
+      val url = containerResolver.asUrl(container).toString()
+      TemporaryRedirect(url).withUpdatedJwt(request.user, containerResolver)
     }
   }
 
@@ -153,7 +153,7 @@ class ContainerController @Inject() (
             for {
               _ <- container.delete
               _ <- deleteOrIgnore(possibleContainer)
-              _ <- HipacheInterface.delete(container)
+              _ <- hipache.delete(container)
             } yield NoContent
           }.recover {
             case e: java.net.ConnectException =>
@@ -166,14 +166,13 @@ class ContainerController @Inject() (
   protected def createComputeNodeContainer(container: Container) =
       for {
         node <- computeNodeDao.get(container.computeNodeId)
-        c <- node.get.containers.create(
-            container.computeNodeContainerName, container.image)
+        c <- node.get.containers.create(cncName(container), container.image)
       } yield c
 
   protected def resolveComputeNodeContainer(container: Container) =
       for {
         node <- computeNodeDao.get(container.computeNodeId)
-        c <- node.get.containers.get(container.computeNodeContainerName)
+        c <- node.get.containers.get(cncName(container))
       } yield c
 
   private case class ValidityCheck(
@@ -208,6 +207,11 @@ class ContainerController @Inject() (
         case None => Future.successful(NotFound("Container does not exist."))
       }
     } yield result
+
+  private def hipache = HipacheInterface(containerResolver)
+
+  private def cncName(container: models.Container) =
+    containerResolver.asFrontend(container).name
 
   private def toJson(c: Container, cnc: Option[MachineShop.Container]) =
       Json.obj(

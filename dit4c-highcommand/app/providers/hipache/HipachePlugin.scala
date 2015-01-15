@@ -86,7 +86,6 @@ class HipacheManagementActor(
   }
 
   private def performMaintenance: Future[_] = {
-    import models.ComputeNode.ContainerNameHelper
     log.debug("Starting Hipache maintenance routine.")
     for {
       currentMappings <- client.all

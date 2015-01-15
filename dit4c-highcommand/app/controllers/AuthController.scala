@@ -18,6 +18,7 @@ import utils.jwt._
 import providers.auth._
 import com.google.inject.Inject
 import providers.db.CouchDB
+import providers.hipache.ContainerResolver
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
@@ -25,6 +26,7 @@ import models._
 
 class AuthController @Inject() (
     authProviders: AuthProviders,
+    containerResolver: ContainerResolver,
     val db: CouchDB.Database)
     extends Controller with Utils {
 
@@ -81,7 +83,7 @@ class AuthController @Inject() (
             }.flatMap { user =>
               Redirect(routes.Application.main("login").url)
                 .withSession(request.session + ("userId" -> user.id))
-                .withUpdatedJwt(user)
+                .withUpdatedJwt(user, containerResolver)
             }
           case Failure(msg) => successful(Forbidden(msg))
           case Invalid => successful(BadRequest)

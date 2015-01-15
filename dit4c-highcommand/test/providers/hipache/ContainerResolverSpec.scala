@@ -28,6 +28,13 @@ class ContainerResolverSpec extends Specification with SpecUtils {
 
   "ContainerResolver" >> {
 
+    "resolves Container to a machineshop container name" >> {
+      val resolver = new ContainerResolver(fakeApp)
+      val name = resolver.asName(container)
+      name must startWith("c-")
+      name must endWith(container.id)
+    }
+
     "resolves Container to URL for redirects" >> {
       val resolver = new ContainerResolver(fakeApp)
       val url = resolver.asUrl(container)

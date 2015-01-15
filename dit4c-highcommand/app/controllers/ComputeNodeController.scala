@@ -13,7 +13,7 @@ import providers.hipache.Hipache
 import akka.actor.ActorRef
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
-import providers.hipache.HipachePlugin
+import providers.hipache.{ContainerResolver, HipachePlugin}
 import providers.machineshop.{MachineShop, ContainerProvider}
 import scala.util.Try
 import java.net.ConnectException
@@ -21,9 +21,9 @@ import models.AccessToken.AccessType
 
 class ComputeNodeController @Inject() (
     val db: CouchDB.Database,
-    mainController: Application) extends Controller with Utils {
+    mainController: Application,
+    containerResolver: ContainerResolver) extends Controller with Utils {
 
-  import ComputeNode.ContainerNameHelper
   import Hipache.hipacheBackendFormat
 
   def index: Action[AnyContent] = Action.async { implicit request =>
@@ -95,7 +95,7 @@ class ComputeNodeController @Inject() (
         _ <- if (computeNode.backend == updated.backend)
                Future.successful(())
              else
-               HipacheInterface.remapAll(updated)
+               HipacheInterface(containerResolver).remapAll(updated)
       } yield Ok(Json.toJson(updated))
     })
   }
@@ -108,7 +108,8 @@ class ComputeNodeController @Inject() (
           _ <- Future.sequence(tokens.map(_.delete))
           nodeContainers <- containerDao.listFor(computeNode)
           _ <- Future.sequence(nodeContainers.map(_.delete))
-          _ <- Future.sequence(nodeContainers.map(HipacheInterface.delete(_)))
+          _ <- Future.sequence(
+              nodeContainers.map(HipacheInterface(containerResolver).delete(_)))
           _ <- computeNode.delete
         } yield NoContent
       })
@@ -257,7 +258,7 @@ class ComputeNodeController @Inject() (
           // Exists and belongs to this compute node
           for {
             dockerContainer <- containerProvider(computeNode)
-                                  .get(container.computeNodeContainerName)
+                                  .get(cncName(container))
             _ <- dockerContainer
                   .map(_.stop)
                   .getOrElse(Future.successful(()))
@@ -291,12 +292,12 @@ class ComputeNodeController @Inject() (
             // Exists and belongs to this compute node
             for {
               dockerContainer <- containerProvider(computeNode)
-                                    .get(container.computeNodeContainerName)
+                                    .get(cncName(container))
               _ <- container.delete
               _ <- dockerContainer
                     .map(_.delete)
                     .getOrElse(Future.successful(()))
-              _ <- HipacheInterface.delete(container)
+              _ <- HipacheInterface(containerResolver).delete(container)
             } yield NoContent
         }
       })
@@ -412,6 +413,9 @@ class ComputeNodeController @Inject() (
           base
       }
     }
+
+  private def cncName(container: models.Container) =
+    containerResolver.asName(container)
 
   implicit lazy val userWriter = new Writes[User]() {
     override def writes(o: User) = Json.obj(

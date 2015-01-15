@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit
 
 trait Utils extends Results {
   import scala.language.implicitConversions
-  import ComputeNode.ContainerNameHelper
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
@@ -42,10 +41,10 @@ trait Utils extends Results {
   protected lazy val computeNodeDao = new ComputeNodeDAO(db, keyDao)
 
   implicit class JwtHelper(response: Result)(implicit request: Request[_]) {
-    def withUpdatedJwt(user: User): Future[Result] =
+    def withUpdatedJwt(user: User, cr: ContainerResolver): Future[Result] =
       for {
         containers <- userContainers(user)
-        jwt <- createJWT(containers.map(_.computeNodeContainerName))
+        jwt <- createJWT(containers.map(cr.asName))
       } yield {
         response.withCookies(Cookie("dit4c-jwt", jwt, domain=getCookieDomain))
       }
@@ -119,12 +118,12 @@ trait Utils extends Results {
     }
 
 
-  object HipacheInterface {
+  case class HipacheInterface(containerResolver: ContainerResolver) {
     import Hipache._
 
     implicit val timeout = Timeout(10, TimeUnit.SECONDS)
 
-    def remapAll(node: ComputeNode)(implicit req: Request[_]) =
+    def remapAll(node: ComputeNode) =
       withHipache { hipache =>
         for {
           containers <- containerDao.listFor(node)
@@ -132,12 +131,12 @@ trait Utils extends Results {
         } yield ()
       }
 
-    def put(container: Container, node: ComputeNode)(implicit req: Request[_]) =
+    def put(container: Container, node: ComputeNode) =
       withHipache { hipache =>
         hipache.put(container, node)
       }
 
-    def delete(container: Container)(implicit req: Request[_]) =
+    def delete(container: Container) =
       withHipache { hipache =>
         hipache.delete(container)
       }
@@ -154,13 +153,10 @@ trait Utils extends Results {
         case None => Future.successful(None)
       }
 
-    private implicit def asFrontend(
-        c: Container)(implicit req: Request[_]): Frontend =
-      Frontend(c.computeNodeContainerName,
-          s"${c.computeNodeContainerName}.${req.host}")
+    private implicit def asFrontend(c: Container): Frontend =
+      containerResolver.asFrontend(c)
 
-    private implicit def asBackend(
-        node: ComputeNode)(implicit req: Request[_]): Backend =
+    private implicit def asBackend(node: ComputeNode): Backend =
       node.backend
 
   }
