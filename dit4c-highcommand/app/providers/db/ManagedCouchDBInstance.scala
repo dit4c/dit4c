@@ -37,7 +37,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Applic
     val uriFile = baseDir.resolve("couchdb.uri")
     Files.deleteIfExists(uriFile)
     import scala.sys.process.Process
-    val process = (Process(s"couchdb -a $configFile") #> NullOutputStream).run
+    val process = (Process(s"couchdb -a $configFile") #> System.out).run
     Await.ready(uriFileCreated(baseDir), 60.seconds)
     (process, new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
   }
