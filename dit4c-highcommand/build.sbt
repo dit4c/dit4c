@@ -90,7 +90,9 @@ dockerfile in docker := {
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")
    .run("chmod", "+x", "/opt/dit4c-highcommand/bin/dit4c-highcommand")
-   .cmd("/usr/bin/supervisord", "-n")
+   .cmd("/opt/dit4c-highcommand/bin/dit4c-highcommand",
+        "-Dconfig.file=/opt/dit4c-highcommand/prod.conf",
+        "-Dpidfile.path=/dev/null")
    .expose(9000)
 }
 
