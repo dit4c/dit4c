@@ -52,13 +52,24 @@ To install DIT4C, you will need:
    * a [RapidAAF account][rapidaaf] account or
    * a [GitHub][github-auth] application.
 
-DIT4C has two Docker containers used to bootstrap new environments:
+DIT4C has three Docker containers used to bootstrap new environments:
+ * [dit4c-deploy-routing][dit4c-deploy-routing]
  * [dit4c-deploy-portal][dit4c-deploy-portal]
  * [dit4c-deploy-compute][dit4c-deploy-compute]
 
-To deploy a portal:
- * Put your certificate and private key (`server.crt` & `server.key`) in `/opt/ssl`.
- * Put your DIT4C portal configuration (`dit4c-highcommand.conf`) in `/opt/config`.
+To deploy a routing node, put your certificate and private key (`server.crt` & `server.key`) in `/opt/ssl`.
+
+Once those files are in place, to deploy routing infrastructure, run:
+
+```shell
+# Change DIT4C_DOMAIN to your domain name
+docker run --name dit4c_deploy_routing --rm \
+           -e DIT4C_DOMAIN=my.domain.example.test \
+           -v /var/run/docker.sock:/var/run/docker.sock \
+           dit4c/dit4c-deploy-routing
+```
+
+To deploy a portal, put your DIT4C portal configuration (`dit4c-highcommand.conf`) in `/opt/config`.
 
 ```
 application.baseUrl: "https://<your_domain_here>/"
@@ -80,17 +91,19 @@ Once those files are in place, to deploy a portal, run:
 ```shell
 # Change DIT4C_DOMAIN to your domain name
 docker run --name dit4c_deploy_portal --rm \
-           -e DIT4C_DOMAIN=my.domain.example.test
+           -e DIT4C_DOMAIN=my.domain.example.test \
            -v /var/run/docker.sock:/var/run/docker.sock \
            dit4c/dit4c-deploy-portal
 ```
+
+You will need to populate the Hipache record for your portal (`frontend:my.domain.example.net`). You can use `etcdctl` to do this manually, and [dit4c-cluster-manager][dit4c-cluster-manager] exists for maintaining this automatically.
 
 To deploy a compute node (preferably on another host), run:
 
 ```shell
 # Change PORTAL_URL to reflect your domain name
 docker run --name dit4c_deploy_compute --rm \
-           -e PORTAL_URL=https://my.domain.example.test
+           -e PORTAL_URL=https://my.domain.example.test \
            -v /var/run/docker.sock:/var/run/docker.sock \
            dit4c/dit4c-deploy-compute
 ```
@@ -110,5 +123,7 @@ docker run --name dit4c_deploy_compute --rm \
 [dit4c-container-ijulia]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ijulia/
 [dit4c-container-x11]: https://registry.hub.docker.com/u/dit4c/dit4c-container-x11/
 [dit4c-container-octave]: https://registry.hub.docker.com/u/dit4c/dit4c-container-octave/
+[dit4c-deploy-routing]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-routing/
 [dit4c-deploy-portal]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-portal/
 [dit4c-deploy-compute]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-compute/
+[dit4c-cluster-manager]: https://registry.hub.docker.com/u/dit4c/dit4c-cluster-manager/
