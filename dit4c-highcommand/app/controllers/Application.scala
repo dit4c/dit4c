@@ -10,7 +10,9 @@ import akka.pattern.after
 import scala.concurrent.Future.successful
 import play.api.libs.concurrent.Akka
 
-class Application @Inject() (authProviders: AuthProviders)
+class Application @Inject() (
+    authProviders: AuthProviders,
+    db: CouchDB.Database)
     extends Controller {
 
   import play.api.libs.concurrent.Execution.Implicits._
@@ -35,6 +37,25 @@ class Application @Inject() (authProviders: AuthProviders)
       }
     }
 
+  /**
+   * Report application health.
+   *
+   * Will ping CouchDB, as app is effectively dead if it can't reach the DB.
+   *
+   */
+  def health(isHeadRequest: Boolean) = Action.async { implicit request =>
+    for {
+      dbExists <- db.asSohvaDb.exists
+    } yield {
+      if (dbExists)
+        if (isHeadRequest)
+          Ok(Results.EmptyContent())
+        else
+          NoContent
+      else
+        InternalServerError("Database does not exist.")
+    }
+  }
 
   private def googleAnalyticsCode: Option[String] =
     Play.current.configuration.getString("ga.code")

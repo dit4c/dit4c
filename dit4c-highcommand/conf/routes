@@ -22,6 +22,8 @@ GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
+HEAD    /health                     @controllers.Application.health(isHeadRequest: Boolean = true)
+GET     /health                     @controllers.Application.health(isHeadRequest: Boolean = false)
 
 # Compute Nodes
 GET     /compute-nodes              @controllers.ComputeNodeController.index

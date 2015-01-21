@@ -31,17 +31,15 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
       "without query string" in new WithApplication(fakeApp) {
         val extractors = new AcceptExtractors {}
         import extractors.Accepts
-        
+
         val controller = injector.getInstance(classOf[Application])
         val action = controller.waiting("http","example.test","foo")
-      
         val htmlResponse = action(
           FakeRequest().withHeaders("Accept" -> Accepts.Html.mimeType))
         status(htmlResponse) must_== 200
         contentAsString(htmlResponse) must contain("window.location.href = 'http://example.test/foo';") 
-        
+
         val notHtml = Seq(Accepts.JavaScript, Accepts.Json, Accepts.Xml)
-        
         notHtml.foreach { accept =>
           val nonHtmlResponse = action(
             FakeRequest().withHeaders("Accept" -> accept.mimeType))
@@ -54,17 +52,15 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
       "with query string" in new WithApplication(fakeApp) {
         val extractors = new AcceptExtractors {}
         import extractors.Accepts
-        
+
         val controller = injector.getInstance(classOf[Application])
         val action = controller.waiting("http","example.test","foo")
-      
         val htmlResponse = action(
           FakeRequest("GET", "/foo?a=1&b=2").withHeaders("Accept" -> Accepts.Html.mimeType))
         status(htmlResponse) must_== 200
         contentAsString(htmlResponse) must contain("window.location.href = 'http://example.test/foo?a=1&b=2';") 
-        
+
         val notHtml = Seq(Accepts.JavaScript, Accepts.Json, Accepts.Xml)
-        
         notHtml.foreach { accept =>
           val nonHtmlResponse = action(
             FakeRequest("GET", "/foo?a=1&b=2").withHeaders("Accept" -> accept.mimeType))
@@ -74,6 +70,25 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
         }
       }
     }
+
+    "provide a health check endpoint" >> {
+      
+      "for HEAD" in new WithApplication(fakeApp) {
+        val controller = injector.getInstance(classOf[Application])
+        val action = controller.health(true)
+        val response = action(FakeRequest())
+        status(response) must_== 200
+      }
+      
+      "for GET" in new WithApplication(fakeApp) {
+        val controller = injector.getInstance(classOf[Application])
+        val action = controller.health(false)
+        val response = action(FakeRequest())
+        status(response) must_== 204
+      }
+      
+    }
+
   }
 
 }
