@@ -1,19 +1,19 @@
 package dit4c.machineshop.auth
 
 import java.io.FileInputStream
-import java.io.File
 import java.text.ParseException
-import akka.actor.Actor
-import scala.util.Try
-import akka.event.Logging
-import scala.concurrent.duration.Duration
-import java.util.concurrent.TimeUnit
-import akka.actor.ActorRef
-import akka.actor.Cancellable
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{future, Future}
-import com.nimbusds.jose.jwk.JWKSet
+
 import scala.collection.JavaConversions._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import com.nimbusds.jose.jwk.JWKSet
+
+import akka.actor._
+import akka.event.Logging
 import spray.http.HttpRequest
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
@@ -28,12 +28,21 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
   type QueuedCheck = (ActorRef, AuthCheck)
 
   /* Signature Checker Updates */
-  object UpdateSignatureVerifier
+  case class UpdateSignatureVerifier(retryCount: Int = 0)
   case class ReplaceSignatureVerifier(sc: SignatureVerifier)
   val base: Receive = {
-    case UpdateSignatureVerifier =>
-      createVerifier.foreach { sc =>
-        context.self ! ReplaceSignatureVerifier(sc)
+    case UpdateSignatureVerifier(retries) =>
+      createVerifier.onComplete {
+        case Success(sv) =>
+          context.self ! ReplaceSignatureVerifier(sv)
+        case Failure(e) =>
+          val delay = 1.second * math.pow(2, retries).toInt
+          log.warning(
+              s"Failure generating signature verifier: $e\nRetry in $delay.")
+          context.system.scheduler.scheduleOnce(
+            delay,
+            context.self,
+            UpdateSignatureVerifier(retries + 1))
       }
   }
 
@@ -46,7 +55,7 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
         Duration.Zero,
         keyUpdateInterval,
         context.self,
-        UpdateSignatureVerifier))
+        UpdateSignatureVerifier()))
   }
 
   override def postStop = {

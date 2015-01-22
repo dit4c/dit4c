@@ -1,16 +1,11 @@
 package dit4c.gatehouse.auth
 
-import java.io.FileInputStream
-import java.io.File
-import java.text.ParseException
-import akka.actor.Actor
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+
+import akka.actor._
 import akka.event.Logging
-import scala.concurrent.duration.Duration
-import java.util.concurrent.TimeUnit
-import akka.actor.ActorRef
-import akka.actor.Cancellable
-import scala.concurrent.duration.FiniteDuration
 
 class AuthActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor with SignatureCheckerProvider {
@@ -27,14 +22,22 @@ class AuthActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration
   type QueuedCheck = (ActorRef, AuthCheck)
 
   /* Signature Checker Updates */
-  object UpdateSignatureChecker
+  case class UpdateSignatureChecker(retryCount: Int = 0)
   case class ReplaceSignatureChecker(sc: SignatureChecker)
   val base: Receive = {
-    case UpdateSignatureChecker =>
-      createSignatureChecker(publicKeySource)
-        .foreach { sc =>
+    case UpdateSignatureChecker(retries) =>
+      createSignatureChecker(publicKeySource).onComplete {
+        case Success(sc) =>
           context.self ! ReplaceSignatureChecker(sc)
-        }
+        case Failure(e) =>
+          val delay = 1.second * math.pow(2, retries).toInt
+          log.warning(
+              s"Failure generating signature checker: $e\nRetry in $delay.")
+          context.system.scheduler.scheduleOnce(
+            delay,
+            context.self,
+            UpdateSignatureChecker(retries + 1))
+      }
   }
 
   var scheduledCheck: Option[Cancellable] = None
@@ -46,7 +49,7 @@ class AuthActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration
         Duration.Zero,
         keyUpdateInterval,
         context.self,
-        UpdateSignatureChecker))
+        UpdateSignatureChecker()))
   }
 
   override def postStop = {
