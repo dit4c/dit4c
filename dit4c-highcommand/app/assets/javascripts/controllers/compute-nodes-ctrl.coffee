@@ -78,7 +78,7 @@ define(['./module'], (controllers) ->
       node.editForm = undefined
 
     $scope.resolveUsers = (node, userIds) ->
-      $scope.users[node.id].filter (user) ->
+      ($scope.users[node.id] || []).filter (user) ->
         userIds.indexOf(user.id) != -1
 
     $scope.updateNode = (node) ->
