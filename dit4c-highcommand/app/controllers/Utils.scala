@@ -45,15 +45,13 @@ trait Utils extends Results {
       for {
         containers <- userContainers(user)
         jwt <- createJWT(containers.map(cr.asName))
-      } yield {
-        response.withCookies(Cookie("dit4c-jwt", jwt, domain=getCookieDomain))
-      }
+      } yield response.withCookies(jwtCookie(jwt))
 
     def withClearedJwt: Future[Result] =
-      Future.successful {
-        response.withCookies(
-            Cookie("dit4c-jwt", "", domain=getCookieDomain))
-      }
+      Future.successful(response.withCookies(jwtCookie("")))
+
+    protected def jwtCookie(data: String): Cookie =
+      Cookie("dit4c-jwt", data, domain=getCookieDomain)
   }
 
   class AuthenticatedRequest[A](val user: User, request: Request[A])

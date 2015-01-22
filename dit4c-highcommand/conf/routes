@@ -3,6 +3,7 @@
 # ~~~~
 
 GET     /login/:name/redirect       @controllers.AuthController.login(name)
+GET     /login/renew                @controllers.AuthController.renew
 POST    /logout                     @controllers.AuthController.logout
 GET     /login/:name/callback       @controllers.AuthController.namedCallback(name)
 POST    /login/:name/callback       @controllers.AuthController.namedCallback(name)

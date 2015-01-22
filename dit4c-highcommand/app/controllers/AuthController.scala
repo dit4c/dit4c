@@ -59,6 +59,10 @@ class AuthController @Inject() (
 
   def unnamedCallback = callback(authProviders.providers)
 
+  def renew = Authenticated.async { implicit request =>
+    NoContent.withUpdatedJwt(request.user, containerResolver)
+  }
+
   protected def callback(providers: Iterable[AuthProvider]) =
     Action.async { implicit request =>
       import CallbackResult._
