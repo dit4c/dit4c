@@ -1,6 +1,5 @@
 define([
     'angular',
-    'ui-bootstrap',
     'ui-bootstrap-tpls',
     './controllers/index',
     './directives/index',
