@@ -87,6 +87,7 @@ dockerfile in docker := {
     .run("yum", "-y", "install", "java-1.7.0-openjdk-headless", "socat")
     .add(jarFile, "/opt/dit4c-machineshop.jar")
     .add(configs, "/etc")
+    .volume("/etc/dit4c-machineshop")
     .cmd("/usr/bin/supervisord", "-n")
     .expose(8080)
 }
