@@ -39,12 +39,14 @@ class AuthController @Inject() (
     }
   }
 
-  def login(name: String) = Action { implicit request =>
+  def login(name: String) = Action.async { implicit request =>
     providerWithName(name) match {
       case Some(provider) =>
-        Redirect(provider.loginURL)
+        provider.loginHandler(request)
       case None =>
-        BadRequest("Login method doesn't exist.")
+        Future.successful {
+          BadRequest("Login method doesn't exist.")
+        }
     }
   }
 

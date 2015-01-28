@@ -112,6 +112,14 @@
                   GitHub
                 </a>
               }
+              case _: TwitterProvider => {
+                <a target="_self" class="btn btn-default btn-block btn-lg"
+                  alt="Login with Twitter"
+                  href="@{routes.AuthController.login(provider.name).url}">
+                  <i class="fa fa-twitter fa-lg"></i>
+                  Twitter
+                </a>
+              }
               case _: DummyProvider => {
                 <br/>
                 <form class="form text-center"

@@ -8,6 +8,7 @@ import com.nimbusds.jwt.JWTParser
 import play.api.libs.json._
 import play.twirl.api.Html
 import scala.concurrent.Future
+import play.api.mvc.Results
 
 class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProvider {
 
@@ -31,7 +32,9 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProv
     }
   }
 
-  override val loginURL = config.url.toString
+  override val loginHandler = { request: Request[AnyContent] =>
+    Future.successful(Results.Redirect(config.url.toString))
+  }
 
   private def extractPayload(request: Request[AnyContent]): Option[JsValue] =
     request.body.asFormUrlEncoded.flatMap { form =>

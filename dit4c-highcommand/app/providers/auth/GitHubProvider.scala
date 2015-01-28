@@ -9,6 +9,7 @@ import play.api.libs.json._
 import play.twirl.api.Html
 import scala.concurrent.Future
 import play.api.libs.ws.WS
+import play.api.mvc.Results
 import play.api.Play
 import play.api.libs.concurrent.Execution
 import play.api.libs.ws.WSResponse
@@ -36,8 +37,14 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
     }
   }
 
-  override val loginURL =
-    s"https://github.com/login/oauth/authorize?client_id=${config.id}&scope=user%3Aemail"
+  override val loginHandler = { request: Request[AnyContent] =>
+    Future.successful {
+      Results.Redirect("https://github.com/login/oauth/authorize", Map(
+        "client_id" -> Seq(config.id),
+        "scope" -> Seq("user,email")
+      ))
+    }
+  }
 
   protected def resolveIdentity(code: String): Future[Identity] =
     tokenRequest(code).flatMap(retreiveIdentityWithEmail)

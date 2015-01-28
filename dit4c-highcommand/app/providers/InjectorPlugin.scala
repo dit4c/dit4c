@@ -32,6 +32,7 @@ class InjectorPlugin(app: play.api.Application) extends Plugin {
         lazy val authProviders = AuthProviders(
             RapidAAFAuthProvider(appConfig) ++
             GitHubProvider(appConfig) ++
+            TwitterProvider(appConfig) ++
             DummyProvider(appConfig))
 
         val dbName = app.configuration.getString("couchdb.database").get

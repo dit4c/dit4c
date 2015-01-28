@@ -16,11 +16,11 @@ class DummyProvider extends AuthProvider {
           override val emailAddress = None
         })
       }.getOrElse {
-          CallbackResult.Failure("Form not posted.")
+        CallbackResult.Failure("Form not posted.")
       }
     }
   }
-  override def loginURL = ??? // Should never be called
+  override def loginHandler = ??? // Should never be called
 }
 
 object DummyProvider extends AuthProviderFactory {
