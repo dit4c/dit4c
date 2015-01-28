@@ -43,7 +43,11 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
       contentAsJson(response) must_== Json.obj(
         "id" -> session.user.id,
         "name" -> session.user.name.get,
-        "email" -> session.user.email.get
+        "email" -> session.user.email.get,
+        "identities" -> Json.arr(Json.obj(
+          "type" -> "test",
+          "id" -> "testuser"
+        ))
       )
       val etag: String = header("ETag", response) match {
         case Some(s) => s
