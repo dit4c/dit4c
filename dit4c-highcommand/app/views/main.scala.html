@@ -63,6 +63,14 @@
                     title="{{currentUser.email}}">
                   <span ng-if="currentUser.name">{{currentUser.name}}</span>
                   <span ng-if="!currentUser.name">Unknown</span>
+                  <span ng-repeat="identity in currentUser.identities">
+                    <!--
+                    Twitter guidelines require you to show screen names.
+                    -->
+                    <span ng-if="identity.type == 'twitter'" href="#">
+                      | <i class="fa fa-twitter"></i> {{identity.id}}
+                    </span>
+                  </span>
                   <b class="caret"></b>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-right" role="menu">
@@ -715,9 +723,17 @@
                   <tbody>
                     <tr ng-repeat="user in users[node.id]">
                       <td>
-                        {{user.name}}
-                        <span ng-if="user.email">
-                          <a href="mailto:{{user.email}}">{{user.email}}</a>
+                        <a ng-if="user.email" href="mailto:{{user.email}}">
+                          {{user.name}}
+                        </a>
+                        <span ng-if="!user.email">
+                          {{user.name}}
+                        </span>
+                        <span ng-repeat="identity in user.identities">
+                          <a ng-if="identity.type == 'twitter'"
+                              href="https://twitter.com/{{identity.id}}">
+                            (<i class="fa fa-twitter"></i> {{identity.id}})
+                          </a>
                         </span>
                       </td>
                       <td class="text-right">
@@ -739,9 +755,17 @@
                   <tbody>
                     <tr ng-repeat="owner in owners[node.id]">
                       <td>
-                        {{owner.name}}
-                        <span ng-if="owner.email">
-                          <a href="mailto:{{owner.email}}">{{owner.email}}</a>
+                        <a ng-if="owner.email" href="mailto:{{owner.email}}">
+                          {{owner.name}}
+                        </a>
+                        <span ng-if="!owner.email">
+                          {{owner.name}}
+                        </span>
+                        <span ng-repeat="identity in owner.identities">
+                          <a ng-if="identity.type == 'twitter'"
+                              href="https://twitter.com/{{identity.id}}">
+                            (<i class="fa fa-twitter"></i> {{identity.id}})
+                          </a>
                         </span>
                       </td>
                       <td class="text-right">

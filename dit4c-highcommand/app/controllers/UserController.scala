@@ -21,12 +21,7 @@ class UserController @Inject() (val db: CouchDB.Database)
       case Some(user) if etag == user._rev =>
         NotModified
       case Some(user) =>
-        val json = Json.obj(
-          "id"    -> user.id,
-          "name"  -> user.name,
-          "email" -> user.email
-        )
-        Ok(json).withHeaders("ETag" -> user._rev.get)
+        Ok(Json.toJson(user)).withHeaders("ETag" -> user._rev.get)
       case None =>
         NotFound
     }

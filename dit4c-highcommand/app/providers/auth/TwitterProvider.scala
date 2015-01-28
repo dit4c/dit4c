@@ -45,11 +45,10 @@ class TwitterProvider(info: ServiceInfo) extends AuthProvider {
             .map {
             case result if result.status == 200 =>
               val json = result.json
-              CallbackResult.Success(new Identity {
-                override val uniqueId = (json \ "id_str").as[String]
-                override val name = (json \ "name").asOpt[String]
-                override val emailAddress = None
-              })
+              CallbackResult.Success(TwitterIdentity(
+                (json \ "screen_name").as[String],
+                (json \ "name").asOpt[String]
+              ))
             case result =>
               CallbackResult.Failure(result.body)
           }
@@ -77,10 +76,17 @@ class TwitterProvider(info: ServiceInfo) extends AuthProvider {
     }
   }
 
+  case class TwitterIdentity(
+      handle: String,
+      val name: Option[String]) extends Identity {
+    override val uniqueId = "twitter:"+handle
+    override val emailAddress = None
+  }
+
 }
 
 object TwitterProvider extends AuthProviderFactory {
-  
+
   def apply(config: play.api.Configuration) =
     for {
       baseUrl <- config.getString("application.baseUrl")
@@ -91,7 +97,7 @@ object TwitterProvider extends AuthProviderFactory {
       info = ServiceInfo(
         "https://api.twitter.com/oauth/request_token",
         "https://api.twitter.com/oauth/access_token",
-        "https://api.twitter.com/oauth/authorize",
+        "https://api.twitter.com/oauth/authenticate",
         consumerKey
       )
     } yield new TwitterProvider(info)

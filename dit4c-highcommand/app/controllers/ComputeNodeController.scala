@@ -417,14 +417,6 @@ class ComputeNodeController @Inject() (
   private def cncName(container: models.Container) =
     containerResolver.asName(container)
 
-  implicit lazy val userWriter = new Writes[User]() {
-    override def writes(o: User) = Json.obj(
-      "id"    -> o.id,
-      "name"  -> o.name,
-      "email" -> o.email
-    )
-  }
-
   implicit lazy val tokenWriter = new Writes[AccessToken]() {
     override def writes(o: AccessToken) = Json.obj(
       "code" -> o.code,

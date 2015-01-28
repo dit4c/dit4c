@@ -9,7 +9,7 @@ import com.nimbusds.jose.crypto.RSASSASigner
 import java.security.KeyPairGenerator
 import java.security.interfaces.{RSAPrivateKey, RSAPublicKey}
 import java.io.{BufferedWriter, FileWriter, File, FileNotFoundException}
-import play.api.libs.json.Json
+import play.api.libs.json.{Json,Writes}
 import scala.collection.JavaConversions._
 import java.util.Calendar
 import com.nimbusds.jwt.JWTParser
@@ -157,6 +157,18 @@ trait Utils extends Results {
     private implicit def asBackend(node: ComputeNode): Backend =
       node.backend
 
+  }
+
+  implicit lazy val userWriter = new Writes[User]() {
+    override def writes(u: User) = Json.obj(
+      "id"    -> u.id,
+      "name"  -> u.name,
+      "email" -> u.email,
+      "identities" -> u.identities.map { s =>
+        val Array(t, id) = s.split(":", 2)
+        Map("type" -> t, "id" -> id)
+      }
+    )
   }
 
 }
