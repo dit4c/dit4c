@@ -2,25 +2,34 @@ package providers.auth
 
 import play.twirl.api.Html
 import scala.concurrent.Future
+import play.api.mvc.Results
 
 class DummyProvider extends AuthProvider {
   override def name = "dummy"
   override def callbackHandler = { request =>
     Future.successful {
-      request.body.asFormUrlEncoded.map { params =>
-        val username: String =
-          params.get("username").map(_.head).getOrElse("anonymous")
-        CallbackResult.Success(new Identity {
-          override val uniqueId = "dummy:"+username
-          override val name = Some(username)
-          override val emailAddress = None
-        })
-      }.getOrElse {
-        CallbackResult.Failure("Form not posted.")
+      val params = request.body.asFormUrlEncoded.getOrElse(request.queryString)
+      params.get("username").map(_.head) match {
+        case Some(username) =>
+          CallbackResult.Success(new Identity {
+            override val uniqueId = "dummy:"+username
+            override val name = Some(username)
+            override val emailAddress = None
+          })
+        case None =>
+          CallbackResult.Failure("No username specified.")
       }
     }
   }
-  override def loginHandler = ??? // Should never be called
+
+  override def loginHandler = { request =>
+    Future.successful {
+      val username = request.getQueryString("username")
+      Results.Redirect(
+          controllers.routes.AuthController.namedCallback(name).url,
+          Map("username" -> username.toSeq))
+    }
+  }
 }
 
 object DummyProvider extends AuthProviderFactory {

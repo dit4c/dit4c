@@ -1,0 +1,51 @@
+@(authProviders: Seq[providers.auth.AuthProvider], providerRoute: String => play.api.mvc.Call)
+
+@import providers.auth._
+
+@for(provider <- authProviders) {
+  @provider match {
+    case _: RapidAAFAuthProvider => {
+      <a target="_self" class="btn btn-default btn-block btn-lg"
+        href="@{providerRoute(provider.name).url}">
+        <img src="https://rapid.aaf.edu.au/aaf.png" style="height: 1.33333333em"/>
+        <abbr title="Australian Access Federation">AAF</abbr>
+      </a>
+    }
+    case _: GitHubProvider => {
+      <a target="_self" class="btn btn-default btn-block btn-lg"
+        alt="Login with GitHub"
+        href="@{providerRoute(provider.name).url}">
+        <i class="fa fa-github fa-lg"></i>
+        GitHub
+      </a>
+    }
+    case _: TwitterProvider => {
+      <a target="_self" class="btn btn-default btn-block btn-lg"
+        alt="Login with Twitter"
+        href="@{providerRoute(provider.name).url}">
+        <i class="fa fa-twitter fa-lg"></i>
+        Twitter
+      </a>
+    }
+    case _: DummyProvider => {
+      <br/>
+      <form class="form text-center"
+        action="@{providerRoute(provider.name).url}"
+        method="GET">
+        <div class="input-group">
+          <input class="form-control" type="text"
+            name="username" value="anonymous"/>
+          <span class="input-group-btn">
+            <button class="btn btn-primary" type="submit">Login</button>
+          </span>
+        </div>
+      </form>
+      <br/>
+    }
+  }
+}
+@if(authProviders.isEmpty) {
+  <div class="alert alert-danger">
+    No authentication provider has been configured.
+  </div>
+}

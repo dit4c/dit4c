@@ -1,6 +1,5 @@
 @(authProviders: Seq[providers.auth.AuthProvider], googleAnalyticsCode: Option[String])
 
-@import providers.auth._
 @import helpers.AppVersion
 
 <!DOCTYPE html5>
@@ -97,56 +96,6 @@
     </div>
     </script>
 
-    <script type="text/ng-template" id="auth-providers.html">
-    @for(provider <- authProviders) {
-      @provider match {
-        case _: RapidAAFAuthProvider => {
-          <a target="_self" class="btn btn-default btn-block btn-lg"
-            href="@{routes.AuthController.login(provider.name).url}">
-            <img src="https://rapid.aaf.edu.au/aaf.png" style="height: 1.33333333em"/>
-            <abbr title="Australian Access Federation">AAF</abbr>
-          </a>
-        }
-        case _: GitHubProvider => {
-          <a target="_self" class="btn btn-default btn-block btn-lg"
-            alt="Login with GitHub"
-            href="@{routes.AuthController.login(provider.name).url}">
-            <i class="fa fa-github fa-lg"></i>
-            GitHub
-          </a>
-        }
-        case _: TwitterProvider => {
-          <a target="_self" class="btn btn-default btn-block btn-lg"
-            alt="Login with Twitter"
-            href="@{routes.AuthController.login(provider.name).url}">
-            <i class="fa fa-twitter fa-lg"></i>
-            Twitter
-          </a>
-        }
-        case _: DummyProvider => {
-          <br/>
-          <form class="form text-center"
-            action="@{routes.AuthController.unnamedCallback.url}"
-            method="POST">
-            <div class="input-group">
-              <input class="form-control" type="text"
-                name="username" value="anonymous"/>
-              <span class="input-group-btn">
-                <button class="btn btn-primary" type="submit">Login</button>
-              </span>
-            </div>
-          </form>
-          <br/>
-        }
-      }
-    }
-    @if(authProviders.isEmpty) {
-      <div class="alert alert-danger">
-        No authentication provider has been configured.
-      </div>
-    }
-    </script>
-
     <script type="text/ng-template" id="login.html">
     <div ng-include src="'navbar.html'"></div>
     <div class="container">
@@ -154,7 +103,7 @@
 
       <div class="row">
         <div class="col-xs-offset-1 col-xs-10 col-sm-offset-2 col-sm-8 col-md-offset-4 col-md-4">
-          <div ng-include src="'auth-providers.html'"></div>
+          @partials.auth_providers(authProviders, routes.AuthController.login)
         </div>
       </div>
 
@@ -168,7 +117,7 @@
       <h1>Account</h1>
 
       <form class="form-horizontal">
-        <div class="form-group text-muted" ng-show="!user.name">
+        <div class="form-group text-muted">
           <label class="col-sm-2 control-label">ID</label>
           <div class="col-sm-10">
             <p class="form-control-static">{{user.id}}</p>
@@ -186,13 +135,26 @@
             <p class="form-control-static">{{user.email}}</p>
           </div>
         </div>
+
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Identities</label>
+          <div class="col-sm-10">
+            <p class="form-control-static" ng-repeat="identity in user.identities">
+              <span ng-if="identity.type == 'dummy'">[dummy]</span>
+              <span ng-if="identity.type == 'RapidAAF'">[AAF]</span>
+              <i class="fa fa-twitter-logo" ng-if="identity.type == 'twitter'"></i>
+              <i class="fa fa-github-logo" ng-if="identity.type == 'github'"></i>
+              {{identity.id}}
+            </p>
+          </div>
+        </div>
       </form>
 
       <h2>Merge with another account</h2>
 
       <div class="row">
         <div class="col-xs-12 col-sm-6 col-md-4">
-          <div ng-include src="'auth-providers.html'"></div>
+          @partials.auth_providers(authProviders, routes.AuthController.merge)
         </div>
       </div>
 

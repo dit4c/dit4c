@@ -49,7 +49,7 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
         createWith(loginIdentity)
     }
 
-  protected def updateWithIdentity(user: User, identity: Identity) =
+  def updateWithIdentity(user: User, identity: Identity) =
     user.update
       .withName(user.name.orElse(identity.name))
       .withEmail(user.email.orElse(identity.emailAddress))

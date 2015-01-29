@@ -30,6 +30,8 @@ class AuthController @Inject() (
     val db: CouchDB.Database)
     extends Controller with Utils {
 
+  val log = play.api.Logger
+
   def publicKeys = Action.async { implicit request =>
     for {
       keys <- keyDao.list
@@ -88,33 +90,56 @@ class AuthController @Inject() (
         }
         .flatMap {
           case Success(identity) =>
-            userDao.findWith(identity).flatMap {
-              case Some(user) =>
-                // If name & email are not populated, populate them
-                user.update
-                  .withName(user.name.orElse(identity.name))
-                  .withEmail(user.email.orElse(identity.emailAddress))
-                  .execIfDifferent(user)
-              case None => userDao.createWith(identity)
-            }.flatMap { user =>
-              Redirect(routes.Application.main("login").url)
-                .withSession(request.session + ("userId" -> user.id))
-                .withUpdatedJwt(user, containerResolver)
-            }
+            for {
+              optSessionUser <- fetchUser(request)
+              optIdentifiedUser <- userDao.findWith(identity)
+              s = request.session
+              // Only merge if merge request and users aren't the same
+              optMergeUser = optSessionUser
+                .filter(isMergeRequest)
+                .filter(u => Some(u.id) != optIdentifiedUser.map(_.id))
+              r <- (optMergeUser, optIdentifiedUser) match {
+                // Merge of two existing users
+                case (Some(userA), Some(userB)) =>
+                  log.info(s"Merge request: ${userA.id}/${userB.id} $identity")
+                  userDao.updateWithIdentity(userB, identity)
+                    .flatMap(redirectToMergeConfirmation(userA))
+                // Adding new identity to existing user
+                case (Some(user), None) =>
+                  log.info(s"Merging new identity (${user.id}): $identity")
+                  userDao.updateWithIdentity(user, identity)
+                    .flatMap(redirectAfterLogin)
+                // Login of existing user
+                case (None, Some(user)) =>
+                  log.info(s"Login (${user.id}): $identity")
+                  userDao.updateWithIdentity(user, identity)
+                    .flatMap(redirectAfterLogin)
+                // New user
+                case (None, None) =>
+                  log.info(s"New User: $identity")
+                  userDao.createWith(identity)
+                    .flatMap(redirectAfterLogin)
+              }
+            } yield r
           case Failure(msg) => successful(Forbidden(msg))
           case Invalid => successful(BadRequest)
         }
     }
 
-  protected def mergeOrLogin(identity: Identity)(implicit request: Request[_]) =
-    for {
-      requestUser <- fetchUser
-      user <- userDao.createMergeOrUpdate(requestUser, identity)
-    } yield {
-      Redirect(routes.Application.main("login").url)
-        .withSession(request.session + ("userId" -> user.id))
-        .withUpdatedJwt(user, containerResolver)
-    }
+  protected def isMergeRequest(user: User)(implicit request: Request[_]) =
+    request.session.get("mergeTo") == Some(user.id)
+
+  protected def redirectToMergeConfirmation(
+      userA: User)(userB: User)(implicit request: Request[_]): Future[Result] =
+    Redirect(routes.Application.main("account/merge").url)
+      .withSession(request.session - "mergeTo" + ("mergeUserId" -> userB.id))
+      .withUpdatedJwt(userA, containerResolver)
+
+  protected def redirectAfterLogin(
+      user: User)(implicit request: Request[_]): Future[Result] =
+    Redirect(routes.Application.main("login").url)
+      .withSession(request.session + ("userId" -> user.id) - "mergeTo")
+      .withUpdatedJwt(user, containerResolver)
 
   protected def providerWithName(name: String): Option[AuthProvider] =
     authProviders.providers.find(_.name == name)

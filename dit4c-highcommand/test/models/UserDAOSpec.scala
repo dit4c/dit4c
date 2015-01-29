@@ -98,7 +98,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         }
 
       }
-
+/*
       "with current user" >> {
 
         "updates user for unknown identities" in new WithApplication(fakeApp) {
@@ -150,7 +150,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
           resultingUser.identities must haveSize(2)
         }
       }
-
+*/
     }
 
   }

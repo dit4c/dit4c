@@ -3,10 +3,12 @@
 # ~~~~
 
 GET     /login/:name/redirect       @controllers.AuthController.login(name)
+GET     /login/:name/merge          @controllers.AuthController.merge(name)
 GET     /login/renew                @controllers.AuthController.renew
 POST    /logout                     @controllers.AuthController.logout
 GET     /login/:name/callback       @controllers.AuthController.namedCallback(name)
 POST    /login/:name/callback       @controllers.AuthController.namedCallback(name)
+
 POST    /auth/callback              @controllers.AuthController.unnamedCallback
 GET     /public-keys                @controllers.AuthController.publicKeys
 
@@ -22,6 +24,7 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /account                    @controllers.Application.main(path="account")
+GET     /account/merge              @controllers.Application.main(path="account/merge")
 GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
 HEAD    /health                     @controllers.Application.health(isHeadRequest: Boolean = true)
