@@ -142,8 +142,8 @@
             <p class="form-control-static" ng-repeat="identity in user.identities">
               <span ng-if="identity.type == 'dummy'">[dummy]</span>
               <span ng-if="identity.type == 'RapidAAF'">[AAF]</span>
-              <i class="fa fa-twitter-logo" ng-if="identity.type == 'twitter'"></i>
-              <i class="fa fa-github-logo" ng-if="identity.type == 'github'"></i>
+              <i class="fa fa-twitter" ng-if="identity.type == 'twitter'"></i>
+              <i class="fa fa-github" ng-if="identity.type == 'github'"></i>
               {{identity.id}}
             </p>
           </div>
@@ -158,7 +158,77 @@
         </div>
       </div>
 
-    <div>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="account-merge.html">
+    <div ng-include src="'navbar.html'"></div>
+    <div class="container">
+
+      <h1>Confirm Account Merger</h1>
+
+      <p>
+      Do you really want to merge these two accounts?
+      </p>
+
+      <div class="row">
+      <div class="col-xs-12 col-sm-6" ng-repeat="user in [userA, userB]">
+      <form class="form-horizontal">
+        <div class="form-group text-muted">
+          <label class="col-sm-2 control-label">ID</label>
+          <div class="col-sm-10">
+            <p class="form-control-static">{{user.id}}</p>
+          </div>
+        </div>
+        <div class="form-group" ng-show="user.name">
+          <label class="col-sm-2 control-label">Name</label>
+          <div class="col-sm-10">
+            <p class="form-control-static">{{user.name}}</p>
+          </div>
+        </div>
+        <div class="form-group" ng-show="user.email">
+          <label class="col-sm-2 control-label">Email</label>
+          <div class="col-sm-10">
+            <p class="form-control-static">{{user.email}}</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Identities</label>
+          <div class="col-sm-10">
+            <p class="form-control-static" ng-repeat="identity in user.identities">
+              <span ng-if="identity.type == 'dummy'">[dummy]</span>
+              <span ng-if="identity.type == 'RapidAAF'">[AAF]</span>
+              <i class="fa fa-twitter" ng-if="identity.type == 'twitter'"></i>
+              <i class="fa fa-github" ng-if="identity.type == 'github'"></i>
+              {{identity.id}}
+            </p>
+          </div>
+        </div>
+      </form>
+      </div>
+      </div>
+
+      <form>
+        <div class="checkbox">
+          <label>
+            <input type="checkbox" ng-model="confirmed">
+            I understand that this is <strong>permanent</strong>
+            and cannot be reversed.
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary"
+            ng-disabled="!confirmed" ng-click="submit()">
+          Yes, merge the accounts
+        </button>
+        <button type="cancel" class="btn btn-default" ng-click="cancel()">
+          I've changed my mind
+        </button>
+      </form>
+
+
+    </div>
     </script>
 
     <script type="text/ng-template" id="containers.html">

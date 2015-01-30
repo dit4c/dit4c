@@ -32,6 +32,19 @@ define(['./app'], (app) ->
         user: (AuthSrv) ->
           AuthSrv.updateUser()
     )
+    
+    $routeProvider.when('/account/merge',
+      templateUrl: 'account-merge.html'
+      controller: 'AccountMergeCtrl',
+      resolve:
+        userA: (AuthSrv) ->
+          AuthSrv.updateUser()
+        userB: ($http) ->
+          $http
+            .get('/users/merge')
+            .then (response) ->
+              response.data
+    )
 
     $routeProvider.when('/containers',
       templateUrl: 'containers.html'

@@ -37,4 +37,14 @@ class UserController @Inject() (val db: CouchDB.Database)
     }
   }
 
+  def mergeUser = Action { implicit request =>
+    request.session.get("mergeUserId") match {
+      case Some(userId) =>
+        Redirect(controllers.routes.UserController.get(userId))
+          .withHeaders("Cache-Control" -> "private, must-revalidate")
+      case None =>
+        NotFound
+    }
+  }
+
 }

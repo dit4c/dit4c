@@ -61,6 +61,15 @@ class AuthController @Inject() (
         Future.successful(BadRequest("Login method doesn't exist."))
     }
   }
+  
+  def confirmMerge = Authenticated.async { implicit request =>
+    ???
+  }
+  
+  def cancelMerge = Authenticated { implicit request =>
+    Redirect(routes.Application.main("account").url)
+      .withSession(request.session - "mergeUserId")
+  }
 
   def logout = Action.async { implicit request =>
     render {

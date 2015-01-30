@@ -13,6 +13,7 @@ POST    /auth/callback              @controllers.AuthController.unnamedCallback
 GET     /public-keys                @controllers.AuthController.publicKeys
 
 GET     /users/current              @controllers.UserController.currentUser
+GET     /users/merge                @controllers.UserController.mergeUser
 GET     /users/:id                  @controllers.UserController.get(id)
 
 # Map static resources from the /public folder to the /assets URL path
@@ -24,11 +25,15 @@ GET     /webjars/*file              controllers.WebJarAssets.at(file)
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /account                    @controllers.Application.main(path="account")
-GET     /account/merge              @controllers.Application.main(path="account/merge")
 GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
 HEAD    /health                     @controllers.Application.health(isHeadRequest: Boolean = true)
 GET     /health                     @controllers.Application.health(isHeadRequest: Boolean = false)
+
+# Account merge
+GET     /account/merge              @controllers.Application.main(path="account/merge")
+POST    /account/merge              @controllers.AuthController.confirmMerge
+DELETE  /account/merge              @controllers.AuthController.cancelMerge
 
 # Compute Nodes
 GET     /compute-nodes              @controllers.ComputeNodeController.index
