@@ -90,6 +90,7 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
     override def revUpdate(rev: String) = this.copy(_rev = Some(rev))
 
     override def update = updateOp(this)
+    override def delete = utils.delete(this)
 
     // Used to update multiple attributes at once
     implicit def updateOp(model: UserImpl): User.UpdateOp =
@@ -114,6 +115,7 @@ trait User extends BaseModel {
   def identities: Seq[String]
 
   def update: User.UpdateOp
+  def delete: Future[Unit]
 }
 
 object User {

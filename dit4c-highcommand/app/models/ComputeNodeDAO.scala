@@ -111,6 +111,12 @@ class ComputeNodeDAO @Inject() (
 
         override def withBackend(backend: Hipache.Backend) =
           model.copy(backend = backend)
+
+        override def withOwners(ids: Set[String]) =
+          model.copy(ownerIDs = ids)
+
+        override def withUsers(ids: Set[String]) =
+          model.copy(userIDs = ids)
       }
 
   }
@@ -141,6 +147,8 @@ object ComputeNode {
     def withName(name: String): UpdateOp
     def withManagementUrl(url: String): UpdateOp
     def withBackend(backend: Hipache.Backend): UpdateOp
+    def withOwners(ids: Set[String]): UpdateOp
+    def withUsers(ids: Set[String]): UpdateOp
   }
 }
 

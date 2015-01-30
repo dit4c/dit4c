@@ -72,6 +72,8 @@ class ContainerDAO(protected val db: CouchDB.Database)
       new utils.UpdateOp(model) with Container.UpdateOp {
         override def withName(name: String) =
           model.copy(name = name)
+        override def withOwners(ids: Set[String]) =
+          model.copy(ownerIDs = ids)
       }
 
   }
@@ -92,5 +94,6 @@ trait Container extends OwnableModel {
 object Container {
   trait UpdateOp extends UpdateOperation[Container] {
     def withName(name: String): UpdateOp
+    def withOwners(ids: Set[String]): UpdateOp
   }
 }

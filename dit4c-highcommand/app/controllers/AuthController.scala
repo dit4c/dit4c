@@ -63,7 +63,42 @@ class AuthController @Inject() (
   }
   
   def confirmMerge = Authenticated.async { implicit request =>
-    ???
+    (request.session.get("mergeUserId") match {
+      case Some(id) => userDao.get(id)
+      case None => Future.successful(None)
+    }) flatMap {
+      case Some(mergeUser) =>
+        for {
+          containers <- containerDao.list
+          computeNodes <- computeNodeDao.list
+          userContainers = containers.filter(_.ownerIDs.contains(mergeUser.id))
+          userComputeNodes = computeNodes.filter { cn =>
+            (cn.ownerIDs ++ cn.userIDs).contains(mergeUser.id)
+          }
+          replaceID = (s: Set[String]) => s.map {
+            case v if v == mergeUser.id => request.user.id
+            case v => v
+          }
+          _ <- Future.sequence {
+            userContainers.map { container =>
+              container.update.withOwners(replaceID(container.ownerIDs))
+            }.map(_.exec)
+          }
+          _ <- Future.sequence {
+            userComputeNodes.map { cn =>
+              cn.update
+                .withOwners(replaceID(cn.ownerIDs))
+                .withUsers(replaceID(cn.userIDs))
+            }.map(_.exec)
+          }
+          updatedUser <- request.user.update
+            .withIdentities(request.user.identities ++ mergeUser.identities)
+            .exec()
+          _ <- mergeUser.delete
+        } yield Ok(Json.toJson(updatedUser))
+      case None =>
+        Future.successful(BadRequest("No merge user in session."))
+    }
   }
   
   def cancelMerge = Authenticated { implicit request =>
