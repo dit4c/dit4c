@@ -44,6 +44,31 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       }
     }
 
+    "allow account mergers to be cancelled" in new WithApplication(fakeApp) {
+      val controller = injector.getInstance(classOf[AuthController])
+
+      val identity1 = new Identity() {
+        def uniqueId = "test:testuser1"
+        def name = Some("Test User 1")
+        def emailAddress = Some("user1@example.test")
+      }
+      val identity2 = new Identity() {
+        def uniqueId = "test:testuser2"
+        def name = Some("Test User 2")
+        def emailAddress = Some("user2@example.test")
+      }
+      val (primaryUser, primaryContainers) = 
+        await(createHierarchy(identity1))
+      val (secondaryUser, secondaryContainers) = 
+        await(createHierarchy(identity2))
+      val response = controller.cancelMerge(
+          (new UserSession(db, identity1)).newRequest
+            .withSession("mergeUserId" -> secondaryUser.id))
+      session(response).get("mergeUserId") must beNone
+      redirectLocation(response) must
+        beSome(controllers.routes.Application.main("account").url)
+    }
+
     "merge accounts" in new WithApplication(fakeApp) {
       val controller = injector.getInstance(classOf[AuthController])
       val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
@@ -65,12 +90,12 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       val (secondaryUser, secondaryContainers) = 
         await(createHierarchy(identity2))
 
-      val session = new UserSession(db, identity1)
       val response = controller.confirmMerge(
-          session.newRequest.withSession("mergeUserId" -> secondaryUser.id))
+          (new UserSession(db, identity1)).newRequest
+            .withSession("mergeUserId" -> secondaryUser.id))
       status(response) must_== 200
+      session(response).get("mergeUserId") must beNone
       (contentAsJson(response) \ "id").as[String] must_== primaryUser.id
-      
       val updatedUser = await(userDao.get(primaryUser.id)).get
       updatedUser.identities must contain(atLeast(primaryUser.identities: _*))
       updatedUser.identities must contain(atLeast(secondaryUser.identities: _*))
