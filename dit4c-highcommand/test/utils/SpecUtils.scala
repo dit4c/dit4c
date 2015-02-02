@@ -1,15 +1,21 @@
 package utils
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+
+import org.specs2.matcher.ConcurrentExecutionContext
+
+import com.google.inject.Inject
+
 import models.UserDAO
 import play.api.mvc.AnyContentAsEmpty
-import play.api.test.{FakeHeaders, FakeRequest}
+import play.api.test.FakeHeaders
+import play.api.test.FakeRequest
+import providers.InjectorPlugin
 import providers.auth.Identity
 import providers.db.CouchDB
-import org.specs2.matcher.ConcurrentExecutionContext
-import providers.InjectorPlugin
+import providers.db.CouchDB.Database
 
 trait SpecUtils extends ConcurrentExecutionContext {
 
@@ -24,9 +30,15 @@ trait SpecUtils extends ConcurrentExecutionContext {
     MockIdentity("testing:test-user", Some("Test User"), None)
 
   class UserSession(db: CouchDB.Database, identity: Identity = mockIdentity) {
-    val user = Await.result(
-      (new UserDAO(db)).createWith(identity),
-      Duration(20, "seconds"))
+    val user = Await.result({
+      val dao = new UserDAO(db)
+      for {
+        optUser <- dao.findWith(identity)
+        user <- optUser
+          .map(Future.successful(_))
+          .getOrElse(dao.createWith(identity))
+      } yield user
+    }, Duration(20, "seconds"))
 
     def newRequest: FakeRequest[AnyContentAsEmpty.type] = {
       FakeRequest().withSession("userId" -> user.id)
