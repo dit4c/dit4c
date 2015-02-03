@@ -26,8 +26,8 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db)
       val dao = new ContainerDAO(db)
       Seq(
-        ("test1", ""),
-        ("test2", "A test description.")
+        ("test", ""),
+        ("test", "A test description.")
       ).foreach { case (name, desc) =>
         val cn = MockComputeNode("mockcontainerid")
         val container = await(dao.create(session.user, name, dummyImage, cn))
