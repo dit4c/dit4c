@@ -5,6 +5,7 @@ name := "dit4c-highcommand"
 
 libraryDependencies ++= Seq(
   cache,
+  filters,
   ws,
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",

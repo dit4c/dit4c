@@ -72,6 +72,7 @@ class ApplicationSpec
 
       status(home) must_== 200
       header(ETAG, home) must beSome
+      header("Cache-Control", home) must beSome("public, max-age=1")
     }
 
     "waiting" in new WithApplication(fakeApp) {
@@ -84,6 +85,7 @@ class ApplicationSpec
         status(waiting) must_== 200
         contentAsString(waiting) must contain(s"https://example.test/$path")
         header(ETAG, waiting) must beSome
+        header("Cache-Control", waiting) must beSome("public, max-age=1")
       }
     }
 

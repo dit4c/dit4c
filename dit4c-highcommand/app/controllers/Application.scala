@@ -17,12 +17,15 @@ class Application @Inject() (
     val db: CouchDB.Database)
     extends Controller with Utils {
 
+  import http.HeaderNames.CACHE_CONTROL
+  
   private val mainTmplETag = classBasedETag(views.html.main.getClass)
   private val waitingTmplETag = classBasedETag(views.html.main.getClass)
 
   def main(path: String) = Action { implicit request =>
     ifNoneMatch(mainTmplETag("")) {
       Ok(views.html.main(authProviders.providers.toSeq, googleAnalyticsCode))
+        .withHeaders(CACHE_CONTROL -> "public, max-age=1")
     }
   }
 
@@ -36,6 +39,7 @@ class Application @Inject() (
           successful {
             ifNoneMatch(waitingTmplETag(url.toString)) {
               Ok(views.html.waiting(url))
+                .withHeaders(CACHE_CONTROL -> "public, max-age=1")
             }
           }
         // Non-HTML should just wait a bit then redirect back
@@ -44,8 +48,8 @@ class Application @Inject() (
           val waitTime = Duration(5, "seconds")
           after(waitTime, scheduler) { 
             successful {
-              Redirect(url.toString, 302).withHeaders(
-                  http.HeaderNames.CACHE_CONTROL -> "no-cache")
+              Redirect(url.toString, 302)
+                .withHeaders(CACHE_CONTROL -> "no-cache")
             }
           }
       }
