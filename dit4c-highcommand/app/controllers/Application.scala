@@ -9,16 +9,21 @@ import scala.concurrent.duration.Duration
 import akka.pattern.after
 import scala.concurrent.Future.successful
 import play.api.libs.concurrent.Akka
+import play.api.libs.Codecs
+import scala.util.Try
 
 class Application @Inject() (
     authProviders: AuthProviders,
-    db: CouchDB.Database)
-    extends Controller {
+    val db: CouchDB.Database)
+    extends Controller with Utils {
 
-  import play.api.libs.concurrent.Execution.Implicits._
+  private val mainTmplETag = classBasedETag(views.html.main.getClass)
+  private val waitingTmplETag = classBasedETag(views.html.main.getClass)
 
   def main(path: String) = Action { implicit request =>
-    Ok(views.html.main(authProviders.providers.toSeq, googleAnalyticsCode))
+    ifNoneMatch(mainTmplETag("")) {
+      Ok(views.html.main(authProviders.providers.toSeq, googleAnalyticsCode))
+    }
   }
 
   def waiting(scheme: String, host: String, uri: String) =
@@ -28,12 +33,21 @@ class Application @Inject() (
       request.acceptedTypes match {
         // HTML should get waiting HTML page which refreshes with JavaScript
         case range :: _ if Accepts.Html.unapply(range) =>
-          successful(Ok(views.html.waiting(url)))
+          successful {
+            ifNoneMatch(waitingTmplETag(url.toString)) {
+              Ok(views.html.waiting(url))
+            }
+          }
         // Non-HTML should just wait a bit then redirect back
         case _ =>
           val scheduler = Akka.system(Play.current).scheduler
           val waitTime = Duration(5, "seconds")
-          after(waitTime, scheduler)(successful(Redirect(url.toString, 302)))
+          after(waitTime, scheduler) { 
+            successful {
+              Redirect(url.toString, 302).withHeaders(
+                  http.HeaderNames.CACHE_CONTROL -> "no-cache")
+            }
+          }
       }
     }
 
@@ -60,4 +74,17 @@ class Application @Inject() (
   private def googleAnalyticsCode: Option[String] =
     Play.current.configuration.getString("ga.code")
 
+  def classBasedETag(c: Class[_]) = {
+    val urlConn = c.getResource(c.getSimpleName + ".class").openConnection
+    val base = 
+      try {
+        Codecs.sha1 {
+          urlConn.getURL.toExternalForm + urlConn.getLastModified
+        }
+      } finally {
+        urlConn.getInputStream.close
+      }
+    { suffix: String => Codecs.sha1(base + suffix) }
+  }
+    
 }

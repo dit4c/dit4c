@@ -46,6 +46,9 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
           status(nonHtmlResponse) must_== 302
           redirectLocation(nonHtmlResponse) must
             beSome("http://example.test/foo")
+          val cacheControl = header("Cache-Control", nonHtmlResponse)
+          cacheControl must beSome
+          cacheControl.get must contain("no-cache")
         }
       }
 

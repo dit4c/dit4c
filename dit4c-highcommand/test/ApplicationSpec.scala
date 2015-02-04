@@ -25,6 +25,8 @@ import utils.SpecUtils
 class ApplicationSpec
     extends PlaySpecification with NoTimeConversions with SpecUtils {
 
+  import play.api.http.HeaderNames._
+
   override implicit def defaultAwaitTimeout: Timeout = 60.seconds
 
   "Application" >> {
@@ -42,14 +44,14 @@ class ApplicationSpec
         call.method must_== "GET"
         call.url must_== "/login"
       }
-      
+
       "waiting" >> {
         val call = controllers.routes.Application.waiting(
           "https", "example.test", "foo")
         call.method must_== "GET"
         call.url must_== "/waiting/https/example.test/foo"
       }
-      
+
       "health" >> {
         val headCall = controllers.routes.Application.health(true)
         headCall.method must_== "HEAD"
@@ -58,7 +60,7 @@ class ApplicationSpec
         getCall.method must_== "GET"
         getCall.url must_== "/health"
       }
-      
+
     }
 
     "send 404 on a bad request" in new WithApplication(fakeApp) {
@@ -69,17 +71,19 @@ class ApplicationSpec
       val home = route(FakeRequest(GET, "/")).get
 
       status(home) must_== 200
+      header(ETAG, home) must beSome
     }
-    
+
     "waiting" in new WithApplication(fakeApp) {
       Seq("", "foo", "foo?a=1&b=2").foreach { path =>
         val urlStr = s"/waiting/https/example.test/$path"
         val waiting = route(FakeRequest(GET, urlStr)
           .withHeaders("Accept" -> "text/html"))
           .get
-  
+
         status(waiting) must_== 200
         contentAsString(waiting) must contain(s"https://example.test/$path")
+        header(ETAG, waiting) must beSome
       }
     }
 

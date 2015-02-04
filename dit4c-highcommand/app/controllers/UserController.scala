@@ -16,12 +16,11 @@ class UserController @Inject() (val db: CouchDB.Database)
 
 
   def get(id: String) = Authenticated.async { implicit request =>
-    val etag = request.headers.get("If-None-Match")
     userDao.get(id).map {
-      case Some(user) if etag == user._rev =>
-        NotModified
       case Some(user) =>
-        Ok(Json.toJson(user)).withHeaders("ETag" -> user._rev.get)
+        ifNoneMatch(user._rev.get) {
+          Ok(Json.toJson(user))
+        }
       case None =>
         NotFound
     }

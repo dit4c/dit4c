@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit
 
 trait Utils extends Results {
   import scala.language.implicitConversions
+  import play.api.http.HeaderNames._
 
   implicit def ec: ExecutionContext =
     play.api.libs.concurrent.Execution.defaultContext
@@ -79,6 +80,15 @@ trait Utils extends Results {
     }
   }
 
+  def ifNoneMatch[A](etag: String)(r: => Result)(implicit req: Request[A]): Result = {
+    req.headers.get(IF_NONE_MATCH) match {
+      case Some(v) if etag == v =>
+        NotModified
+      case _ =>
+        r.withHeaders(ETAG -> etag)
+    }
+  }
+  
   protected def getCookieDomain(implicit request: Request[_]): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
