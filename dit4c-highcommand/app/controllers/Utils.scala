@@ -58,13 +58,21 @@ trait Utils extends Results {
     extends WrappedRequest[A](request)
 
   object Authenticated extends ActionBuilder[AuthenticatedRequest] {
+    import play.api.http.HeaderNames._
     override def invokeBlock[A](
         request: Request[A],
         block: (AuthenticatedRequest[A]) => Future[Result]
         ): Future[Result] = {
       fetchUser(request).flatMap { possibleUser =>
         possibleUser match {
-          case Some(user) => block(new AuthenticatedRequest(user, request))
+          case Some(user) =>
+            for {
+              result <- block(new AuthenticatedRequest(user, request))
+              ccDirectives = "private" :: "must-revalidate" ::
+                  result.header.headers.get(CACHE_CONTROL).toList
+              privateResult = result.withHeaders(
+                  CACHE_CONTROL -> ccDirectives.mkString(", "))
+            } yield privateResult
           case None => Future.successful(Forbidden)
         }
       }

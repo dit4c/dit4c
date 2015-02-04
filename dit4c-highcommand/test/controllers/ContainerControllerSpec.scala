@@ -60,6 +60,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
         (json \ "name").as[String] must_== container.name
         (json \ "active").as[Boolean] must beFalse
       }
+      header("Cache-Control", threeResponse) must beSome("private, must-revalidate")
     }
 
     "provide JSON of a single container" in new WithApplication(fakeApp) {
@@ -83,6 +84,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       (json \ "id").as[String] must_== container.id
       (json \ "name").as[String] must_== container.name
       (json \ "active").as[Boolean] must beFalse
+      header("Cache-Control", response) must beSome("private, must-revalidate")
     }
 
     "provide redirects for containers" in new WithApplication(fakeApp) {
@@ -106,6 +108,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       status(response) must_== 307
       header("Location", response) must beSome
       header("Location", response).get must endWith(".localhost.localdomain/")
+      header("Cache-Control", response) must beSome("private, must-revalidate")
     }
 
     "create containers" in new WithApplication(fakeApp) {
@@ -134,6 +137,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
           "computeNodeId"->computeNode.id,
           "active"->true))) 
       status(okResponse) must_== 201
+      header("Cache-Control", okResponse) must beSome("private, must-revalidate")
     }
     
     "update containers" in new WithApplication(fakeApp) {
@@ -162,6 +166,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       (json \ "id").as[String] must_== container.id
       (json \ "name").as[String] must_== "changed"
       (json \ "active").as[Boolean] must beTrue
+      header("Cache-Control", response) must beSome("private, must-revalidate")
     }
 
     def getMockedController = {
