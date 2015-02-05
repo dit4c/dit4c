@@ -7,16 +7,22 @@
   <head>
     <title>DIT4C @AppVersion</title>
 
-    <link href="@routes.WebJarAssets.at(WebJarAssets.locate("bootstrap.css"))" rel="stylesheet">
-    <link href="@routes.WebJarAssets.at(WebJarAssets.locate("font-awesome.css"))" rel="stylesheet">
-    <link rel="stylesheet" media="screen" href="@routes.Assets.versioned("stylesheets/main.css")">
+    <link href='@routes.Assets.versioned("lib/bootstrap/css/bootstrap.css")' rel="stylesheet">
+    <link href='@routes.Assets.versioned("lib/font-awesome/css/font-awesome.css")' rel="stylesheet">
+    <link rel="stylesheet" media="screen" href='@routes.Assets.versioned("stylesheets/main.css")'>
     <link href='//fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
 
-    <link rel="shortcut icon" type="image/x-icon" href="@routes.Assets.versioned("images/favicon.ico")">
+    <link rel="shortcut icon" type="image/x-icon" href='@routes.Assets.versioned("images/favicon.ico")'>
+
+    <!--
+    @{
+      play.api.Play.current.configuration.getString("assets.defaultCache")
+    }
+    -->
 
     <script>
-    // Enhance RequireJS to handle WebJARs
-    @Html(org.webjars.RequireJS.getSetupJavaScript("/webjars/"))
+    // Enhance RequireJS to handle WebJARs from CDN
+    @Html(org.webjars.RequireJS.getSetupJavaScript("https://cdn.jsdelivr.net/webjars/",""))
     </script>
     @for(code <- googleAnalyticsCode) {
     <script>
@@ -874,7 +880,7 @@
     </div>
     </script>
 
-    <script data-main="@routes.Assets.versioned("javascripts/main.js")"
-            src="@routes.WebJarAssets.at(WebJarAssets.locate("require.min.js"))"></script>
+    <script data-main='@routes.Assets.versioned("javascripts/main.js")'
+            src='@routes.Assets.versioned("lib/requirejs/require.min.js")'></script>
   </body>
 </html>
