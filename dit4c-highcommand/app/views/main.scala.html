@@ -14,12 +14,6 @@
 
     <link rel="shortcut icon" type="image/x-icon" href='@routes.Assets.versioned("images/favicon.ico")'>
 
-    <!--
-    @{
-      play.api.Play.current.configuration.getString("assets.defaultCache")
-    }
-    -->
-
     <script>
     // Enhance RequireJS to handle WebJARs from CDN
     @Html(org.webjars.RequireJS.getSetupJavaScript("https://cdn.jsdelivr.net/webjars/",""))
