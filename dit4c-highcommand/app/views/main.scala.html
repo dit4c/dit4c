@@ -1,14 +1,20 @@
-@(authProviders: Seq[providers.auth.AuthProvider], googleAnalyticsCode: Option[String])
+@(authProviders: Seq[providers.auth.AuthProvider], googleAnalyticsCode: Option[String], webjarCDN: String = "https://cdn.jsdelivr.net/webjars/")
 
 @import helpers.AppVersion
 
+@cdnWebJarAsset(partialPath: String) = @{
+  import org.webjars.WebJarAssetLocator
+  val locator = new WebJarAssetLocator();
+  val entry = WebJarAssetLocator.getWebJar(locator.getFullPath(partialPath))
+  webjarCDN + entry.getKey() + "/" + entry.getValue() + "/" + partialPath
+}
 <!DOCTYPE html5>
 <html>
   <head>
     <title>DIT4C @AppVersion</title>
 
-    <link href='@routes.Assets.versioned("lib/bootstrap/css/bootstrap.css")' rel="stylesheet">
-    <link href='@routes.Assets.versioned("lib/font-awesome/css/font-awesome.css")' rel="stylesheet">
+    <link href='@cdnWebJarAsset("css/bootstrap.min.css")' rel="stylesheet">
+    <link href='@cdnWebJarAsset("css/font-awesome.min.css")' rel="stylesheet">
     <link rel="stylesheet" media="screen" href='@routes.Assets.versioned("stylesheets/main.css")'>
     <link href='//fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
 
@@ -16,7 +22,7 @@
 
     <script>
     // Enhance RequireJS to handle WebJARs from CDN
-    @Html(org.webjars.RequireJS.getSetupJavaScript("https://cdn.jsdelivr.net/webjars/",""))
+    @Html(org.webjars.RequireJS.getSetupJavaScript(webjarCDN,""))
     </script>
     @for(code <- googleAnalyticsCode) {
     <script>
