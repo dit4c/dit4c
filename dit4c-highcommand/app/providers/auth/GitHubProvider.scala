@@ -41,7 +41,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
     Future.successful {
       Results.Redirect("https://github.com/login/oauth/authorize", Map(
         "client_id" -> Seq(config.id),
-        "scope" -> Seq("user,email")
+        "scope" -> Seq("user:email")
       ))
     }
   }
