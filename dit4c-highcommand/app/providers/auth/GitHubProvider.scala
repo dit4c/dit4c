@@ -100,7 +100,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
         GitHubIdentity(
           (json \ "login").as[String],
           (json \ "name").as[Option[String]],
-          (json \ "email").as[Option[String]]
+          (json \ "email").as[Option[String]].filter(!_.isEmpty)
         )
       }
 
