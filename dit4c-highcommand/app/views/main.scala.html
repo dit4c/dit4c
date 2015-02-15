@@ -35,6 +35,9 @@
       ga('send', 'pageview');
     </script>
     }
+
+    <script data-main='@routes.Assets.versioned("javascripts/main.js")'
+            src='@routes.Assets.versioned("lib/requirejs/require.min.js")'></script>
   </head>
   <body class="{{$root.bodyClass}}" ng-controller="ApplicationCtrl">
     <div data-ng-view></div>
@@ -879,8 +882,5 @@
       </div>
     </div>
     </script>
-
-    <script data-main='@routes.Assets.versioned("javascripts/main.js")'
-            src='@routes.Assets.versioned("lib/requirejs/require.min.js")'></script>
   </body>
 </html>
