@@ -231,7 +231,7 @@ class ComputeNodeController @Inject() (
         dockerContainers <- containerProvider(computeNode).list
         dcMap = dockerContainers.map(c => (c.name -> c)).toMap
       } yield Ok(JsArray(containers.map { c =>
-        val cnc = dcMap.get(c.name)
+        val cnc = dcMap.get(containerResolver.asName(c))
         Json.obj(
           "id" -> c.id,
           "name" -> c.name,
