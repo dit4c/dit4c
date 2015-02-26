@@ -809,12 +809,18 @@
                     <tr ng-repeat="user in users[node.id]">
                       <td>
                         <a ng-if="user.email" href="mailto:{{user.email}}">
-                          {{user.name}}
+                          <span ng-if="user.name">{{user.name}}</span>
+                          <span ng-if="!user.name">{{user.email}}</span>
                         </a>
                         <span ng-if="!user.email">
-                          {{user.name}}
+                          <span ng-if="user.name">{{user.name}}</span>
+                          <span ng-if="!user.name" class="text-muted">{{user.id}}</span>
                         </span>
                         <span ng-repeat="identity in user.identities">
+                          <a ng-if="identity.type == 'github'"
+                              href="https://github.com/{{identity.id}}">
+                            (<i class="fa fa-github"></i> {{identity.id}})
+                          </a>
                           <a ng-if="identity.type == 'twitter'"
                               href="https://twitter.com/{{identity.id}}">
                             (<i class="fa fa-twitter"></i> {{identity.id}})

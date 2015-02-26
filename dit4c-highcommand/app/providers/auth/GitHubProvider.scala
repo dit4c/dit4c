@@ -111,11 +111,10 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
 
   case class GitHubIdentity(
       username: String,
-      name: Option[String],
+      displayName: Option[String],
       emailAddress: Option[String]) extends Identity {
-
     def uniqueId = s"github:$username"
-
+    def name = displayName.orElse(Some(username))
   }
 
   case class GitHubEmail(
