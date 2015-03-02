@@ -91,6 +91,8 @@ dockerfile in docker := {
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")
    .run("chmod", "+x", "/opt/dit4c-highcommand/bin/dit4c-highcommand")
+   .run("useradd", "-d", "/opt/dit4c-highcommand", "-r", "dit4c")
+   .user("dit4c")
    .cmd("/opt/dit4c-highcommand/bin/dit4c-highcommand",
         "-Dconfig.file=/opt/dit4c-highcommand/prod.conf",
         "-Dpidfile.path=/dev/null")
