@@ -13,6 +13,7 @@ import spray.http.ContentTypes._
 import spray.json._
 import dit4c.machineshop.docker.models._
 import java.util.{Calendar, TimeZone}
+import com.typesafe.config.ConfigFactory
 
 class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
@@ -27,7 +28,12 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
     spray.client.pipelining.sendReceive
 
-  def sendTo = spray.client.pipelining.sendTo(IO(Http)(system))
+  val sendTo = {
+    val config = ConfigFactory.load()
+    val system = ActorSystem("export",
+        config.getConfig("docker.export").withFallback(config))
+    spray.client.pipelining.sendTo(IO(Http)(system))
+  }
 
   override val images = ImagesImpl
   override val containers = ContainersImpl
