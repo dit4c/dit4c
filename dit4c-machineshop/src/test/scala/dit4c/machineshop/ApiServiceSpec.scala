@@ -50,6 +50,12 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         updateList(
             new MockDockerContainer(id, name, image, ContainerStatus.Stopped))
       })
+      override def export(onChunk: spray.http.HttpMessagePart => Unit) = {
+        val data: Array[Byte] = Array.fill(16)(0) // Empty tar
+        val entity = HttpEntity(
+            ContentType(MediaTypes.`application/x-tar`, None), data)
+        HttpResponse(entity = entity).asPartStream(8).foreach(onChunk)
+      }
       override def delete = Future.successful({
         containerList = containerList.filterNot(_ == this)
       })
@@ -253,6 +259,23 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         responseAs[JsObject].fields("active") must_== JsBoolean(false)
       }
       dc.refresh.await.isRunning must_== false
+    }
+
+    "export containers with POST requests to /containers/:name/export" in {
+      import spray.json._
+      import spray.httpx.SprayJsonSupport._
+      import DefaultJsonProtocol._
+      implicit val client = mockDockerClient
+      val dc = client.containers.create("foobar", image).await
+      Get("/containers/foobar/export") ~> route ~> check {
+        status must_== StatusCodes.OK
+        header("Content-Type").get.value must_== "application/x-tar"
+        forall(chunks) { chunk =>
+          val bytes = chunk.asInstanceOf[MessageChunk].data.toByteArray
+          bytes must haveSize(8)
+          forall(bytes)((b) => b must_== 0)
+        }
+      }
     }
 
     "return a MethodNotAllowed error for DELETE requests to /containers" in {
