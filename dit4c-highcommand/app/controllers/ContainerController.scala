@@ -3,8 +3,10 @@ package controllers
 import play.api._
 import play.api.mvc._
 import play.api.libs.json._
+import play.api.libs.iteratee.Enumerator
 import providers.db.CouchDB
 import com.google.inject.Inject
+import com.osinka.slugify.Slugify
 import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
@@ -83,6 +85,26 @@ class ContainerController @Inject() (
         cnc <- fallbackToMissing(resolveComputeNodeContainer)(container)
       } yield {
         Ok(toJson(container, cnc))
+      }
+    }
+  }
+
+  def export(id: String) = Authenticated.async { implicit request =>
+    withContainer(id) { container =>
+      for {
+        clientInstance <- client(container)
+        response <- clientInstance(s"containers/${cncName(container)}/export")
+                      .signed(_.withMethod("GET"))
+      } yield {
+        val stream = response match {
+          case r: play.api.libs.ws.ning.NingWSResponse =>
+            r.ahcResponse.getResponseBodyAsStream
+        }
+        Status(response.status)
+          .chunked(Enumerator.fromStream(stream))
+          .as("application/x-tar")
+          .withHeaders("Content-Disposition" ->
+            s"attachment; filename=${Slugify(container.name)}.tar")
       }
     }
   }
@@ -207,6 +229,15 @@ class ContainerController @Inject() (
         case None => Future.successful(NotFound("Container does not exist."))
       }
     } yield result
+
+  protected def client(container: Container) =
+    for {
+      computeNode <- computeNodeDao.get(container.computeNodeId).map(_.get)
+    } yield {
+      new MachineShop.Client(
+        computeNode.managementUrl,
+        () => keyDao.bestSigningKey.map(_.get.toJWK))
+    }
 
   private def hipache = HipacheInterface(containerResolver)
 

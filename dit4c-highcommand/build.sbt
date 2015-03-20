@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   ws,
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
+  "com.osinka.slugify"  %%  "slugify"         % "1.2.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
   "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",

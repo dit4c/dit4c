@@ -23,7 +23,7 @@
 
     <script>
     // Enhance RequireJS to handle WebJARs from CDN
-    @Html(org.webjars.RequireJS.getSetupJavaScript(webjarCDN,""))
+    @play.twirl.api.Html(org.webjars.RequireJS.getSetupJavaScript(webjarCDN,""))
     </script>
     @for(code <- googleAnalyticsCode) {
     <script>
@@ -322,7 +322,8 @@
         <tbody>
           <tr ng-repeat="container in containers | orderBy:'name'">
             <td ng-show="!container.editing">
-              <a ng-if="container.active && container.id" href="{{containerUrl(container.id)}}"
+              <a ng-if="container.active && container.id"
+                 href="{{containerRedirectUrl(container.id)}}"
                  target="_blank">{{container.name}}</a>
               <span ng-if="!(container.active && container.id)"
                  title="{{container.id}}">{{container.name}}</span>
@@ -356,6 +357,9 @@
               </span>
             </td>
             <td>
+              <a class="btn btn-default" ng-disabled="container.active"
+                 href="{{containerDownloadUrl(container.id)}}"
+                 target="_self">Export</a>
               <button class="btn btn-danger" ng-if="container.id"
                 ng-click="delete(container.id)">Delete</button>
             </td>
