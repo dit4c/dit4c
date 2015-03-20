@@ -1,8 +1,6 @@
 package dit4c.machineshop
 
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.actor.ActorRefFactory
+import akka.actor._
 import akka.pattern.ask
 import spray.util.LoggingContext
 import spray.routing._
@@ -149,6 +147,18 @@ class ApiService(
               }
             }
           }
+        } ~
+        path("export") {
+          get {
+            signatureCheck {
+              withContainer(name) { container =>
+                onSuccess(getStreamer) { streamer =>
+                  // container.export will pass message chunks directly through
+                  (ctx) => container.export(streamer(ctx.responder))
+                }
+              }
+            }
+          }
         }
       }
     } ~
@@ -218,6 +228,63 @@ class ApiService(
       }
     }
 
+    def getStreamer: Future[ActorRef => HttpMessagePart => Unit] = {
+      val ready = scala.concurrent.Promise[ActorRef]()
+      actorRefFactory.actorOf {
+        Props {
+          new Actor with ActorLogging {
+            import spray.can.Http
+
+            var responder: ActorRef = null
+
+            override def preStart = {
+              log.info("Started streaming response")
+              ready.success(self)
+            }
+
+            def receive = clearToSend
+
+            val clearToSend: Receive = {
+              case r: ActorRef =>
+                responder = r
+              case "ok" =>
+                // Nothing to do while waiting for the next packet
+              case part: HttpMessagePart =>
+                responder ! part.withAck("ok")
+                context.become(waitingForAck(Seq.empty))
+              case ev: Http.ConnectionClosed =>
+                log.warning("Stopping response streaming due to {}", ev)
+                context.stop(self)
+            }
+
+            def waitingForAck(queue: Seq[HttpMessagePart]): Receive = {
+              case "ok" =>
+                queue match {
+                  case Nil =>
+                    context.become(clearToSend)
+                  case head :: Nil if head.isInstanceOf[ChunkedMessageEnd] =>
+                    responder ! queue.head
+                    context.stop(self)
+                  case head :: tail =>
+                    responder ! head.withAck("ok")
+                    context.become(waitingForAck(tail))
+                }
+              case part: HttpMessagePart =>
+                context.become(waitingForAck(queue :+ part))
+              case ev: Http.ConnectionClosed =>
+                log.warning("Stopping response streaming due to {}", ev)
+                context.stop(self)
+            }
+          }
+        }
+      }
+      ready.future.map { sender =>
+        (responder: ActorRef) => {
+          sender ! responder
+          (part: HttpMessagePart) => sender ! part
+        }
+      }
+    }
 }
 
 object ApiService {

@@ -2,9 +2,12 @@ package dit4c.machineshop.docker
 
 import scala.concurrent.{Future, future}
 import scala.concurrent.duration._
+import akka.actor._
+import akka.io.IO
 import akka.actor.ActorSystem
 import akka.util.Timeout
 import akka.event.Logging
+import spray.can.Http
 import spray.http._
 import spray.http.ContentTypes._
 import spray.json._
@@ -23,6 +26,8 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
   // Overridden in unit tests
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
     spray.client.pipelining.sendReceive
+
+  def sendTo = spray.client.pipelining.sendTo(IO(Http)(system))
 
   override val images = ImagesImpl
   override val containers = ContainersImpl
@@ -178,6 +183,31 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
         Post(baseUrl + s"containers/$id/stop?t=$t")
       }).flatMap({
         case _: Unit => this.refresh
+      })
+    }
+
+    override def export(onChunk: HttpMessagePart => Unit): Unit = {
+      import spray.httpx.ResponseTransformation._
+
+      val receiver = system.actorOf {
+        Props {
+          new Actor with ActorLogging {
+            def receive = {
+              case ChunkedResponseStart(response) =>
+                onChunk(ChunkedResponseStart(response))
+              case MessageChunk(data, ext) =>
+                onChunk(MessageChunk(data, ext))
+              case ChunkedMessageEnd(ext, trailer) =>
+                onChunk(ChunkedMessageEnd(ext, trailer))
+                context.stop(self)
+            }
+          }
+        }
+      }
+
+      sendTo.withResponsesReceivedBy(receiver)({
+        import spray.httpx.RequestBuilding._
+        Get(baseUrl + s"containers/$id/export")
       })
     }
 
