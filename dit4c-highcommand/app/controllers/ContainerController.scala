@@ -103,8 +103,10 @@ class ContainerController @Inject() (
         Status(response.status)
           .chunked(Enumerator.fromStream(stream))
           .as("application/x-tar")
-          .withHeaders("Content-Disposition" ->
-            s"attachment; filename=${Slugify(container.name)}.tar")
+          .withHeaders(
+              "X-Accel-Buffering" -> "off", // Nginx should just let it stream
+              "Content-Disposition" ->
+                s"attachment; filename=${Slugify(container.name)}.tar")
       }
     }
   }

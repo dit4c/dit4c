@@ -28,13 +28,6 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
     spray.client.pipelining.sendReceive
 
-  val sendTo = {
-    val config = ConfigFactory.load()
-    val system = ActorSystem("export",
-        config.getConfig("docker.export").withFallback(config))
-    spray.client.pipelining.sendTo(IO(Http)(system))
-  }
-
   override val images = ImagesImpl
   override val containers = ContainersImpl
 
@@ -192,29 +185,64 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
       })
     }
 
-    override def export(onChunk: HttpMessagePart => Unit): Unit = {
-      import spray.httpx.ResponseTransformation._
+    override def export(sendChunk: HttpMessagePart => Future[Unit]): Unit = {
+      type ChunkFuture = () => Future[HttpMessagePart]
 
-      val receiver = system.actorOf {
-        Props {
-          new Actor with ActorLogging {
-            def receive = {
-              case ChunkedResponseStart(response) =>
-                onChunk(ChunkedResponseStart(response))
-              case MessageChunk(data, ext) =>
-                onChunk(MessageChunk(data, ext))
-              case ChunkedMessageEnd(ext, trailer) =>
-                onChunk(ChunkedMessageEnd(ext, trailer))
-                context.stop(self)
-            }
+      import java.io._
+      import com.ning.http.client._
+      import BodyDeferringAsyncHandler.BodyDeferringInputStream
+      import AsyncHandler.STATE
+
+      val maxChunkSize = 1024
+      val pout = new PipedOutputStream
+      val handler = new AsyncHandler[Unit] {
+        override def onStatusReceived(s: HttpResponseStatus): STATE = {
+          s.getStatusCode match {
+            case 200 =>
+              STATE.CONTINUE
+            case other =>
+              blockingSend(ChunkedResponseStart(HttpResponse(other)))
+              blockingSend(ChunkedMessageEnd)
+              STATE.ABORT
+          }
+        }
+        def onHeadersReceived(headers: HttpResponseHeaders): STATE = {
+          blockingSend(ChunkedResponseStart(HttpResponse(200)))
+          STATE.CONTINUE
+        }
+        def onBodyPartReceived(bodyPart: HttpResponseBodyPart): STATE = {
+          if (blockingSend(MessageChunk(bodyPart.getBodyPartBytes)))
+            STATE.CONTINUE
+          else
+            STATE.ABORT
+        }
+        def onCompleted(): Unit = {
+          blockingSend(ChunkedMessageEnd)
+        }
+        def onThrowable(t: Throwable): Unit = {
+          log.error(t, "Prematurely ending export")
+          // Don't send end message, so client doesn't think it has everything
+        }
+
+        private def blockingSend(chunk: HttpMessagePart): Boolean = {
+          import scala.concurrent.Await
+          try {
+            Await.ready(sendChunk(chunk), Duration("10 seconds"))
+            true
+          } catch {
+            case e: java.util.concurrent.TimeoutException =>
+              log.error(e, "client send failed");
+              false
           }
         }
       }
 
-      sendTo.withResponsesReceivedBy(receiver)({
-        import spray.httpx.RequestBuilding._
-        Get(baseUrl + s"containers/$id/export")
-      })
+      println("Fetching export")
+      for {
+        _ <- (new dispatch.Http)(
+            dispatch.url(baseUrl + s"containers/$id/export").GET.toRequest,
+            handler)
+      } yield ()
     }
 
     override def delete = {

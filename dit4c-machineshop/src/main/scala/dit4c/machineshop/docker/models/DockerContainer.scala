@@ -18,7 +18,7 @@ trait DockerContainer {
   def refresh: Future[DockerContainer]
   def start: Future[DockerContainer]
   def stop(timeout: Duration = DurationInt(1).second): Future[DockerContainer]
-  def export(onChunk: HttpMessagePart => Unit): Unit
+  def export(onChunk: HttpMessagePart => Future[Unit]): Unit
   def delete: Future[Unit]
 
 }

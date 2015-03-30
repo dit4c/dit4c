@@ -7,6 +7,7 @@ import spray.testkit.Specs2RouteTest
 import spray.http._
 import StatusCodes._
 import spray.routing.HttpService
+import spray.http.HttpMessagePart
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models._
 import dit4c.machineshop.images._
@@ -50,7 +51,7 @@ class ApiServiceSpec extends Specification with Specs2RouteTest with HttpService
         updateList(
             new MockDockerContainer(id, name, image, ContainerStatus.Stopped))
       })
-      override def export(onChunk: spray.http.HttpMessagePart => Unit) = {
+      override def export(onChunk: HttpMessagePart => Future[Unit]) = {
         val data: Array[Byte] = Array.fill(16)(0) // Empty tar
         val entity = HttpEntity(
             ContentType(MediaTypes.`application/x-tar`, None), data)

@@ -15,6 +15,7 @@ libraryDependencies ++= {
   Seq(
     "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
+    "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
     "io.spray"            %%  "spray-can"       % sprayV,
     "io.spray"            %%  "spray-client"    % sprayV,
     "io.spray"            %%  "spray-json"      % "1.3.0",
