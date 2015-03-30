@@ -93,15 +93,12 @@ class ContainerController @Inject() (
     withContainer(id) { container =>
       for {
         clientInstance <- client(container)
-        response <- clientInstance(s"containers/${cncName(container)}/export")
-                      .signed(_.withMethod("GET"))
+        (headers, body) <-
+          clientInstance(s"containers/${cncName(container)}/export")
+            .signedAsStream(_.withMethod("GET"))
       } yield {
-        val stream = response match {
-          case r: play.api.libs.ws.ning.NingWSResponse =>
-            r.ahcResponse.getResponseBodyAsStream
-        }
-        Status(response.status)
-          .chunked(Enumerator.fromStream(stream))
+        Status(headers.status)
+          .chunked(body)
           .as("application/x-tar")
           .withHeaders(
               "X-Accel-Buffering" -> "off", // Nginx should just let it stream

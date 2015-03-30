@@ -32,25 +32,37 @@ object MachineShop {
       response <- call.get
     } yield response.body.trim
   }
-  
+
   class Client(
       managementUrl: String,
       privateKeyProvider: () => Future[RSAKey]
       )(implicit executionContext: ExecutionContext) {
-    
+
     import play.api.Play.current
-    
+
     def apply(path: String) = new RequestHolder(WS.url(s"$managementUrl$path"))  
-    
+
     class RequestHolder(ws: WSRequestHolder) {
+      import play.api.libs.iteratee.Enumerator
       type PrepFunc = WSRequestHolder => WSRequestHolder
-      
+      type StreamTuple = (WSResponseHeaders, Enumerator[Array[Byte]])
+
       def signed(prepareFunc: PrepFunc): Future[WSResponse] =
         for {
+          request <- signedNoExec(prepareFunc)
+          response <- request.execute()
+        } yield response
+
+      def signedAsStream(prepareFunc: PrepFunc): Future[StreamTuple] =
+        for {
+          request <- signedNoExec(prepareFunc)
+          stream <- request.getStream()
+        } yield stream
+
+      protected def signedNoExec(f: PrepFunc): Future[WSRequestHolder] =
+        for {
           key <- privateKeyProvider()
-          signedRequest = prepareFunc(ws).calculateDigest.httpSign(key)
-          result <- signedRequest.execute()
-        } yield result
+        } yield f(ws).calculateDigest.httpSign(key)
 
       def unsigned(prepareFunc: PrepFunc): Future[WSResponse] =
         prepareFunc(ws).calculateDigest.execute()

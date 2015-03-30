@@ -237,7 +237,6 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
         }
       }
 
-      println("Fetching export")
       for {
         _ <- (new dispatch.Http)(
             dispatch.url(baseUrl + s"containers/$id/export").GET.toRequest,
