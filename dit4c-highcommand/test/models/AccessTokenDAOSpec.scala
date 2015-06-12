@@ -33,7 +33,7 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
       (json \ "type").as[String] must_== "AccessToken"
       (json \ "_id").as[String] must_== token.id
       (json \ "_rev").as[String] must_== token._rev.get
-      (json \ "code").as[String] must beMatching("[A-Z0-9]{12}")
+      (json \ "code").as[String] must beMatching("[A-HJ-NP-Z2-9]{12}")
       (json \ "accessType").as[String] must_== AccessType.Share.toString
       (json \ "resource" \ "id").as[String] must_== computeNode.id
       (json \ "resource" \ "type").as[String] must_==

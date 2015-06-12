@@ -30,7 +30,10 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
 
   val typeValue = "AccessToken"
   val newCodeLength = 12
-  val validCodeChars: IndexedSeq[Char] = ('0' to '9') ++ ('A' to 'Z')
+
+  // Exclude '0','O','1' & 'I' because in certain fonts they look similar 
+  val validCodeChars: IndexedSeq[Char] =
+    ('2' to '9') ++ ('A' to 'H') ++ ('J' to 'N') ++ ('P' to 'Z')
 
   def create(
       accessType: AccessType.Value,
