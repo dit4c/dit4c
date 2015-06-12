@@ -1,3 +1,5 @@
+import play._
+import com.typesafe.sbt.web._
 import sbtrelease._
 import ReleaseStateTransformations._
 
@@ -10,6 +12,7 @@ scalaVersion in ThisBuild := "2.11.4"
 
 // Target JDK 1.7
 scalacOptions in ThisBuild += "-target:jvm-1.7"
+
 javacOptions in ThisBuild ++= Seq("-source", "1.7",  "-target", "1.7")
 
 // Project definitions (automatically aggregated)
@@ -17,8 +20,7 @@ javacOptions in ThisBuild ++= Seq("-source", "1.7",  "-target", "1.7")
 lazy val gatehouse   = project in file("dit4c-gatehouse")
 
 lazy val highcommand = (project in file("dit4c-highcommand")).
-  enablePlugins(PlayScala).
-  enablePlugins(SbtWeb)
+  enablePlugins(PlayScala, SbtWeb)
 
 lazy val machineshop = project in file("dit4c-machineshop")
 
