@@ -3,3 +3,10 @@ jdk:
   - oraclejdk8
 scala:
   - 2.11.6
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/f8d2a73ac3672d8e7a8e
+    on_success: change
+    on_failure: always
+    on_start: false
