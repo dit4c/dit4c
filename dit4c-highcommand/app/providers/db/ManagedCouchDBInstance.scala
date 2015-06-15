@@ -1,12 +1,13 @@
 package providers.db
 
-import scala.concurrent.{ExecutionContext, Future, future}
+import scala.concurrent.{ExecutionContext, Future}
 import java.nio.file._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.net.URL
 import java.nio.charset.Charset
 import play.api.Application
+import scala.sys.process.Process
 
 abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Application) extends CouchDB.Instance {
 
@@ -17,6 +18,22 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Applic
 
   override def disconnect {
     process.destroy
+  }
+
+  /**
+   * Handles the possibility that some of the default config paths may be
+   * unreadable, and filters them out.
+   */
+  lazy val configFileOpts: String = {
+    def addOpt(f: java.io.File): String = {
+      val optFlag = (if (f.isDirectory) "-A" else "-a")
+      s"$optFlag ${f.getAbsolutePath}"
+    }
+    val addOpts = Process("couchdb -c").lineStream
+      .map(new java.io.File(_))
+      .filter(_.canRead)
+      .map(addOpt)
+    "-n "+addOpts.mkString(" ")
   }
 
   protected def startProcess = {
@@ -37,9 +54,12 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Applic
     val uriFile = baseDir.resolve("couchdb.uri")
     Files.deleteIfExists(uriFile)
     import scala.sys.process.Process
-    val process = (Process(s"couchdb -a $configFile") #> System.out).run
+    println(s"couchdb $configFileOpts -a $configFile")
+    val process =
+      (Process(s"couchdb $configFileOpts -a $configFile") #> System.out).run
     Await.ready(uriFileCreated(baseDir), 60.seconds)
-    (process, new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
+    (process,
+        new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
   }
 
   protected def createDirIfMissing(dir: Path): Path = {
