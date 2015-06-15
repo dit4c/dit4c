@@ -14,10 +14,9 @@ import net.liftweb.{json => lift}
 
 object CouchDB {
 
-  abstract class Instance(implicit ec: ExecutionContext, app: Application) {
+  abstract class Instance(implicit ec: ExecutionContext, system: ActorSystem) {
 
     implicit private val timeout: Timeout = Timeout(5.seconds)
-    implicit private def system: ActorSystem = Akka.system(app)
     implicit private val instance = this
 
     def url: java.net.URL

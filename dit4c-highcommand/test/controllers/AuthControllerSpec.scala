@@ -31,12 +31,12 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
   "AuthController" should {
 
     "provide JSON for public keys" in new WithApplication(fakeApp) {
-      val controller = injector.getInstance(classOf[AuthController])
+      val controller = injector(app).instanceOf(classOf[AuthController])
 
       val response = controller.publicKeys(FakeRequest())
       status(response) must_== 200
       val json = contentAsJson(response)
-      (json \ "keys").asInstanceOf[JsArray].value.foreach { key =>
+      (json \ "keys").as[Seq[JsValue]].foreach { key =>
         (key \ "kty").as[String] must_== "RSA"
         (key \ "n").asOpt[String] must beSome[String]
         (key \ "e").asOpt[String] must beSome[String]
@@ -45,7 +45,7 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "allow account mergers to be cancelled" in new WithApplication(fakeApp) {
-      val controller = injector.getInstance(classOf[AuthController])
+      val controller = injector(app).instanceOf(classOf[AuthController])
 
       val identity1 = new Identity() {
         def uniqueId = "test:testuser1"
@@ -62,7 +62,7 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       val (secondaryUser, secondaryContainers) = 
         await(createHierarchy(identity2))
       val response = controller.cancelMerge(
-          (new UserSession(db, identity1)).newRequest
+          (new UserSession(db(app), identity1)).newRequest
             .withSession("mergeUserId" -> secondaryUser.id))
       session(response).get("mergeUserId") must beNone
       redirectLocation(response) must
@@ -70,10 +70,10 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "merge accounts" in new WithApplication(fakeApp) {
-      val controller = injector.getInstance(classOf[AuthController])
-      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val containerDao = new ContainerDAO(db)
-      val userDao = new UserDAO(db)
+      val controller = injector(app).instanceOf(classOf[AuthController])
+      val computeNodeDao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
+      val containerDao = new ContainerDAO(db(app))
+      val userDao = new UserDAO(db(app))
 
       val identity1 = new Identity() {
         def uniqueId = "test:testuser1"
@@ -91,7 +91,7 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
         await(createHierarchy(identity2))
 
       val response = controller.confirmMerge(
-          (new UserSession(db, identity1)).newRequest
+          (new UserSession(db(app), identity1)).newRequest
             .withSession("mergeUserId" -> secondaryUser.id))
       status(response) must_== 200
       session(response).get("mergeUserId") must beNone
@@ -120,15 +120,14 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
 
   def createHierarchy(
       identity: Identity)(implicit app: App): Future[(User, Seq[Container])] = {
-    val db = injector.getInstance(classOf[CouchDB.Database])
     def randomAlpha = Random.alphanumeric.take(20).mkString
 
     for {
-      user <- (new UserDAO(db)).createWith(identity)
+      user <- (new UserDAO(db(app))).createWith(identity)
       computeNodes <- Future.sequence {
         Stream.continually {
           val cnHostname = randomAlpha
-          (new ComputeNodeDAO(db, new KeyDAO(db))).create(
+          (new ComputeNodeDAO(db(app), new KeyDAO(db(app)))).create(
               user, cnHostname, s"id-$cnHostname", s"http://$cnHostname:8080/",
               Hipache.Backend(cnHostname, 80, "http"))
         }.take(Random.nextInt(3)+1)
@@ -136,7 +135,7 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       containers <- Future.sequence {
         Stream.continually {
           val cn = Random.shuffle(computeNodes).head
-          (new ContainerDAO(db)).create(user, randomAlpha, testImage, cn)
+          (new ContainerDAO(db(app))).create(user, randomAlpha, testImage, cn)
         }.take(Random.nextInt(19)+1)
       }
     } yield (user, containers)

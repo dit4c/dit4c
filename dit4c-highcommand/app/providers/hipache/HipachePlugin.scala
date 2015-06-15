@@ -1,6 +1,7 @@
 package providers.hipache
 
 import providers.db.CouchDB
+import javax.inject.Inject
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import play.api.Plugin
@@ -15,15 +16,15 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import models._
 import net.nikore.etcd.EtcdClient
 
-class HipachePlugin(app: play.api.Application) extends Plugin {
+class HipachePlugin @Inject() (app: play.api.Application) extends Plugin {
 
   implicit val timeout = new Timeout(30, TimeUnit.SECONDS)
   implicit lazy val ec = play.api.libs.concurrent.Execution.defaultContext
   lazy val system = play.api.libs.concurrent.Akka.system(app)
 
-  def injector = app.plugin[InjectorPlugin].get.injector.get
-  def db = injector.getInstance(classOf[CouchDB.Database])
-  def containerResolver = injector.getInstance(classOf[ContainerResolver])
+  def injector = app.injector
+  def db = injector.instanceOf(classOf[CouchDB.Database])
+  def containerResolver = injector.instanceOf(classOf[ContainerResolver])
 
   def serverConfig: Option[Hipache.ServerConfig] =
     for {

@@ -20,8 +20,8 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
   "ComputeNodeDAO" should {
 
     "create a compute node" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val session = new UserSession(db(app))
+      val dao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
       val node = await(dao.create(
           session.user,
           "Local",
@@ -35,12 +35,12 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
       node.backend must_== Hipache.Backend("localhost", 6000)
       // Check database has data
       val couchResponse =
-        await(db.asSohvaDb.getDocById[JsValue](node.id, None))
+        await(db(app).asSohvaDb.getDocById[JsValue](node.id, None))
       couchResponse must beSome
       val json = couchResponse.get
       (json \ "type").as[String] must_== "ComputeNode"
       (json \ "_id").as[String] must_== node.id
-      (json \ "_rev").as[Option[String]] must_== node._rev
+      (json \ "_rev").asOpt[String] must_== node._rev
       (json \ "name").as[String] must_== node.name
       (json \ "serverID").as[String] must_== node.serverId
       (json \ "managementURL").as[String] must_== node.managementUrl
@@ -52,8 +52,8 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "list all compute nodes" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val session = new UserSession(db(app))
+      val dao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
       await(dao.list) must beEmpty
       val node = await(dao.create(
           session.user,
@@ -66,8 +66,8 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "get a particular compute node" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val dao = new ComputeNodeDAO(db, new KeyDAO(db))
+      val session = new UserSession(db(app))
+      val dao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
       val node = await(dao.create(
           session.user,
           "Local",

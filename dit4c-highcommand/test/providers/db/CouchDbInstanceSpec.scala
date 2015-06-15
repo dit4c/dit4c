@@ -6,6 +6,7 @@ import org.specs2.runner.JUnitRunner
 import scala.concurrent.ExecutionContext
 import play.api.Application
 import play.api.test._
+import akka.actor.ActorSystem
 
 @RunWith(classOf[JUnitRunner])
 class CouchDbInstanceSpec extends PlaySpecification {
@@ -16,7 +17,7 @@ class CouchDbInstanceSpec extends PlaySpecification {
     play.api.libs.concurrent.Execution.defaultContext
 
   def createNewInstance(implicit app: Application) =
-    new EphemeralCouchDBInstance()(ec, app)
+    new EphemeralCouchDBInstance()(ec, app.injector.instanceOf[ActorSystem])
 
   "CouchDbInstance" should {
 

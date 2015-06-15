@@ -1,6 +1,7 @@
 package providers
 
 import play.api.Plugin
+import javax.inject.Inject
 import models.{KeyDAO, Key}
 import providers.db.CouchDB
 import scala.concurrent.Future
@@ -14,14 +15,14 @@ import akka.pattern.ask
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 
-class KeyManagementPlugin(app: play.api.Application) extends Plugin {
+class KeyManagementPlugin @Inject() (app: play.api.Application) extends Plugin {
 
   implicit val timeout = new Timeout(30, TimeUnit.SECONDS)
   implicit lazy val ec = play.api.libs.concurrent.Execution.defaultContext
   lazy val system = play.api.libs.concurrent.Akka.system(app)
 
-  def injector = app.plugin[InjectorPlugin].get.injector.get
-  def db = injector.getInstance(classOf[CouchDB.Database])
+  def injector = app.injector
+  def db = injector.instanceOf(classOf[CouchDB.Database])
 
   lazy val config = KeyManagementConfig(
     app.configuration

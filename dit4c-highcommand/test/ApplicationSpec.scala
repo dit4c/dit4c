@@ -63,10 +63,6 @@ class ApplicationSpec
 
     }
 
-    "send 404 on a bad request" in new WithApplication(fakeApp) {
-      route(FakeRequest(GET, "/boum")) must beNone
-    }
-
     "index page" in new WithApplication(fakeApp) {
       val home = route(FakeRequest(GET, "/")).get
 
@@ -90,7 +86,7 @@ class ApplicationSpec
     }
 
     "callback" in new WithApplication(fakeApp) {
-      createTestKey
+      createTestKey(app)
 
       def base = FakeRequest(POST, "/auth/callback")
 

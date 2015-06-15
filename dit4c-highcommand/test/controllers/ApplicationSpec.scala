@@ -12,7 +12,6 @@ import org.specs2.runner.JUnitRunner
 import models._
 import providers.auth.Identity
 import play.api.test.WithApplication
-import play.api.Play
 import play.api.mvc.AcceptExtractors
 import providers.InjectorPlugin
 import utils.SpecUtils
@@ -32,7 +31,7 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
         val extractors = new AcceptExtractors {}
         import extractors.Accepts
 
-        val controller = injector.getInstance(classOf[Application])
+        val controller = injector(app).instanceOf(classOf[Application])
         val action = controller.waiting("http","example.test","foo")
         val htmlResponse = action(
           FakeRequest().withHeaders("Accept" -> Accepts.Html.mimeType))
@@ -56,7 +55,7 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
         val extractors = new AcceptExtractors {}
         import extractors.Accepts
 
-        val controller = injector.getInstance(classOf[Application])
+        val controller = injector(app).instanceOf(classOf[Application])
         val action = controller.waiting("http","example.test","foo")
         val htmlResponse = action(
           FakeRequest("GET", "/foo?a=1&b=2").withHeaders("Accept" -> Accepts.Html.mimeType))
@@ -77,14 +76,14 @@ class ApplicationSpec extends PlaySpecification with SpecUtils {
     "provide a health check endpoint" >> {
       
       "for HEAD" in new WithApplication(fakeApp) {
-        val controller = injector.getInstance(classOf[Application])
+        val controller = injector(app).instanceOf(classOf[Application])
         val action = controller.health(true)
         val response = action(FakeRequest())
         status(response) must_== 200
       }
       
       "for GET" in new WithApplication(fakeApp) {
-        val controller = injector.getInstance(classOf[Application])
+        val controller = injector(app).instanceOf(classOf[Application])
         val action = controller.health(false)
         val response = action(FakeRequest())
         status(response) must_== 204

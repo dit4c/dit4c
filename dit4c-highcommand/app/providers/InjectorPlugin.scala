@@ -10,61 +10,67 @@ import com.google.inject.Injector
 import play.api.Plugin
 import play.twirl.api.Html
 import providers.auth._
-import providers.db.{CouchDB, CouchDBPlugin}
+import providers.db.CouchDB
 import models.ViewManager
 import providers.auth.Identity
 import scala.concurrent.ExecutionContext
 import gnieh.sohva.{DesignDoc,ViewDoc}
 import gnieh.sohva.async._
+import play.api.{Configuration, Environment}
+import providers.db._
+import com.google.inject.Provides
+import akka.actor.ActorSystem
+import play.api.inject.ApplicationLifecycle
+import javax.inject.Singleton
 
-class InjectorPlugin(app: play.api.Application) extends Plugin {
-
+class InjectorPlugin(
+    environment: Environment,
+    configuration: Configuration) extends AbstractModule {
   implicit val ec = play.api.libs.concurrent.Execution.defaultContext
 
   lazy val log = play.api.Logger
-  var injector: Option[Injector] = None
+  
+  lazy val authProviders = AuthProviders(
+      RapidAAFAuthProvider(configuration) ++
+      GitHubProvider(configuration) ++
+      TwitterProvider(configuration) ++
+      DummyProvider(configuration))
 
-  override def onStart {
-    injector = Some(
-      Guice.createInjector(new AbstractModule {
-        val appConfig = app.configuration
+  val dbName = configuration.getString("couchdb.database").get
 
-        lazy val authProviders = AuthProviders(
-            RapidAAFAuthProvider(appConfig) ++
-            GitHubProvider(appConfig) ++
-            TwitterProvider(appConfig) ++
-            DummyProvider(appConfig))
-
-        val dbName = app.configuration.getString("couchdb.database").get
-
-        lazy val dbServerInstance = app.plugin[CouchDBPlugin].get.get
-
-        // Make sure a database exists
-        lazy val database = Await.result(
-          for {
-            maybeDb <- dbServerInstance.databases(dbName)
-            db <- maybeDb match {
-              case Some(db) => Future.successful(db)
-              case None => dbServerInstance.databases.create(dbName)
-            }
-            design = db.asSohvaDb.design("main", "javascript")
-            _ <- ViewManager.update(design)
-          } yield db,
-          1.minute)
-
-        def configure {
-          bind(classOf[play.api.Application]).toInstance(app)
-          bind(classOf[AuthProviders]).toInstance(authProviders)
-          bind(classOf[CouchDB.Database]).toInstance(database)
-          bind(classOf[ExecutionContext]).toInstance(
-              play.api.libs.concurrent.Execution.defaultContext)
-        }
-      })
-    )
+  @Singleton @Provides def dbServerInstance(
+      lifecycle: ApplicationLifecycle)(
+          implicit system: ActorSystem): CouchDB.Instance = {
+    val instance =
+      if (configuration.getBoolean("couchdb.testing").getOrElse(false)) {
+        new EphemeralCouchDBInstance
+      } else if (configuration.getString("couchdb.url").isDefined) {
+        new ExternalCouchDBInstance(new java.net.URL(
+          configuration.getString("couchdb.url").get))
+      } else {
+        new PersistentCouchDBInstance("./db", 40000)
+      }
+    lifecycle.addStopHook { () => 
+      instance.disconnect
+      Future.successful(())
+    }
+    instance
   }
 
-  override def onStop {
-    injector = None
-  }
+  // Make sure a database exists
+  @Provides def database(dbServerInstance: CouchDB.Instance) = Await.result(
+    for {
+      maybeDb <- dbServerInstance.databases(dbName)
+      db <- maybeDb match {
+        case Some(db) => Future.successful(db)
+        case None => dbServerInstance.databases.create(dbName)
+      }
+      design = db.asSohvaDb.design("main", "javascript")
+      _ <- ViewManager.update(design)
+    } yield db,
+    1.minute)
 
+  def configure {
+    bind(classOf[AuthProviders]).toInstance(authProviders)
+  }
 }

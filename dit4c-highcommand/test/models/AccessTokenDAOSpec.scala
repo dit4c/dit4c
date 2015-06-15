@@ -21,13 +21,13 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
     "create a token" in new WithApplication(fakeApp) {
       import AccessToken._
-      val dao = new AccessTokenDAO(db)
+      val dao = new AccessTokenDAO(db(app))
       val computeNode = mockComputeNode
       val token = await(dao.create(AccessType.Share, computeNode))
       token.accessType must_== AccessType.Share
       // Check database has data
       val couchResponse =
-        await(db.asSohvaDb.getDocById[JsValue](token.id, None))
+        await(db(app).asSohvaDb.getDocById[JsValue](token.id, None))
       couchResponse must beSome
       val json = couchResponse.get
       (json \ "type").as[String] must_== "AccessToken"
@@ -42,7 +42,7 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
     "get by ID" in new WithApplication(fakeApp) {
       import AccessToken._
-      val dao = new AccessTokenDAO(db)
+      val dao = new AccessTokenDAO(db(app))
       val computeNode = mockComputeNode
       val token = await(dao.create(AccessType.Share, computeNode))
       // Refresh from DAO
@@ -55,7 +55,7 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
     "list by resource" in new WithApplication(fakeApp) {
       import AccessToken._
-      val dao = new AccessTokenDAO(db)
+      val dao = new AccessTokenDAO(db(app))
       val computeNode = mockComputeNode
       val token = await(dao.create(AccessType.Share, computeNode))
       val tokens = await(dao.listFor(computeNode))
@@ -65,7 +65,7 @@ class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
     "delete" in new WithApplication(fakeApp) {
       import AccessToken._
-      val dao = new AccessTokenDAO(db)
+      val dao = new AccessTokenDAO(db(app))
       val computeNode = mockComputeNode
       val token = await(dao.create(AccessType.Share, computeNode))
       await(dao.get(token.id)) must beSome

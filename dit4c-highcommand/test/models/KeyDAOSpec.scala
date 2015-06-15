@@ -26,7 +26,7 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
   "KeyDAO" should {
 
     "create a new key" in new WithApplication(fakeApp) {
-      val dao = new KeyDAO(db)
+      val dao = new KeyDAO(db(app))
       val namespace = "localhost.localdomain"
       val key = await(dao.create(namespace, 512))
       key.namespace must_== namespace
@@ -34,12 +34,12 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
       key.publicId must_== s"$namespace ${key.createdAt} [${key.id}]"
       // Check database has data
       val couchResponse =
-        await(db.asSohvaDb.getDocById[JsValue](key.id, None))
+        await(db(app).asSohvaDb.getDocById[JsValue](key.id, None))
       couchResponse must beSome
       val json = couchResponse.get
       (json \ "type").as[String] must_== "Key"
       (json \ "_id").as[String] must_== key.id
-      (json \ "_rev").as[Option[String]] must_== key._rev
+      (json \ "_rev").asOpt[String] must_== key._rev
       (json \ "namespace").as[String] must_== key.namespace
       (json \ "createdAt").as[String] must_== key.createdAt.toString()
       (json \ "retired").as[Boolean] must beFalse
@@ -51,14 +51,14 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "list all keys" in new WithApplication(fakeApp) {
-      val dao = new KeyDAO(db)
+      val dao = new KeyDAO(db(app))
       await(dao.list) must beEmpty
       val key = await(dao.create("localhost.localdomain", 512))
       await(dao.list) must haveSize(1)
     }
 
     "provide the best signing key" in new WithApplication(fakeApp) {
-      val dao = new KeyDAO(db)
+      val dao = new KeyDAO(db(app))
       // Create three keys sequentially, then retire the oldest
       val k1 = await(dao.create("localhost.localdomain", 512).flatMap(_.retire))
       val k2 = await(dao.create("localhost.localdomain", 512))
@@ -73,7 +73,7 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
   "Key" should {
 
     "retire" in new WithApplication(fakeApp) {
-      val dao = new KeyDAO(db)
+      val dao = new KeyDAO(db(app))
       val key = await(dao.create("localhost.localdomain", 512))
       key.retired must beFalse
       val retiredKey = await(key.retire)
@@ -84,7 +84,7 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "delete" in new WithApplication(fakeApp) {
-      val dao = new KeyDAO(db)
+      val dao = new KeyDAO(db(app))
       await(dao.list) must beEmpty
       val key = await(dao.create("localhost.localdomain", 512))
       await(dao.list) must haveSize(1)

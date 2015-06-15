@@ -49,15 +49,14 @@ trait SpecUtils extends ConcurrentExecutionContext {
     }
   }
 
-  def db(implicit app: play.api.Application) =
-    injector.getInstance(classOf[CouchDB.Database])
+  def db(app: play.api.Application) =
+    injector(app).instanceOf(classOf[CouchDB.Database])
 
-  def injector(implicit app: play.api.Application) =
-    app.plugin(classOf[InjectorPlugin]).get.injector.get
+  def injector(app: play.api.Application) = app.injector
 
-  def createTestKey(implicit app: play.api.Application): models.Key =
+  def createTestKey(app: play.api.Application): models.Key =
     Await.result(
-        (new models.KeyDAO(db)).create("DIT4C Test Key", 512),
+        (new models.KeyDAO(db(app))).create("DIT4C Test Key", 512),
         Duration(20, "seconds"))
 
 }

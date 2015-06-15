@@ -34,11 +34,10 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
   "ContainerController" should {
 
     "provide JSON list of containers" in new WithApplication(fakeApp) {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val containerDao = new ContainerDAO(db)
+      val session = new UserSession(db(app))
+      val controller = getMockedController(app)
+      val computeNodeDao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
+      val containerDao = new ContainerDAO(db(app))
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
@@ -64,11 +63,10 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "provide JSON of a single container" in new WithApplication(fakeApp) {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val containerDao = new ContainerDAO(db)
+      val session = new UserSession(db(app))
+      val controller = getMockedController(app)
+      val computeNodeDao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
+      val containerDao = new ContainerDAO(db(app))
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
@@ -88,13 +86,12 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "provide redirects for containers" in new WithApplication(fakeApp) {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val keyDao = new KeyDAO(db)
+      val session = new UserSession(db(app))
+      val controller = getMockedController(app)
+      val keyDao = new KeyDAO(db(app))
       val key = keyDao.create("localhost.localdomain",512)
-      val computeNodeDao = new ComputeNodeDAO(db, keyDao)
-      val containerDao = new ContainerDAO(db)
+      val computeNodeDao = new ComputeNodeDAO(db(app), keyDao)
+      val containerDao = new ContainerDAO(db(app))
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
@@ -112,13 +109,12 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "create containers" in new WithApplication(fakeApp) {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val keyDao = new KeyDAO(db)
+      val session = new UserSession(db(app))
+      val controller = getMockedController(app)
+      val keyDao = new KeyDAO(db(app))
       val key = keyDao.create("localhost.localdomain",512)
-      val computeNodeDao = new ComputeNodeDAO(db, keyDao)
-      val containerDao = new ContainerDAO(db)
+      val computeNodeDao = new ComputeNodeDAO(db(app), keyDao)
+      val containerDao = new ContainerDAO(db(app))
       val computeNode = 
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
@@ -141,11 +137,10 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
     }
     
     "update containers" in new WithApplication(fakeApp) {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db)
-      val controller = getMockedController
-      val computeNodeDao = new ComputeNodeDAO(db, new KeyDAO(db))
-      val containerDao = new ContainerDAO(db)
+      val session = new UserSession(db(app))
+      val controller = getMockedController(app)
+      val computeNodeDao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
+      val containerDao = new ContainerDAO(db(app))
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
@@ -169,20 +164,19 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       header("Cache-Control", response) must beSome("private, must-revalidate")
     }
 
-    def getMockedController = {
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      new ContainerController(
-          db,
-          injector.getInstance(classOf[Application]),
-          injector.getInstance(classOf[ContainerResolver])) {
-        override def createComputeNodeContainer(container: Container) =
-          Future.successful(MockMCC(container.name, false))
+  }
 
-        override def resolveComputeNodeContainer(container: Container) =
-          Future.successful(Some(MockMCC(container.name, false)))
-      }
+  def getMockedController(app: play.api.Application) = {
+    new ContainerController(
+        db(app),
+        injector(app).instanceOf(classOf[Application]),
+        injector(app).instanceOf(classOf[ContainerResolver])) {
+      override def createComputeNodeContainer(container: Container) =
+        Future.successful(MockMCC(container.name, false))
+
+      override def resolveComputeNodeContainer(container: Container) =
+        Future.successful(Some(MockMCC(container.name, false)))
     }
-
   }
 
   case class MockMCC(val name: String, val active: Boolean)

@@ -8,8 +8,9 @@ import java.net.URL
 import java.nio.charset.Charset
 import play.api.Application
 import scala.sys.process.Process
+import akka.actor.ActorSystem
 
-abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, app: Application) extends CouchDB.Instance {
+abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: ActorSystem) extends CouchDB.Instance {
 
   def baseDir: Path
   def desiredPort: Int = 0

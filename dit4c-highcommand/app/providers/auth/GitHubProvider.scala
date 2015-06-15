@@ -99,13 +99,13 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
         val json = response.json
         GitHubIdentity(
           (json \ "login").as[String],
-          (json \ "name").as[Option[String]],
-          (json \ "email").as[Option[String]].filter(!_.isEmpty)
+          (json \ "name").asOpt[String],
+          (json \ "email").asOpt[String].filter(!_.isEmpty)
         )
       }
 
   protected def throwIfError(response: WSResponse): Unit =
-    (response.json \ "error_description").as[Option[String]]
+    (response.json \ "error_description").asOpt[String]
       .foreach(msg => throw new Exception(msg))
 
 

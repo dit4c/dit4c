@@ -12,7 +12,6 @@ import org.specs2.runner.JUnitRunner
 import models._
 import providers.auth.Identity
 import play.api.test.WithApplication
-import play.api.Play
 import providers.InjectorPlugin
 import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
@@ -34,9 +33,9 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
   "ComputeNodeController" should {
 
     "list compute nodes" in new WithApplication(fakeApp) {
-      val dao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val dao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
 
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
@@ -52,25 +51,25 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       json must haveSize(1)
       json match {
         case Seq(json) =>
-          json \ "id" must beAnInstanceOf[JsString]
-          json \ "name" must_== JsString("Local")
-          json \ "managementUrl" must_== JsString("http://localhost:5000/")
-          json \ "backend" \ "host" must_== JsString("localhost")
-          json \ "backend" \ "port" must_== JsNumber(8080)
-          json \ "backend" \ "scheme" must_== JsString("https")
-          json \ "owned" must_== JsBoolean(true)
-          json \ "usable" must_== JsBoolean(true)
+          (json \ "id").as[String] must beAnInstanceOf[String]
+          (json \ "name").as[String] must_== "Local"
+          (json \ "managementUrl").as[String] must_== "http://localhost:5000/"
+          (json \ "backend" \ "host").as[String] must_== "localhost"
+          (json \ "backend" \ "port").as[Int] must_== 8080
+          (json \ "backend" \ "scheme").as[String] must_== "https"
+          (json \ "owned").as[Boolean] must beTrue
+          (json \ "usable").as[Boolean] must beTrue
       }
     }
 
     "redeem access token" in new WithApplication(fakeApp) {
-      val atDao = injector.getInstance(classOf[AccessTokenDAO])
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val creatingSession = new UserSession(db, MockIdentity(
+      val atDao = injector(app).instanceOf(classOf[AccessTokenDAO])
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val creatingSession = new UserSession(db(app), MockIdentity(
         "testing:creator", Some("Creator"), None
       ))
-      val redeemingSession = new UserSession(db, MockIdentity(
+      val redeemingSession = new UserSession(db(app), MockIdentity(
         "testing:redeemer", Some("Redeemer"), None
       ))
       val cn = await(cnDao.create(creatingSession.user,
@@ -95,10 +94,10 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "create access token" in new WithApplication(fakeApp) {
-      val atDao = injector.getInstance(classOf[AccessTokenDAO])
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val atDao = injector(app).instanceOf(classOf[AccessTokenDAO])
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
           Hipache.Backend("example.test", 80, "https")))
@@ -112,15 +111,15 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       token.accessType must be(AccessToken.AccessType.Share)
 
       val json = contentAsJson(response).as[JsObject]
-      json \ "code" must_== JsString(token.code)
-      json \ "type" must_== JsString("share")
+      (json \ "code").as[String] must_== token.code
+      (json \ "type").as[String] must_== "share"
     }
 
     "list access tokens" in new WithApplication(fakeApp) {
-      val atDao = injector.getInstance(classOf[AccessTokenDAO])
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val atDao = injector(app).instanceOf(classOf[AccessTokenDAO])
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
           Hipache.Backend("example.test", 80, "https")))
@@ -137,15 +136,15 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       json must haveSize(1)
       json match {
         case Seq(json) =>
-          json \ "code" must_== JsString(token.code)
-          json \ "type" must_== JsString("share")
+          (json \ "code").as[String] must_== token.code
+          (json \ "type").as[String] must_== "share"
       }
     }
 
     "list owners" in new WithApplication(fakeApp) {
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
           Hipache.Backend("example.test", 80, "https")))
@@ -158,16 +157,16 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
         case Seq(json) =>
           val user = session.user
           (json \ "id").as[String] must_== user.id
-          (json \ "name").as[Option[String]] must_== user.name
-          (json \ "email").as[Option[String]] must_== user.email
+          (json \ "name").asOpt[String] must_== user.name
+          (json \ "email").asOpt[String] must_== user.email
       }
     }
 
     "remove owner" in new WithApplication(fakeApp) {
-      val userDao = injector.getInstance(classOf[UserDAO])
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val userDao = injector(app).instanceOf(classOf[UserDAO])
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val newOwner = await(userDao.createWith(MockIdentity(
         "test:new-owner",
         Some("Tommy Atkins"),
@@ -194,9 +193,9 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "list users" in new WithApplication(fakeApp) {
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
           Hipache.Backend("example.test", 80, "https")))
@@ -209,16 +208,16 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
         case Seq(json) =>
           val user = session.user
           (json \ "id").as[String] must_== user.id
-          (json \ "name").as[Option[String]] must_== user.name
-          (json \ "email").as[Option[String]] must_== user.email
+          (json \ "name").asOpt[String] must_== user.name
+          (json \ "email").asOpt[String] must_== user.email
       }
     }
 
     "remove user" in new WithApplication(fakeApp) {
-      val userDao = injector.getInstance(classOf[UserDAO])
-      val cnDao = injector.getInstance(classOf[ComputeNodeDAO])
-      val controller = injector.getInstance(classOf[ComputeNodeController])
-      val session = new UserSession(db)
+      val userDao = injector(app).instanceOf(classOf[UserDAO])
+      val cnDao = injector(app).instanceOf(classOf[ComputeNodeDAO])
+      val controller = injector(app).instanceOf(classOf[ComputeNodeController])
+      val session = new UserSession(db(app))
       val newUser = await(userDao.createWith(MockIdentity(
         "test:new-user",
         Some("Tommy Atkins"),

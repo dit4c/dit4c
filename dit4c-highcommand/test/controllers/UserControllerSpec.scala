@@ -27,13 +27,12 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
   "UserController" should {
 
     "provide JSON for users" in new WithApplication(fakeApp) {
-      val controller = injector.getInstance(classOf[UserController])
+      val controller = injector(app).instanceOf(classOf[UserController])
 
       val withoutLogin = controller.currentUser(FakeRequest())
       status(withoutLogin) must_== 404
 
-      val db = injector.getInstance(classOf[CouchDB.Database])
-      val session = new UserSession(db, new Identity() {
+      val session = new UserSession(db(app), new Identity() {
         def uniqueId = "test:testuser"
         def name = Some("Test User")
         def emailAddress = Some("user@example.test")
@@ -59,13 +58,13 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
     }
 
     "provide redirect to current user" in new WithApplication(fakeApp) {
-      val controller = injector.getInstance(classOf[UserController])
+      val controller = injector(app).instanceOf(classOf[UserController])
 
       val withoutLogin = controller.currentUser(FakeRequest())
       status(withoutLogin) must_== 404
 
       val user = {
-        val dao = new UserDAO(injector.getInstance(classOf[CouchDB.Database]))
+        val dao = new UserDAO(injector(app).instanceOf(classOf[CouchDB.Database]))
         await(dao.createWith(new Identity() {
           def uniqueId = "test:testuser"
           def name = Some("Test User")

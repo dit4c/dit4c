@@ -7,6 +7,7 @@ libraryDependencies ++= Seq(
   cache,
   filters,
   ws,
+  specs2 % "test",
   "com.google.inject"   %   "guice"           % "3.0",
   "com.nimbusds"        %   "nimbus-jose-jwt" % "2.26.1",
   "com.osinka.slugify"  %%  "slugify"         % "1.2.1",
@@ -14,7 +15,9 @@ libraryDependencies ++= Seq(
   "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",
   "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.6"     % "test",
-  "org.specs2"          %%  "specs2-scalacheck" % "2.3.12"  % "test",
+  "org.specs2" %% "specs2-core" % "3.6" % "test",
+  "org.specs2" %% "specs2-junit" % "3.6" % "test",
+  "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS
@@ -29,6 +32,7 @@ libraryDependencies ++= Seq(
 resolvers ++= Seq(
   "DIT4C BinTray" at "http://dl.bintray.com/dit4c/repo/",
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
+  "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases",
   "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/")
 
 version <<= version in ThisBuild
@@ -53,20 +57,6 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirecto
   cache(Set( dir / "helpers" / "AppVersion.scala" )).toSeq
 }
 
-// Clojure compiler options to handle Ember.js, from:
-// http://stackoverflow.com/questions/22137767/playframework-requirejs-javascript-files-not-being-optimized
-val closureOptions = {
-  import com.google.javascript.jscomp._
-  val root = new java.io.File(".")
-  val opts = new CompilerOptions()
-  opts.closurePass = true
-  opts.setProcessCommonJSModules(true)
-  opts.setCommonJSModulePathPrefix(root.getCanonicalPath + "/app/assets/javascripts/")
-  opts.setLanguageIn(CompilerOptions.LanguageMode.ECMASCRIPT5_STRICT)
-  CompilationLevel.WHITESPACE_ONLY.setOptionsForCompilationLevel(opts)
-  opts
-}
-
 pipelineStages := Seq(rjs, digest, gzip)
 
 sbtdocker.Plugin.dockerSettings
@@ -74,14 +64,14 @@ sbtdocker.Plugin.dockerSettings
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 // Make docker depend on the package task, which generates a jar file of the application code
-docker <<= docker.dependsOn(com.typesafe.sbt.packager.universal.Keys.stage)
+docker <<= docker.dependsOn(com.typesafe.sbt.packager.Keys.stage)
 
 // Docker build
 dockerfile in docker := {
  import sbtdocker.Instructions._
  import sbtdocker._
  val stageDir =
-   com.typesafe.sbt.packager.universal.Keys.stagingDirectory.in(Universal).value
+   com.typesafe.sbt.packager.Keys.stagingDirectory.in(Universal).value
  val dockerResources = baseDirectory.value / "docker"
  val configs = dockerResources / "etc"
  val prodConfig = dockerResources / "opt" / "dit4c-highcommand" / "prod.conf"

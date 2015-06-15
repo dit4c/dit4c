@@ -23,8 +23,8 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
   "ContainerDAO" should {
 
     "create a container from a name and description" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val dao = new ContainerDAO(db)
+      val session = new UserSession(db(app))
+      val dao = new ContainerDAO(db(app))
       Seq(
         ("test", ""),
         ("test", "A test description.")
@@ -35,12 +35,12 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
         container.image must be(container.image)
         // Check database has data
         val couchResponse =
-          await(db.asSohvaDb.getDocById[JsValue](container.id, None))
+          await(db(app).asSohvaDb.getDocById[JsValue](container.id, None))
         couchResponse must beSome
         val json = couchResponse.get
         (json \ "type").as[String] must_== "Container"
         (json \ "_id").as[String] must_== container.id
-        (json \ "_rev").as[Option[String]] must_== container._rev
+        (json \ "_rev").asOpt[String] must_== container._rev
         (json \ "name").as[String] must_== container.name
         (json \ "image").as[String] must_== container.image
         (json \ "computeNodeId").as[String] must_== container.computeNodeId
@@ -50,8 +50,8 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "get by ID" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
-      val dao = new ContainerDAO(db)
+      val session = new UserSession(db(app))
+      val dao = new ContainerDAO(db(app))
       val cn = MockComputeNode("mockcontainerid")
       val container = await(dao.create(
           session.user, "test1", dummyImage, cn))
@@ -59,10 +59,10 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "delete containers" in new WithApplication(fakeApp) {
-      val session = new UserSession(db)
+      val session = new UserSession(db(app))
       def getId(id: String) =
-        await(db.asSohvaDb.getDocById[JsValue](container.id, None))
-      val dao = new ContainerDAO(db)
+        await(db(app).asSohvaDb.getDocById[JsValue](container.id, None))
+      val dao = new ContainerDAO(db(app))
       val cn = MockComputeNode("mockcontainerid")
       val container = await(dao.create(
           session.user, "test1", dummyImage, cn))
@@ -71,26 +71,26 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       getId(container.id) must beNone
     }
 
-    case class MockComputeNode(val id: String) extends ComputeNode {
-      override def _rev: Option[String] = ???
-      override def backend: providers.hipache.Hipache.Backend = ???
-      override def containers: providers.machineshop.ContainerProvider = ???
-      override def managementUrl: String = ???
-      override def name: String = ???
-      override def serverId = ???
-      override def ownerIDs = ???
-      override def userIDs = ???
+  }
 
-      // Members declared in models.UpdatableModel
-      override def update = ???
+  case class MockComputeNode(val id: String) extends ComputeNode {
+    override def _rev: Option[String] = ???
+    override def backend: providers.hipache.Hipache.Backend = ???
+    override def containers: providers.machineshop.ContainerProvider = ???
+    override def managementUrl: String = ???
+    override def name: String = ???
+    override def serverId = ???
+    override def ownerIDs = ???
+    override def userIDs = ???
 
-      override def addOwner(user: User) = ???
-      override def addUser(user: User) = ???
-      override def removeOwner(userId: String) = ???
-      override def removeUser(userId: String) = ???
-      override def delete = ???
-    }
+    // Members declared in models.UpdatableModel
+    override def update = ???
 
+    override def addOwner(user: User) = ???
+    override def addUser(user: User) = ???
+    override def removeOwner(userId: String) = ???
+    override def removeUser(userId: String) = ???
+    override def delete = ???
   }
 
 }

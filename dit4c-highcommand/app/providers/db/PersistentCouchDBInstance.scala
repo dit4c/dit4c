@@ -3,10 +3,11 @@ package providers.db
 import scala.concurrent.ExecutionContext
 import java.nio.file.{Files,Paths}
 import play.api.Application
+import akka.actor.ActorSystem
 
 class PersistentCouchDBInstance(
     dir: String,
-    specifiedPort: Int)(implicit ec: ExecutionContext, app: Application)
+    specifiedPort: Int)(implicit ec: ExecutionContext, system: ActorSystem)
   extends ManagedCouchDBInstance {
 
   def log = play.api.Logger

@@ -1,4 +1,3 @@
-import play._
 import com.typesafe.sbt.web._
 import sbtrelease._
 import ReleaseStateTransformations._
@@ -8,12 +7,12 @@ name := "dit4c"
 // Overriding publishArtifactsAction, so unnecessary for actual operation
 publishTo := Some(Resolver.file("file",  new File( "/tmp" )) )
 
-scalaVersion in ThisBuild := "2.11.4"
+scalaVersion in ThisBuild := "2.11.6"
 
-// Target JDK 1.7
-scalacOptions in ThisBuild += "-target:jvm-1.7"
+// Target JDK 1.8
+scalacOptions in ThisBuild += "-target:jvm-1.8"
 
-javacOptions in ThisBuild ++= Seq("-source", "1.7",  "-target", "1.7")
+javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 
 // Project definitions (automatically aggregated)
 

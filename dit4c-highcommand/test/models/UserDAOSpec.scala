@@ -20,7 +20,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
   "UserDAO" should {
 
     "create a user from an identity" in new WithApplication(fakeApp) {
-      val dao = new UserDAO(db)
+      val dao = new UserDAO(db(app))
       Seq(
         MockIdentity("test:user1", None, None),
         MockIdentity("test:user2", Some("Test User"), None),
@@ -32,20 +32,20 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         user.identities must contain(identity.uniqueId)
         // Check database has data
         val couchResponse =
-          await(db.asSohvaDb.getDocById[JsValue](user.id, None))
+          await(db(app).asSohvaDb.getDocById[JsValue](user.id, None))
         couchResponse must beSome
         val json = couchResponse.get
         (json \ "type").as[String] must_== "User"
         (json \ "_id").as[String] must_== user.id
-        (json \ "name").as[Option[String]] must_== user.name
-        (json \ "email").as[Option[String]] must_== user.email
+        (json \ "name").asOpt[String] must_== user.name
+        (json \ "email").asOpt[String] must_== user.email
         (json \ "identities").as[Seq[String]] must_== user.identities
       }
       done
     }
 
     "lookup using identity" in new WithApplication(fakeApp) {
-      val dao = new UserDAO(db)
+      val dao = new UserDAO(db(app))
       val identity = MockIdentity("foo:bar", None, None)
       await(dao.findWith(identity)) must beNone
       val user = await(dao.createWith(identity))
@@ -53,13 +53,13 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
     }
 
     "get by ID" in new WithApplication(fakeApp) {
-      val dao = new UserDAO(db)
+      val dao = new UserDAO(db(app))
       val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
       await(dao.get(user.id)) must beSome
     }
 
     "update name & email" in new WithApplication(fakeApp) {
-      val dao = new UserDAO(db)
+      val dao = new UserDAO(db(app))
       val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
 
       val update = user.update
@@ -76,7 +76,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
       "without current user" >> {
 
         "creates new user for unknown identities" in new WithApplication(fakeApp) {
-          val dao = new UserDAO(db)
+          val dao = new UserDAO(db(app))
           val identity = MockIdentity("foo:bar", None, None)
           val resultingUser = await(dao.createMergeOrUpdate(None, identity))
           resultingUser.name must_== identity.name
@@ -85,7 +85,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         }
 
         "updates existing user for known identities" in new WithApplication(fakeApp) {
-          val dao = new UserDAO(db)
+          val dao = new UserDAO(db(app))
           val user =
             await(dao.createWith(MockIdentity("foo:bar", None, None)))
           val identity =
@@ -102,7 +102,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
       "with current user" >> {
 
         "updates user for unknown identities" in new WithApplication(fakeApp) {
-          val dao = new UserDAO(db)
+          val dao = new UserDAO(db(app))
           val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
           val identity =
             MockIdentity("foo:baz", Some("Foo Baz"), Some("foo@baz.test"))
@@ -119,7 +119,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         }
 
         "updates user for known connected identities" in new WithApplication(fakeApp) {
-          val dao = new UserDAO(db)
+          val dao = new UserDAO(db(app))
           val user = await(dao.createWith(MockIdentity("foo:bar", None, None)))
           val identity =
             MockIdentity("foo:bar", Some("Foo Bar"), Some("foo@bar.test"))
@@ -134,7 +134,7 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
         }
 
         "merges users for known unconnected identities" in new WithApplication(fakeApp) {
-          val dao = new UserDAO(db)
+          val dao = new UserDAO(db(app))
           val user1 = await(dao.createWith(MockIdentity("foo:bar", None, None)))
           val user2 = await(dao.createWith(MockIdentity("foo:baz",
             Some("Foo Bar"), Some("foo@bar.test"))))
