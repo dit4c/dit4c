@@ -42,7 +42,7 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
     } yield key
 
   /**
-   * @returns Oldest non-retired key (which may not exist)
+   * @return Oldest non-retired key (which may not exist)
    */
   def bestSigningKey: Future[Option[Key]] =
     list.map { keys =>

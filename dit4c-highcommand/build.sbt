@@ -57,7 +57,7 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirecto
   cache(Set( dir / "helpers" / "AppVersion.scala" )).toSeq
 }
 
-pipelineStages := Seq(rjs, digest, gzip)
+pipelineStages := Seq(digest, gzip)
 
 sbtdocker.Plugin.dockerSettings
 
@@ -77,7 +77,11 @@ dockerfile in docker := {
  val prodConfig = dockerResources / "opt" / "dit4c-highcommand" / "prod.conf"
  immutable.Dockerfile.empty
    .from("dit4c/dit4c-platform-base")
-   .run("yum", "-y", "install", "java-1.7.0-openjdk-headless")
+   .run("bash", "-c",
+      """
+      rpm --rebuilddb &&
+      yum -y install java-1.8.0-openjdk
+      """)
    .add(stageDir, "/opt/dit4c-highcommand/")
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")

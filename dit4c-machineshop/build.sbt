@@ -85,7 +85,11 @@ dockerfile in docker := {
   val configs = dockerResources / "etc"
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-base")
-    .run("yum", "-y", "install", "java-1.7.0-openjdk-headless", "socat")
+    .run("bash", "-c",
+      """
+      rpm --rebuilddb &&
+      yum -y install java-1.8.0-openjdk socat
+      """)
     .add(jarFile, "/opt/dit4c-machineshop.jar")
     .add(configs, "/etc")
     .volume("/etc/dit4c-machineshop")

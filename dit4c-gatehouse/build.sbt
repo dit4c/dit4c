@@ -72,7 +72,8 @@ dockerfile in docker := {
     .from("dit4c/dit4c-platform-base")
     .run("bash", "-c",
       """
-      yum -y install java-1.7.0-openjdk-headless nginx socat &&
+      rpm --rebuilddb &&
+      yum -y install java-1.8.0-openjdk nginx socat &&
       rm /etc/nginx/conf.d/*.conf
       """)
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
