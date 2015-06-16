@@ -55,8 +55,9 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: Act
           |""".stripMargin.getBytes)
     val uriFile = baseDir.resolve("couchdb.uri")
     Files.deleteIfExists(uriFile)
+    val stdoutFile = baseDir.resolve("couch.out").toFile
     val process =
-      (Process(s"couchdb $configFileOpts -a $configFile") #> System.out).run
+      (Process(s"couchdb $configFileOpts -a $configFile") #> stdoutFile).run
     Await.ready(uriFileCreated(baseDir), 60.seconds)
     (process,
         new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
