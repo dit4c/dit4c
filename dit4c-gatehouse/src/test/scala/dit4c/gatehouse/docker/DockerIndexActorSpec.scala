@@ -34,15 +34,15 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
 
       (index ask PortQuery("foo"))
         .mapTo[PortReply] must equalTo(PortReply(Some(43000)))
-        .await(retries = 2, timeout = 150.millis)
+        .await(retries = 2, timeout = 200.millis)
 
       (index ask PortQuery("bar"))
         .mapTo[PortReply] must equalTo(PortReply(Some(43001)))
-        .await(retries = 2, timeout = 150.millis)
+        .await(retries = 2, timeout = 200.millis)
 
       (index ask PortQuery("doesnotexist"))
         .mapTo[PortReply] must equalTo(PortReply(None))
-        .await(retries = 2, timeout = 150.millis)
+        .await(retries = 2, timeout = 200.millis)
 
       0 must_== 0
     }
