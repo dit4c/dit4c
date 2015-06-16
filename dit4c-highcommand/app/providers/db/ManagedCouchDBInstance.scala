@@ -19,6 +19,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: Act
 
   override def disconnect {
     process.destroy
+    process.exitValue
   }
 
   /**
@@ -54,8 +55,6 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: Act
           |""".stripMargin.getBytes)
     val uriFile = baseDir.resolve("couchdb.uri")
     Files.deleteIfExists(uriFile)
-    import scala.sys.process.Process
-    println(s"couchdb $configFileOpts -a $configFile")
     val process =
       (Process(s"couchdb $configFileOpts -a $configFile") #> System.out).run
     Await.ready(uriFileCreated(baseDir), 60.seconds)
