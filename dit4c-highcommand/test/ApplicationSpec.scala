@@ -23,7 +23,7 @@ import utils.SpecUtils
  */
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec
-    extends PlaySpecification with NoTimeConversions with SpecUtils {
+    extends PlaySpecification with SpecUtils {
 
   import play.api.http.HeaderNames._
 

@@ -42,9 +42,9 @@ object MachineShop {
 
     def apply(path: String) = new RequestHolder(WS.url(s"$managementUrl$path"))  
 
-    class RequestHolder(ws: WSRequestHolder) {
+    class RequestHolder(ws: WSRequest) {
       import play.api.libs.iteratee.Enumerator
-      type PrepFunc = WSRequestHolder => WSRequestHolder
+      type PrepFunc = WSRequest => WSRequest
       type StreamTuple = (WSResponseHeaders, Enumerator[Array[Byte]])
 
       def signed(prepareFunc: PrepFunc): Future[WSResponse] =
@@ -59,7 +59,7 @@ object MachineShop {
           stream <- request.getStream()
         } yield stream
 
-      protected def signedNoExec(f: PrepFunc): Future[WSRequestHolder] =
+      protected def signedNoExec(f: PrepFunc): Future[WSRequest] =
         for {
           key <- privateKeyProvider()
         } yield f(ws).calculateDigest.httpSign(key)
@@ -71,8 +71,8 @@ object MachineShop {
       
   }
   
-  implicit class HttpSignatureCalculator(request: WSRequestHolder) {
-    def httpSign(privateKey: RSAKey): WSRequestHolder = {
+  implicit class HttpSignatureCalculator(request: WSRequest) {
+    def httpSign(privateKey: RSAKey): WSRequest = {
       def now = {
         val sdf = new java.text.SimpleDateFormat(
             "E, dd MMM yyyy HH:mm:ss z", java.util.Locale.US)
@@ -117,7 +117,7 @@ object MachineShop {
       )
     }
 
-    def calculateDigest: WSRequestHolder = request.body match {
+    def calculateDigest: WSRequest = request.body match {
       case InMemoryBody(bytes) =>
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(bytes)

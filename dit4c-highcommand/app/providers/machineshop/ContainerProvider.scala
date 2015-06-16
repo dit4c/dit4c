@@ -21,7 +21,7 @@ class ContainerProvider(
 
   def create(name: String, image: String) =
     client("containers")
-      .signed { ws: WSRequestHolder =>
+      .signed { ws: WSRequest =>
         ws.withMethod("POST")
           .withHeaders("Content-Type" -> "application/json; charset=utf-8")
           .withBody(InMemoryBody(Json.stringify(
