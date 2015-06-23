@@ -88,7 +88,7 @@ dockerfile in docker := {
     .run("bash", "-c",
       """
       rpm --rebuilddb &&
-      yum -y install java-1.8.0-openjdk socat
+      yum -y install java-1.8.0-openjdk socat dbus
       """)
     .add(jarFile, "/opt/dit4c-machineshop.jar")
     .add(configs, "/etc")
