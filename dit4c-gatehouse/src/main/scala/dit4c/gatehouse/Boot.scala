@@ -12,8 +12,7 @@ import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import spray.http.Uri
-import dit4c.gatehouse.docker.DockerClient
-import dit4c.gatehouse.docker.DockerIndexActor
+import dit4c.gatehouse.docker._
 import dit4c.gatehouse.auth.AuthActor
 import scala.util.{Success,Failure}
 
@@ -25,7 +24,7 @@ object Boot extends App with SimpleRoutingApp {
 
   def start(config: Config) {
     startServer(interface = config.interface, port = config.port) {
-      val dockerClient = new DockerClient(Uri(config.dockerHost.toString))
+      val dockerClient = new DockerClient(config.dockerHost)
       val dockerIndex = actorRefFactory.actorOf(
           Props(classOf[DockerIndexActor], dockerClient), "docker-index")
       val auth = actorRefFactory.actorOf(

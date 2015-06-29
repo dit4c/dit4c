@@ -21,7 +21,7 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
 
   import spray.util.pimpFuture
 
-  def client = new DockerClient(Uri("http://localhost:4243/")) {
+  def client = new DockerClient(java.net.URI.create("http://localhost:4243/")) {
     override def containerPorts: Future[Map[String, Int]] =
       Promise.successful(Map("foo" -> 43000, "bar" -> 43001)).future
   }
