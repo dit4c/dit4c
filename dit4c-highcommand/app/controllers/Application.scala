@@ -14,6 +14,7 @@ import scala.util.Try
 
 class Application @Inject() (
     authProviders: AuthProviders,
+    webConfig: providers.WebConfig,
     val db: CouchDB.Database)
     extends Controller with Utils {
 
@@ -24,7 +25,7 @@ class Application @Inject() (
 
   def main(path: String) = Action { implicit request =>
     ifNoneMatch(mainTmplETag("")) {
-      Ok(views.html.main(authProviders.providers.toSeq, googleAnalyticsCode))
+      Ok(views.html.main(authProviders.providers.toSeq, webConfig))
         .withHeaders(CACHE_CONTROL -> "public, max-age=1")
     }
   }
@@ -74,9 +75,6 @@ class Application @Inject() (
         InternalServerError("Database does not exist.")
     }
   }
-
-  private def googleAnalyticsCode: Option[String] =
-    Play.current.configuration.getString("ga.code")
 
   def classBasedETag(c: Class[_]) = {
     val urlConn = c.getResource(c.getSimpleName + ".class").openConnection

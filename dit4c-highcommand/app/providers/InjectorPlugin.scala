@@ -22,6 +22,8 @@ import com.google.inject.Provides
 import akka.actor.ActorSystem
 import play.api.inject.ApplicationLifecycle
 import javax.inject.Singleton
+import play.twirl.api.Html
+import com.github.rjeschke.txtmark;
 
 class InjectorPlugin(
     environment: Environment,
@@ -37,6 +39,25 @@ class InjectorPlugin(
       DummyProvider(configuration))
 
   val dbName = configuration.getString("couchdb.database").get
+
+  @Singleton @Provides def webConfigInstance(): WebConfig = {
+    val vSiteTitle = configuration.getString("site.title")
+    val vFrontpageLogo =
+      configuration.getString("frontpage.logo").flatMap(parseUrl)
+    val vFrontpageHtml =
+      configuration.getString("frontpage.html").orElse {
+        configuration.getString("frontpage.markdown").map { md =>
+          txtmark.Processor.process(md)
+        }
+      }.map(Html(_))
+    val vGACode = configuration.getString("ga.code")
+    new WebConfig {
+      def siteTitle = vSiteTitle
+      def frontpageLogo = vFrontpageLogo
+      def frontpageHtml = vFrontpageHtml
+      def googleAnalyticsCode = vGACode
+    }
+  }
 
   @Singleton @Provides def dbServerInstance(
       lifecycle: ApplicationLifecycle)(
@@ -73,4 +94,7 @@ class InjectorPlugin(
   def configure {
     bind(classOf[AuthProviders]).toInstance(authProviders)
   }
+  
+  private def parseUrl(str: String): Option[java.net.URL] =
+    Try(new java.net.URL(str)).toOption
 }

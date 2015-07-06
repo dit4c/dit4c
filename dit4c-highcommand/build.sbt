@@ -13,11 +13,12 @@ libraryDependencies ++= Seq(
   "com.osinka.slugify"  %%  "slugify"         % "1.2.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
   "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
+  "com.github.rjeschke" %   "txtmark"         % "0.13",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.6"     % "test",
   "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.6"     % "test",
-  "org.specs2" %% "specs2-core" % "3.6" % "test",
-  "org.specs2" %% "specs2-junit" % "3.6" % "test",
-  "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
+  "org.specs2"          %%  "specs2-core"     % "3.6"       % "test",
+  "org.specs2"          %%  "specs2-junit"    % "3.6"       % "test",
+  "org.specs2"          %%  "specs2-scalacheck" % "3.6"     % "test",
   // WebJars for client-side dependencies
   "org.webjars" %% "webjars-play" % "2.3.0",
   // AngularJS

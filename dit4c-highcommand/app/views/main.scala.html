@@ -1,4 +1,4 @@
-@(authProviders: Seq[providers.auth.AuthProvider], googleAnalyticsCode: Option[String], webjarCDN: String = "https://cdn.jsdelivr.net/webjars/")
+@(authProviders: Seq[providers.auth.AuthProvider], webConfig: providers.WebConfig, webjarCDN: String = "https://cdn.jsdelivr.net/webjars/")
 
 @import helpers.AppVersion
 
@@ -11,7 +11,9 @@
 <!DOCTYPE html5>
 <html>
   <head>
-    <title>DIT4C @AppVersion</title>
+    @defining(webConfig.siteTitle.getOrElse("DIT4C "+AppVersion)) { title =>
+      <title>@title</title>
+    }
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href='@cdnWebJarAsset("css/bootstrap.min.css")' rel="stylesheet">
@@ -25,7 +27,7 @@
     // Enhance RequireJS to handle WebJARs from CDN
     @play.twirl.api.Html(org.webjars.RequireJS.getSetupJavaScript(webjarCDN,""))
     </script>
-    @for(code <- googleAnalyticsCode) {
+    @for(code <- webConfig.googleAnalyticsCode) {
     <script>
       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -102,26 +104,29 @@
       <div class="container">
         <div class="row">
           <div class="col-md-8 col-md-push-4">
-            <img class="img-responsive center-block"
-              src="assets/images/logo.svg"/>
+            @defining(webConfig.frontpageLogo.getOrElse(routes.Assets.versioned("images/logo.svg"))) { src =>
+              <img class="img-responsive center-block" src="@src"/>
+            }
           </div>
           <div class="col-md-4 col-md-pull-8">
-            <h1 id="dit4c">DIT4C</h1>
-            <p>
-            Get access to common research tools direct from your browser.
-            </p>
-            <p>
-            No installation required.
-            </p>
-            <p>
-              <a href="https://dit4c.github.io/">
-                <i class="fa fa-github"/>
-              </a>
-              &nbsp;
-              <a href="https://twitter.com/search?q=%23DIT4C">
-                <i class="fa fa-twitter"/>
-              </a>
-            </p>
+            @if(webConfig.frontpageHtml.isDefined) { @webConfig.frontpageHtml.get } else {
+              <h1 id="dit4c">DIT4C</h1>
+              <p>
+              Get access to common research tools direct from your browser.
+              </p>
+              <p>
+              No installation required.
+              </p>
+              <p>
+                <a href="https://dit4c.github.io/">
+                  <i class="fa fa-github"/>
+                </a>
+                &nbsp;
+                <a href="https://twitter.com/search?q=%23DIT4C">
+                  <i class="fa fa-twitter"/>
+                </a>
+              </p>
+            }
           </div>
         </div>
       </div>
