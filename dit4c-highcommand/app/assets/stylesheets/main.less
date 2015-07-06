@@ -14,7 +14,7 @@
 
 body {
   padding-top: 70px;
-  font-family: Raleway, inherit;
+  font-family: Raleway;
   .navbar {
     background: white;
     .icon-bar {
@@ -65,6 +65,7 @@ body {
 }
 
 #home-jumbo {
+  font-family: Raleway;
   background: transparent;
   position: absolute;
   top: 0;
@@ -72,8 +73,12 @@ body {
   right: 0;
   bottom: 0;
   margin-bottom: 0;
-  text-align: center;
   overflow: hidden;
+  > .container {
+    padding-top: 50px;
+    padding-left: 50px;
+    padding-right: 50px;
+  }
   .icon-dit4c-logo {
     display: inline-block;
     margin-top: 150px;

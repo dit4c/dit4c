@@ -99,8 +99,31 @@
     <script type="text/ng-template" id="index.html">
     <div ng-include src="'navbar.html'"></div>
     <div id="home-jumbo" class="jumbotron">
-      <div class="container align-center">
-        <i class="icon-dit4c-logo"></i>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-8 col-md-push-4">
+            <img class="img-responsive center-block"
+              src="assets/images/logo.svg"/>
+          </div>
+          <div class="col-md-4 col-md-pull-8">
+            <h1 id="dit4c">DIT4C</h1>
+            <p>
+            Get access to common research tools direct from your browser.
+            </p>
+            <p>
+            No installation required.
+            </p>
+            <p>
+              <a href="https://dit4c.github.io/">
+                <i class="fa fa-github"/>
+              </a>
+              &nbsp;
+              <a href="https://twitter.com/search?q=%23DIT4C">
+                <i class="fa fa-twitter"/>
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
     </script>
@@ -554,6 +577,8 @@
                 I've changed my mind
               </button>
             </p>
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
           </div>
 
           <div class="well" ng-if="node.editForm">
