@@ -539,7 +539,7 @@
       </div>
 
       <accordion close-others="oneAtATime">
-        <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'" is-disabled="!node.owned">
+        <accordion-group ng-repeat="node in computeNodes | filter:relevantComputeNode | orderBy:'name'">
           <accordion-heading>
             {{node.name}}
             <div class="pull-right">
@@ -658,7 +658,14 @@
             </form>
           </div>
 
-          <div ng-if="!(node.editForm || node.confirmingDelete)">
+          <div ng-if="!node.owned">
+            <p>
+            Go to the <a href="/containers">Containers</a> tab
+            to create a new container.
+            </p>
+          </div>
+
+          <div ng-if="node.owned && !(node.editForm || node.confirmingDelete)">
             <div class="pull-right clear">
               <button class="btn btn-default" ng-if="node.owned" ng-click="populateEditForm(node)">
                 Edit
