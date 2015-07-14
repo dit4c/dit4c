@@ -582,8 +582,6 @@
                 I've changed my mind
               </button>
             </p>
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
           </div>
 
           <div class="well" ng-if="node.editForm">
@@ -797,7 +795,9 @@
                   </thead>
                   <tbody>
                     <tr ng-repeat="container in containers[node.id]">
-                      <td>{{container.name}}</td>
+                      <td>
+                        <span title="{{container.id}}">{{container.name}}</span>
+                      </td>
                       <td>{{container.image}}</td>
                       <td>
                         <div ng-repeat="user in resolveUsers(node, container.ownerIDs)">
