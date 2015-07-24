@@ -32,7 +32,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
   val route =
     path("auth") {
       get {
-        host("""^([\w\-]+)\.""".r) { containerName =>
+        headerValueByName("X-Server-Name") { containerName =>
           optionalCookie(AUTH_TOKEN_COOKIE) {
             case Some(jwtCookie) =>
               onComplete(auth ask AuthCheck(jwtCookie.content, containerName)) {
@@ -72,7 +72,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
           }
         } ~
         respondWithStatus(400) {
-          complete("A Host header with at least two DNS labels is required.")
+          complete("A X-Server-Name header is required.")
         }
       }
     }

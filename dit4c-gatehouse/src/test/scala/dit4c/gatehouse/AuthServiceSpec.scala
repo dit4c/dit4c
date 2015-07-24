@@ -24,27 +24,27 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
 
     "for GET requests to the auth path" >> {
 
-      "return 400 if subdomain label is not present" in {
-        Get("/auth") ~> addHeader("Host", "localhost") ~> route ~> check {
+      "return 400 if X-Server-Name is not present" in {
+        Get("/auth") ~> route ~> check {
           status must be(BadRequest)
-          responseAs[String] must beMatching(".*Host header.*".r)
+          responseAs[String] must beMatching(".*X-Server-Name header.*".r)
         }
         // Check dashed domain labels work
-        Get("/auth") ~> addHeader("Host", "a-b.test") ~> route ~> check {
+        Get("/auth") ~> addHeader("X-Server-Name", "a-b") ~> route ~> check {
           status must not be(BadRequest)
         }
       }
 
       "return 403 if Host is present and token is missing or invalid" in {
         Get("/auth") ~>
-            addHeader("Host", "foo.example.com") ~>
+            addHeader("X-Server-Name", "foo") ~>
             route ~> check {
           status must be(Forbidden)
           entity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
         Get("/auth") ~>
-            addHeader("Host", "foo.example.com") ~>
+            addHeader("X-Server-Name", "foo") ~>
             Cookie(HttpCookie("dit4c-jwt", badToken)) ~>
             route ~> check {
           status must be(Forbidden)
@@ -54,9 +54,9 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
         }
       }
 
-      "return 200 if Host is present, token is valid and port is found" in {
+      "return 200 if X-Server-Name is present, token is valid and port is found" in {
         Get("/auth") ~>
-            addHeader("Host", "foo.example.com") ~>
+            addHeader("X-Server-Name", "foo") ~>
             Cookie(HttpCookie("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(OK)
@@ -68,7 +68,7 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
 
       "return 404 if Host is present, token is valid and port is not found" in {
         Get("/auth") ~>
-            addHeader("Host", "bar.example.com") ~>
+            addHeader("X-Server-Name", "bar") ~>
             Cookie(HttpCookie("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(NotFound)
@@ -79,7 +79,7 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
 
       "return 500 if port query fails" in {
         Get("/auth") ~>
-            addHeader("Host", "die.example.com") ~>
+            addHeader("X-Server-Name", "die") ~>
             Cookie(HttpCookie("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(InternalServerError)
