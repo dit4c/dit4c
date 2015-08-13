@@ -66,22 +66,22 @@ dockerfile in docker := {
   import sbtdocker.Instructions._
   import sbtdocker._
   val jarFile = artifactPath.in(Compile, oneJar).value
-  val dockerResources = baseDirectory.value / "src" / "main" / "docker"
-  val configs = dockerResources / "etc"
-  val optFiles = dockerResources / "opt"
   immutable.Dockerfile.empty
-    .from("dit4c/dit4c-platform-base")
-    .run("bash", "-c",
-      """
-      rpm --rebuilddb &&
-      yum -y install java-1.8.0-openjdk nginx socat &&
-      rm /etc/nginx/conf.d/*.conf
+    .from("progrium/busybox")
+    .run("opkg-install", "curl", "grep")
+    .run("sh", "-c", """
+      ZULU_DOWNLOADS="http://www.azulsystems.com/products/zulu/downloads" &&
+      ZULU_ZIP_URL=$(curl -s $ZULU_DOWNLOADS | grep -Po '(?<=")http://[^"]*x86lx64.zip(?=")' | head -1) &&
+      echo "Downloading $ZULU_ZIP_URL" &&
+      curl -s -o /tmp/jdk.zip --referer $ZULU_DOWNLOADS $ZULU_ZIP_URL &&
+      unzip -q /tmp/jdk.zip -d /usr/lib &&
+      rm /tmp/jdk.zip /usr/lib/zulu*/*.zip &&
+      ln -s /usr/lib/zulu*/bin/java /usr/bin/ &&
+      java -version
       """)
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
-    .add(configs, "/etc")
-    .add(optFiles, "/opt")
-    .cmd("bash", "/opt/run.sh")
-    .expose(80)
+    .cmd("sh", "-c", "cd /opt && exec java -jar /opt/dit4c-gatehouse.jar -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys")
+    .expose(8080)
 }
 
 // Set a custom image name
