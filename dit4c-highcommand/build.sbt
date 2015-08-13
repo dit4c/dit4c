@@ -77,17 +77,12 @@ dockerfile in docker := {
  val configs = dockerResources / "etc"
  val prodConfig = dockerResources / "opt" / "dit4c-highcommand" / "prod.conf"
  immutable.Dockerfile.empty
-   .from("dit4c/dit4c-platform-base")
-   .run("bash", "-c",
-      """
-      rpm --rebuilddb &&
-      yum -y install java-1.8.0-openjdk
-      """)
+   .from("dit4c/dit4c-platform-basejre")
    .add(stageDir, "/opt/dit4c-highcommand/")
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")
    .run("chmod", "+x", "/opt/dit4c-highcommand/bin/dit4c-highcommand")
-   .run("useradd", "-d", "/opt/dit4c-highcommand", "-r", "dit4c")
+   .run("adduser", "-h", "/opt/dit4c-highcommand", "-S", "dit4c")
    .user("dit4c")
    .cmd("/opt/dit4c-highcommand/bin/dit4c-highcommand",
         "-Dconfig.file=/opt/dit4c-highcommand/prod.conf",

@@ -67,18 +67,7 @@ dockerfile in docker := {
   import sbtdocker._
   val jarFile = artifactPath.in(Compile, oneJar).value
   immutable.Dockerfile.empty
-    .from("progrium/busybox")
-    .run("opkg-install", "curl", "grep")
-    .run("sh", "-c", """
-      ZULU_DOWNLOADS="http://www.azulsystems.com/products/zulu/downloads" &&
-      ZULU_ZIP_URL=$(curl -s $ZULU_DOWNLOADS | grep -Po '(?<=")http://[^"]*x86lx64.zip(?=")' | head -1) &&
-      echo "Downloading $ZULU_ZIP_URL" &&
-      curl -s -o /tmp/jdk.zip --referer $ZULU_DOWNLOADS $ZULU_ZIP_URL &&
-      unzip -q /tmp/jdk.zip -d /usr/lib &&
-      rm /tmp/jdk.zip /usr/lib/zulu*/*.zip &&
-      ln -s /usr/lib/zulu*/bin/java /usr/bin/ &&
-      java -version
-      """)
+    .from("dit4c/dit4c-platform-basejre")
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
     .cmd("sh", "-c", "cd /opt && exec java -jar /opt/dit4c-gatehouse.jar -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys")
     .expose(8080)
