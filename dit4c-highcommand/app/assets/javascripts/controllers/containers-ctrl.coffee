@@ -19,7 +19,7 @@ define(['./module'], (controllers) ->
       name: ""
       computeNode: null
       image: ""
-      active: false
+      active: true
 
     $scope.$watch("computeNodes",
       (newValue, oldValue) ->

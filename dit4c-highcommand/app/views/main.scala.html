@@ -310,21 +310,9 @@
               </div>
             </div>
             <div class="form-group">
-              <label class="col-sm-3 control-label">Initial State</label>
-              <div class="col-sm-9">
-                <div class="btn-group">
-                  <span ng-if="newContainer.active" class="btn btn-success active disabled" style="opacity: 1">On</span>
-                  <button ng-if="newContainer.active" class="btn btn-default" ng-click="newContainer.active = false">&nbsp;</button>
-                  <button ng-if="!newContainer.active" class="btn btn-default" ng-click="newContainer.active = true">&nbsp;</button>
-                  <span ng-if="!newContainer.active" class="btn btn-default active disabled" style="opacity: 1">Off</span>
-                </div>
-                <input type="hidden" ng-model="newContainer.active"/>
-              </div>
-            </div>
-            <div class="form-group">
               <div class="col-sm-offset-3 col-sm-10">
                 <button class="btn btn-primary" ng-click="create()" ng-class="{ disabled: newContainer.name.length == 0 }">
-                  Create
+                  Start
                 </button>
               </div>
             </div>
