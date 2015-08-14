@@ -55,7 +55,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 
   private def pollDocker = {
     dockerClient.containerPorts.onComplete({
-      case Success(m: Map[String, Int]) =>
+      case Success(m: Map[String, String]) =>
         self ! UpdatePortIndex(m)
       case Failure(e) =>
         log.warning(s"Docker poll failed: $e")
