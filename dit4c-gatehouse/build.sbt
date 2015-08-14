@@ -69,7 +69,7 @@ dockerfile in docker := {
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-basejre")
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
-    .cmd("sh", "-c", "cd /opt && exec java -jar /opt/dit4c-gatehouse.jar -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys")
+    .cmd("sh", "-c", "cd /opt && exec java -jar /opt/dit4c-gatehouse.jar -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys")
     .expose(8080)
 }
 
