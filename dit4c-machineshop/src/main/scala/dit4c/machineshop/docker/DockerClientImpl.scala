@@ -1,6 +1,6 @@
 package dit4c.machineshop.docker
 
-import scala.concurrent.{Future, future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.actor._
 import akka.io.IO
@@ -15,7 +15,9 @@ import dit4c.machineshop.docker.models._
 import java.util.{Calendar, TimeZone}
 import com.typesafe.config.ConfigFactory
 
-class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
+class DockerClientImpl(
+    val baseUrl: spray.http.Uri,
+    val newContainerLinks: Seq[ContainerLink] = Nil) extends DockerClient {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val timeout: Timeout = Timeout(15.seconds)
@@ -273,10 +275,10 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
 
     override def create(name: String, image: DockerImage) = {
       import spray.httpx.ResponseTransformation._
+      import spray.json._
+      import DefaultJsonProtocol._
 
       def parseJsonResponse: HttpResponse => DockerContainer = { res =>
-        import spray.json._
-        import DefaultJsonProtocol._
 
         val obj = JsonParser(res.entity.asString).convertTo[JsObject]
 
@@ -296,7 +298,7 @@ class DockerClientImpl(val baseUrl: spray.http.Uri) extends DockerClient {
           "CpuShares" -> JsNumber(1),
           "Image" -> JsString(image),
           "HostConfig" -> JsObject(
-            "PublishAllPorts" -> JsTrue,
+            "Links" -> newContainerLinks.map(_.toString.toJson).toJson,
             "RestartPolicy" -> JsObject(
               "Name" -> JsString("always")
             )

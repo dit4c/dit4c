@@ -23,17 +23,43 @@ class DockerClient(val uri: java.net.URI) {
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
   val dockerClient = new DefaultDockerClient(uri)
-
-  def containerPorts = Future {
-    dockerClient.listContainers().toSeq.flatMap { c =>
-      val names = c.names().toSeq.map(_.stripPrefix("/"))
-      val ports = c.ports.toSeq
+  
+  def containerPort(containerId: String): Future[Option[String]] =
+    Future {
+      dockerClient.inspectContainer(containerId)
+    }.map { info =>
+      val exposedPorts = info.config.exposedPorts.toSet
       POTENTIAL_SERVICE_PORTS
-        .map(p => ports.find(_.getPrivatePort == p))
-        .flatten.headOption.toSeq
-        .flatMap(mapping => names.toSeq.map(n => (n, mapping.getPublicPort)) )
-    }.filter(_._1.isValidContainerName).toMap
-  }
+        .filter(p => exposedPorts.contains(s"$p/tcp"))
+        .headOption
+        .map(info.networkSettings.ipAddress+":"+_)
+    }
+
+  def containerPorts =
+    Future(dockerClient.listContainers().toSeq).flatMap { containers =>
+      val nameMap =
+        containers.flatMap { c =>
+          c.names.toSeq
+            .map(_.stripPrefix("/"))
+            .map((_, c.id))
+        }.filter(_._1.isValidContainerName).toMap
+      // Future id => port map 
+      val fPortMap = Future.sequence {
+          // Futures for each container
+          nameMap.values.toSet.map { id: String =>
+            // Get container port, wrapping name into the Option response
+            containerPort(id).map(maybePort => maybePort.map { (id, _) })
+          }
+        }.map(_.flatten.toMap) // Turn into map, removing None lookups
+      // Merge the names and ports
+      fPortMap.map { portMap =>
+        nameMap
+          .filter { case (name, id) => portMap.contains(id) }
+          .map { case (name, id) =>
+            (name, portMap(id))
+          }
+      }
+    }
 
   implicit class ContainerNameTester(str: String) {
 

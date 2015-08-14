@@ -21,9 +21,9 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
 
   import spray.util.pimpFuture
 
-  def client = new DockerClient(java.net.URI.create("http://localhost:4243/")) {
-    override def containerPorts: Future[Map[String, Int]] =
-      Promise.successful(Map("foo" -> 43000, "bar" -> 43001)).future
+  def client = new DockerClient(java.net.URI.create("http://localhost:2375/")) {
+    override def containerPorts: Future[Map[String, String]] =
+      Promise.successful(Map("foo" -> "1.2.3.4:8080", "bar" -> "2.3.4.5:8888")).future
   }
 
   "DockerIndexActor" should {
@@ -33,11 +33,11 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
       val index: ActorRef = system.actorOf(Props(classOf[DockerIndexActor], client))
 
       (index ask PortQuery("foo"))
-        .mapTo[PortReply] must equalTo(PortReply(Some(43000)))
+        .mapTo[PortReply] must equalTo(PortReply(Some("1.2.3.4:8080")))
         .await(retries = 2, timeout = 200.millis)
 
       (index ask PortQuery("bar"))
-        .mapTo[PortReply] must equalTo(PortReply(Some(43001)))
+        .mapTo[PortReply] must equalTo(PortReply(Some("2.3.4.5:8888")))
         .await(retries = 2, timeout = 200.millis)
 
       (index ask PortQuery("doesnotexist"))

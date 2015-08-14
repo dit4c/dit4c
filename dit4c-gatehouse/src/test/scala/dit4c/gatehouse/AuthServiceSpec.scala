@@ -62,7 +62,7 @@ class AuthServiceSpec extends Specification with Specs2RouteTest {
           status must be(OK)
           entity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beSome
-          header("X-Upstream-Port").get.value must_== "40003"
+          header("X-Upstream-Port").get.value must_== "3.4.5.6:8080"
         }
       }
 
@@ -105,7 +105,7 @@ object AuthServiceSpec {
       case PortQuery("die") =>
         // Do nothing
       case PortQuery("foo") =>
-        sender ! PortReply(Some(40003))
+        sender ! PortReply(Some("3.4.5.6:8080"))
       case PortQuery(_) =>
         sender ! PortReply(None)
     }

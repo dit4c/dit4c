@@ -17,7 +17,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   import DockerIndexActor._
 
   private case class DelayedQuery(sender: ActorRef, query: PortQuery)
-  private case class UpdatePortIndex(index: Map[String, Int])
+  private case class UpdatePortIndex(index: Map[String, String])
 
   private var queue: Queue[DelayedQuery] = Queue.empty
 
@@ -38,7 +38,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   }
 
   // Respond using index
-  def respondWith(index: Map[String, Int]): Receive = {
+  def respondWith(index: Map[String, String]): Receive = {
     clearQueue
     commonReceive orElse {
       case DelayedQuery(originalSender, PortQuery(containerName)) =>
@@ -66,5 +66,5 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 
 object DockerIndexActor {
   case class PortQuery(containerName: String)
-  case class PortReply(port: Option[Int])
+  case class PortReply(port: Option[String])
 }
