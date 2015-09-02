@@ -58,4 +58,4 @@ libraryDependencies ++= Seq(
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "0.8.5")
 
 // Dependency graph
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.4")
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.5")

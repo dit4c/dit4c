@@ -5,15 +5,16 @@ import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
 import play.api.libs.json._
 import gnieh.sohva.async.View
+import com.google.inject.Inject
 
-class ContainerDAO(protected val db: CouchDB.Database)
+class ContainerDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
   import play.api.Play.current
 
   val typeValue = "Container"
-  
+
   def create(
       user: User,
       name: String,
@@ -45,6 +46,7 @@ class ContainerDAO(protected val db: CouchDB.Database)
   )(ContainerImpl.apply _, unlift(ContainerImpl.unapply))
     .withTypeAttribute(typeValue)
 
+  def fromJson(json: JsValue) = json.asOpt[ContainerImpl]
 
   case class ContainerImpl(
       id: String,
