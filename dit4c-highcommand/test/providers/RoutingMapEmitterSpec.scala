@@ -9,6 +9,7 @@ import models._
 import utils.SpecUtils
 import providers.hipache.Hipache
 import play.api.libs.iteratee._
+import scala.concurrent.Promise
 
 @RunWith(classOf[JUnitRunner])
 class RoutingMapEmitterSpec extends PlaySpecification with SpecUtils {
@@ -44,23 +45,26 @@ class RoutingMapEmitterSpec extends PlaySpecification with SpecUtils {
         await(containerDao.create(session.user, "name3", testImage, computeNode))
       )
 
-      val fEvent1 = emitter.newFeed &> tapEcho |>>> Iteratee.takeUpTo(1)
-      val events: Seq[Event] = await(fEvent1)
-      events must haveSize(1)
-      events.head must beAnInstanceOf[ReplaceAllRoutes]
-      val ReplaceAllRoutes(routes) = events.head
-      routes must not beEmpty
+      val ReplaceAllRoutes(routes) = await {
+        val p = Promise[Event]()
+        emitter.newFeed |>>> Iteratee.foreach {
+          p.success(_)
+        }
+        p.future
+      }
+      routes must haveSize(3)
+      routes.map(_.backend) must contain(be_==(computeNode.backend))
 
-//      val fEvent2 = emitter.newFeed &> tapEcho |>>> Iteratee.head;
-//      await(Future.sequence(containers.map(_.delete)));
-//      {
-//        val event: Option[Event] = await(fEvent2)
-//        event must beSome(beAnInstanceOf[ReplaceAllRoutes])
-//        val ReplaceAllRoutes(routes) = event.get
-//        routes must beEmpty
-//      }
+      await(Future.sequence(containers.map(_.delete)));
 
-      pending
+      val ReplaceAllRoutes(routesAfterDelete) = await {
+        val p = Promise[Event]()
+        emitter.newFeed |>>> Iteratee.foreach {
+          p.success(_)
+        }
+        p.future
+      }
+      routesAfterDelete must beEmpty
     }
 
     "should emit new events as DB is updated" in new WithApplication(fakeApp) {

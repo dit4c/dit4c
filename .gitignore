@@ -22,3 +22,5 @@ activator-*.sbt
 /db/
 **/karma/node_modules/
 /dit4c-machineshop/known_images*.json
+**/.cache-main
+**/.cache-tests

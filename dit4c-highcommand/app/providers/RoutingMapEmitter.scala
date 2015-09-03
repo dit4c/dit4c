@@ -103,13 +103,11 @@ class RoutingMapEmitter @Inject() (
       fs.values.map(v => Route(v._1, bs(v._2))).toSet
     }
 
-
   def newFeed: Enumerator[Event] = Enumerator.flatten {
     for {
       routes <- currentRoutes
     } yield {
-      println(routes)
-      Enumerator.enumerate[Event](Some(ReplaceAllRoutes(routes))) andThen
+      Enumerator[Event](ReplaceAllRoutes(routes)) andThen
         eventBus
     }
   }
