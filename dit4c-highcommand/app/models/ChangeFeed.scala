@@ -4,9 +4,10 @@ import play.api.libs.iteratee.Enumerator
 import play.api.libs.json._
 import providers.db.CouchDB
 import com.google.inject.Inject
+import com.google.inject.Singleton
 import play.api.libs.iteratee.Concurrent
 
-class ChangeFeed @Inject() (db: CouchDB.Database) {
+class ChangeFeed @Inject() @Singleton() (db: CouchDB.Database) {
   import ChangeFeed._
 
   val (eventBus, channel) = Concurrent.broadcast[Change]

@@ -10,46 +10,47 @@ import java.security.MessageDigest
 import providers.hipache.ContainerResolver
 import rx.lang.scala.Subscription
 import play.api.libs.iteratee.Concurrent
+import providers.RoutingMapEmitter
+import play.api.libs.EventSource
+import play.api.libs.iteratee.Enumeratee
+import providers.RoutingMapEmitter.ReplaceAllRoutes
 
 class RoutingMapController @Inject() (
     val db: CouchDB.Database,
-    val containerResolver: ContainerResolver)
+    val routingMapEmitter: RoutingMapEmitter)
     extends Controller with Utils {
 
-  def get = Action.async { implicit request =>
-    for {
-      computeNodes <- computeNodeDao.list
-      cnMap = computeNodes.map(cn => (cn.id, cn)).toMap
-      containers <- containerDao.list
-    } yield {
-      val json = Json.obj(
-        "mappings" -> Json.toJson(containers.flatMap { c =>
-          cnMap.get(c.computeNodeId).map(_.backend).map { backend =>
-            val frontend = containerResolver.asFrontend(c)
-            Json.obj(
-              "domain" -> frontend.domain,
-              "protocol" -> backend.scheme,
-              "servers" -> Seq(backend.host + ":" + backend.port)
-            )
-          }
-        })
-      )
-      Ok(json).withHeaders("ETag" -> etagFromJsValue(json))
+  def feed = Action.async { implicit request =>
+    Future.successful {
+      val feed = routingMapEmitter.newFeed &>
+         Enumeratee.map(Json.toJson(_)) &>
+         EventSource()
+      Ok.stream(feed).as("text/event-stream")
     }
   }
 
-  def feed = Action.async { implicit request =>
-    Future.successful(Ok("").as("text/event-stream"))
+  implicit val routeWrites: Writes[RoutingMapEmitter.Route] = Writes { route =>
+    Json.obj(
+      "name" -> route.frontend.name,
+      "domain" -> route.frontend.domain,
+      "scheme" -> route.backend.scheme,
+      "servers" -> Json.arr(route.backend.host+":"+route.backend.port)
+    )
   }
 
-  val (eventEnumerator, eventChannel) = Concurrent.broadcast
-
-  
-
-  def etagFromJsValue(json: JsValue): String =
-    MessageDigest.getInstance("SHA1")
-      .digest(Json.stringify(json).getBytes)
-      .map("%02x".format(_))
-      .mkString
+  implicit val rarWrites = Writes[RoutingMapEmitter.Event] {
+    case RoutingMapEmitter.ReplaceAllRoutes(routes) =>
+      Json.obj(
+          "event" -> "replace-all-routes",
+          "routes" -> Json.toJson(routes))
+    case RoutingMapEmitter.SetRoute(route) =>
+      Json.obj(
+          "event" -> "set-route",
+          "route" -> Json.toJson(route))
+    case RoutingMapEmitter.DeleteRoute(route) =>
+      Json.obj(
+          "event" -> "delete-route",
+          "route" -> Json.toJson(route))
+  }
 
 }
