@@ -31,25 +31,30 @@ class RoutingMapController @Inject() (
 
   implicit val routeWrites: Writes[RoutingMapEmitter.Route] = Writes { route =>
     Json.obj(
-      "name" -> route.frontend.name,
       "domain" -> route.frontend.domain,
-      "scheme" -> route.backend.scheme,
-      "servers" -> Json.arr(route.backend.host+":"+route.backend.port)
+      "headers" -> Json.obj(
+        "X-Server-Name" -> route.frontend.name
+      ),
+      "upstream" -> Json.obj(
+        "scheme" -> route.backend.scheme,
+        "host" -> route.backend.host,
+        "port" -> route.backend.port
+      )
     )
   }
 
   implicit val rarWrites = Writes[RoutingMapEmitter.Event] {
     case RoutingMapEmitter.ReplaceAllRoutes(routes) =>
       Json.obj(
-          "event" -> "replace-all-routes",
+          "op" -> "replace-all-routes",
           "routes" -> Json.toJson(routes))
     case RoutingMapEmitter.SetRoute(route) =>
       Json.obj(
-          "event" -> "set-route",
+          "op" -> "set-route",
           "route" -> Json.toJson(route))
     case RoutingMapEmitter.DeleteRoute(route) =>
       Json.obj(
-          "event" -> "delete-route",
+          "op" -> "delete-route",
           "route" -> Json.toJson(route))
   }
 
