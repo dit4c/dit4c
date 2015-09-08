@@ -1,0 +1,14 @@
+server {
+  listen       8080;
+  server_name  {{domain}};
+
+  location / {
+    {{#upstream}}
+    proxy_pass {{scheme}}://{{host}}:{{port}};
+    {{/upstream}}
+    {{#headers}}
+    proxy_set_header {{name}} "{{value}}";
+    {{/headers}}
+    proxy_set_header Host "{{domain}}";
+  }
+}
