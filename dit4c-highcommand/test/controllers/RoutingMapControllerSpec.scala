@@ -62,9 +62,12 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
         ((v \ "op").as[String] must_== "set-route") and
         ((v \ "route" \ "domain").as[String] must contain(".")) and
         ((v \ "route" \ "headers").as[Map[String,String]] must haveKey("X-Server-Name")) and
-        ((v \ "route" \ "upstream" \ "scheme").as[String] must_== "https") and
-        ((v \ "route" \ "upstream" \ "host").as[String] must_== "localhost") and
-        ((v \ "route" \ "upstream" \ "port").as[Int] must_== 8080)
+        ((v \ "route" \ "upstream") match { case u =>
+          ((u \ "scheme").as[String] must_== "https") and
+          ((u \ "host").as[String] must_== "localhost") and
+          ((u \ "port").as[Int] must_== 8080)
+        })
+
       })
     }
 
