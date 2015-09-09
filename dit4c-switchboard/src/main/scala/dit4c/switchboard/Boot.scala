@@ -9,6 +9,7 @@ import akka.http.scaladsl.model._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.fusesource.scalate._
+import scala.util._
 
 object Boot extends App {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,33 +36,8 @@ object Boot extends App {
     }
   }).start
 
-  val engine = new TemplateEngine
-
-  protected def replaceAllRoutes(routes: Seq[Route]) = routes.foreach { route =>
-    println(route)
-    try {
-      val output = engine.layout("/nginx_vhost.tmpl.mustache",
-        Map(
-          "domain" -> route.domain,
-          "headers" -> route.headers.map {
-            case (k, v) => Map("name" -> k, "value" -> v)
-          },
-          "upstream" -> Map(
-            "scheme" -> route.upstream.scheme,
-            "host" -> route.upstream.host,
-            "port" -> route.upstream.port.toString
-          )
-        )
-      )
-      println(output)
-    } catch {
-      case e => println(e)
-    }
-  }
-  protected def setRoute(route: Route) = println(route)
-  protected def deleteRoute(route: Route) = println(route)
-
   ArgParser.parse(args, Config()) map { config =>
+    val nginx = new NginxInstance(None, 9200)
     for {
       response <- Http().singleRequest(HttpRequest(uri = config.feed.toString))
     } yield {
@@ -75,11 +51,11 @@ object Boot extends App {
             .runForeach { v =>
               println {(v \ "op").as[String] match {
                 case "replace-all-routes" =>
-                  replaceAllRoutes((v \ "routes").as[Seq[Route]])
+                  nginx.replaceAllRoutes((v \ "routes").as[Seq[Route]])
                 case "set-route" =>
-                  setRoute((v \ "route").as[Route])
+                  nginx.setRoute((v \ "route").as[Route])
                 case "delete-route" =>
-                  deleteRoute((v \ "route").as[Route])
+                  nginx.deleteRoute((v \ "route").as[Route])
               }}
             }
       }

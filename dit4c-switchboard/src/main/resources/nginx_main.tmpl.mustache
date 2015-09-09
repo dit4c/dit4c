@@ -1,0 +1,62 @@
+worker_processes  1;
+daemon off;
+
+error_log  /dev/stdout warn;
+pid        {{pidfile}};
+
+events {
+  worker_connections  1024;
+}
+
+
+http {
+
+  log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+  access_log  /dev/stdout main;
+
+  default_type  application/octet-stream;
+  # Large numbers of vhosts means super-size hash size
+  server_names_hash_max_size 32768;
+  # vhost names are a bit long too
+  server_names_hash_bucket_size 256;
+  sendfile        on;
+  keepalive_timeout  65;
+  client_max_body_size 1G;
+  # Do not use SSLv3 - POODLE vulnerability
+  ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
+
+  gzip on;
+  gunzip on;
+  gzip_proxied any;
+  gzip_types text/css application/javascript application/json;
+
+  proxy_cache_path {{cachedir}} keys_zone=main:128m;
+  proxy_cache_key "$scheme$host$request_uri $http_accept";
+
+  index   index.html index.htm;
+
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+  }
+
+  include {{vhostdir}}/*.conf;
+
+  {{#domain}}
+  server {
+    listen       *:{{port}};
+    server_name  _;
+
+    location / {
+      # Redirect to server wait page (unless that would cause a redirect loop)
+      if ($http_host != "{{domain}}") {
+        return 302 $scheme://{{domain}}/waiting/$scheme/$http_host$request_uri;
+      }
+      # Otherwise service is unavailable
+      return 503;
+    }
+  }
+  {{/domain}}
+}
