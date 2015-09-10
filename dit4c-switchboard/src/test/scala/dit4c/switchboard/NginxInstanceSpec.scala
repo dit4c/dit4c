@@ -39,6 +39,8 @@ class NginxInstanceSpec extends Specification with PathMatchers {
       vhostContent must contain("listen *:55001;")
       vhostContent must contain(s"server_name ${route.domain};")
       vhostContent must contain("proxy_pass https://127.0.0.1:443;")
+      vhostContent must contain("proxy_set_header X-Forwarded-Proto $user_proto;")
+      vhostContent must contain("proxy_set_header X-Forwarded-Host \"foo.example.test\";")
       vhostContent must contain("proxy_set_header X-Foo \"bar\";")
 
       instance.shutdown

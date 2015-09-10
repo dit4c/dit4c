@@ -1,0 +1,16 @@
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%date{yyyy-MM-dd'T'HH:mm:ss,UTC}Z %highlight(%-5level) %logger{15} - %message%n%xException{5}</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="org.fusesource.scalate" level="WARN" />
+  <logger name="dit4c.switchboard" level="DEBUG" />
+
+  <root level="ERROR">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+</configuration>

@@ -12,19 +12,34 @@ import rx.lang.scala.Subscription
 import play.api.libs.iteratee.Concurrent
 import providers.RoutingMapEmitter
 import play.api.libs.EventSource
-import play.api.libs.iteratee.Enumeratee
+import play.api.libs.iteratee._
 import providers.RoutingMapEmitter.ReplaceAllRoutes
+import play.api.libs.concurrent.Promise
+import scala.concurrent.duration._
+import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
 
 class RoutingMapController @Inject() (
     val db: CouchDB.Database,
     val routingMapEmitter: RoutingMapEmitter)
     extends Controller with Utils {
 
+  def comment(msg: String) = new EventSource.Event(msg, None, None) {
+    override lazy val formatted = """(?m)^""".r.replaceAllIn(msg, "; ")+"\n"
+  }
+
+  val keepAlive: Enumerator[EventSource.Event] = {
+    val fmt = ISODateTimeFormat.dateHourMinuteSecond()
+    Enumerator.repeatM {
+      Promise.timeout(comment(fmt.print(new DateTime())), 10.seconds)
+    }
+  }
+
   def feed = Action.async { implicit request =>
     Future.successful {
       val feed = routingMapEmitter.newFeed &>
          Enumeratee.map(Json.toJson(_)) &>
-         EventSource()
+         EventSource() interleave keepAlive
       Ok.stream(feed).as("text/event-stream")
     }
   }

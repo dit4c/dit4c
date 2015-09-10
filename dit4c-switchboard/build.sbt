@@ -19,6 +19,8 @@ libraryDependencies ++= {
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.play"   %%  "play-json"       % "2.4.3",
+    "ch.qos.logback"      %   "logback-classic" % "1.1.2",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra" % specs2V % "test",
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
@@ -26,3 +28,5 @@ libraryDependencies ++= {
     "com.github.scopt"    %%  "scopt"           % "3.2.0"
   )
 }
+
+net.virtualvoid.sbt.graph.Plugin.graphSettings

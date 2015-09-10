@@ -30,3 +30,4 @@ lazy val switchboard = project in file("dit4c-switchboard")
 releaseSettings
 
 crossScalaVersions := Nil
+

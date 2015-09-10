@@ -9,8 +9,10 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.FileVisitResult
 import java.io.IOException
 import org.fusesource.scalate.TemplateEngine
+import com.typesafe.scalalogging.LazyLogging
+import scala.sys.process.ProcessLogger
 
-class NginxInstance(baseDomain: Option[String], port: Int) {
+class NginxInstance(baseDomain: Option[String], port: Int) extends LazyLogging {
 
   val baseDir = Files.createTempDirectory("nginx-")
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
@@ -41,22 +43,26 @@ class NginxInstance(baseDomain: Option[String], port: Int) {
     )
   }
 
-  val nginxProcess: Process = Process(s"$nginxPath -c $mainConfig").run
+  protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
+  val nginxProcess: Process = Process(s"$nginxPath -c $mainConfig").run(pLog)
 
-  def replaceAllRoutes(routes: Traversable[Route]) = reloadAfter {
+  def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
     recursivelyDelete(vhostDir)
     Files.createDirectory(vhostDir)
+    logger.info("Updating entire route set:")
     routes.foreach { route =>
-      println(route)
+      logger.info(route.domain)
       writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
     }
   }
 
   def setRoute(route: Route) = reloadAfter {
+    logger.info(s"Setting route: ${route.domain}")
     writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
   }
 
   def deleteRoute(route: Route) = reloadAfter {
+    logger.info(s"Deleting route: ${route.domain}")
     Files.delete(vhostDir.resolve(route.domain+".conf"))
   }
 
@@ -65,12 +71,16 @@ class NginxInstance(baseDomain: Option[String], port: Int) {
     recursivelyDelete(baseDir)
   }
 
-  private def reloadAfter(f: => Unit) {
+  // Guard against instance not being shutdown, as there's no valid case where
+  // it should be left running.
+  sys.addShutdownHook(shutdown)
+
+  protected def reloadAfter(f: => Unit) {
     f
-    Process(s"$nginxPath -c $mainConfig -s reload").run
+    Process(s"$nginxPath -c $mainConfig -s reload").run(pLog)
   }
 
-  private def vhostTmpl(route: Route) =
+  protected def vhostTmpl(route: Route) =
     engine.layout("/nginx_vhost.tmpl.mustache",
       Map(
         "port" -> port.toString,
@@ -86,10 +96,10 @@ class NginxInstance(baseDomain: Option[String], port: Int) {
       )
     )
 
-  private def writeFile(f: Path)(content: String): Path =
+  protected def writeFile(f: Path)(content: String): Path =
     Files.write(f, content.getBytes("utf-8"))
 
-  private def recursivelyDelete(path: Path) =
+  protected def recursivelyDelete(path: Path) =
     Files.walkFileTree(path, new DeletingFileVisitor)
 
   class DeletingFileVisitor extends SimpleFileVisitor[Path] {
