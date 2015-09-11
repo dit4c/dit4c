@@ -28,7 +28,9 @@ http {
   ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
 
   gzip on;
-  gunzip on;
+  # Disabled because Travis CI fails. Not strictly necessary, given few clients
+  # lack gzip support these days.
+  #gunzip on;
   gzip_proxied any;
   gzip_types text/css application/javascript application/json;
 
