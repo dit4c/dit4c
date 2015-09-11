@@ -66,7 +66,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
   }
 
   def withNewInstance(port: Int)(op: NginxInstance => Result) = {
-    val nginxInstance = new NginxInstance(Some("example.test"), port)
+    val nginxInstance = new NginxInstance(Some("example.test"), port, None)
     try {
       op(nginxInstance)
     } catch {

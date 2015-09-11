@@ -49,11 +49,16 @@ http {
     '' $scheme;
   }
 
+  {{#tls}}
+  ssl_certificate       {{certificate}};
+  ssl_certificate_key   {{key}};
+  {{/tls}}
+
   include {{vhostdir}}/*.conf;
 
   {{#domain}}
   server {
-    listen       *:{{port}};
+    listen       *:{{port}} {{#tls}}ssl spdy{{/tls}};
     server_name  _;
 
     location / {

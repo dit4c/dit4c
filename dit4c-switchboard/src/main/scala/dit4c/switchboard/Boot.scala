@@ -1,5 +1,6 @@
 package dit4c.switchboard
 
+import java.io._
 import java.net.URI
 import akka.actor._
 import akka.pattern.after
@@ -13,6 +14,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
 import com.typesafe.scalalogging.LazyLogging
+import org.bouncycastle.openssl.PEMParser
 
 object Boot extends App with LazyLogging {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -78,7 +80,15 @@ object Boot extends App with LazyLogging {
       }
 
   ArgParser.parse(args, Config()) map { config =>
-    val nginx = new NginxInstance(config.baseDomain, config.port)
+    val tlsConfig =
+      for { k <- config.sslKey; c <- config.sslCertificate } yield TlsConfig(c,k)
+    tlsConfig match {
+      case Some(c) =>
+        logger.info(s"Starting as HTTPS server: ${c.certificate.getSubject}")
+      case None =>
+        logger.info("Starting as HTTP server")
+    }
+    val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig)
     monitorFeed(config, nginx)
   } getOrElse {
     // arguments are bad, error message will have been displayed
@@ -90,7 +100,9 @@ object Boot extends App with LazyLogging {
 case class Config(
   val feed: URI = new URI("https://example.test/routes"),
   val baseDomain: Option[String] = None,
-  val port: Int = 9200)
+  val port: Int = 9200,
+  val sslCertificate: Option[File] = None,
+  val sslKey: Option[File] = None)
 
 case class Route(
   domain: String,
@@ -115,4 +127,10 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port for Nginx to listen on")
+  opt[File]('c', "ssl-certificate")
+    .action { (x, c) => c.copy(sslCertificate = Some(x)) }
+    .text("SSL certificate for HTTPS")
+  opt[File]('k', "ssl-key")
+    .action { (x, c) => c.copy(sslKey = Some(x)) }
+    .text("SSL certificate for HTTPS")
 }

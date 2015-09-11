@@ -12,7 +12,10 @@ import org.fusesource.scalate.TemplateEngine
 import com.typesafe.scalalogging.LazyLogging
 import scala.sys.process.ProcessLogger
 
-class NginxInstance(baseDomain: Option[String], port: Int) extends LazyLogging {
+class NginxInstance(
+    baseDomain: Option[String],
+    port: Int,
+    tlsConfig: Option[TlsConfig]) extends LazyLogging {
 
   val baseDir = Files.createTempDirectory("nginx-")
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
@@ -33,13 +36,18 @@ class NginxInstance(baseDomain: Option[String], port: Int) extends LazyLogging {
   writeFile(mainConfig) {
     implicit def path2str(p: Path) = p.toAbsolutePath.toString
     engine.layout("/nginx_main.tmpl.mustache",
-      Map[String,String](
+      Map[String,Any](
         "basedir" -> baseDir,
         "cachedir" -> cacheDir,
         "vhostdir" -> vhostDir,
         "pidfile" -> baseDir.resolve("nginx.pid"),
         "port" -> port.toString
-      ) ++ baseDomain.map(d => Map("domain" -> d)).getOrElse(Map.empty)
+      ) ++ baseDomain.map(d => Map("domain" -> d))
+        ++ tlsConfig.map { c =>
+          Map("tls" -> Map(
+              "key" -> c.keyFile.getAbsolutePath,
+              "certificate" -> c.certificateFile.getAbsolutePath))
+        }
     )
   }
 
@@ -83,6 +91,7 @@ class NginxInstance(baseDomain: Option[String], port: Int) extends LazyLogging {
   protected def vhostTmpl(route: Route) =
     engine.layout("/nginx_vhost.tmpl.mustache",
       Map(
+        "https" -> tlsConfig.isDefined,
         "port" -> port.toString,
         "domain" -> route.domain,
         "headers" -> route.headers.map {
@@ -101,6 +110,9 @@ class NginxInstance(baseDomain: Option[String], port: Int) extends LazyLogging {
 
   protected def recursivelyDelete(path: Path) =
     Files.walkFileTree(path, new DeletingFileVisitor)
+
+  implicit private def optionMapToMap[A,B](om: Option[Map[A,B]]): Map[A,B] =
+    om.getOrElse(Map.empty[A,B])
 
   class DeletingFileVisitor extends SimpleFileVisitor[Path] {
     override def visitFile(file: Path, attrs: BasicFileAttributes) = {
