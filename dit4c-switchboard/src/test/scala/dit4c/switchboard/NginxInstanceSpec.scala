@@ -36,7 +36,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
       vhostFile.toString must beAnExistingPath
       val vhostContent = (new String(Files.readAllBytes(vhostFile), "utf-8"))
 
-      vhostContent must contain("listen *:55001;")
+      vhostContent must contain("listen *:55001 ;")
       vhostContent must contain(s"server_name ${route.domain};")
       vhostContent must contain("proxy_pass https://127.0.0.1:443;")
       vhostContent must contain("proxy_set_header X-Forwarded-Proto $user_proto;")

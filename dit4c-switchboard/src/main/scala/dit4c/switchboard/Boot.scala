@@ -34,13 +34,6 @@ object Boot extends App with LazyLogging {
     (__ \ "upstream").read[Upstream]
   )(Route.apply _)
 
-  new Thread(new Runnable() {
-    def run = {
-      while (System.in.read() != -1) { }
-      System.exit(0)
-    }
-  }).start
-
   def monitorFeed(config: Config, nginx: NginxInstance, retryWait: FiniteDuration = 5.seconds): Unit =
     Http().singleRequest(HttpRequest(uri = config.feed.toString))
       .map { response =>
