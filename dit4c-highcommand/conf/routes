@@ -24,6 +24,7 @@ GET     /assets/*file               controllers.Assets.versioned(path="/public",
 GET     /                           @controllers.Application.main(path="")
 GET     /login                      @controllers.Application.main(path="login")
 GET     /account                    @controllers.Application.main(path="account")
+GET     /routes                     @controllers.RoutingMapController.feed()
 GET     /waiting/:scheme/:host/     @controllers.Application.waiting(scheme,host,uri="")
 GET     /waiting/:scheme/:host/*uri @controllers.Application.waiting(scheme,host,uri)
 HEAD    /health                     @controllers.Application.health(isHeadRequest: Boolean = true)

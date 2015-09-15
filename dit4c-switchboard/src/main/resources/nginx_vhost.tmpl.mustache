@@ -1,0 +1,21 @@
+server {
+  listen *:{{port}} {{#https}}ssl spdy{{/https}};
+  server_name {{domain}};
+
+  location / {
+    {{#upstream}}
+    proxy_pass {{scheme}}://{{host}}:{{port}};
+    {{/upstream}}
+    proxy_http_version 1.1;
+    proxy_read_timeout 1d; # Allow websockets to idle
+    proxy_set_header Accept-Encoding "gzip"; # Force gzip for cache
+    add_header X-Proxy-Cache $upstream_cache_status;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header X-Forwarded-Proto $user_proto;
+    proxy_set_header X-Forwarded-Host "{{domain}}";
+    {{#headers}}
+    proxy_set_header {{name}} "{{value}}";
+    {{/headers}}
+  }
+}

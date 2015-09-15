@@ -59,6 +59,8 @@ class ComputeNodeDAO @Inject() (
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
     .withTypeAttribute(typeValue)
 
+  def fromJson(json: JsValue) = json.asOpt[ComputeNodeImpl]
+
   case class ComputeNodeImpl(
       id: String,
       _rev: Option[String],
