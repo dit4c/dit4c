@@ -7,6 +7,8 @@ import akka.pattern.after
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
+import akka.stream.io.Framing
+import akka.util.ByteString
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.fusesource.scalate._
@@ -40,7 +42,9 @@ object Boot extends App with LazyLogging {
         response.entity match {
           case HttpEntity.Chunked(mimeType, parts) if mimeType.mediaType.value == "text/event-stream" =>
             parts
-              .map(v => new String(v.data.decodeString(mimeType.charset.value)))
+              .map(_.data)
+              .via(Framing.delimiter(ByteString("\n"), Int.MaxValue))
+              .map(v => new String(v.decodeString(mimeType.charset.value)))
               .filter(_.startsWith("data: "))
               .map(_.replaceFirst("data: ", ""))
               .map(Json.parse(_))
