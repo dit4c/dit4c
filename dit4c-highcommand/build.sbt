@@ -20,12 +20,12 @@ libraryDependencies ++= Seq(
   "org.specs2"          %%  "specs2-junit"    % "3.6"       % "test",
   "org.specs2"          %%  "specs2-scalacheck" % "3.6"     % "test",
   // WebJars for client-side dependencies
-  "org.webjars" %% "webjars-play" % "2.3.0",
+  "org.webjars" %% "webjars-play" % "2.4.0-1",
   // AngularJS
   "org.webjars" % "angular-ui-bootstrap" % "0.12.0",
   // Bootstrap & Font Awesome
-  "org.webjars" % "bootstrap" % "3.3.1",
-  "org.webjars" % "font-awesome" % "4.2.0",
+  "org.webjars" % "bootstrap" % "3.3.5",
+  "org.webjars" % "font-awesome" % "4.4.0",
   // domReady
   "org.webjars" % "requirejs-domready" % "2.0.1-2"
 )

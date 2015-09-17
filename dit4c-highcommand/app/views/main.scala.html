@@ -1,13 +1,7 @@
-@(authProviders: Seq[providers.auth.AuthProvider], webConfig: providers.WebConfig, webjarCDN: String = "https://cdn.jsdelivr.net/webjars/")
+@(authProviders: Seq[providers.auth.AuthProvider], webConfig: providers.WebConfig)
 
 @import helpers.AppVersion
 
-@cdnWebJarAsset(partialPath: String) = @{
-  import org.webjars.WebJarAssetLocator
-  val locator = new WebJarAssetLocator();
-  val entry = WebJarAssetLocator.getWebJar(locator.getFullPath(partialPath))
-  webjarCDN + entry.getKey() + "/" + entry.getValue() + "/" + partialPath
-}
 <!DOCTYPE html5>
 <html>
   <head>
@@ -16,8 +10,8 @@
     }
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href='@cdnWebJarAsset("css/bootstrap.min.css")' rel="stylesheet">
-    <link href='@cdnWebJarAsset("css/font-awesome.min.css")' rel="stylesheet">
+    <link href='@routes.WebJarAssets.at(WebJarAssets.locate("css/bootstrap.min.css"))' rel="stylesheet">
+    <link href='@routes.WebJarAssets.at(WebJarAssets.locate("css/font-awesome.min.css"))' rel="stylesheet">
     <link rel="stylesheet" media="screen" href='@routes.Assets.versioned("stylesheets/main.css")'>
     <link href='//fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
 
@@ -25,7 +19,7 @@
 
     <script>
     // Enhance RequireJS to handle WebJARs from CDN
-    @play.twirl.api.Html(org.webjars.RequireJS.getSetupJavaScript(webjarCDN,""))
+    @play.twirl.api.Html(org.webjars.RequireJS.getSetupJavaScript(routes.WebJarAssets.at("").url))
     </script>
     @for(code <- webConfig.googleAnalyticsCode) {
     <script>
@@ -296,7 +290,7 @@
               <div class="col-sm-5">
                 <select class="form-control"
                   ng-model="newContainer.computeNode"
-                	required="true"
+                    required="true"
                   ng-change="selectFirstImage(newContainer.computeNode)"
                   ng-options="node.name for node in computeNodes track by node.id"></select>
               </div>
@@ -420,8 +414,8 @@
             </label>
             <div class="col-sm-9">
             <select id="accessform-node"
-            	class="form-control" ng-model="accessForm.node"
-            	ng-options="node.name for node in computeNodes track by node.id"
+                class="form-control" ng-model="accessForm.node"
+                ng-options="node.name for node in computeNodes track by node.id"
               ></select>
             </div>
           </div>
