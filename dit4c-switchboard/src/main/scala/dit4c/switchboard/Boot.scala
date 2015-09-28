@@ -42,6 +42,7 @@ object Boot extends App with LazyLogging {
         response.entity match {
           case HttpEntity.Chunked(mimeType, parts) if mimeType.mediaType.value == "text/event-stream" =>
             parts
+              .takeWithin(1.hour) // Avoid timeouts
               .map(_.data)
               .via(Framing.delimiter(ByteString("\n"), Int.MaxValue))
               .map(v => new String(v.decodeString(mimeType.charset.value)))
