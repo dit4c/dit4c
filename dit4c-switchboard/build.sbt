@@ -88,6 +88,7 @@ dockerfile in docker := {
         --pid-path=$NGINX_RUN_DIR/nginx.pid
         --lock-path=$NGINX_RUN_DIR/nginx.lock
         --with-http_auth_request_module
+        --with-http_spdy_module
         --with-http_ssl_module
         --without-http_ssi_module
         --without-http_userid_module
