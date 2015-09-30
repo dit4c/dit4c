@@ -1,5 +1,5 @@
 server {
-  listen *:{{port}} {{#https}}ssl spdy{{/https}};
+  listen *:{{port}} {{#https}}ssl http2{{/https}};
   server_name {{domain}};
 
   location / {

@@ -57,7 +57,7 @@ dockerfile in docker := {
       set -e
       set -x
       # Statically compile nginx, then remove build tools
-      export NGINX_VERSION=1.8.0
+      export NGINX_VERSION=1.9.5
       export NPS_VERSION=1.9.32.6
       export NGINX_CACHE_DIR=/var/cache/nginx
       export NGINX_LOG_DIR=/var/log/nginx
@@ -88,7 +88,7 @@ dockerfile in docker := {
         --pid-path=$NGINX_RUN_DIR/nginx.pid
         --lock-path=$NGINX_RUN_DIR/nginx.lock
         --with-http_auth_request_module
-        --with-http_spdy_module
+        --with-http_v2_module
         --with-http_ssl_module
         --without-http_ssi_module
         --without-http_userid_module

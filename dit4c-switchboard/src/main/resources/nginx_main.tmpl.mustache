@@ -62,7 +62,7 @@ http {
 
   {{#domain}}
   server {
-    listen       *:{{port}} {{#tls}}ssl spdy{{/tls}};
+    listen       *:{{port}} {{#tls}}ssl http2{{/tls}};
     server_name  _;
 
     location / {
