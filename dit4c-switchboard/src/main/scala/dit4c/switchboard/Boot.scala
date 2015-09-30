@@ -86,7 +86,8 @@ object Boot extends App with LazyLogging {
       case None =>
         logger.info("Starting as HTTP server")
     }
-    val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig)
+    val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig,
+        config.extraMainConfig, config.extraVHostConfig)
     monitorFeed(config, nginx)
   } getOrElse {
     // arguments are bad, error message will have been displayed
@@ -100,7 +101,9 @@ case class Config(
   val baseDomain: Option[String] = None,
   val port: Int = 9200,
   val sslCertificate: Option[File] = None,
-  val sslKey: Option[File] = None)
+  val sslKey: Option[File] = None,
+  val extraMainConfig: Option[String] = None,
+  val extraVHostConfig: Option[String] = None)
 
 case class Route(
   domain: String,
@@ -131,4 +134,16 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   opt[File]('k', "ssl-key")
     .action { (x, c) => c.copy(sslKey = Some(x)) }
     .text("SSL certificate for HTTPS")
+  opt[File]("extra-main-config")
+    .action { (f, c) =>
+      val config = scala.io.Source.fromFile(f).mkString
+      c.copy(extraMainConfig = Some(config))
+    }
+    .text("Include extra main (`http {...}`) config")
+  opt[File]("extra-vhost-config")
+    .action { (f, c) =>
+      val config = scala.io.Source.fromFile(f).mkString
+      c.copy(extraVHostConfig = Some(config))
+    }
+    .text("Include extra vhost (`server {...}`) config")
 }

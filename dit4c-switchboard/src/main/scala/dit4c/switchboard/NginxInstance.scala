@@ -15,7 +15,9 @@ import scala.sys.process.ProcessLogger
 class NginxInstance(
     baseDomain: Option[String],
     port: Int,
-    tlsConfig: Option[TlsConfig]) extends LazyLogging {
+    tlsConfig: Option[TlsConfig],
+    extraMainConfig: Option[String],
+    extraVHostConfig: Option[String]) extends LazyLogging {
 
   val baseDir = Files.createTempDirectory("nginx-")
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
@@ -47,6 +49,9 @@ class NginxInstance(
           Map("tls" -> Map(
               "key" -> c.keyFile.getAbsolutePath,
               "certificate" -> c.certificateFile.getAbsolutePath))
+        }
+        ++ extraMainConfig.map { c =>
+          Map("extraconf" -> c)
         }
     )
   }
@@ -102,7 +107,9 @@ class NginxInstance(
           "host" -> route.upstream.host,
           "port" -> route.upstream.port.toString
         )
-      )
+      ) ++ extraVHostConfig.map { c =>
+        Map("extraconf" -> c)
+      }
     )
 
   protected def writeFile(f: Path)(content: String): Path =

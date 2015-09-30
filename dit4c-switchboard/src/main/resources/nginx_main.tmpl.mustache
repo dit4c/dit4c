@@ -24,8 +24,6 @@ http {
   sendfile        on;
   keepalive_timeout  65;
   client_max_body_size 1G;
-  # Do not use SSLv3 - POODLE vulnerability
-  ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
 
   gzip on;
   # Disabled because Travis CI fails. Not strictly necessary, given few clients
@@ -50,9 +48,15 @@ http {
   }
 
   {{#tls}}
+  # Do not use SSLv3 - POODLE vulnerability
+  ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
   ssl_certificate       {{certificate}};
   ssl_certificate_key   {{key}};
   {{/tls}}
+
+  {{#extraconf}}
+  {{{extraconf}}}
+  {{/extraconf}}
 
   include {{vhostdir}}/*.conf;
 

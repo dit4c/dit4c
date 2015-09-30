@@ -42,6 +42,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
       vhostContent must contain("proxy_set_header X-Forwarded-Proto $user_proto;")
       vhostContent must contain("proxy_set_header X-Forwarded-Host \"foo.example.test\";")
       vhostContent must contain("proxy_set_header X-Foo \"bar\";")
+      vhostContent must contain("# vHost \"comment\"")
 
       instance.shutdown
       done
@@ -66,7 +67,8 @@ class NginxInstanceSpec extends Specification with PathMatchers {
   }
 
   def withNewInstance(port: Int)(op: NginxInstance => Result) = {
-    val nginxInstance = new NginxInstance(Some("example.test"), port, None)
+    val nginxInstance = new NginxInstance(Some("example.test"), port,
+        None, Some("# Main comment"), Some("# vHost \"comment\""))
     try {
       op(nginxInstance)
     } catch {

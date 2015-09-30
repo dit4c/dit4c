@@ -17,5 +17,8 @@ server {
     {{#headers}}
     proxy_set_header {{name}} "{{value}}";
     {{/headers}}
+    {{#extraconf}}
+    {{{extraconf}}}
+    {{/extraconf}}
   }
 }

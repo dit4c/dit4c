@@ -31,7 +31,7 @@ class InjectorPlugin(
   implicit val ec = play.api.libs.concurrent.Execution.defaultContext
 
   lazy val log = play.api.Logger
-  
+
   lazy val authProviders = AuthProviders(
       RapidAAFAuthProvider(configuration) ++
       GitHubProvider(configuration) ++
@@ -71,7 +71,7 @@ class InjectorPlugin(
       } else {
         new PersistentCouchDBInstance("./db", 40000)
       }
-    lifecycle.addStopHook { () => 
+    lifecycle.addStopHook { () =>
       instance.disconnect
       Future.successful(())
     }
@@ -79,22 +79,23 @@ class InjectorPlugin(
   }
 
   // Make sure a database exists
-  @Provides def database(dbServerInstance: CouchDB.Instance) = Await.result(
-    for {
-      maybeDb <- dbServerInstance.databases(dbName)
-      db <- maybeDb match {
-        case Some(db) => Future.successful(db)
-        case None => dbServerInstance.databases.create(dbName)
-      }
-      design = db.asSohvaDb.design("main", "javascript")
-      _ <- ViewManager.update(design)
-    } yield db,
-    1.minute)
+  @Provides def database(dbServerInstance: CouchDB.Instance): CouchDB.Database =
+    Await.result(
+      for {
+        maybeDb <- dbServerInstance.databases(dbName)
+        db <- maybeDb match {
+          case Some(db) => Future.successful(db)
+          case None => dbServerInstance.databases.create(dbName)
+        }
+        design = db.asSohvaDb.design("main", "javascript")
+        _ <- ViewManager.update(design)
+      } yield db,
+      1.minute)
 
   def configure {
     bind(classOf[AuthProviders]).toInstance(authProviders)
   }
-  
+
   private def parseUrl(str: String): Option[java.net.URL] =
     Try(new java.net.URL(str)).toOption
 }
