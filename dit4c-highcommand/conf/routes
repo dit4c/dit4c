@@ -17,9 +17,10 @@ GET     /users/merge                @controllers.UserController.mergeUser
 GET     /users/:id                  @controllers.UserController.get(id)
 
 # Map static resources from the /public folder to the /assets URL path
-GET     /favicon.ico                controllers.Assets.at(path="/public", file="images/favicon.ico")
-GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
-GET     /webjars/*file              controllers.WebJarAssets.at(file)
+GET     /favicon.ico                @controllers.Assets.at(path="/public", file="images/favicon.ico")
+GET     /assets/javascripts/*file   @controllers.Application.jsAsset(file)
+GET     /assets/*file               @controllers.Assets.versioned(path="/public", file: Asset)
+GET     /webjars/*file              @controllers.WebJarAssets.at(file)
 
 # Home page
 GET     /                           @controllers.Application.main(path="")

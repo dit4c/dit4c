@@ -1,4 +1,4 @@
-@(authProviders: Seq[providers.auth.AuthProvider], webConfig: providers.WebConfig)
+@(authProviders: Seq[providers.auth.AuthProvider], webConfig: providers.WebConfig, requireJsConfig: String)
 
 @import helpers.AppVersion
 
@@ -18,8 +18,7 @@
     <link rel="shortcut icon" type="image/x-icon" href='@routes.Assets.versioned("images/favicon.ico")'>
 
     <script>
-    // Enhance RequireJS to handle WebJARs from CDN
-    @play.twirl.api.Html(org.webjars.RequireJS.getSetupJavaScript(routes.WebJarAssets.at("").url))
+    @play.twirl.api.Html(requireJsConfig)
     </script>
     @for(code <- webConfig.googleAnalyticsCode) {
     <script>
