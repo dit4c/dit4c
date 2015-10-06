@@ -58,7 +58,7 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: Act
     val stdoutFile = baseDir.resolve("couch.out").toFile
     val process =
       (Process(s"couchdb $configFileOpts -a $configFile") #> stdoutFile).run
-    Await.ready(uriFileCreated(baseDir), 60.seconds)
+    Await.ready(uriFileCreated(baseDir).flatMap(waitForFileContent), 60.seconds)
     (process,
         new URL(Files.readAllLines(uriFile, Charset.forName("UTF-8")).get(0)))
   }
@@ -100,6 +100,10 @@ abstract class ManagedCouchDBInstance(implicit ec: ExecutionContext, system: Act
       watchKey.cancel
       watcher.close
     }
+  }
+
+  protected def waitForFileContent(file: Path): Future[Unit] = Future {
+    while (Files.readAllLines(file).size() <= 0) {}
   }
 
   object NullOutputStream extends java.io.OutputStream {

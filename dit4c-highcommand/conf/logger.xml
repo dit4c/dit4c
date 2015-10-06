@@ -9,6 +9,7 @@
   </appender>
 
   <logger name="play" level="INFO" />
+  <logger name="play.api.libs.concurrent.ActorSystemProvider" level="WARN" />
   <logger name="application" level="DEBUG" />
 
   <root level="ERROR">
