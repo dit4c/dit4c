@@ -29,8 +29,10 @@ class UserController @Inject() (val db: CouchDB.Database)
   def currentUser = Action.async { implicit request =>
     fetchUser.map {
       case Some(user) =>
-        Redirect(controllers.routes.UserController.get(user.id))
-          .withHeaders("Cache-Control" -> "private, must-revalidate")
+        ifNoneMatch(user._rev.get) {
+          Ok(Json.toJson(user))
+            .withHeaders("Cache-Control" -> "private, must-revalidate")
+        }
       case None =>
         NotFound
     }

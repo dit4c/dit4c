@@ -52,7 +52,7 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
       status(ifMatchResponse) must_== 304
     }
 
-    "provide redirect to current user" in new WithApplication(fakeApp) {
+    "provide current user" in new WithApplication(fakeApp) {
       val controller = injector(app).instanceOf(classOf[UserController])
 
       val withoutLogin = controller.currentUser(FakeRequest())
@@ -68,8 +68,20 @@ class UserControllerSpec extends PlaySpecification with SpecUtils {
       }
       val withLogin = controller.currentUser(
           FakeRequest().withSession("userId" -> user.id))
-      status(withLogin) must_== 303
-      redirectLocation(withLogin) must beSome(s"/users/${user.id}")
+      status(withLogin) must_== 200
+      contentAsJson(withLogin) must_== Json.obj(
+        "id" -> user.id,
+        "name" -> user.name.get,
+        "email" -> user.email.get,
+        "identities" -> Json.arr(Json.obj(
+          "type" -> "test",
+          "id" -> "testuser"
+        ))
+      )
+      val etag: String = header("ETag", withLogin) match {
+        case Some(s) => s
+        case None => failure("ETag must be sent with user record"); ""
+      }
       header("Cache-Control", withLogin) must beSome("private, must-revalidate")
     }
 
