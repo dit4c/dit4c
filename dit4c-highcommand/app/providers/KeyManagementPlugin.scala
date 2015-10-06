@@ -1,6 +1,5 @@
 package providers
 
-import play.api.Plugin
 import javax.inject.Inject
 import models.{KeyDAO, Key}
 import providers.db.CouchDB
@@ -14,21 +13,22 @@ import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
+import play.api.Environment
+import play.api.Configuration
+import com.google.inject.AbstractModule
+import akka.actor.ActorSystem
+import javax.inject.Singleton
+import com.google.inject.Provides
 
-class KeyManagementPlugin @Inject() (app: play.api.Application) extends Plugin {
+class KeyManagementPlugin(
+    environment: Environment,
+    configuration: Configuration) extends AbstractModule {
 
-  implicit val timeout = new Timeout(30, TimeUnit.SECONDS)
-  implicit lazy val ec = play.api.libs.concurrent.Execution.defaultContext
-  lazy val system = play.api.libs.concurrent.Akka.system(app)
-
-  def injector = app.injector
-  def db = injector.instanceOf(classOf[CouchDB.Database])
-
-  lazy val config = KeyManagementConfig(
-    app.configuration
+  @Singleton @Provides def keyManagementConfig = KeyManagementConfig(
+    configuration
       .getString("application.baseUrl")
       .getOrElse("DIT4C"),
-    app.configuration
+    configuration
       .getInt("keys.length")
       .getOrElse(1024),
     Period.hours(3),
@@ -36,19 +36,31 @@ class KeyManagementPlugin @Inject() (app: play.api.Application) extends Plugin {
     Period.days(7)
   )
 
-  private var manager: ActorRef = null
+  override def configure {
+    if (enabled) {
+      bind(classOf[KeyManager]).asEagerSingleton()
+    }
+  }
 
-  override def enabled =
-    app.configuration
-      .getBoolean("keys.manage")
-      .getOrElse(true)
+  private def enabled = configuration.getBoolean("keys.manage").getOrElse(true)
+}
 
-  override def onStart {
-    manager = system.actorOf(Props(classOf[KeyManagementActor], config, db))
-    Await.result(manager ? "waitOnStart", timeout.duration)
+@Singleton
+class KeyManager @Inject() (
+    config: KeyManagementConfig,
+    system: ActorSystem,
+    db: CouchDB.Database) {
+
+  implicit val timeout = new Timeout(30, TimeUnit.SECONDS)
+
+  private val actor = {
+    val m = system.actorOf(Props(classOf[KeyManagementActor], config, db))
+    Await.result(m ? "waitOnStart", timeout.duration)
+    m
   }
 
 }
+
 
 case class KeyManagementConfig(
   namespace: String,
