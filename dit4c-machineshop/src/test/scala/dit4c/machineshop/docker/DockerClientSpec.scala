@@ -38,7 +38,10 @@ class DockerClientSpec extends Specification {
     contain(beTypedEqualTo(n)) ^^ ((_:DockerImage).names aka "names")
 
 
-  val image = "dit4c/dit4c-container-ipython"
+  val image = "busybox"
+
+  // This spec must be run sequentially
+  sequential
 
   "DockerClient" >> {
 

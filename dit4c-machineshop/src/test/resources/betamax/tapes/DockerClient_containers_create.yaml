@@ -1,20 +1,20 @@
 !tape
 name: DockerClient.containers.create
 interactions:
-- recorded: 2014-07-18T00:34:46.195Z
+- recorded: 2015-10-06T00:53:00.269Z
   request:
     method: POST
     uri: http://localhost:4243/containers/create?name=testnew
     headers:
-      Content-Length: '153'
-      Content-Type: text/plain; charset=UTF-8
+      Content-Length: '165'
+      Content-Type: application/json; charset=UTF-8
       Host: localhost:4243
-      User-Agent: spray-can/1.3.1
-    body: '{"Hostname":"testnew","Tty":true,"AttachStdout":true,"AttachStderr":true,"Dns":null,"Image":"dit4c/dit4c-container-ipython","ExposedPorts":{"80/tcp":{}}}'
+      User-Agent: spray-can/1.3.3
+    body: '{"HostConfig":{"Links":[],"RestartPolicy":{"Name":"always"}},"AttachStdout":true,"Tty":true,"Hostname":"testnew","CpuShares":1,"AttachStderr":true,"Image":"busybox"}'
   response:
     status: 201
     headers:
       Content-Type: application/json
-      Server: nginx/1.5.12
+      X-Date: Tue, 06 Oct 2015 00:53:00 GMT
     body: |
-      {"Id":"f5d7b3f95fb0b0732368d3960bde1ca2a9c257cb63fdbaa2c4452b4ff3e6c377","Warnings":null}
+      {"Id":"9fe55edcaf432973ba4747ad0ed6b90ea52c1d6df943adb3b4df820e55c5af57","Warnings":null}

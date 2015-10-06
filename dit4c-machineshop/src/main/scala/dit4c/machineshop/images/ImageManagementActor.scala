@@ -111,7 +111,8 @@ class ImageManagementActor(
 
   protected def replyWithRemovedImage(sender: ActorRef, removedImage: Image) {
     refetchImages.onComplete {
-      case _ => sender ! RemovedImage(removedImage)
+      case _ =>
+        sender ! RemovedImage(removedImage)
     }
   }
 

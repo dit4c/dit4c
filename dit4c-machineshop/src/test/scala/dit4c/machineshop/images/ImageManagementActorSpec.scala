@@ -35,17 +35,20 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
   import ImageManagementActor._
 
+  // This spec must be run sequentially
+  sequential
+
   "ImageManagementActor" >> {
 
     "adds images" >> {
       val actorRef = newActor
 
-      val future = actorRef ? AddImage("Fedora", "fedora", "20")
+      val future = actorRef ? AddImage("Alpine", "alpine", "3.2")
       result(future, timeoutDuration) match {
         case AddedImage(image) =>
-          image.displayName must_== "Fedora"
-          image.repository must_== "fedora"
-          image.tag must_== "20"
+          image.displayName must_== "Alpine"
+          image.repository must_== "alpine"
+          image.tag must_== "3.2"
         case other => failure("Unexpected: "+other)
       }
       done
@@ -53,26 +56,26 @@ class ImageManagementActorSpec extends Specification with Mockito {
 
     "declines duplicate images" >> {
       val knownImages = ephemeralKnownImages
-      knownImages += KnownImage("Fedora", "fedora", "20")
+      knownImages += KnownImage("Alpine", "alpine", "3.2")
       val actorRef = newActor(knownImages)
 
       {
-        val future = actorRef ? AddImage("Fedora 20", "fedora", "20")
+        val future = actorRef ? AddImage("Alpine 3.2", "alpine", "3.2")
         result(future, timeoutDuration) match {
           case ConflictingImages(Seq(image)) =>
-            image.displayName must_== "Fedora"
-            image.repository must_== "fedora"
-            image.tag must_== "20"
+            image.displayName must_== "Alpine"
+            image.repository must_== "alpine"
+            image.tag must_== "3.2"
         }
       }
 
       {
-        val future = actorRef ? AddImage("Fedora", "fedora", "latest")
+        val future = actorRef ? AddImage("Alpine", "alpine", "latest")
         result(future, timeoutDuration) match {
           case ConflictingImages(Seq(image)) =>
-            image.displayName must_== "Fedora"
-            image.repository must_== "fedora"
-            image.tag must_== "20"
+            image.displayName must_== "Alpine"
+            image.repository must_== "alpine"
+            image.tag must_== "3.2"
         }
       }
     }
@@ -80,7 +83,7 @@ class ImageManagementActorSpec extends Specification with Mockito {
     "pulls images" >> {
       val knownImages = ephemeralKnownImages
       val dockerClient = spy(new MockDockerClient(knownImages))
-      val knownImage = KnownImage("Fedora", "fedora", "20")
+      val knownImage = KnownImage("Alpine", "alpine", "3.2")
       knownImages += knownImage
       val actorRef = newActor(knownImages, dockerClient)
 
@@ -93,15 +96,15 @@ class ImageManagementActorSpec extends Specification with Mockito {
         case other => failure("Unexpected: "+other)
       }
 
-      there was one(dockerClient.images).pull("fedora", "20")
+      there was one(dockerClient.images).pull("alpine", "3.2")
     }
 
     "lists images" >> {
       val knownImages = ephemeralKnownImages
       val knownImageList = IndexedSeq(
-        KnownImage("CentOS", "centos", "centos7"),
-        KnownImage("Fedora 19", "fedora", "19"),
-        KnownImage("Fedora 20", "fedora", "20"))
+        KnownImage("Alpine 3.2", "alpine", "3.2"),
+        KnownImage("Alpine Edge", "alpine", "edge"),
+        KnownImage("CentOS", "centos", "centos7"))
       shuffle(knownImageList).foreach(knownImages += _)
       val actorRef = newActor(knownImages)
 
@@ -122,15 +125,15 @@ class ImageManagementActorSpec extends Specification with Mockito {
     "removes images" >> {
       val knownImages = ephemeralKnownImages
       val actorRef = newActor(knownImages)
-      val knownImage = KnownImage("Fedora", "fedora", "20")
+      val knownImage = KnownImage("Alpine", "alpine", "3.2")
       knownImages += knownImage
 
       val future = actorRef ? RemoveImage(knownImage.id)
       result(future, timeoutDuration) match {
         case RemovedImage(image) =>
-          image.displayName must_== "Fedora"
-          image.repository must_== "fedora"
-          image.tag must_== "20"
+          image.displayName must_== "Alpine"
+          image.repository must_== "alpine"
+          image.tag must_== "3.2"
         case other => failure("Unexpected: "+other)
       }
       done
