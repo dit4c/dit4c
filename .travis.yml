@@ -12,7 +12,7 @@ cache:
 before_install:
   - |
     BASE=$HOME && \
-    test -d $BASE/nginx || \
+    test -f $BASE/nginx/sbin/nginx || \
     (curl -L -s https://github.com/nginx/nginx/archive/release-1.9.5.tar.gz | tar xz -C $BASE && \
     cd $BASE/nginx-release-1.9.5 && \
     auto/configure \
