@@ -8,6 +8,9 @@ cache:
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
+before_script:
+  - couchdb -V
+  - nginx -V
 script:
   # Test script
   - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M test
