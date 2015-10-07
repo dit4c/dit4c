@@ -119,8 +119,11 @@ class NginxInstance(
   protected def writeFile(f: Path)(content: String): Path =
     Files.write(f, content.getBytes("utf-8"))
 
-  protected def recursivelyDelete(path: Path) =
-    Files.walkFileTree(path, new DeletingFileVisitor)
+  protected def recursivelyDelete(path: Path) {
+    if (Files.exists(path)) {
+      Files.walkFileTree(path, new DeletingFileVisitor)
+    }
+  }
 
   implicit private def optionMapToMap[A,B](om: Option[Map[A,B]]): Map[A,B] =
     om.getOrElse(Map.empty[A,B])
