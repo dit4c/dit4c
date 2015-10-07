@@ -8,7 +8,42 @@ cache:
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
+before_install:
+  - curl -L -s https://github.com/nginx/nginx/archive/release-1.9.5.tar.gz | tar xz
+  - |
+    BASE=`pwd` && \
+    cd nginx-release-1.9.5 && \
+    auto/configure \
+        --prefix=$BASE/nginx \
+        --conf-path=$BASE/etc/nginx/nginx.conf \
+        --http-log-path=/dev/stdout \
+        --error-log-path=/dev/stderr \
+        --with-http_auth_request_module \
+        --with-http_v2_module \
+        --with-http_ssl_module \
+        --without-http_ssi_module \
+        --without-http_userid_module \
+        --without-http_access_module \
+        --without-http_auth_basic_module \
+        --without-http_autoindex_module \
+        --without-http_geo_module \
+        --without-http_split_clients_module \
+        --without-http_fastcgi_module \
+        --without-http_uwsgi_module \
+        --without-http_scgi_module \
+        --without-http_memcached_module \
+        --without-http_limit_conn_module \
+        --without-http_limit_req_module \
+        --without-http_empty_gif_module \
+        --without-http_browser_module && \
+    make && \
+    make install && \
+    cd - && \
+    rm -rf nginx-release-1.9.5 && \
+    ls -laR $BASE/nginx && \
+    export PATH=$BASE/nginx/bin:$PATH
 before_script:
+  - echo $PATH
   - couchdb -V
   - nginx -V
 script:
