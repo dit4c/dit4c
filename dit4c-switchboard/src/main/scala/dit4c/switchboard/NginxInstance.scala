@@ -22,6 +22,7 @@ class NginxInstance(
   val baseDir = Files.createTempDirectory("nginx-")
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
   val configDir = Files.createDirectory(baseDir.resolve("conf"))
+  val proxyDir = Files.createDirectory(baseDir.resolve("proxy"))
   val tmpDir = Files.createDirectory(baseDir.resolve("tmp"))
   val vhostDir = Files.createDirectory(configDir.resolve("vhost.d"))
   val mainConfig = configDir.resolve("nginx.conf")
@@ -42,6 +43,7 @@ class NginxInstance(
       Map[String,Any](
         "basedir" -> baseDir,
         "cachedir" -> cacheDir,
+        "proxydir" -> proxyDir,
         "tmpdir" -> tmpDir,
         "vhostdir" -> vhostDir,
         "pidfile" -> baseDir.resolve("nginx.pid"),

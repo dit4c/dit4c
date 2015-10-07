@@ -33,6 +33,7 @@ http {
   gzip_types text/css application/javascript application/json;
 
   client_body_temp_path {{tmpdir}};
+  proxy_temp_path {{proxydir}};
 
   proxy_cache_path {{cachedir}} keys_zone=main:128m;
   proxy_cache_key "$scheme$host$request_uri $http_accept";
