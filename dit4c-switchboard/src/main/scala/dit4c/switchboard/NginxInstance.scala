@@ -119,9 +119,16 @@ class NginxInstance(
   protected def writeFile(f: Path)(content: String): Path =
     Files.write(f, content.getBytes("utf-8"))
 
-  protected def recursivelyDelete(path: Path) {
+  protected def recursivelyDelete(path: Path, retries: Int = 5) {
     if (Files.exists(path)) {
-      Files.walkFileTree(path, new DeletingFileVisitor)
+      try {
+        Files.walkFileTree(path, new DeletingFileVisitor)
+      } catch {
+        case e: java.nio.file.NoSuchFileException =>
+          if (retries > 0) {
+            recursivelyDelete(path, retries - 1)
+          }
+      }
     }
   }
 
