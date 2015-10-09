@@ -2,22 +2,26 @@ package dit4c.machineshop.auth
 
 import com.nimbusds.jose.jwk.JWKSet
 import scala.collection.JavaConversions._
-import spray.http.HttpRequest
 import java.security.Signature
-import spray.http.HttpHeaders
-import spray.http.GenericHttpCredentials
-import scala.collection.JavaConversions._
 import com.nimbusds.jose.util.Base64
-import spray.http.DateTime
 import java.security.MessageDigest
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.GenericHttpCredentials
+import akka.util.ByteString
+import akka.stream.Materializer
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext
 
 // https://web-payments.org/specs/source/http-signatures/
 class SignatureVerifier(publicKeys: JWKSet) {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   // Maximum skew of Date header from current time (in milliseconds)
   val maximumSkew = 300000
 
-  def apply(request: HttpRequest): Either[String, Unit] = {
+  def apply(request: HttpRequest)(implicit materializer: Materializer): Either[String, Unit] = {
     validateDate(request)
       .right.flatMap(validateDigest)
       .right.flatMap(extractSignatureInfo)
@@ -39,7 +43,7 @@ class SignatureVerifier(publicKeys: JWKSet) {
   }
 
   private def validateDate(request: HttpRequest): Either[String, HttpRequest] =
-    request.header[HttpHeaders.Date] match {
+    request.header[headers.Date] match {
       case None => Right(request) // Dates aren't required on requests
       case Some(header) =>
         if (header.date.insideSkew(DateTime.now, maximumSkew))
@@ -48,7 +52,7 @@ class SignatureVerifier(publicKeys: JWKSet) {
           Left(s"Date header is skewed more than $maximumSkew milliseconds.")
     }
 
-  private def validateDigest(request: HttpRequest): Either[String, HttpRequest] = {
+  private def validateDigest(request: HttpRequest)(implicit materializer: Materializer): Either[String, HttpRequest] = {
     val digests: Seq[(String, String)] =
       request.headers
         .filter(_.lowercaseName == "digest")
@@ -61,10 +65,13 @@ class SignatureVerifier(publicKeys: JWKSet) {
     if (digests.isEmpty)
       Right(request) // No digest, no problem
     else {
+      val requestBytes = Await.result(
+          request.entity.dataBytes.runFold(ByteString.empty)((a,b) => a++b).map(_.toArray),
+          5.seconds)
       val errors = digests
         .map { case(alg, b64digest) =>
           val digest = MessageDigest.getInstance(alg)
-          digest.update(request.entity.data.toByteArray)
+          digest.update(requestBytes)
           val calculated: String = Base64.encode(digest.digest).toString
           if (calculated == b64digest) {
             None
@@ -83,7 +90,7 @@ class SignatureVerifier(publicKeys: JWKSet) {
 
   private def extractSignatureInfo(
       request: HttpRequest): Either[String, SignatureAuthorizationHeader] = {
-    request.header[HttpHeaders.Authorization]
+    request.header[headers.Authorization]
       .map(Right(_))
       .getOrElse(Left("No \"Authorization\" header present."))
       .right.flatMap { header =>

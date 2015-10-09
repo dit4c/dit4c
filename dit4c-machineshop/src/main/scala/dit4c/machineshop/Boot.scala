@@ -3,10 +3,11 @@ package dit4c.machineshop
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.io.IO
-import spray.can.Http
-import spray.http.Uri
-import spray.routing.SimpleRoutingApp
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
@@ -18,31 +19,35 @@ import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.images.{ImageManagementActor, KnownImages}
 import dit4c.machineshop.auth.SignatureActor
 
-object Boot extends App with SimpleRoutingApp {
+object Boot extends App {
   implicit val system = ActorSystem("dit4c-machineshop")
+  implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(10, TimeUnit.SECONDS)
   val log = Logging.getLogger(system, this)
   import system.dispatcher
 
   def start(config: Config) {
-    startServer(interface = config.interface, port = config.port) {
+    val route = {
       val knownImages = new KnownImages(config.knownImageFile)
       val dockerClient = new DockerClientImpl(
           Uri("http://127.0.0.1:2375/"), config.containerLinks)
       val signatureActor: Option[ActorRef] =
         config.publicKeyLocation.map { loc =>
-          actorRefFactory.actorOf(
+          system.actorOf(
             Props(classOf[SignatureActor], loc, config.keyUpdateInterval),
             "signature-checker")
         }
-      val imageMonitor = actorRefFactory.actorOf(
+      val imageMonitor = system.actorOf(
           Props(classOf[ImageManagementActor],
             knownImages, dockerClient, config.imageUpdateInterval),
           "image-monitor")
 
       MiscService(config.serverId).route ~
         ApiService(dockerClient, imageMonitor, signatureActor).route
-    } onComplete {
+    }
+    val bindingFuture =
+      Http().bindAndHandle(route, config.interface, config.port)
+    bindingFuture.onComplete {
       case Success(b) =>
         log.info(s"Successfully bound to ${b.localAddress}")
       case Failure(msg) =>

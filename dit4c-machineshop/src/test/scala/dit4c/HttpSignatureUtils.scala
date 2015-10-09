@@ -1,13 +1,17 @@
 package dit4c
 
-import spray.http.HttpRequest
 import com.nimbusds.jose.util.Base64
 import java.security.MessageDigest
 import java.security.Signature
 import java.security.interfaces.RSAPrivateKey
-import spray.http.HttpHeaders
-import spray.http.GenericHttpCredentials
-import spray.httpx.RequestBuilding._
+import akka.http.scaladsl.client.RequestBuilding._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.GenericHttpCredentials
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import akka.util.ByteString
+import akka.stream.Materializer
+import scala.concurrent.ExecutionContext
 
 object HttpSignatureUtils {
 
@@ -16,16 +20,23 @@ object HttpSignatureUtils {
   }
   object `RSA-SHA1` extends SigningAlgorithm("rsa-sha1", "SHA1withRSA")
   object `RSA-SHA256` extends SigningAlgorithm("rsa-sha256", "SHA256withRSA")
-  
-  def addDigest(algorithm: String): HttpRequest => HttpRequest = { req =>
+
+  def addDigest(algorithm: String)(
+      implicit ec: ExecutionContext, materializer: Materializer):
+      HttpRequest => HttpRequest = { req =>
+    val requestBytes = Await.result(
+          req.entity.dataBytes
+            .runFold(ByteString.empty)((a,b) => a++b)
+            .map(_.toArray),
+          5.seconds)
     val digest: String = {
       val digest = MessageDigest.getInstance(algorithm)
-      digest.update(req.entity.data.toByteArray)
+      digest.update(requestBytes)
       val b64 = Base64.encode(digest.digest)
       s"${algorithm}=${b64}"
     }
     val digestHeader =
-        HttpHeaders.RawHeader("Digest", digest)
+        headers.RawHeader("Digest", digest)
     req ~> addHeader(digestHeader)
   }
 
@@ -35,7 +46,6 @@ object HttpSignatureUtils {
       algorithm: SigningAlgorithm,
       requiredHeaders: Seq[String]): HttpRequest => HttpRequest =
     { req: HttpRequest =>
-      import spray.httpx.RequestBuilding._
 
       def headerValue(name: String) =
         if (name == "(request-target)")
@@ -63,7 +73,7 @@ object HttpSignatureUtils {
         Base64.encode(sig.sign)
       }
 
-      req ~> addHeader(HttpHeaders.Authorization(
+      req ~> addHeader(headers.Authorization(
         GenericHttpCredentials("Signature", "", Map(
           "keyId" -> keyId,
           "algorithm" -> algorithm.httpName,

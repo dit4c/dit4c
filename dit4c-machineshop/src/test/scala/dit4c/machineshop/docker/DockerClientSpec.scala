@@ -4,17 +4,11 @@ import scala.concurrent.Future
 import scala.concurrent.Promise
 import org.specs2.mutable.Specification
 import akka.util.Timeout.intToTimeout
-import spray.http.ContentTypes
-import spray.http.HttpEntity
-import spray.http.HttpRequest
-import spray.http.HttpResponse
-import spray.http.StatusCodes
-import spray.http.Uri
-import spray.util.pimpFuture
 import dit4c.machineshop.docker.models._
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import scalaz.IsEmpty
+import akka.http.scaladsl.model.Uri
 
 class DockerClientSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global

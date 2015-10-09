@@ -7,28 +7,37 @@ import akka.io.IO
 import akka.actor.ActorSystem
 import akka.util.Timeout
 import akka.event.Logging
-import spray.can.Http
-import spray.http._
-import spray.http.ContentTypes._
-import spray.json._
+import akka.http.scaladsl.model.Uri
 import dit4c.machineshop.docker.models._
 import java.util.{Calendar, TimeZone}
 import com.typesafe.config.ConfigFactory
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.client.RequestBuilding._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.Http
+import akka.stream.Materializer
+import spray.json.JsValue
+import spray.json._
+import spray.json.DefaultJsonProtocol._
+import akka.event.LoggingAdapter
+import akka.http.scaladsl.client.TransformerAux._
+import akka.stream.ActorMaterializer
 
 class DockerClientImpl(
-    val baseUrl: spray.http.Uri,
+    val baseUrl: Uri,
     val newContainerLinks: Seq[ContainerLink] = Nil) extends DockerClient {
 
   implicit val system: ActorSystem = ActorSystem()
+  implicit val mat: Materializer = ActorMaterializer()
   implicit val timeout: Timeout = Timeout(15.seconds)
   import system.dispatcher // implicit execution context
-  val log = Logging(system, getClass)
+  val log: LoggingAdapter = Logging(system, getClass)
 
   val SERVICE_PORT = 80
 
   // Overridden in unit tests
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
-    spray.client.pipelining.sendReceive
+    Http().singleRequest(_)
 
   override val images = ImagesImpl
   override val containers = ContainersImpl
@@ -41,14 +50,13 @@ class DockerClientImpl(
   object ImagesImpl extends DockerImages {
 
     def list = {
-      import spray.httpx.ResponseTransformation._
 
-      def parseJsonResponse: HttpResponse => List[DockerImage] = { res =>
+      def parseJsonResponse: JsValue => List[DockerImage] = { json =>
         import spray.json._
         import DefaultJsonProtocol._
 
         for {
-          obj <- JsonParser(res.entity.asString).convertTo[List[JsObject]]
+          obj <- json.convertTo[List[JsObject]]
           dockerImage = obj match {
             case JsObject(fields) =>
               ImageImpl(
@@ -67,36 +75,38 @@ class DockerClientImpl(
       }
 
       val pipeline: HttpRequest => Future[Seq[DockerImage]] =
-        sendAndReceive ~>
-        logResponse(log, Logging.DebugLevel) ~>
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]]
+        logValue(log, Logging.DebugLevel)  ~>[HttpResponse,Future[JsValue],Future[JsValue]]
+        reqToJson ~>
         parseJsonResponse
 
       pipeline({
-        import spray.httpx.RequestBuilding._
         Get(baseUrl + "images/json")
       })
     }
 
     def pull(imageName: String, tagName: String) = {
-      import spray.httpx.ResponseTransformation._
 
       def urlEncode(s: String) = java.net.URLEncoder.encode(s, "utf-8")
 
-      def parseResponse: HttpResponse => Unit = { res =>
+      def parseResponse: HttpResponse => Future[Unit] = { res =>
         res.status match {
           case StatusCodes.InternalServerError =>
             throw new Exception(
                 "Pull failed due to server error:\n\n"+res.entity.asString)
           case _: StatusCode =>
-            Unit
+            // Get each progress message, but discard because we don't have a
+            // use for the output yet.
+            res.entity.dataBytes.runFold(Seq.empty[String]) { case (m, v) =>
+              m :+ v.decodeString("utf-8")
+            }.map(_.map(_.parseJson)).map(v => ())
         }
       }
 
       val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[Unit],Future[Unit]] parseResponse
 
       pipeline({
-        import spray.httpx.RequestBuilding._
         Post(baseUrl + ("images/create?fromImage=%s&tag=%s".format(
           urlEncode(imageName), urlEncode(tagName)
         )))
@@ -111,13 +121,8 @@ class DockerClientImpl(
 
     override def refresh = {
 
-      import spray.httpx.ResponseTransformation._
-
-      def parseJsonResponse: HttpResponse => DockerContainer = { res =>
-        import spray.json._
-        import DefaultJsonProtocol._
-
-        val obj = JsonParser(res.entity.asString).convertTo[JsObject]
+      def parseJsonResponse: JsValue => DockerContainer = { json =>
+        val obj = json.asJsObject
 
         val status =
           if (obj.fields("State").asJsObject.fields("Running").convertTo[Boolean])
@@ -128,17 +133,15 @@ class DockerClientImpl(
       }
 
       val pipeline: HttpRequest => Future[DockerContainer] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
 
       pipeline {
-        import spray.httpx.RequestBuilding._
         Get(baseUrl + s"containers/$id/json")
       }
 
     }
 
     override def start = {
-      import spray.httpx.ResponseTransformation._
 
       def parseResponse: HttpResponse => Unit = { res =>
         if (res.status == StatusCodes.NotFound) {
@@ -147,7 +150,7 @@ class DockerClientImpl(
       }
 
       val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
 
       val startRequest =
         JsObject(
@@ -156,9 +159,8 @@ class DockerClientImpl(
         )
 
       pipeline({
-        import spray.httpx.RequestBuilding._
-        Post(baseUrl + s"containers/$id/start")
-          .withEntity(HttpEntity(`application/json`, startRequest.compactPrint))
+        Post(baseUrl + s"containers/$id/start",
+          HttpEntity(ContentTypes.`application/json`, startRequest.compactPrint))
       }).flatMap({
         case _: Unit => this.refresh
       })
@@ -174,19 +176,19 @@ class DockerClientImpl(
       }
 
       val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
 
       // Cannot have negative timeout
       val t = Math.max(0, timeout.toSeconds)
 
       pipeline({
-        import spray.httpx.RequestBuilding._
         Post(baseUrl + s"containers/$id/stop?t=$t")
       }).flatMap({
         case _: Unit => this.refresh
       })
     }
 
+    /*
     override def export(sendChunk: HttpMessagePart => Future[Unit]): Unit = {
       type ChunkFuture = () => Future[HttpMessagePart]
 
@@ -195,6 +197,7 @@ class DockerClientImpl(
       import BodyDeferringAsyncHandler.BodyDeferringInputStream
       import AsyncHandler.STATE
 
+    
       val maxChunkSize = 1024
       val pout = new PipedOutputStream
       val handler = new AsyncHandler[Unit] {
@@ -225,7 +228,7 @@ class DockerClientImpl(
           log.error(t, "Prematurely ending export")
           // Don't send end message, so client doesn't think it has everything
         }
-
+Response
         private def blockingSend(chunk: HttpMessagePart): Boolean = {
           import scala.concurrent.Await
           try {
@@ -245,9 +248,9 @@ class DockerClientImpl(
             handler)
       } yield ()
     }
+    */
 
     override def delete = {
-      import spray.httpx.ResponseTransformation._
 
       def parseResponse: HttpResponse => Unit = { res =>
         res.status match {
@@ -255,16 +258,15 @@ class DockerClientImpl(
             throw new Exception("Container does not exist")
           case StatusCodes.InternalServerError =>
             throw new Exception(
-                "Deletion failed due to server error:\n\n"+res.entity.asString)
+                "Deletion failed due to server error.")
           case _: StatusCode => Unit
         }
       }
 
       val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
 
       pipeline({
-        import spray.httpx.RequestBuilding._
         Delete(baseUrl + s"containers/$id?v=1")
       })
     }
@@ -278,16 +280,16 @@ class DockerClientImpl(
       import spray.json._
       import DefaultJsonProtocol._
 
-      def parseJsonResponse: HttpResponse => DockerContainer = { res =>
+      def parseJsonResponse: JsValue => DockerContainer = { json =>
 
-        val obj = JsonParser(res.entity.asString).convertTo[JsObject]
+        val obj = json.asJsObject
 
         new ContainerImpl(obj.getFields("Id").head.convertTo[String], name,
             ContainerStatus.Stopped)
       }
 
       val pipeline: HttpRequest => Future[DockerContainer] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
 
       val createRequest =
         JsObject(
@@ -310,22 +312,15 @@ class DockerClientImpl(
           throw new IllegalArgumentException(
               "Name must be a valid lower-case DNS label")
         }
-        import spray.httpx.RequestBuilding._
-        Post(baseUrl + s"containers/create?name=$name")
-          .withEntity(HttpEntity(`application/json`, createRequest.compactPrint))
+        Post(baseUrl + s"containers/create?name=$name",
+          HttpEntity(ContentTypes.`application/json`, createRequest.compactPrint))
       }
     }
 
     override def list = {
 
-      import spray.httpx.ResponseTransformation._
-
-      def parseJsonResponse: HttpResponse => Seq[DockerContainer] = { res =>
-        import spray.json._
-        import DefaultJsonProtocol._
-
-        JsonParser(res.entity.asString)
-          .convertTo[Seq[JsObject]]
+      def parseJsonResponse: JsValue => Seq[DockerContainer] = { json =>
+        json.convertTo[Seq[JsObject]]
           .map { obj: JsObject =>
             val Seq(jsId, namesWithSlashes, jsStatus) =
               obj.getFields("Id", "Names", "Status")
@@ -346,16 +341,24 @@ class DockerClientImpl(
       }
 
       val pipeline: HttpRequest => Future[Seq[DockerContainer]] =
-        sendAndReceive ~> logResponse(log, Logging.DebugLevel) ~> parseJsonResponse
+        sendAndReceive ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
 
       pipeline {
-        import spray.httpx.RequestBuilding._
         Get(baseUrl + "containers/json?all=1")
       }
 
     }
 
   }
+
+  implicit class ResponseEntityExtra(entity: ResponseEntity) {
+    import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers._
+
+    def asString = stringUnmarshaller(mat)(entity)
+  }
+
+  private def reqToJson(res: HttpResponse): Future[JsValue] =
+    sprayJsValueUnmarshaller(mat)(res.entity)
 
   implicit class ContainerNameTester(str: String) {
     // Same as domain name, but use of capitals is prohibited because container

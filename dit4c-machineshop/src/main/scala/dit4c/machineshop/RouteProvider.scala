@@ -1,9 +1,9 @@
 package dit4c.machineshop
 
-import spray.routing.RequestContext
+import akka.http.scaladsl.server.Route
 
 trait RouteProvider {
 
-  def route: RequestContext => Unit
+  def route: Route
 
 }

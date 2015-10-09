@@ -10,15 +10,20 @@ scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 libraryDependencies ++= {
   val akkaV = "2.3.6"
   val sprayV = "1.3.3"
+  val akkaHttpV = "1.0"
   val scalaioV = "0.4.3-1"
   val specs2V = "2.4.6-scalaz-7.0.6"
   Seq(
     "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
     "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
+    "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "io.spray"            %%  "spray-can"       % sprayV,
     "io.spray"            %%  "spray-client"    % sprayV,
     "io.spray"            %%  "spray-json"      % "1.3.0",
+    "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
+    "com.typesafe.akka"   %%  "akka-http-testkit-experimental" % akkaHttpV % "test",
+    "com.typesafe.akka"   %%  "akka-http-xml-experimental" % akkaHttpV,
     "io.spray"            %%  "spray-routing"   % sprayV,
     "io.spray"            %%  "spray-testkit"   % sprayV  % "test",
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,

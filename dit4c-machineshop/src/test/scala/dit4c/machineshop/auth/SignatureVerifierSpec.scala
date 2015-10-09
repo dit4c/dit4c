@@ -13,18 +13,20 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.Use
-import spray.httpx.RequestBuilding._
+import akka.http.scaladsl.client.RequestBuilding._
 import akka.util.Timeout
-import spray.http.HttpRequest
-import spray.http.HttpHeaders
-import spray.http.GenericHttpCredentials
-import spray.http.DateTime
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
 import spray.json._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model._
+import akka.stream.ActorMaterializer
+import akka.actor.ActorSystem
 
 class SignatureVerifierSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
+  implicit val system = ActorSystem("SignatureVerifierSpec")
+  implicit val materializer = ActorMaterializer()
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
   "SignatureVerifier" >> {
@@ -49,8 +51,8 @@ class SignatureVerifierSpec extends Specification {
       Seq(`RSA-SHA1`, `RSA-SHA256`).foreach { algorithm =>
         val now = DateTime.now
         val request = Post("/container/foo/start", "") ~>
-          addHeader(HttpHeaders.Date(now)) ~>
-          addHeader(HttpHeaders.`Content-Length`(0)) ~>
+          addHeader(headers.Date(now)) ~>
+          addHeader("Content-Length", 0L.toString) ~>
           addSignature(
               keyId, privateKey, algorithm,
               Seq("(request-target)", "date", "content-length"))
@@ -61,12 +63,12 @@ class SignatureVerifierSpec extends Specification {
         verifier(
           request
             ~> removeHeader("Date")
-            ~> addHeader(HttpHeaders.Date(now + 1000))) must beLeft[String]
+            ~> addHeader(headers.Date(now + 1000))) must beLeft[String]
         // Check validation fails if date is outside a 5 minute skew
         verifier(
           Post("/container/foo/start", "") ~>
-            addHeader(HttpHeaders.Date(now - 3600000)) ~>
-            addHeader(HttpHeaders.`Content-Length`(0)) ~>
+            addHeader(headers.Date(now - 3600000)) ~>
+            addHeader("Content-Length", 0L.toString) ~>
             addSignature(
                 keyId, privateKey, algorithm,
                 Seq("(request-target)", "date", "content-length"))) must beLeft[String]
@@ -79,14 +81,14 @@ class SignatureVerifierSpec extends Specification {
           JsObject("name" -> JsString("changed"), "image" -> JsString("test"))
         verifier(
           Post("/container/new", testPayload ) ~>
-            addHeader(HttpHeaders.Date(now)) ~>
+            addHeader(headers.Date(now)) ~>
             addDigest("SHA-256") ~>
             addSignature(
                 keyId, privateKey, algorithm,
                 Seq("(request-target)", "date", "digest"))) must beRight
         verifier(
           Post("/container/new", testPayload) ~>
-            addHeader(HttpHeaders.Date(now)) ~>
+            addHeader(headers.Date(now)) ~>
             addDigest("SHA-256") ~>
             { req => req.withEntity(alteredPayload.prettyPrint) } ~>
             addSignature(

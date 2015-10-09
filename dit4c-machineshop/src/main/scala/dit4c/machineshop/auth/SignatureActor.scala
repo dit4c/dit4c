@@ -2,19 +2,17 @@ package dit4c.machineshop.auth
 
 import java.io.FileInputStream
 import java.text.ParseException
-
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 import com.nimbusds.jose.jwk.JWKSet
-
 import akka.actor._
 import akka.event.Logging
-import spray.http.HttpRequest
+import akka.http.scaladsl.model.HttpRequest
+import akka.stream.ActorMaterializer
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor {
@@ -22,6 +20,7 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
 
   implicit val executionContext = context.system.dispatcher
   implicit val actorRefFactory = context.system
+  implicit val materializer = ActorMaterializer()
 
   import SignatureActor._
 

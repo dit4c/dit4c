@@ -2,33 +2,40 @@ package dit4c.machineshop
 
 import akka.actor._
 import akka.pattern.ask
-import spray.util.LoggingContext
-import spray.routing._
-import spray.http._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.unmarshalling._
 import spray.json._
-import MediaTypes._
 import scala.collection.JavaConversions._
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.images._
 import scala.util._
-import spray.httpx.marshalling.Marshaller
-import spray.httpx.marshalling.ToResponseMarshaller
-import spray.httpx.unmarshalling.Unmarshaller
-import spray.httpx.unmarshalling.FromRequestUnmarshaller
-import spray.httpx.SprayJsonSupport
-import spray.httpx.unmarshalling.UnmarshallerLifting
 import scala.concurrent.Future
 import akka.util.Timeout
 import shapeless.HNil
 import java.util.Calendar
 import java.text.SimpleDateFormat
+import akka.http.scaladsl.server.RequestContext
+import akka.http.scaladsl.server.RouteResult
+import akka.http.scaladsl.model.StatusCodes
+import akka.stream.Materializer
+import akka.http.scaladsl.model.HttpRequest
+import scala.concurrent.ExecutionContext
+import akka.stream.ActorMaterializer
+import scala.concurrent.duration._
+import akka.http.scaladsl.model.HttpEntity
 
 class ApiService(
     arf: ActorRefFactory,
     client: DockerClient,
     imageMonitor: ActorRef,
-    signatureActor: Option[ActorRef]) extends HttpService with RouteProvider {
+    signatureActor: Option[ActorRef])
+    extends RouteProvider {
   import scala.concurrent.duration._
   import dit4c.machineshop.images.ImageManagementActor._
 
@@ -41,8 +48,15 @@ class ApiService(
   import ApiService.marshallers._
 
   implicit val actorRefFactory = arf
+  implicit val mat = ActorMaterializer()
 
-  def withContainer(name: String)(f: DockerContainer => RequestContext => Unit) =
+  implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
+    fromRequestUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader, mat))
+
+  implicit val newImageRequestUnmarshaller: FromRequestUnmarshaller[NewImageRequest] =
+    fromRequestUnmarshaller(sprayJsonUnmarshaller(newImageRequestReader, mat))
+
+  def withContainer(name: String)(f: DockerContainer => Route): Route =
     onSuccess(client.containers.list) { containers =>
       containers.find(c => c.name == name) match {
         case Some(c) => f(c)
@@ -50,7 +64,7 @@ class ApiService(
       }
     }
 
-  def withImage(id: String)(f: Image => RequestContext => Unit) =
+  def withImage(id: String)(f: Image => Route): Route =
     onSuccess(imageMonitor ? ListImages()) {
       case ImageList(images, _) => images.find(_.id == id) match {
         case Some(c) => f(c)
@@ -58,32 +72,38 @@ class ApiService(
       }
     }
 
-  def signatureCheck: Directive0 =
+  def signatureCheck(f: => Route): Route =
     signatureActor
       .map { actor =>
-        headerValueByName("Authorization").flatMap { _ =>
-          requestInstance.flatMap { request =>
+        headerValueByName("Authorization") { _ =>
+          extractRequest { request =>
             val sigCheck: Future[AuthResponse] =
               (actor ask AuthCheck(request)).map(_.asInstanceOf[AuthResponse])
-            onSuccess(sigCheck).flatMap[HNil] {
+            onSuccess(sigCheck) {
               case AccessGranted =>
-                pass
+                f
               case AccessDenied(msg) =>
                 val challengeHeaders = Nil
-                complete(StatusCodes.Forbidden, challengeHeaders, msg)
+                overrideStatusCode(StatusCodes.Forbidden) {
+                  complete(msg)
+                }
             }
           }
-        } |
-        provide("Authorization required using HTTP Signature.").flatMap[HNil] { msg =>
-          val challengeHeaders = HttpHeaders.`WWW-Authenticate`(
+        } ~
+        provide("Authorization required using HTTP Signature.") { msg =>
+          val challengeHeaders = `WWW-Authenticate`(
               HttpChallenge("Signature", "",
                   Map("headers" -> "(request-target) date"))) :: Nil
-          complete(StatusCodes.Unauthorized, challengeHeaders, msg)
+          overrideStatusCode(StatusCodes.Unauthorized) {
+            respondWithHeaders(challengeHeaders) {
+              complete(msg)
+            }
+          }
         }
       }
-      .getOrElse( pass )
+      .getOrElse( f )
 
-  val route: RequestContext => Unit =
+  val route: RequestContext => Future[RouteResult] =
     pathPrefix("containers") {
       pathEndOrSingleSlash {
         get {
@@ -97,7 +117,7 @@ class ApiService(
           entity(as[NewContainerRequest]) { npr =>
             signatureCheck {
               onSuccess(client.containers.create(npr.name, npr.image)) { container =>
-                respondWithStatus(StatusCodes.Created) {
+                overrideStatusCode(StatusCodes.Created) {
                   complete(container)
                 }
               }
@@ -118,7 +138,7 @@ class ApiService(
                 onComplete(container.delete) {
                   case _: Success[Unit] => complete(StatusCodes.NoContent)
                   case Failure(e) =>
-                    respondWithStatus(StatusCodes.InternalServerError) {
+                    overrideStatusCode(StatusCodes.InternalServerError) {
                       complete(e.getMessage)
                     }
                 }
@@ -147,7 +167,7 @@ class ApiService(
               }
             }
           }
-        } ~
+        }/* ~
         path("export") {
           get {
             signatureCheck {
@@ -162,7 +182,7 @@ class ApiService(
               }
             }
           }
-        }
+        }*/
       }
     } ~
     pathPrefix("images") {
@@ -171,12 +191,14 @@ class ApiService(
           onSuccess(imageMonitor ? ListImages()) {
             case ImageList(images, stateId) =>
               val etag = EntityTag(stateId)
-              optionalHeaderValueByType[HttpHeaders.`If-None-Match`]() {
-                case Some(HttpHeaders.`If-None-Match`(EntityTagRange.Default(tags)))
+              optionalHeaderValueByType[`If-None-Match`]() {
+                case Some(`If-None-Match`(EntityTagRange.Default(tags)))
                     if tags.contains(etag) =>
-                  complete(StatusCodes.NotModified)
+                  overrideStatusCode(StatusCodes.NotModified) {
+                    complete(HttpEntity.Empty)
+                  }
                 case etag =>
-                  respondWithHeader(HttpHeaders.ETag(EntityTag(stateId))) {
+                  respondWithHeader(ETag(EntityTag(stateId))) {
                     complete(images)
                   }
               }
@@ -188,11 +210,11 @@ class ApiService(
               val addReq = AddImage(nir.displayName, nir.repository, nir.tag)
               onSuccess(imageMonitor ? addReq) {
                 case AddedImage(image) =>
-                  respondWithStatus(StatusCodes.Created) {
+                  overrideStatusCode(StatusCodes.Created) {
                     complete(image)
                   }
                 case ConflictingImages(images) =>
-                  respondWithStatus(StatusCodes.Conflict) {
+                  overrideStatusCode(StatusCodes.Conflict) {
                     complete(images)
                   }
               }
@@ -248,7 +270,7 @@ object ApiService {
       )(implicit actorRefFactory: ActorRefFactory) =
     new ApiService(actorRefFactory, client, imageMonitor, signatureActor)
 
-  object marshallers extends DefaultJsonProtocol with SprayJsonSupport with UnmarshallerLifting {
+  object marshallers extends DefaultJsonProtocol with SprayJsonSupport {
     implicit val newContainerRequestReader = jsonFormat2(NewContainerRequest)
     implicit val newImageRequestReader = jsonFormat3(NewImageRequest)
 
@@ -296,11 +318,11 @@ object ApiService {
         JsArray(cs.map(imageWriter.write(_)).toSeq: _*)
     }
 
-    implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
-      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader)))
-
-    implicit val newImageRequestUnmarshaller: FromRequestUnmarshaller[NewImageRequest] =
-      fromRequestUnmarshaller(fromMessageUnmarshaller(sprayJsonUnmarshaller(newImageRequestReader)))
+    def fromRequestUnmarshaller[T](feu: FromEntityUnmarshaller[T]): FromRequestUnmarshaller[T] =
+      new Unmarshaller[HttpRequest, T] {
+        override def apply(value: HttpRequest)(implicit ec: ExecutionContext) =
+          feu(value.entity)
+      }
 
     implicit val containerJsonMarshaller: ToResponseMarshaller[DockerContainer] =
       sprayJsonMarshaller(containerWriter)

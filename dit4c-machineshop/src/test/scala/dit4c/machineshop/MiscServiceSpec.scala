@@ -1,13 +1,15 @@
 package dit4c.machineshop
 
 import org.specs2.mutable.Specification
-import spray.testkit.Specs2RouteTest
-import spray.http._
+import akka.http.scaladsl.client.RequestBuilding._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model._
 import StatusCodes._
-import spray.routing.HttpService
+import akka.http.scaladsl.testkit.RouteTest
+import akka.testkit.TestKit
+import dit4c.Specs2TestInterface
 
-class MiscServiceSpec extends Specification with Specs2RouteTest with HttpService {
-  implicit def actorRefFactory = system
+class MiscServiceSpec extends Specification with RouteTest with Specs2TestInterface {
   val miscRoute = MiscService("fake-server-id").route
 
   "MiscService" should {
@@ -37,7 +39,7 @@ class MiscServiceSpec extends Specification with Specs2RouteTest with HttpServic
     }
 
     "return a MethodNotAllowed error for PUT requests to the root path" in {
-      Put() ~> sealRoute(miscRoute) ~> check {
+      Put() ~> Route.seal(miscRoute) ~> check {
         status === MethodNotAllowed
         responseAs[String] === "HTTP method not allowed, supported methods: GET"
       }
