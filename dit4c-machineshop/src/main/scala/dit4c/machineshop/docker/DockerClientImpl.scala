@@ -92,8 +92,11 @@ class DockerClientImpl(
       def parseResponse: HttpResponse => Future[Unit] = { res =>
         res.status match {
           case StatusCodes.InternalServerError =>
+            val errorMsg = res.entity.dataBytes.runFold("") { case (m, v) =>
+              m + v.decodeString("utf-8")
+            }
             throw new Exception(
-                "Pull failed due to server error:\n\n"+res.entity.asString)
+                "Pull failed due to server error:\n\n"+errorMsg)
           case _: StatusCode =>
             // Get each progress message, but discard because we don't have a
             // use for the output yet.
@@ -167,7 +170,6 @@ class DockerClientImpl(
     }
 
     override def stop(timeout: Duration) = {
-      import spray.httpx.ResponseTransformation._
 
       def parseResponse: HttpResponse => Unit = { res =>
         if (res.status == StatusCodes.NotFound) {
@@ -197,7 +199,7 @@ class DockerClientImpl(
       import BodyDeferringAsyncHandler.BodyDeferringInputStream
       import AsyncHandler.STATE
 
-    
+
       val maxChunkSize = 1024
       val pout = new PipedOutputStream
       val handler = new AsyncHandler[Unit] {
@@ -276,9 +278,6 @@ Response
   object ContainersImpl extends DockerContainers {
 
     override def create(name: String, image: DockerImage) = {
-      import spray.httpx.ResponseTransformation._
-      import spray.json._
-      import DefaultJsonProtocol._
 
       def parseJsonResponse: JsValue => DockerContainer = { json =>
 
@@ -349,12 +348,6 @@ Response
 
     }
 
-  }
-
-  implicit class ResponseEntityExtra(entity: ResponseEntity) {
-    import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers._
-
-    def asString = stringUnmarshaller(mat)(entity)
   }
 
   private def reqToJson(res: HttpResponse): Future[JsValue] =

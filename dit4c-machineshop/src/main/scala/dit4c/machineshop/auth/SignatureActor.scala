@@ -13,6 +13,11 @@ import akka.actor._
 import akka.event.Logging
 import akka.http.scaladsl.model.HttpRequest
 import akka.stream.ActorMaterializer
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers._
+import akka.http.scaladsl.client.RequestBuilding._
+import akka.http.scaladsl.client.TransformerAux._
+import akka.http.scaladsl.model.HttpResponse
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor {
@@ -20,7 +25,7 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
 
   implicit val executionContext = context.system.dispatcher
   implicit val actorRefFactory = context.system
-  implicit val materializer = ActorMaterializer()
+  implicit val mat = ActorMaterializer()
 
   import SignatureActor._
 
@@ -94,9 +99,6 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
     }
   }
 
-  import spray.http._
-  import spray.client.pipelining._
-
   private def createVerifier: Future[SignatureVerifier] = {
     log.info(s"Retrieving keys from $publicKeySource")
     if (publicKeySource.isAbsolute()) {
@@ -122,8 +124,11 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
     }
   }
 
-  protected def pipeline = sendReceive ~> unmarshal[String]
-
+  protected def pipeline(req: HttpRequest) =
+    for {
+      res <- Http().singleRequest(req)
+      str <- stringUnmarshaller(mat)(res.entity)
+    } yield str
 }
 
 

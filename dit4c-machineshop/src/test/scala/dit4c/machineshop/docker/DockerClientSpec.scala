@@ -9,12 +9,12 @@ import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import scalaz.IsEmpty
 import akka.http.scaladsl.model.Uri
+import scala.concurrent.Await
 
 class DockerClientSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
-  import spray.util.pimpFuture
   import dit4c.BetamaxUtils._
 
   def newDockerClient = new DockerClientImpl(Uri("http://localhost:4243/"))
@@ -31,6 +31,9 @@ class DockerClientSpec extends Specification {
   def haveImageName(n: String) =
     contain(beTypedEqualTo(n)) ^^ ((_:DockerImage).names aka "names")
 
+  implicit class FutureAwaitable[T](f: Future[T]) {
+    def await(implicit timeout: Timeout) = Await.result(f, timeout.duration)
+  }
 
   val image = "busybox"
 

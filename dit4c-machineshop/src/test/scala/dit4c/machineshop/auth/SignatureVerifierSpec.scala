@@ -73,7 +73,7 @@ class SignatureVerifierSpec extends Specification {
                 keyId, privateKey, algorithm,
                 Seq("(request-target)", "date", "content-length"))) must beLeft[String]
         // Check validation checks message digests
-        import spray.httpx.SprayJsonSupport._
+        import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
         import DefaultJsonProtocol._
         val testPayload =
           JsObject("name" -> JsString("test"), "image" -> JsString("test"))

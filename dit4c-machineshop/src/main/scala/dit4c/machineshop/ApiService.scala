@@ -17,7 +17,6 @@ import dit4c.machineshop.images._
 import scala.util._
 import scala.concurrent.Future
 import akka.util.Timeout
-import shapeless.HNil
 import java.util.Calendar
 import java.text.SimpleDateFormat
 import akka.http.scaladsl.server.RequestContext

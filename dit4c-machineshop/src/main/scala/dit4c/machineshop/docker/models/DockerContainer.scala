@@ -1,9 +1,6 @@
 package dit4c.machineshop.docker.models
 
 import scala.concurrent.Future
-import spray.http.HttpResponse
-import spray.http.HttpRequest
-import spray.http.HttpMessagePart
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.`package`.DurationInt
 

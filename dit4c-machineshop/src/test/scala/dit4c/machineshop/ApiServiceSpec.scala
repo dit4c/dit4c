@@ -25,15 +25,18 @@ import dit4c.Specs2TestInterface
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.headers.EntityTagRange
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import scala.concurrent.Await
 
 class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterface {
   implicit val actorRefFactory = system
-
-  import spray.util.pimpFuture
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
   def ephemeralKnownImages = new KnownImages(
     RamFileSystem().fromString("/known_images.json"))
+
+  implicit class FutureAwaitable[T](f: Future[T]) {
+    def await(implicit timeout: Timeout) = Await.result(f, timeout.duration)
+  }
 
   def mockDockerClient = new DockerClient {
     var containerList: Seq[DockerContainer] = Nil
@@ -168,7 +171,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "create containers with POST requests to /containers" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       client.containers.list.await must beEmpty
@@ -185,7 +187,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "require HTTP Signatures for POST requests to /containers" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       val client = mockDockerClient
       val knownImages = ephemeralKnownImages
@@ -229,7 +230,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "delete containers with DELETE requests to /containers/:name" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).await
@@ -241,7 +241,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "start containers with POST requests to /containers/:name/start" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).await
@@ -255,7 +254,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "stop containers with POST requests to /containers/:name/stop" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).flatMap(_.start).await
@@ -298,7 +296,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "create new known image with POST requests to /images" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       client.images.list.await must beEmpty
@@ -319,7 +316,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "list images with GET request to /images" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val knownImages = ephemeralKnownImages
       implicit val client = mockDockerClient
@@ -352,7 +348,6 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
 
     "pull images with POST request to /images/:id/pull" in {
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val knownImages = ephemeralKnownImages
       implicit val client = mockDockerClient
