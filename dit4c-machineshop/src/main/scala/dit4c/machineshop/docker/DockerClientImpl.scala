@@ -22,6 +22,12 @@ import spray.json.DefaultJsonProtocol._
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.client.TransformerAux._
 import akka.stream.ActorMaterializer
+import com.github.dockerjava.core.DockerClientConfig
+import com.github.dockerjava.core.DockerClientBuilder
+import scala.collection.JavaConversions._
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
+import com.github.dockerjava.core.command.PullImageResultCallback
 
 class DockerClientImpl(
     val baseUrl: Uri,
@@ -33,7 +39,16 @@ class DockerClientImpl(
   import system.dispatcher // implicit execution context
   val log: LoggingAdapter = Logging(system, getClass)
 
-  val SERVICE_PORT = 80
+  // Uncapped ExecutionContext, so we can do sync network requests
+  val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
+  val docker: com.github.dockerjava.api.DockerClient = {
+    val config =
+      DockerClientConfig.createDefaultConfigBuilder
+        .withUri(baseUrl.toString)
+        .build
+    DockerClientBuilder.getInstance(config).build
+  }
 
   // Overridden in unit tests
   def sendAndReceive: HttpRequest => Future[HttpResponse] =
@@ -49,72 +64,23 @@ class DockerClientImpl(
 
   object ImagesImpl extends DockerImages {
 
-    def list = {
+    def list = Future({
+      docker.listImagesCmd.exec.toIterable.map { img =>
+        ImageImpl(
+            img.getId,
+            img.getRepoTags.toSet.filter(_ != "<none>:<none>"),
+            {
+              val c = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+              c.setTimeInMillis(img.getCreated * 1000)
+              c
+            })
+      }.filter(!_.names.isEmpty).toSeq
+    })(ec)
 
-      def parseJsonResponse: JsValue => List[DockerImage] = { json =>
-        import spray.json._
-        import DefaultJsonProtocol._
-
-        for {
-          obj <- json.convertTo[List[JsObject]]
-          dockerImage = obj match {
-            case JsObject(fields) =>
-              ImageImpl(
-                  fields("Id").convertTo[String],
-                  fields("RepoTags").convertTo[Set[String]]
-                    .filter(_ != "<none>:<none>"),
-                  {
-                    val c = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-                    val epochSeconds = fields("Created").convertTo[Long]
-                    c.setTimeInMillis(epochSeconds * 1000)
-                    c
-                  })
-          }
-          namedImage <- Some(dockerImage).filter(!_.names.isEmpty)
-        } yield namedImage
-      }
-
-      val pipeline: HttpRequest => Future[Seq[DockerImage]] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]]
-        logValue(log, Logging.DebugLevel)  ~>[HttpResponse,Future[JsValue],Future[JsValue]]
-        reqToJson ~>
-        parseJsonResponse
-
-      pipeline({
-        Get(baseUrl + "images/json")
-      })
-    }
-
-    def pull(imageName: String, tagName: String) = {
-
-      def urlEncode(s: String) = java.net.URLEncoder.encode(s, "utf-8")
-
-      def parseResponse: HttpResponse => Future[Unit] = { res =>
-        res.status match {
-          case StatusCodes.InternalServerError =>
-            val errorMsg = res.entity.dataBytes.runFold("") { case (m, v) =>
-              m + v.decodeString("utf-8")
-            }
-            throw new Exception(
-                "Pull failed due to server error:\n\n"+errorMsg)
-          case _: StatusCode =>
-            // Get each progress message, but discard because we don't have a
-            // use for the output yet.
-            res.entity.dataBytes.runFold(Seq.empty[String]) { case (m, v) =>
-              m :+ v.decodeString("utf-8")
-            }.map(_.map(_.parseJson)).map(v => ())
-        }
-      }
-
-      val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[Unit],Future[Unit]] parseResponse
-
-      pipeline({
-        Post(baseUrl + ("images/create?fromImage=%s&tag=%s".format(
-          urlEncode(imageName), urlEncode(tagName)
-        )))
-      })
-    }
+    def pull(imageName: String, tagName: String) = Future({
+      docker.pullImageCmd(imageName).withTag(tagName)
+        .exec(new PullImageResultCallback()).awaitSuccess
+    })(ec)
 
   }
 

@@ -17,6 +17,7 @@ libraryDependencies ++= {
     "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
     "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
+    "com.github.docker-java" % "docker-java"    % "2.1.1",
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "io.spray"            %%  "spray-json"      % "1.3.0",
     "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
