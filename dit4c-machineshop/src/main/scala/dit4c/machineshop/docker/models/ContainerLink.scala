@@ -1,6 +1,6 @@
 package dit4c.machineshop.docker.models
 
-class ContainerLink(outside: String, inside: String) {
+class ContainerLink(val outside: String, val inside: String) {
   override lazy val toString = outside + ":" + inside
 }
 

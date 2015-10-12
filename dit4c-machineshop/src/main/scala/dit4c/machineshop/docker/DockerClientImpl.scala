@@ -1,46 +1,34 @@
 package dit4c.machineshop.docker
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import akka.actor._
-import akka.io.IO
-import akka.actor.ActorSystem
-import akka.util.Timeout
-import akka.event.Logging
-import akka.http.scaladsl.model.Uri
-import dit4c.machineshop.docker.models._
-import java.util.{Calendar, TimeZone}
-import com.typesafe.config.ConfigFactory
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import akka.http.scaladsl.client.RequestBuilding._
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.Http
-import akka.stream.Materializer
-import spray.json.JsValue
-import spray.json._
-import spray.json.DefaultJsonProtocol._
-import akka.event.LoggingAdapter
-import akka.http.scaladsl.client.TransformerAux._
-import akka.stream.ActorMaterializer
-import com.github.dockerjava.core.DockerClientConfig
-import com.github.dockerjava.core.DockerClientBuilder
-import scala.collection.JavaConversions._
+import java.util.Calendar
+import java.util.TimeZone
 import java.util.concurrent.Executors
+
+import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+
+import com.github.dockerjava.api.model.Link
+import com.github.dockerjava.api.model.RestartPolicy
+import com.github.dockerjava.core.DockerClientBuilder
+import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.command.PullImageResultCallback
+
+import akka.http.scaladsl.model.Uri
+import dit4c.machineshop.docker.models.ContainerLink
+import dit4c.machineshop.docker.models.ContainerStatus
+import dit4c.machineshop.docker.models.DockerContainer
+import dit4c.machineshop.docker.models.DockerContainers
+import dit4c.machineshop.docker.models.DockerImage
+import dit4c.machineshop.docker.models.DockerImages
 
 class DockerClientImpl(
     val baseUrl: Uri,
     val newContainerLinks: Seq[ContainerLink] = Nil) extends DockerClient {
 
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val mat: Materializer = ActorMaterializer()
-  implicit val timeout: Timeout = Timeout(15.seconds)
-  import system.dispatcher // implicit execution context
-  val log: LoggingAdapter = Logging(system, getClass)
-
   // Uncapped ExecutionContext, so we can do sync network requests
-  val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   val docker: com.github.dockerjava.api.DockerClient = {
     val config =
@@ -49,10 +37,6 @@ class DockerClientImpl(
         .build
     DockerClientBuilder.getInstance(config).build
   }
-
-  // Overridden in unit tests
-  def sendAndReceive: HttpRequest => Future[HttpResponse] =
-    Http().singleRequest(_)
 
   override val images = ImagesImpl
   override val containers = ContainersImpl
@@ -88,73 +72,22 @@ class DockerClientImpl(
 
   class ContainerImpl(val id: String, val name: String, val status: ContainerStatus) extends DockerContainer {
 
-    override def refresh = {
+    override def refresh = Future({
+      val c = docker.inspectContainerCmd(id).exec
+      val status =
+        if (c.getState.isRunning) ContainerStatus.Running
+        else ContainerStatus.Stopped
+      new ContainerImpl(id, name, status)
+    })(ec)
 
-      def parseJsonResponse: JsValue => DockerContainer = { json =>
-        val obj = json.asJsObject
+    override def start = Future({
+      docker.startContainerCmd(id).exec
+    })(ec).flatMap(_ => this.refresh)
 
-        val status =
-          if (obj.fields("State").asJsObject.fields("Running").convertTo[Boolean])
-            ContainerStatus.Running
-          else
-            ContainerStatus.Stopped
-        new ContainerImpl(id, name, status)
-      }
-
-      val pipeline: HttpRequest => Future[DockerContainer] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
-
-      pipeline {
-        Get(baseUrl + s"containers/$id/json")
-      }
-
-    }
-
-    override def start = {
-
-      def parseResponse: HttpResponse => Unit = { res =>
-        if (res.status == StatusCodes.NotFound) {
-          throw new Exception("Container does not exist")
-        }
-      }
-
-      val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
-
-      val startRequest =
-        JsObject(
-          "PortBindings" -> JsObject(),
-          "PublishAllPorts" -> JsTrue
-        )
-
-      pipeline({
-        Post(baseUrl + s"containers/$id/start",
-          HttpEntity(ContentTypes.`application/json`, startRequest.compactPrint))
-      }).flatMap({
-        case _: Unit => this.refresh
-      })
-    }
-
-    override def stop(timeout: Duration) = {
-
-      def parseResponse: HttpResponse => Unit = { res =>
-        if (res.status == StatusCodes.NotFound) {
-          throw new Exception("Container does not exist")
-        }
-      }
-
-      val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
-
-      // Cannot have negative timeout
-      val t = Math.max(0, timeout.toSeconds)
-
-      pipeline({
-        Post(baseUrl + s"containers/$id/stop?t=$t")
-      }).flatMap({
-        case _: Unit => this.refresh
-      })
-    }
+    override def stop(timeout: Duration) = Future({
+      docker.stopContainerCmd(id)
+        .withTimeout(Math.max(0, timeout.toSeconds.toInt)).exec
+    })(ec).flatMap(_ => this.refresh)
 
     /*
     override def export(sendChunk: HttpMessagePart => Future[Unit]): Unit = {
@@ -218,106 +151,52 @@ Response
     }
     */
 
-    override def delete = {
-
-      def parseResponse: HttpResponse => Unit = { res =>
-        res.status match {
-          case StatusCodes.NotFound =>
-            throw new Exception("Container does not exist")
-          case StatusCodes.InternalServerError =>
-            throw new Exception(
-                "Deletion failed due to server error.")
-          case _: StatusCode => Unit
-        }
-      }
-
-      val pipeline: HttpRequest => Future[Unit] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~> parseResponse
-
-      pipeline({
-        Delete(baseUrl + s"containers/$id?v=1")
-      })
-    }
+    override def delete = Future({
+      docker.removeContainerCmd(id).withRemoveVolumes(true).exec
+      () // Need to return Unit, not Void
+    })(ec)
 
   }
 
   object ContainersImpl extends DockerContainers {
 
-    override def create(name: String, image: DockerImage) = {
-
-      def parseJsonResponse: JsValue => DockerContainer = { json =>
-
-        val obj = json.asJsObject
-
-        new ContainerImpl(obj.getFields("Id").head.convertTo[String], name,
-            ContainerStatus.Stopped)
+    override def create(name: String, image: DockerImage) = Future({
+      if (!name.isValidContainerName) {
+        throw new IllegalArgumentException(
+            "Name must be a valid lower-case DNS label")
       }
+      val c = docker.createContainerCmd(image)
+        .withName(name)
+        .withHostName(name)
+        .withTty(true)
+        .withAttachStdout(true)
+        .withAttachStderr(true)
+        .withCpuShares(2)
+        .withLinks(newContainerLinks.map(l => new Link(l.outside, l.inside)): _*)
+        .withRestartPolicy(RestartPolicy.alwaysRestart)
+        .exec
+      new ContainerImpl(c.getId, name, ContainerStatus.Stopped)
+    })(ec)
 
-      val pipeline: HttpRequest => Future[DockerContainer] =
-        sendAndReceive ~>[HttpResponse,HttpResponse,Future[HttpResponse]] logValue(log, Logging.DebugLevel) ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
-
-      val createRequest =
-        JsObject(
-          "Hostname" -> JsString(name),
-          "Tty" -> JsTrue,
-          "AttachStdout" -> JsTrue,
-          "AttachStderr" -> JsTrue,
-          "CpuShares" -> JsNumber(1),
-          "Image" -> JsString(image),
-          "HostConfig" -> JsObject(
-            "Links" -> newContainerLinks.map(_.toString.toJson).toJson,
-            "RestartPolicy" -> JsObject(
-              "Name" -> JsString("always")
-            )
-          )
-        )
-
-      pipeline {
-        if (!name.isValidContainerName) {
-          throw new IllegalArgumentException(
-              "Name must be a valid lower-case DNS label")
+    override def list = Future({
+      docker.listContainersCmd.withShowAll(true)
+        .exec.toSeq
+        .map { c =>
+          // Get the first name, without the slash
+          // (Multiple names are possible, but first should be native name.)
+          val name: String = c.getNames.toSeq
+            .filter(_.startsWith("/"))
+            .map(_.stripPrefix("/"))
+            .head
+          val status =
+            if (c.getStatus.matches("Up .*")) ContainerStatus.Running
+            else ContainerStatus.Stopped
+          new ContainerImpl(c.getId, name, status)
         }
-        Post(baseUrl + s"containers/create?name=$name",
-          HttpEntity(ContentTypes.`application/json`, createRequest.compactPrint))
-      }
-    }
-
-    override def list = {
-
-      def parseJsonResponse: JsValue => Seq[DockerContainer] = { json =>
-        json.convertTo[Seq[JsObject]]
-          .map { obj: JsObject =>
-            val Seq(jsId, namesWithSlashes, jsStatus) =
-              obj.getFields("Id", "Names", "Status")
-            // Get the first name, without the slash
-            // (Multiple names are possible, but first should be native name.)
-            val name: String = namesWithSlashes.convertTo[List[String]] match {
-              case nameWithSlash :: _ if nameWithSlash.startsWith("/") =>
-                nameWithSlash.stripPrefix("/")
-            }
-            val status =
-              if (jsStatus.convertTo[String].matches("Up .*"))
-                ContainerStatus.Running
-              else
-                ContainerStatus.Stopped
-            new ContainerImpl(jsId.convertTo[String], name, status)
-          }
-          .filter(_.name.isValidContainerName)
-      }
-
-      val pipeline: HttpRequest => Future[Seq[DockerContainer]] =
-        sendAndReceive ~>[HttpResponse,Future[JsValue],Future[JsValue]] reqToJson ~> parseJsonResponse
-
-      pipeline {
-        Get(baseUrl + "containers/json?all=1")
-      }
-
-    }
+        .filter(_.name.isValidContainerName)
+    })(ec)
 
   }
-
-  private def reqToJson(res: HttpResponse): Future[JsValue] =
-    sprayJsValueUnmarshaller(mat)(res.entity)
 
   implicit class ContainerNameTester(str: String) {
     // Same as domain name, but use of capitals is prohibited because container
