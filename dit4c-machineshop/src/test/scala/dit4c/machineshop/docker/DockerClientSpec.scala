@@ -3,6 +3,7 @@ package dit4c.machineshop.docker
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import org.specs2.mutable.Specification
+import org.specs2.specification.BeforeAfterAll
 import akka.util.Timeout.intToTimeout
 import dit4c.machineshop.docker.models._
 import akka.util.Timeout
@@ -10,14 +11,49 @@ import java.util.concurrent.TimeUnit
 import scalaz.IsEmpty
 import akka.http.scaladsl.model.Uri
 import scala.concurrent.Await
+import com.github.dockerjava.core.DockerClientBuilder
+import com.github.dockerjava.api.model.PortBinding
+import com.github.dockerjava.api.model.Ports
+import com.github.dockerjava.api.model.ExposedPort
 
-class DockerClientSpec extends Specification {
+class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
-  import dit4c.BetamaxUtils._
+  var dindId: Option[String] = None
+  var dockerUri: Option[Uri] = None
 
-  def newDockerClient = new DockerClientImpl(Uri("http://localhost:4243/"))
+  def beforeAll = {
+    val client = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build
+    dindId = Some(client.createContainerCmd("docker.io/jpetazzo/dind")
+      .withPrivileged(true)
+      .withAttachStdout(true)
+      .withAttachStderr(true)
+      .withName("dit4c_machineshop_dind_test")
+      .withEnv(
+        "PORT=2375",
+        "DOCKER_DAEMON_ARGS=--storage-driver=vfs")
+      .withExposedPorts(ExposedPort.tcp(2375))
+      .withPortBindings(new PortBinding(Ports.Binding("127.0.0.1",4243), ExposedPort.tcp(2375)))
+      .exec
+      .getId)
+    client.startContainerCmd(dindId.get).exec
+    Thread.sleep(5000)
+    dockerUri = Some(Uri("http://localhost:4243/"))
+  }
+
+  def afterAll = {
+    dindId.foreach { id =>
+      val client = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build
+      client.removeContainerCmd(id).withForce.exec
+    }
+  }
+
+  def newDockerClient: DockerClient = dockerUri match {
+    case Some(uri) => new DockerClientImpl(uri)
+    case None => skipped; null
+  }
+
 
   def haveId(id: String) =
     beTypedEqualTo(id) ^^ ((_:DockerContainer).id aka "ID")
@@ -44,92 +80,75 @@ class DockerClientSpec extends Specification {
 
     "images" >> {
       "pull and list" in {
-        withTape("DockerClient.images.pull") {
-          val client = newDockerClient
-          client.images.pull("busybox").await(Timeout(5, TimeUnit.MINUTES))
-        }
-        withTape("DockerClient.images.list") {
-          val client = newDockerClient
-          val images = client.images.list.await
-          images must contain(haveImageName("busybox:latest"))
-        }
+        val client = newDockerClient
+        client.images.pull("busybox").await(Timeout(5, TimeUnit.MINUTES))
+        val images = client.images.list.await
+        images must contain(haveImageName("busybox:latest"))
       }
     }
 
     "containers" >> {
       "create" in {
-        withTape("DockerClient.containers.create") {
-          val client = newDockerClient
-          val dc = client.containers.create("testnew", image).await
-          dc must (haveName("testnew") and beStopped)
-          // Check we can't pass invalid names
-          client.containers.create("test_new", image).await must
-            throwA[IllegalArgumentException]
-        }
+        val client = newDockerClient
+        val dc = client.containers.create("testnew", image).await
+        dc must (haveName("testnew") and beStopped)
+        // Check we can't pass invalid names
+        client.containers.create("test_new", image).await must
+          throwA[IllegalArgumentException]
       }
       "list" in {
-        withTape("DockerClient.containers.list") {
-          val client = newDockerClient
-          client.containers.create("testlist-1", image).await
-          client.containers.create("testlist-2", image).flatMap(_.start).await
-          val containers = client.containers.list.await
-          containers must contain(allOf(
-            haveName("testlist-1") and beStopped,
-            haveName("testlist-2") and beRunning))
-        }
+        val client = newDockerClient
+        client.containers.create("testlist-1", image).await
+        client.containers.create("testlist-2", image).flatMap(_.start).await
+        val containers = client.containers.list.await
+        containers must contain(allOf(
+          haveName("testlist-1") and beStopped,
+          haveName("testlist-2") and beRunning))
       }
     }
 
     "container" >> {
       "refresh" >> {
-        withTape("DockerClient.container.refresh") {
-          val client = newDockerClient
-          val dc = client.containers.create("testrefresh", image).await
-          val refreshed = dc.refresh.await
-          refreshed must (haveId(dc.id)
-              and haveName(dc.name)
-              and beStopped
-              and be(dc).not)
-        }
+        val client = newDockerClient
+        val dc = client.containers.create("testrefresh", image).await
+        val refreshed = dc.refresh.await
+        refreshed must (haveId(dc.id)
+            and haveName(dc.name)
+            and beStopped
+            and be(dc).not)
       }
       "start" >> {
-        withTape("DockerClient.container.start") {
-          val client = newDockerClient
-          val dc = client.containers.create("teststart", image).await
-          val refreshed = dc.start.await
-          refreshed must (haveId(dc.id)
-              and haveName(dc.name)
-              and beRunning)
-        }
+        val client = newDockerClient
+        val dc = client.containers.create("teststart", image).await
+        val refreshed = dc.start.await
+        refreshed must (haveId(dc.id)
+            and haveName(dc.name)
+            and beRunning)
       }
       "stop" >> {
         val client = newDockerClient
-        val dc = withTape("DockerClient.container.stop-setup") {
+        val dc =
           client.containers.create("teststop", image).flatMap(_.start).await
-        }
         dc must (haveId(dc.id)
             and haveName(dc.name)
             and beRunning)
-        val refreshed = withTape("DockerClient.container.stop-run") {
+        val refreshed =
           dc.stop().await
-        }
         refreshed must (haveId(dc.id)
             and haveName(dc.name)
             and beStopped)
       }
       "delete" >> {
         val client = newDockerClient
-        val dc = withTape("DockerClient.container.delete-setup") {
+        val dc = {
           val dc = client.containers.create("testdelete", image).await
           val cs = client.containers.list.await
           cs must contain(haveId(dc.id))
           dc
         }
-        withTape("DockerClient.container.delete-run") {
-          dc.delete.await
-          val cs = client.containers.list.await
-          cs must not contain(haveId(dc.id))
-        }
+        dc.delete.await
+        val cs = client.containers.list.await
+        cs must not contain(haveId(dc.id))
       }
     }
   }

@@ -20,8 +20,7 @@ import scala.util.Random.shuffle
 import scala.concurrent.Await.result
 import java.util.Calendar
 import akka.testkit.TestKit
-import org.specs2.time.{Duration => SpecsDuration}
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration._
 
 class ImageManagementActorSpec extends Specification with Mockito {
 
@@ -29,9 +28,6 @@ class ImageManagementActorSpec extends Specification with Mockito {
   implicit val system = ActorSystem()
   implicit val timeoutDuration = new FiniteDuration(5, TimeUnit.SECONDS)
   implicit val timeout = Timeout(timeoutDuration)
-
-  private implicit def specsDuration2scala(d: SpecsDuration): FiniteDuration =
-    Duration.create(d.inMilliseconds, "millis")
 
   import ImageManagementActor._
 

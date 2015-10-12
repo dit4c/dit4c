@@ -12,7 +12,7 @@ libraryDependencies ++= {
   val sprayV = "1.3.3"
   val akkaHttpV = "1.0"
   val scalaioV = "0.4.3-1"
-  val specs2V = "2.4.6-scalaz-7.0.6"
+  val specs2V = "3.6.4"
   Seq(
     "com.github.scala-incubator.io" %% "scala-io-core" % scalaioV,
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
@@ -29,7 +29,6 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
     "org.mockito"         %   "mockito-all"     % "1.10.8" % "test",
     "org.codehaus.groovy" %   "groovy-all"      % "1.8.8" % "compile",
-    "co.freeside"         %   "betamax"         % "1.1.2" % "test",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0"
   )
