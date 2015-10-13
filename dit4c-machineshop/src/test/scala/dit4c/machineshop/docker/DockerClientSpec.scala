@@ -1,7 +1,7 @@
 package dit4c.machineshop.docker
 
-import scala.concurrent.Future
-import scala.concurrent.Promise
+import scala.concurrent._
+import scala.util._
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 import akka.util.Timeout.intToTimeout
@@ -12,46 +12,74 @@ import scalaz.IsEmpty
 import akka.http.scaladsl.model.Uri
 import scala.concurrent.Await
 import com.github.dockerjava.core.DockerClientBuilder
-import com.github.dockerjava.api.model.PortBinding
-import com.github.dockerjava.api.model.Ports
-import com.github.dockerjava.api.model.ExposedPort
+import com.github.dockerjava.api.model._
+import scala.util._
+import com.github.dockerjava.core.command.LogContainerResultCallback
+import java.io.Closeable
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
 
-  var dindId: Option[String] = None
-  var dockerUri: Option[Uri] = None
+  trait DockerInDockerInstance {
+    def newClient: DockerClient
+    def destroy: Unit
+  }
 
-  def beforeAll = {
-    val client = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build
-    dindId = Some(client.createContainerCmd("docker.io/jpetazzo/dind")
+  def setupDockerInDocker: DockerInDockerInstance = {
+    val hostDockerUri = "unix:///var/run/docker.sock"
+    val client = DockerClientBuilder.getInstance(hostDockerUri).build
+    val dindId = client.createContainerCmd("docker.io/jpetazzo/dind")
       .withPrivileged(true)
       .withAttachStdout(true)
       .withAttachStderr(true)
-      .withName("dit4c_machineshop_dind_test")
+      .withName("dit4c_mc_dind_test-"+Random.alphanumeric.take(8).mkString)
       .withEnv(
         "PORT=2375",
         "DOCKER_DAEMON_ARGS=--storage-driver=vfs")
       .withExposedPorts(ExposedPort.tcp(2375))
-      .withPortBindings(new PortBinding(Ports.Binding("127.0.0.1",4243), ExposedPort.tcp(2375)))
+      .withPublishAllPorts(true)
       .exec
-      .getId)
-    client.startContainerCmd(dindId.get).exec
-    Thread.sleep(5000)
-    dockerUri = Some(Uri("http://localhost:4243/"))
-  }
-
-  def afterAll = {
-    dindId.foreach { id =>
-      val client = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build
-      client.removeContainerCmd(id).withForce.exec
+      .getId
+    client.startContainerCmd(dindId).exec
+    val dindPort = client.inspectContainerCmd(dindId).exec
+      .getNetworkSettings.getPorts.getBindings.get(ExposedPort.tcp(2375))
+      .toIterable.head.getHostPort
+    client.logContainerCmd(dindId).withStdOut.withStdErr.withFollowStream
+      .exec(new LogContainerResultCallback() {
+        override def onNext(frame: Frame) = {
+          val s = new String(frame.getPayload, "utf-8")
+          if (s.contains("Docker daemon")) {
+            println(s.trim)
+            close
+          }
+        }
+      })
+      .awaitCompletion(2, TimeUnit.MINUTES)
+    new DockerInDockerInstance() {
+      def newClient = new DockerClientImpl(s"http://localhost:$dindPort/")
+      override def destroy {
+        client.removeContainerCmd(dindId).withForce.exec
+      }
     }
   }
 
-  def newDockerClient: DockerClient = dockerUri match {
-    case Some(uri) => new DockerClientImpl(uri)
-    case None => skipped; null
+  var dind: Either[Throwable,DockerInDockerInstance] = null
+
+  def beforeAll = {
+    dind = Try(setupDockerInDocker) match {
+      case Success(d) => Right(d)
+      case Failure(e) => Left(e)
+    }
+  }
+
+  def afterAll = {
+    dind.right.foreach(_.destroy)
+  }
+
+  def newDockerClient: DockerClient = dind match {
+    case Right(d) => d.newClient
+    case Left(e) => skipped("skipped: "+e.getMessage); null
   }
 
 
@@ -77,7 +105,6 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
   sequential
 
   "DockerClient" >> {
-
     "images" >> {
       "pull and list" in {
         val client = newDockerClient
