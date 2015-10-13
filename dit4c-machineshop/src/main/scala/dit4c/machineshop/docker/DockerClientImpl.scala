@@ -3,25 +3,25 @@ package dit4c.machineshop.docker
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.Executors
-
 import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-
 import com.github.dockerjava.api.model.Link
 import com.github.dockerjava.api.model.RestartPolicy
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.command.PullImageResultCallback
-
 import akka.http.scaladsl.model.Uri
+import akka.stream.io.InputStreamSource
+import akka.stream.scaladsl.Source
 import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.docker.models.ContainerStatus
 import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
+import akka.util.ByteString
 
 class DockerClientImpl(
     val baseUrl: Uri,
@@ -89,67 +89,15 @@ class DockerClientImpl(
         .withTimeout(Math.max(0, timeout.toSeconds.toInt)).exec
     })(ec).flatMap(_ => this.refresh)
 
-    /*
-    override def export(sendChunk: HttpMessagePart => Future[Unit]): Unit = {
-      type ChunkFuture = () => Future[HttpMessagePart]
-
-      import java.io._
-      import com.ning.http.client._
-      import BodyDeferringAsyncHandler.BodyDeferringInputStream
-      import AsyncHandler.STATE
-
-
-      val maxChunkSize = 1024
-      val pout = new PipedOutputStream
-      val handler = new AsyncHandler[Unit] {
-        override def onStatusReceived(s: HttpResponseStatus): STATE = {
-          s.getStatusCode match {
-            case 200 =>
-              STATE.CONTINUE
-            case other =>
-              blockingSend(ChunkedResponseStart(HttpResponse(other)))
-              blockingSend(ChunkedMessageEnd)
-              STATE.ABORT
-          }
-        }
-        def onHeadersReceived(headers: HttpResponseHeaders): STATE = {
-          blockingSend(ChunkedResponseStart(HttpResponse(200)))
-          STATE.CONTINUE
-        }
-        def onBodyPartReceived(bodyPart: HttpResponseBodyPart): STATE = {
-          if (blockingSend(MessageChunk(bodyPart.getBodyPartBytes)))
-            STATE.CONTINUE
-          else
-            STATE.ABORT
-        }
-        def onCompleted(): Unit = {
-          blockingSend(ChunkedMessageEnd)
-        }
-        def onThrowable(t: Throwable): Unit = {
-          log.error(t, "Prematurely ending export")
-          // Don't send end message, so client doesn't think it has everything
-        }
-Response
-        private def blockingSend(chunk: HttpMessagePart): Boolean = {
-          import scala.concurrent.Await
-          try {
-            Await.ready(sendChunk(chunk), Duration("10 seconds"))
-            true
-          } catch {
-            case e: java.util.concurrent.TimeoutException =>
-              log.error(e, "client send failed");
-              false
-          }
-        }
+    override def export: Future[Source[ByteString, Future[Long]]] = Future({
+      docker.commitCmd(id).exec
+    })(ec).map { imageId =>
+      InputStreamSource(docker.saveImageCmd(imageId).exec)
+        .mapMaterializedValue { length =>
+        Future(docker.removeImageCmd(imageId))(ec)
+        length
       }
-
-      for {
-        _ <- (new dispatch.Http)(
-            dispatch.url(baseUrl + s"containers/$id/export").GET.toRequest,
-            handler)
-      } yield ()
     }
-    */
 
     override def delete = Future({
       docker.removeContainerCmd(id).withRemoveVolumes(true).exec

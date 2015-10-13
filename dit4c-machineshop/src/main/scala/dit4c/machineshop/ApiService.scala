@@ -28,6 +28,10 @@ import scala.concurrent.ExecutionContext
 import akka.stream.ActorMaterializer
 import scala.concurrent.duration._
 import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.ContentType
+import akka.http.scaladsl.model.MediaTypes
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.HttpResponse
 
 class ApiService(
     arf: ActorRefFactory,
@@ -166,22 +170,22 @@ class ApiService(
               }
             }
           }
-        }/* ~
+        } ~
         path("export") {
           get {
             signatureCheck {
               withContainer(name) { container =>
-                (ctx) => {
-                  val fn = (chunk: HttpMessagePart) => {
-                    (ctx.responder ? chunk.withAck("ok")).map(_ => ())
+                onSuccess(container.export) { byteSource =>
+                  val contentType = ContentType(MediaTypes.`application/x-tar`)
+                  val content = byteSource.map { bytes =>
+                    HttpEntity.Chunk(bytes.toArray)
                   }
-                  // container.export will pass message chunks directly through
-                  container.export(fn)
+                  complete(HttpEntity.Chunked(contentType, content))
                 }
               }
             }
           }
-        }*/
+        }
       }
     } ~
     pathPrefix("images") {

@@ -26,6 +26,8 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.headers.EntityTagRange
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import scala.concurrent.Await
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 
 class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterface {
   implicit val actorRefFactory = system
@@ -58,13 +60,13 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
         updateList(
             new MockDockerContainer(id, name, image, ContainerStatus.Stopped))
       })
-      /*
-      override def export(onChunk: HttpEntity.ChunkStreamPart => Future[Unit]) = {
+      override def export = {
         val data: Array[Byte] = Array.fill(16)(0) // Empty tar
-        val entity = HttpEntity(
-            ContentType(MediaTypes.`application/x-tar`, None), data)
-        HttpResponse(entity = entity).asPartStream(8).foreach(onChunk)
-      }*/
+        Future.successful {
+          Source(ByteString(data).grouped(8).toStream)
+            .mapMaterializedValue(_ => Future.successful(data.length))
+        }
+      }
       override def delete = Future.successful({
         containerList = containerList.filterNot(_ == this)
       })
@@ -266,23 +268,19 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
     }
 
     "export containers with POST requests to /containers/:name/export" in {
-      pending
-      /*
       import spray.json._
-      import spray.httpx.SprayJsonSupport._
       import DefaultJsonProtocol._
       implicit val client = mockDockerClient
       val dc = client.containers.create("foobar", image).await
       Get("/containers/foobar/export") ~> route ~> check {
         status must_== StatusCodes.OK
-        header("Content-Type").get.value must_== "application/x-tar"
+        contentType.value must_== "application/x-tar"
         forall(chunks) { chunk =>
           val bytes = chunk.data.toArray
           bytes must haveSize(8)
           forall(bytes)((b) => b must_== 0)
         }
       }
-      */
     }
 
     "return a MethodNotAllowed error for DELETE requests to /containers" in {
