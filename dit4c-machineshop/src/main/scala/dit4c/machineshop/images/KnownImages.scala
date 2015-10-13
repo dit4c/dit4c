@@ -37,22 +37,22 @@ class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
   }
 
   private def read: Set[KnownImage] = {
-    val images =
-      backingFile.inputStream().string.parseJson.convertTo[List[KnownImage]]
+    val fileContents = backingFile.inputStream().string
+    val images = fileContents.parseJson.convertTo[List[KnownImage]]
     images.toSet
   }
 
 }
 
 case class KnownImage(displayName: String, repository: String, tag: String) {
-  
+
   def id: String = asHex(digest(s"$repository:$tag"))
   def ref = (repository, tag)
-  
+
   private def digest(text: String): Array[Byte] =
     MessageDigest.getInstance("SHA-1").digest(text.getBytes("UTF-8"))
-    
+
   private def asHex(bytes: Array[Byte]): String =
     bytes.map("%02x" format _).mkString
-  
+
 }
