@@ -16,6 +16,8 @@ import com.github.dockerjava.api.model._
 import scala.util._
 import com.github.dockerjava.core.command.LogContainerResultCallback
 import java.io.Closeable
+import akka.stream.ActorMaterializer
+import akka.actor.ActorSystem
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,6 +25,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
 
   trait DockerInDockerInstance {
     def newClient: DockerClient
+    def newDirectClient: com.github.dockerjava.api.DockerClient
     def destroy: Unit
   }
 
@@ -57,7 +60,9 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       })
       .awaitCompletion(2, TimeUnit.MINUTES)
     new DockerInDockerInstance() {
-      def newClient = new DockerClientImpl(s"http://localhost:$dindPort/")
+      val uri = s"http://localhost:$dindPort/"
+      def newClient = new DockerClientImpl(uri)
+      def newDirectClient = DockerClientBuilder.getInstance(uri).build
       override def destroy {
         client.removeContainerCmd(dindId).withForce.exec
       }
@@ -164,6 +169,20 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
         refreshed must (haveId(dc.id)
             and haveName(dc.name)
             and beStopped)
+      }
+      "export" >> {
+        implicit val system = ActorSystem()
+        implicit val materializer = ActorMaterializer()
+        val client = newDockerClient
+        val dc =
+          client.containers.create("testexport", image).await
+        dc must (haveId(dc.id)
+            and haveName(dc.name)
+            and beStopped)
+        val numImages = dind.right.get.newDirectClient.listImagesCmd.exec.size
+        val exportSource = dc.export.await
+        exportSource.runFold(0)((count, str) => count + str.length).await must beGreaterThan(10000)
+        dind.right.get.newDirectClient.listImagesCmd.exec.size must_== numImages
       }
       "delete" >> {
         val client = newDockerClient

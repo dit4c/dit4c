@@ -93,10 +93,10 @@ class DockerClientImpl(
       docker.commitCmd(id).exec
     })(ec).map { imageId =>
       InputStreamSource(docker.saveImageCmd(imageId).exec)
-        .mapMaterializedValue { length =>
-        Future(docker.removeImageCmd(imageId))(ec)
-        length
-      }
+        .mapMaterializedValue { fLength =>
+          fLength.foreach(_ => docker.removeImageCmd(imageId).exec)(ec)
+          fLength
+        }
     }
 
     override def delete = Future({
