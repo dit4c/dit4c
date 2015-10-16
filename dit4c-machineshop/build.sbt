@@ -85,16 +85,15 @@ dockerfile in docker := {
   val dockerResources = baseDirectory.value / "src" / "main" / "docker"
   val configs = dockerResources / "etc"
   immutable.Dockerfile.empty
-    .from("dit4c/dit4c-platform-base")
-    .run("bash", "-c",
-      """
-      rpm --rebuilddb &&
-      yum -y install java-1.8.0-openjdk socat dbus
-      """)
+    .from("dit4c/dit4c-platform-basejre")
+    .run("opkg-install", "dbus")
     .add(jarFile, "/opt/dit4c-machineshop.jar")
-    .add(configs, "/etc")
     .volume("/etc/dit4c-machineshop")
-    .cmd("/usr/bin/supervisord", "-n")
+    .cmd("sh", "-c", """
+      set -e
+      dbus-uuidgen --ensure=/etc/dit4c-machineshop/machine-id
+      java -jar /opt/dit4c-machineshop.jar -i 0.0.0.0 -p 8080 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys --link dit4c_cnproxy:cnproxy --server-id-seed-file /etc/dit4c-machineshop/machine-id --image-update-interval 900 --known-images-file /etc/dit4c-machineshop/known_images.json
+      """)
     .expose(8080)
 }
 

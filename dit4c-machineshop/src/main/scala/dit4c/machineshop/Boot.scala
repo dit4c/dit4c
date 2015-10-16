@@ -11,6 +11,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
+import java.net.URI
 import java.util.concurrent.TimeUnit
 import scalax.file.{FileSystem,Path}
 import scala.util.{Success,Failure}
@@ -30,7 +31,7 @@ object Boot extends App {
     val route = {
       val knownImages = new KnownImages(config.knownImageFile)
       val dockerClient = new DockerClientImpl(
-          Uri("http://127.0.0.1:2375/"), config.containerLinks)
+          Uri(config.dockerHost.toString), config.containerLinks)
       val signatureActor: Option[ActorRef] =
         config.publicKeyLocation.map { loc =>
           system.actorOf(
@@ -68,6 +69,7 @@ object Boot extends App {
 case class Config(
     val interface: String = "localhost",
     val port: Int = 8080,
+    val dockerHost: URI = URI.create("http://127.0.0.1:2375/"),
     val serverId: String = null,
     val publicKeyLocation: Option[java.net.URI] = None,
     val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS),
@@ -90,6 +92,9 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
+  opt[URI]('H', "docker-host")
+    .action { (x, c) => c.copy(dockerHost = x) }
+    .text("Docker URI")
   opt[java.net.URI]('s', "signed-by")
     .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }
     .text("URL/file of JWK RSA keyset used to sign privileged requests")

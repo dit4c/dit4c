@@ -66,7 +66,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
     .text("port to listen on")
   opt[URI]('H', "docker-host")
     .action { (x, c) => c.copy(dockerHost = x) }
-    .text("URL/file of JWK RSA keyset used to sign JWT tokens")
+    .text("Docker URI")
   opt[URI]('s', "signed-by")
     .required()
     .action { (x, c) => c.copy(keyLocation = x) }

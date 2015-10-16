@@ -22,6 +22,7 @@ import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
 import akka.util.ByteString
+import java.io.BufferedInputStream
 
 class DockerClientImpl(
     val baseUrl: Uri,
@@ -92,11 +93,9 @@ class DockerClientImpl(
     override def export: Future[Source[ByteString, Future[Long]]] = Future({
       docker.commitCmd(id).exec
     })(ec).map { imageId =>
-      InputStreamSource(docker.saveImageCmd(imageId).exec)
-        .mapMaterializedValue { fLength =>
-          fLength.foreach(_ => docker.removeImageCmd(imageId).exec)(ec)
-          fLength
-        }
+      lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
+      InputStreamSource(() => new BufferedInputStream(docker.saveImageCmd(imageId).exec))
+        .map(v => { fRemoveImage; v }) // Remove image onces stream starts
     }
 
     override def delete = Future({
