@@ -540,7 +540,18 @@
 
             <p>
             There is <strong>no undo</strong>, and this will remove the compute
-            node and all containers associated with the compute node.
+            node and all containers associated with the compute node for
+            <strong>all users</strong>.
+            </p>
+
+            <p>
+            <em>
+            <ng-pluralize count="users[node.id].length"
+              when="{'0': 'No users', '1': 'A single user', 'other': '{} users'}">
+            </ng-pluralize>
+            will have their access removed and their all their containers on
+            this compute node deleted.
+            </em>
             </p>
 
             <p>
