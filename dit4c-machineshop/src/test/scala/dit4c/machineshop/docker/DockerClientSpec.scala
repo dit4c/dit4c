@@ -32,7 +32,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
   def setupDockerInDocker: DockerInDockerInstance = {
     val hostDockerUri = "unix:///var/run/docker.sock"
     val client = DockerClientBuilder.getInstance(hostDockerUri).build
-    val dindId = client.createContainerCmd("docker.io/jpetazzo/dind")
+    val dindId = client.createContainerCmd("docker.io/docker:1.8-dind")
       .withPrivileged(true)
       .withAttachStdout(true)
       .withAttachStderr(true)
