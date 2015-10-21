@@ -23,6 +23,10 @@ import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
 import akka.util.ByteString
 import java.io.BufferedInputStream
+import akka.stream.scaladsl.Flow
+import dit4c.machineshop.docker.utils.DiskBasedChunker
+import akka.stream.stage.PushStage
+import akka.stream.stage.Context
 
 class DockerClientImpl(
     val baseUrl: Uri,
@@ -94,7 +98,8 @@ class DockerClientImpl(
       docker.commitCmd(id).exec
     })(ec).map { imageId =>
       lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
-      InputStreamSource(() => new BufferedInputStream(docker.saveImageCmd(imageId).exec))
+      InputStreamSource(() =>docker.saveImageCmd(imageId).exec)
+        .transform(() => new DiskBasedChunker(65536))
         .map(v => { fRemoveImage; v }) // Remove image onces stream starts
     }
 

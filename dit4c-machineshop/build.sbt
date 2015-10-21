@@ -20,6 +20,7 @@ libraryDependencies ++= {
     "com.github.docker-java" % "docker-java"    % "2.1.1",
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "io.spray"            %%  "spray-json"      % "1.3.0",
+    "ch.qos.logback"      %   "logback-classic" % "1.1.3",
     "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-http-testkit-experimental" % akkaHttpV % "test",
     "com.typesafe.akka"   %%  "akka-http-xml-experimental" % akkaHttpV,
@@ -30,7 +31,8 @@ libraryDependencies ++= {
     "org.mockito"         %   "mockito-all"     % "1.10.8" % "test",
     "org.codehaus.groovy" %   "groovy-all"      % "1.8.8" % "compile",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
-    "com.github.scopt"    %%  "scopt"           % "3.2.0"
+    "com.github.scopt"    %%  "scopt"           % "3.2.0",
+    "com.squareup"        %   "tape"            % "1.2.3"
   )
 }
 

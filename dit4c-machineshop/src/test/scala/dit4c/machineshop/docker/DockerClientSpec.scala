@@ -18,10 +18,13 @@ import com.github.dockerjava.core.command.LogContainerResultCallback
 import java.io.Closeable
 import akka.stream.ActorMaterializer
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
+import akka.stream.scaladsl.Keep
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
-  implicit val timeout = new Timeout(5, TimeUnit.SECONDS)
+  implicit val timeout = new Timeout(30, TimeUnit.SECONDS)
 
   trait DockerInDockerInstance {
     def newClient: DockerClient
@@ -64,7 +67,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       def newClient = new DockerClientImpl(uri)
       def newDirectClient = DockerClientBuilder.getInstance(uri).build
       override def destroy {
-        client.removeContainerCmd(dindId).withForce.exec
+        client.removeContainerCmd(dindId).withForce.withRemoveVolumes(true).exec
       }
     }
   }
@@ -104,7 +107,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     def await(implicit timeout: Timeout) = Await.result(f, timeout.duration)
   }
 
-  val image = "busybox"
+  val image = "debian:8"
 
   // This spec must be run sequentially
   sequential
@@ -113,9 +116,12 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     "images" >> {
       "pull and list" in {
         val client = newDockerClient
-        client.images.pull("busybox").await(Timeout(5, TimeUnit.MINUTES))
+        val (imageName, tagName) = Some(image.span(_ != ':'))
+          .map(v => (v._1, v._2.stripPrefix(":")))
+          .get
+        client.images.pull(imageName, tagName).await(Timeout(5, TimeUnit.MINUTES))
         val images = client.images.list.await
-        images must contain(haveImageName("busybox:latest"))
+        images must contain(haveImageName(image))
       }
     }
 
@@ -181,8 +187,17 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
             and beStopped)
         val numImages = dind.right.get.newDirectClient.listImagesCmd.exec.size
         val exportSource = dc.export.await
-        exportSource.runFold(0)((count, str) => count + str.length).await must beGreaterThan(10000)
-        dind.right.get.newDirectClient.listImagesCmd.exec.size must_== numImages
+        val sink = Sink.fold[Long,ByteString](0L) { (count, str) =>
+          count + str.length
+        }
+        val (expectedSize, actualSize) = exportSource.toMat(sink)({
+          case (fExpected, fActual) =>
+            for { e <- fExpected; a <- fActual } yield (e,a)
+        }).run.await
+        actualSize must_== expectedSize
+        val images = dind.right.get.newDirectClient.listImagesCmd.exec
+        images.size must_== numImages
+        actualSize must beGreaterThan(images.get(0).getVirtualSize)
       }
       "delete" >> {
         val client = newDockerClient
