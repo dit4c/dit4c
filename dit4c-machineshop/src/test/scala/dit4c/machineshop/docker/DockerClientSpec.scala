@@ -1,26 +1,26 @@
 package dit4c.machineshop.docker
 
-import scala.concurrent._
+import java.util.concurrent.TimeUnit
+
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util._
+
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
-import akka.util.Timeout.intToTimeout
-import dit4c.machineshop.docker.models._
-import akka.util.Timeout
-import java.util.concurrent.TimeUnit
-import scalaz.IsEmpty
-import akka.http.scaladsl.model.Uri
-import scala.concurrent.Await
-import com.github.dockerjava.core.DockerClientBuilder
+
 import com.github.dockerjava.api.model._
-import scala.util._
+import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.core.command.LogContainerResultCallback
-import java.io.Closeable
-import akka.stream.ActorMaterializer
+
 import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
-import akka.stream.scaladsl.Keep
+import akka.util.Timeout
+import dit4c.machineshop.docker.models.DockerContainer
+import dit4c.machineshop.docker.models.DockerImage
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global

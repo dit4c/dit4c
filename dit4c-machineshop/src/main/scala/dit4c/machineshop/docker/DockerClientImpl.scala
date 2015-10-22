@@ -3,30 +3,30 @@ package dit4c.machineshop.docker
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.Executors
-import scala.collection.JavaConversions._
+
+import scala.collection.JavaConversions.asScalaBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+
 import com.github.dockerjava.api.model.Link
 import com.github.dockerjava.api.model.RestartPolicy
+import com.github.dockerjava.api.model._
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.command.PullImageResultCallback
+
 import akka.http.scaladsl.model.Uri
 import akka.stream.io.InputStreamSource
 import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.docker.models.ContainerStatus
 import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
-import akka.util.ByteString
-import java.io.BufferedInputStream
-import akka.stream.scaladsl.Flow
 import dit4c.machineshop.docker.utils.DiskBasedChunker
-import akka.stream.stage.PushStage
-import akka.stream.stage.Context
 
 class DockerClientImpl(
     val baseUrl: Uri,

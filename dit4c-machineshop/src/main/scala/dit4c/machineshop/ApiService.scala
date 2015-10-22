@@ -1,37 +1,40 @@
 package dit4c.machineshop
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
+
+import scala.collection.JavaConversions._
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util._
+
 import akka.actor._
-import akka.pattern.ask
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.server._
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.marshalling._
-import akka.http.scaladsl.unmarshalling._
-import spray.json._
-import scala.collection.JavaConversions._
-import dit4c.machineshop.docker.DockerClient
-import dit4c.machineshop.docker.models.DockerContainer
-import dit4c.machineshop.images._
-import scala.util._
-import scala.concurrent.Future
-import akka.util.Timeout
-import java.util.Calendar
-import java.text.SimpleDateFormat
+import akka.http.scaladsl.model.ContentType
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.MediaTypes
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RequestContext
 import akka.http.scaladsl.server.RouteResult
-import akka.http.scaladsl.model.StatusCodes
-import akka.stream.Materializer
-import akka.http.scaladsl.model.HttpRequest
-import scala.concurrent.ExecutionContext
+import akka.http.scaladsl.unmarshalling._
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import scala.concurrent.duration._
-import akka.http.scaladsl.model.HttpEntity
-import akka.http.scaladsl.model.ContentType
-import akka.http.scaladsl.model.MediaTypes
-import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.HttpResponse
+import akka.stream.Materializer
+import akka.stream.stage.Context
+import akka.stream.stage.PushPullStage
+import akka.util.ByteString
+import akka.util.Timeout
+import dit4c.machineshop.docker.DockerClient
+import dit4c.machineshop.docker.models.DockerContainer
+import spray.json._
 
 class ApiService(
     arf: ActorRefFactory,
@@ -177,9 +180,8 @@ class ApiService(
               withContainer(name) { container =>
                 onSuccess(container.export) { byteSource =>
                   val contentType = ContentType(MediaTypes.`application/x-tar`)
-                  val content = byteSource.map { bytes =>
-                    HttpEntity.Chunk(bytes.toArray)
-                  }
+                  val content =
+                    byteSource.transform(() => new ApiService.ChunkingStage)
                   complete(HttpEntity.Chunked(contentType, content))
                 }
               }
@@ -338,6 +340,20 @@ object ApiService {
 
     implicit val imagesJsonMarshaller: ToResponseMarshaller[Seq[Image]] =
       sprayJsonMarshaller(imagesWriter)
+
+  }
+
+  class ChunkingStage extends PushPullStage[ByteString,ChunkStreamPart]() {
+
+    override def onPush(elem: ByteString, ctx: Context[ChunkStreamPart]) =
+      ctx.push(HttpEntity.Chunk(elem.toArray))
+
+    override def onPull(ctx: Context[ChunkStreamPart]) =
+      if (!ctx.isFinishing) ctx.pull
+      else ctx.pushAndFinish(HttpEntity.LastChunk)
+
+    override def onUpstreamFinish(ctx: Context[ChunkStreamPart]) =
+      ctx.absorbTermination
 
   }
 

@@ -1,33 +1,35 @@
 package dit4c.machineshop
 
-import akka.util.Timeout
+import java.security.MessageDigest
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
+
+import scala.concurrent.Await
+import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+
 import org.specs2.mutable.Specification
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers._
+
+import akka.actor.ActorRef
+import akka.actor.Props
 import akka.http.scaladsl.client.RequestBuilding._
-import StatusCodes._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.testkit.RouteTest
+import akka.stream.scaladsl.Source
+import akka.testkit.TestActor
+import akka.testkit.TestProbe
+import akka.util.ByteString
+import akka.util.Timeout
+import dit4c.Specs2TestInterface
+import dit4c.machineshop.auth.SignatureActor
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models._
 import dit4c.machineshop.images._
-import scala.concurrent.Future
-import scala.concurrent.duration.Duration
-import akka.actor.{ActorRef, Props}
-import dit4c.machineshop.auth.SignatureActor
-import akka.testkit.TestProbe
-import akka.testkit.TestActor
-import scala.util.Random
 import scalax.file.ramfs.RamFileSystem
-import java.util.Calendar
-import java.security.MessageDigest
-import akka.http.scaladsl.testkit.RouteTest
-import dit4c.Specs2TestInterface
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.model.headers.EntityTagRange
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import scala.concurrent.Await
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 
 class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterface {
   implicit val actorRefFactory = system
@@ -275,11 +277,14 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
       Get("/containers/foobar/export") ~> route ~> check {
         status must_== StatusCodes.OK
         contentType.value must_== "application/x-tar"
-        forall(chunks) { chunk =>
+        chunks must haveSize(3)
+        forall(chunks.init) { chunk =>
           val bytes = chunk.data.toArray
           bytes must haveSize(8)
           forall(bytes)((b) => b must_== 0)
         }
+        chunks.last.isLastChunk must beTrue
+        chunks.last must beAnInstanceOf[HttpEntity.LastChunk]
       }
     }
 
