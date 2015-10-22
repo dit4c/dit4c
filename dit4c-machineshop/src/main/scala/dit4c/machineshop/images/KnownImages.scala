@@ -2,6 +2,7 @@ package dit4c.machineshop.images
 
 import java.security.MessageDigest
 import scalax.file.Path
+import scala.util.Try
 
 class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
 
@@ -16,7 +17,6 @@ class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
   import KnownImageProtocol._
 
   if (!backingFile.exists) {
-    backingFile.createFile()
     write(Set.empty)
   }
 
@@ -33,14 +33,15 @@ class KnownImages(backingFile: Path) extends Iterable[KnownImage] {
   def iterator = read.toList.sortBy(_.displayName).toIterator
 
   private def write(images: Set[KnownImage]) = {
-    backingFile.outputStream().write(images.toJson.prettyPrint)
+    backingFile.write(images.toJson.prettyPrint)
   }
 
-  private def read: Set[KnownImage] = {
-    val fileContents = backingFile.inputStream().string
-    val images = fileContents.parseJson.convertTo[List[KnownImage]]
-    images.toSet
-  }
+  private def read: Set[KnownImage] =
+    Try({
+      val fileContents = backingFile.chars.mkString
+      val images = fileContents.parseJson.convertTo[List[KnownImage]]
+      images.toSet[KnownImage]
+    }).getOrElse(Set.empty)
 
 }
 
