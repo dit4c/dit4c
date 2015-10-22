@@ -36,7 +36,12 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
         await(containerDao.create(session.user, "name2", testImage, computeNode)),
         await(containerDao.create(session.user, "name3", testImage, computeNode))
       )
-      await(Future.sequence(containers.map(_.delete)))
+
+      await {
+        containers.foldLeft(Future.successful(())) { (f, c) =>
+          f.flatMap(_ => c.delete)
+        }
+      }
 
       val events: IndexedSeq[Change] = await(fEvents).toIndexedSeq
       events must haveSize(8)
