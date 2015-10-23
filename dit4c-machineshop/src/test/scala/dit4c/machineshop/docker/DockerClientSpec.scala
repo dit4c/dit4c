@@ -110,7 +110,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     def await(implicit timeout: Timeout) = Await.result(f, timeout.duration)
   }
 
-  val image = "debian:8"
+  val image = "busybox:latest"
 
   // This spec must be run sequentially
   sequential
