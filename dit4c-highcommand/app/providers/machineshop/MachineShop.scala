@@ -3,7 +3,6 @@ package providers.machineshop
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import scala.util.Try
-
 import java.security.MessageDigest
 import java.security.Signature
 import java.util.Date
@@ -11,6 +10,7 @@ import java.util.TimeZone
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64
 import play.api.libs.ws._
+import scala.concurrent.duration._
 
 object MachineShop {
   trait Container {
@@ -40,7 +40,9 @@ object MachineShop {
 
     import play.api.Play.current
 
-    def apply(path: String) = new RequestHolder(WS.url(s"$managementUrl$path"))  
+    def apply(path: String, timeout: FiniteDuration = 2.minutes) =
+      new RequestHolder(WS.url(s"$managementUrl$path")
+          .withRequestTimeout(timeout.toMillis))
 
     class RequestHolder(ws: WSRequest) {
       import play.api.libs.iteratee.Enumerator
@@ -68,9 +70,9 @@ object MachineShop {
         prepareFunc(ws).calculateDigest.execute()
 
     }
-      
+
   }
-  
+
   implicit class HttpSignatureCalculator(request: WSRequest) {
     def httpSign(privateKey: RSAKey): WSRequest = {
       def now = {
@@ -127,6 +129,6 @@ object MachineShop {
       case _ => request // Can't calculate easily
     }
   }
-  
+
 
 }

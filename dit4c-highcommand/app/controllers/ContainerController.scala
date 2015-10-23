@@ -10,6 +10,7 @@ import com.osinka.slugify.Slugify
 import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import play.mvc.Http.RequestHeader
 import providers.machineshop.MachineShop
 import providers.hipache.ContainerResolver
@@ -94,7 +95,7 @@ class ContainerController @Inject() (
       for {
         clientInstance <- client(container)
         (headers, body) <-
-          clientInstance(s"containers/${cncName(container)}/export")
+          clientInstance(s"containers/${cncName(container)}/export", 1.day)
             .signedAsStream(_.withMethod("GET"))
       } yield {
         Status(headers.status)
