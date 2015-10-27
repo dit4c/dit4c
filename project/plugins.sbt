@@ -62,3 +62,8 @@ addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.5")
 
 // Gather dependencies without squashing to single JAR
 addSbtPlugin("org.xerial.sbt" % "sbt-pack" % "0.7.5")
+
+// Coverage tools
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.0.4")
+
+addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.0.0")
