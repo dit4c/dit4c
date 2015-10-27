@@ -50,31 +50,6 @@ Revolver.settings
 
 seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
 
-// Build runnable executable
-lazy val generateExecutable = taskKey[String]("Creates a single-file Linux executable using one-jar and a stub script.")
-
-generateExecutable := {
-  import scalax.io._
-  val outputFile = target.value / "executable" / s"${name.value}-${version.value}"
-  // Based on https://coderwall.com/p/ssuaxa
-  val payload = Resource.fromFile(oneJar.value)
-  val stubScript = Resource.fromFile(
-    (resourceDirectory in Compile).value / "exec_stub.sh")
-  val output = Resource.fromFile(outputFile)
-  // Delete any existing content, then write stub followed by payload
-  for {
-    processor <- output.outputProcessor
-    out = processor.asOutput
-  } {
-    out.write(stubScript.bytes)
-    out.write(payload.bytes)
-  }
-  // Set as executable
-  outputFile.setExecutable(true)
-  // Return path
-  outputFile.getAbsolutePath
-}
-
 sbtdocker.Plugin.dockerSettings
 
 // Make docker depend on the package task, which generates a jar file of the application code
