@@ -7,7 +7,6 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import akka.event.Logging
 import com.spotify.docker.client.DefaultDockerClient
-import spray.http._
 import spray.json.DefaultJsonProtocol
 import spray.json.RootJsonFormat
 import spray.json.JsObject
@@ -23,7 +22,7 @@ class DockerClient(val uri: java.net.URI) {
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
   val dockerClient = new DefaultDockerClient(uri)
-  
+
   def containerPort(containerId: String): Future[Option[String]] =
     Future {
       dockerClient.inspectContainer(containerId)
@@ -43,7 +42,7 @@ class DockerClient(val uri: java.net.URI) {
             .map(_.stripPrefix("/"))
             .map((_, c.id))
         }.filter(_._1.isValidContainerName).toMap
-      // Future id => port map 
+      // Future id => port map
       val fPortMap = Future.sequence {
           // Futures for each container
           nameMap.values.toSet.map { id: String =>
