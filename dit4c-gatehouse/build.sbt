@@ -23,7 +23,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"     % "2.4.2" % "test",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
-    "com.spotify"         %   "docker-client"   % "2.7.27"
+    "com.github.docker-java" % "docker-java"    % "2.1.1"
   )
 }
 
