@@ -16,7 +16,7 @@ class AuthActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration
   val authorizationChecker = new AuthorizationChecker
 
   implicit val executionContext = context.system.dispatcher
-  implicit val actorRefFactory = context.system
+  implicit val system: ActorSystem = context.system
 
   type AuthChecker = AuthCheck => AuthResponse
   type QueuedCheck = (ActorRef, AuthCheck)

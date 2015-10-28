@@ -3,35 +3,38 @@ package dit4c.gatehouse
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.io.IO
-import spray.can.Http
-import spray.routing.SimpleRoutingApp
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.duration._
 import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
-import spray.http.Uri
 import dit4c.gatehouse.docker._
 import dit4c.gatehouse.auth.AuthActor
 import scala.util.{Success,Failure}
+import akka.stream.ActorMaterializer
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives._
 
-object Boot extends App with SimpleRoutingApp {
+object Boot extends App {
   implicit val system = ActorSystem("dit4c-gatehouse")
+  implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(10, TimeUnit.SECONDS)
   val log = Logging.getLogger(system, this)
   import system.dispatcher
 
   def start(config: Config) {
-    startServer(interface = config.interface, port = config.port) {
+    val route = {
       val dockerClient = new DockerClient(config.dockerHost)
-      val dockerIndex = actorRefFactory.actorOf(
+      val dockerIndex = system.actorOf(
           Props(classOf[DockerIndexActor], dockerClient), "docker-index")
-      val auth = actorRefFactory.actorOf(
+      val auth = system.actorOf(
           Props(classOf[AuthActor], config.keyLocation, config.keyUpdateInterval),
           "auth")
-      AuthService(actorRefFactory, dockerIndex, auth).route ~ MiscService.route
-    } onComplete {
+      AuthService(system, dockerIndex, auth).route.~(MiscService.route)
+    }
+    Http().bindAndHandle(route, config.interface, config.port) onComplete {
       case Success(b) =>
         log.info(s"Successfully bound to ${b.localAddress}")
       case Failure(msg) =>

@@ -1,25 +1,26 @@
 package dit4c.gatehouse
 
-import spray.util.LoggingContext
-import spray.routing._
-import spray.http._
 import spray.json._
-import MediaTypes._
+import akka.http.scaladsl.model.MediaTypes._
 import akka.actor.ActorRef
 import akka.pattern.ask
 import dit4c.gatehouse.auth.AuthActor._
 import dit4c.gatehouse.docker.DockerIndexActor._
 import akka.util.Timeout
-import spray.util.pimpFuture
 import akka.actor.ActorSystem
 import akka.actor.ActorRefFactory
-import spray.http.HttpHeaders.RawHeader
 import akka.event.Logging
 import scala.util.{Success, Failure}
 import akka.event.LoggingReceive
 import dit4c.gatehouse.auth.AuthorizationChecker
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.RequestContext
+import scala.concurrent.Future
+import akka.http.scaladsl.server.RouteResult
 
-class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, auth: ActorRef) extends HttpService {
+class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, auth: ActorRef) {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
 
@@ -29,49 +30,49 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
 
   val authorizationChecker = new AuthorizationChecker
 
-  val route =
+  val route: RequestContext => Future[RouteResult] =
     path("auth") {
       get {
         headerValueByName("X-Server-Name") { containerName =>
           optionalCookie(AUTH_TOKEN_COOKIE) {
             case Some(jwtCookie) =>
-              onComplete(auth ask AuthCheck(jwtCookie.content, containerName)) {
+              onComplete(auth ask AuthCheck(jwtCookie.value, containerName)) {
                 case Success(AccessGranted) =>
                   onComplete(dockerIndex ask PortQuery(containerName)) {
                     case Success(PortReply(Some(port))) =>
                       respondWithHeader(RawHeader("X-Upstream-Port", s"$port")) {
-                        complete(200, HttpEntity.Empty)
+                        complete(HttpResponse(200))
                       }
                     case Success(PortReply(None)) =>
-                      complete(404, HttpEntity.Empty)
+                      complete(HttpResponse(404))
                     case Success(obj) =>
-                      logRequestResponse(s"query error - unknown reply: $obj") {
-                        complete(500, HttpEntity.Empty)
+                      logRequestResult(s"query error - unknown reply: $obj") {
+                        complete(HttpResponse(500))
                       }
                     case Failure(e)  =>
-                      logRequestResponse(s"query error: $e") {
-                        complete(500, HttpEntity.Empty)
+                      logRequestResult(s"query error: $e") {
+                        complete(HttpResponse(500))
                       }
                   }
                 case Success(AccessDenied(reason)) =>
-                  logRequestResponse(reason, Logging.InfoLevel) {
+                  logRequestResult(reason, Logging.InfoLevel) {
                     complete(403, reason)
                   }
                 case Success(unknown) =>
-                  logRequestResponse(s"unknown auth response: $unknown", Logging.InfoLevel) {
-                    complete(500, HttpEntity.Empty)
+                  logRequestResult(s"unknown auth response: $unknown", Logging.InfoLevel) {
+                    complete(HttpResponse(500))
                   }
                 case Failure(e) =>
-                  logRequestResponse(s"query error: $e", Logging.InfoLevel) {
-                    complete(500, HttpEntity.Empty)
+                  logRequestResult(s"query error: $e", Logging.InfoLevel) {
+                    complete(HttpResponse(500))
                   }
               }
             case _ =>
               // Missing cookie
-              complete(403, HttpEntity.Empty)
+              complete(HttpResponse(403))
           }
         } ~
-        respondWithStatus(400) {
+        overrideStatusCode(400) {
           complete("A X-Server-Name header is required.")
         }
       }

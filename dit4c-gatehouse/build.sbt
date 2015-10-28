@@ -11,13 +11,13 @@ fork in run := true
 
 libraryDependencies ++= {
   val akkaV = "2.3.5"
-  val sprayV = "1.3.1"
+  val akkaHttpV = "1.0"
   Seq(
-    "io.spray"            %%  "spray-can"       % sprayV,
-    "io.spray"            %%  "spray-client"    % sprayV,
+    "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
+    "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
+    "com.typesafe.akka"   %%  "akka-http-xml-experimental" % akkaHttpV,
+    "com.typesafe.akka"   %%  "akka-http-testkit-experimental" % akkaHttpV % "test",
     "io.spray"            %%  "spray-json"      % "1.3.1",
-    "io.spray"            %%  "spray-routing"   % sprayV,
-    "io.spray"            %%  "spray-testkit"   % sprayV  % "test",
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
     "org.specs2"          %%  "specs2-core"     % "2.4.2" % "test",

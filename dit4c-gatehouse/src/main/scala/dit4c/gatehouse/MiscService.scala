@@ -2,32 +2,28 @@ package dit4c.gatehouse
 
 import akka.actor.{Actor,ActorRefFactory}
 
-import spray.util.LoggingContext
-import spray.routing._
-import spray.http._
 import spray.json._
-import MediaTypes._
+import akka.http.scaladsl.model.MediaTypes._
+import akka.http.scaladsl.server.Directives._
 import scala.collection.JavaConversions._
+import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport._
 
 // this trait defines our service behavior independently from the service actor
-class MiscService(implicit val actorRefFactory: ActorRefFactory)
-    extends HttpService {
+class MiscService(implicit val actorRefFactory: ActorRefFactory) {
 
   val route =
     //logRequestResponse("") {
       path("") {
         get {
-          respondWithMediaType(`text/html`) { // XML is marshalled to `text/xml` by default, so we simply override here
-            complete {
-              <html>
-                <body>
-                  <h1>DIT4C Gatehouse</h1>
-                  <ul>
-                    <a href="auth">Auth Query</a>
-                  </ul>
-                </body>
-              </html>
-            }
+          complete {
+            <html>
+              <body>
+                <h1>DIT4C Gatehouse</h1>
+                <ul>
+                  <a href="auth">Auth Query</a>
+                </ul>
+              </body>
+            </html>
           }
         }
       } ~

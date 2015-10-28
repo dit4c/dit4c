@@ -10,16 +10,12 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.util.Timeout.intToTimeout
-import spray.http.Uri
-import spray.util.pimpFuture
 
 class DockerIndexActorSpec extends Specification with NoTimeConversions {
   import scala.concurrent.duration._
 
   val system = ActorSystem("testSystem")
   implicit val timeout = Timeout(100.millis)
-
-  import spray.util.pimpFuture
 
   def client = new DockerClient(java.net.URI.create("http://localhost:2375/")) {
     override def containerPorts: Future[Map[String, String]] =
@@ -44,7 +40,7 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
         .mapTo[PortReply] must equalTo(PortReply(None))
         .await(retries = 2, timeout = 200.millis)
 
-      0 must_== 0
+      done
     }
   }
 }
