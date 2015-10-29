@@ -99,7 +99,7 @@ class DockerClientImpl(
     })(ec).map { imageId =>
       lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
       InputStreamSource(() =>docker.saveImageCmd(imageId).exec)
-        .transform(() => new DiskBasedChunker(65536))
+        .transform(() => new DiskBasedChunker(250000))
         .map(v => { fRemoveImage; v }) // Remove image onces stream starts
     }
 
