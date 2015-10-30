@@ -34,7 +34,8 @@ class DiskBasedChunker(val chunkSize: Int)
    * Take it all, with no back-pressure.
    */
   override def onPush(elem: ByteString, ctx: DetachedContext[ByteString]) = {
-    elem.grouped(chunkSize).foreach(queue.add)
+    if (elem.size <= chunkSize) queue.add(elem)
+    else elem.grouped(chunkSize).foreach(queue.add)
     if (ctx.isHoldingDownstream) ctx.pushAndPull(nextElement)
     else ctx.pull
   }
@@ -52,7 +53,7 @@ class DiskBasedChunker(val chunkSize: Int)
     var (out, over) = (next, ByteString.empty)
     while (queue.size > 0 && over.isEmpty) {
       val headE = queue.peek
-      if ((out.size + headE.size) < chunkSize) {
+      if ((out.size + headE.size) <= chunkSize) {
         out ++= headE
       } else {
         val neededBytes = chunkSize - out.size;
