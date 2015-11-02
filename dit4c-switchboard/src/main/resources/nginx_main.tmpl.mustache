@@ -62,6 +62,10 @@ http {
   {{{extraconf}}}
   {{/extraconf}}
 
+  # Relative redirects shouldn't include the listening port, which likely isn't
+  # the same as the one seen publicly.
+  port_in_redirect off;
+
   include {{vhostdir}}/*.conf;
 
   {{#domain}}
