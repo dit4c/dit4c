@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 import play.mvc.Http.RequestHeader
 import providers.machineshop.MachineShop
 import providers.hipache.ContainerResolver
+import spray.http.StatusCodes.ServerError
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
@@ -76,6 +77,9 @@ class ContainerController @Inject() (
         case e: java.net.ConnectException =>
           Logger.warn(e.getMessage)
           InternalServerError("Unable to contact compute node.")
+        case e: Throwable =>
+          Logger.warn(e.getMessage)
+          InternalServerError(e.getMessage)
       }
     }
   }
@@ -87,6 +91,10 @@ class ContainerController @Inject() (
       } yield {
         Ok(toJson(container, cnc))
       }
+    }.recover {
+      case e: Throwable =>
+        Logger.warn(e.getMessage)
+        InternalServerError(e.getMessage)
     }
   }
 
@@ -148,6 +156,10 @@ class ContainerController @Inject() (
             maybeUpdatedCnp.map[JsBoolean](cnc => JsBoolean(cnc.active))
         ))
       }
+    }.recover {
+      case e: Throwable =>
+        Logger.warn(e.getMessage)
+        InternalServerError(e.getMessage)
     }
   }
 

@@ -27,9 +27,9 @@ class ContainerProvider(
           .withBody(InMemoryBody(Json.stringify(
               Json.obj("name" -> name, "image" -> image)).getBytes))
       }
-      .map(_.json.as[Container])
+      .map(rethrowErrors(_.json.as[Container]))
 
-  def get(name: String): Future[Option[Container]] = 
+  def get(name: String): Future[Option[Container]] =
     client(s"containers/$name")
       .unsigned(_.withMethod("GET"))
       .map(r => Try(r.json.as[Container]).toOption)
@@ -38,7 +38,7 @@ class ContainerProvider(
     client("containers")
       .unsigned(_.withMethod("GET"))
       .map { response =>
-        response.json.asInstanceOf[JsArray].value.map(_.as[Container])
+        response.json.as[Seq[Container]]
       }
 
   class ContainerImpl(
@@ -49,12 +49,12 @@ class ContainerProvider(
     override def start: Future[Container] =
       client(s"containers/$name/start")
         .signed(_.withMethod("POST"))
-        .map(_.json.as[Container])
+        .map(rethrowErrors(_.json.as[Container]))
 
     override def stop: Future[Container] =
       client(s"containers/$name/stop")
         .signed(_.withMethod("POST"))
-        .map(_.json.as[Container])
+        .map(rethrowErrors(_.json.as[Container]))
 
     override def delete: Future[Unit] =
       stop.flatMap { _ =>
@@ -75,5 +75,8 @@ class ContainerProvider(
     (__ \ "name").read[String] and
     (__ \ "active").read[Boolean]
   )((new ContainerImpl(_,_)))
+
+  private def rethrowErrors[A](f: WSResponse => A)(r: WSResponse) =
+    Try(f(r)).getOrElse(throw MachineShop.Error(r.body))
 
 }

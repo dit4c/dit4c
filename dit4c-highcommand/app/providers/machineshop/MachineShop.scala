@@ -130,5 +130,6 @@ object MachineShop {
     }
   }
 
+  case class Error(msg: String) extends Exception(msg)
 
 }
