@@ -15,7 +15,8 @@ import scala.util.Random
 object Buffering {
   def diskBuffer(e: Enumerator[ByteString])(implicit ec: ExecutionContext): Enumerator[ByteString] = {
     val buffer = new Buffer()
-    (e run Iteratee.foreach(buffer.enqueue)).foreach(_ => buffer.finish)
+    (e run Iteratee.foreach(buffer.enqueue))
+      .foreach(_ => buffer.finish)
     Enumerator.generateM(buffer.dequeue).onDoneEnumerating(buffer.close)
   }
 
@@ -62,7 +63,7 @@ object Buffering {
 
     def close = db.close
 
-    private def addToQueue(v: ByteString) { queue.add(v) }
+    private def addToQueue(v: ByteString) { if (!db.isClosed) queue.add(v) }
     private def takeFromQueue: Option[ByteString] = Option(queue.poll)
   }
 

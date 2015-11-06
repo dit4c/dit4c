@@ -10,6 +10,7 @@ import play.api.libs.iteratee.Iteratee
 import akka.util.ByteString
 import java.security.MessageDigest
 import scala.util.Random
+import play.api.libs.iteratee.Enumeratee
 
 @RunWith(classOf[JUnitRunner])
 class BufferingSpec extends Specification {
@@ -20,33 +21,35 @@ class BufferingSpec extends Specification {
 
     "not change elements" >> {
       val seed = Random.nextLong
-      def testStream: Stream[ByteString] = {
-        val r = new Random(seed)
-        Stream.continually(ByteString(r.nextString(10240))).take(10000)
-      }
-      def testEnumerator = Enumerator.enumerate(testStream)
-      def testIteratee =
-        Iteratee.fold[ByteString,MessageDigest](
-            MessageDigest.getInstance("SHA-512")) { (md, v) =>
-              md.update(v.toArray); md
-            }
       val v1 = Await.result(
-        (testEnumerator run testIteratee).map {
-          _.digestToByteString
-        }
+        (testEnumerator(seed) run testIteratee)
       , 20.seconds)
       val v2 = Await.result(
-        (Buffering.diskBuffer(testEnumerator) run testIteratee).map {
-          _.digestToByteString
-        }
+        (Buffering.diskBuffer(testEnumerator(seed)) run testIteratee)
       , 20.seconds)
       v2 must_== v1
     }
+
+    "handle partly-consumed enumerators" >> {
+      val seed = Random.nextLong
+      val v = Await.result(
+        (Buffering.diskBuffer(testEnumerator(seed)) &> Enumeratee.take(20)
+            run testIteratee)
+      , 20.seconds)
+      done
+    }
   }
 
-  implicit class MessageDigestByteStringGenerator(md: MessageDigest) {
-    def digestToByteString = ByteString(md.digest)
+  def testEnumerator(seed: Long): Enumerator[ByteString] = {
+    val r = new Random(seed)
+    Enumerator.enumerate(
+      Stream.continually(ByteString(r.nextString(10240))).take(10000))
   }
 
+  def testIteratee =
+        (Iteratee.fold[ByteString,MessageDigest](
+            MessageDigest.getInstance("SHA-512")) { (md, v) =>
+              md.update(v.toArray); md
+            }).map(md => ByteString(md.digest))
 
 }
