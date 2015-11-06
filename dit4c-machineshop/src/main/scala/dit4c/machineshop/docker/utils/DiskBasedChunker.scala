@@ -2,21 +2,25 @@ package dit4c.machineshop.docker.utils
 
 import akka.stream.stage._
 import akka.util.ByteString
-import com.squareup.tape._
-import java.io.File
-import java.io.ByteArrayOutputStream
+import java.io._
+import org.mapdb._
+import java.util.concurrent.BlockingQueue
 
 class DiskBasedChunker(val chunkSize: Int)
     extends DetachedStage[ByteString, ByteString] {
 
-  var queueFile: File = null
-  var queue: ObjectQueue[ByteString] = null
+  var db: DB = null
+  var queue: BlockingQueue[ByteString] = null
   var next: ByteString = ByteString.empty
 
   override def preStart(ctx: LifecycleContext) {
-    queueFile = File.createTempFile(this.getClass.getSimpleName, "")
-    queueFile.delete // FileObjectQueue expects to create the file
-    queue = new FileObjectQueue(queueFile, ByteStringConverter)
+    db = DBMaker.newTempFileDB
+      .asyncWriteEnable
+      .transactionDisable
+      .deleteFilesAfterClose
+      .closeOnJvmShutdown
+      .make
+    queue = db.createQueue("buffer", ByteStringSerializer, false)
   }
 
   /**
@@ -46,7 +50,8 @@ class DiskBasedChunker(val chunkSize: Int)
 
   override def postStop {
     queue = null
-    queueFile.delete
+    db.close
+    db = null
   }
 
   def nextElement: ByteString = {
@@ -60,15 +65,22 @@ class DiskBasedChunker(val chunkSize: Int)
         out = out ++ headE.take(neededBytes)
         over = headE.drop(neededBytes)
       }
-      queue.remove
+      queue.remove()
     }
     next = over
     out
   }
 
-  object ByteStringConverter extends FileObjectQueue.Converter[ByteString] {
-    override def from(bytes: Array[Byte]) = ByteString(bytes)
-    def toStream(v: akka.util.ByteString, os: java.io.OutputStream) =
-      os.write(v.toArray)
+  object ByteStringSerializer extends Serializer[ByteString] with Serializable {
+     val internal = Serializer.BYTE_ARRAY
+
+     override def deserialize(in: DataInput, available: Int) =
+       ByteString(internal.deserialize(in, available))
+
+     override def serialize(out: DataOutput, value: ByteString) =
+       internal.serialize(out, value.toArray)
+
+     override def fixedSize = internal.fixedSize
   }
+
 }
