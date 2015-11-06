@@ -1,6 +1,5 @@
 package utils
 
-import scala.concurrent.ExecutionContext
 import play.api.libs.iteratee._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import play.api.libs.iteratee.{Cont, Error}
@@ -10,9 +9,14 @@ import org.mapdb.DBMaker
 import org.mapdb.Serializer
 import java.io._
 import scala.util.Random
+import java.util.concurrent.Executors
 
 object Buffering {
-  def diskBuffer(e: Enumerator[Array[Byte]])(implicit ec: ExecutionContext): Enumerator[Array[Byte]] = {
+
+  implicit val ec = ExecutionContext.fromExecutorService(
+      Executors.newCachedThreadPool)
+
+  def diskBuffer(e: Enumerator[Array[Byte]]): Enumerator[Array[Byte]] = {
     val buffer = new Buffer()
     (e run Iteratee.foreach(buffer.enqueue))
       .foreach(_ => buffer.finish)
