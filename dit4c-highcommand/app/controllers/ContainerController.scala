@@ -15,6 +15,8 @@ import play.mvc.Http.RequestHeader
 import providers.machineshop.MachineShop
 import providers.hipache.ContainerResolver
 import spray.http.StatusCodes.ServerError
+import play.api.libs.iteratee.Enumeratee
+import akka.util.ByteString
 
 class ContainerController @Inject() (
     val db: CouchDB.Database,
@@ -106,8 +108,9 @@ class ContainerController @Inject() (
           clientInstance(s"containers/${cncName(container)}/export", 1.day)
             .signedAsStream(_.withMethod("GET"))
       } yield {
+        val stream = utils.Buffering.diskBuffer(body)
         Status(headers.status)
-          .chunked(body)
+          .chunked(stream)
           .as("application/x-tar")
           .withHeaders(
               "X-Accel-Buffering" -> "off", // Nginx should just let it stream

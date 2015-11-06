@@ -7,7 +7,6 @@ import play.api.libs.iteratee.Enumerator
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
-import akka.util.ByteString
 import java.security.MessageDigest
 import scala.util.Random
 import play.api.libs.iteratee.Enumeratee
@@ -40,16 +39,16 @@ class BufferingSpec extends Specification {
     }
   }
 
-  def testEnumerator(seed: Long): Enumerator[ByteString] = {
+  def testEnumerator(seed: Long): Enumerator[Array[Byte]] = {
     val r = new Random(seed)
     Enumerator.enumerate(
-      Stream.continually(ByteString(r.nextString(10240))).take(10000))
+      Stream.continually(r.nextString(10240).getBytes).take(10000))
   }
 
   def testIteratee =
-        (Iteratee.fold[ByteString,MessageDigest](
+        (Iteratee.fold[Array[Byte],MessageDigest](
             MessageDigest.getInstance("SHA-512")) { (md, v) =>
               md.update(v.toArray); md
-            }).map(md => ByteString(md.digest))
+            }).map(md => md.digest)
 
 }
