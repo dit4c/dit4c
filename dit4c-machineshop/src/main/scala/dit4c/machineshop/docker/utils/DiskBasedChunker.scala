@@ -56,7 +56,7 @@ class DiskBasedChunker(val chunkSize: Int)
 
   def nextElement: ByteString = {
     var (out, over) = (next, ByteString.empty)
-    while (queue.size > 0 && over.isEmpty) {
+    while (!queue.isEmpty && over.isEmpty) {
       val headE = queue.peek
       if ((out.size + headE.size) <= chunkSize) {
         out ++= headE
@@ -71,16 +71,16 @@ class DiskBasedChunker(val chunkSize: Int)
     out
   }
 
-  object ByteStringSerializer extends Serializer[ByteString] with Serializable {
-     val internal = Serializer.BYTE_ARRAY
+}
 
-     override def deserialize(in: DataInput, available: Int) =
-       ByteString(internal.deserialize(in, available))
+object ByteStringSerializer extends Serializer[ByteString] with Serializable {
+   val internal = Serializer.BYTE_ARRAY
 
-     override def serialize(out: DataOutput, value: ByteString) =
-       internal.serialize(out, value.toArray)
+   override def deserialize(in: DataInput, available: Int) =
+     ByteString(internal.deserialize(in, available))
 
-     override def fixedSize = internal.fixedSize
-  }
+   override def serialize(out: DataOutput, value: ByteString) =
+     internal.serialize(out, value.toArray)
 
+   override def fixedSize = internal.fixedSize
 }
