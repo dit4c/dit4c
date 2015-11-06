@@ -15,6 +15,7 @@ libraryDependencies ++= Seq(
   "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
   "com.github.rjeschke" %   "txtmark"         % "0.13",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.11",
+  "org.mapdb"           %   "mapdb"           % "1.0.8",
   "com.typesafe.akka"   %%  "akka-testkit"    % "2.3.11"    % "test",
   "org.specs2"          %%  "specs2-core"     % "3.6"       % "test",
   "org.specs2"          %%  "specs2-junit"    % "3.6"       % "test",
