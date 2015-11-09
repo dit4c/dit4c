@@ -20,7 +20,7 @@ class AuthActorSpec extends Specification with NoTimeConversions {
   import scala.concurrent.duration._
   import AuthActor._
   implicit val system = ActorSystem("testSystem")
-  implicit val timeout = Timeout(1.second)
+  implicit val timeout = Timeout(2.second)
 
   "Auth Actor" should {
 
