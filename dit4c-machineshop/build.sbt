@@ -32,7 +32,6 @@ libraryDependencies ++= {
     "org.codehaus.groovy" %   "groovy-all"      % "1.8.8" % "compile",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
-    "org.mapdb"           %   "mapdb"           % "1.0.8",
     "com.google.code.findbugs" % "jsr305"       % "3.0.1"
   )
 }

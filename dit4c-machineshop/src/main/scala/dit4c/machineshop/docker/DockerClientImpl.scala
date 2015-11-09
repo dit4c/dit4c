@@ -26,7 +26,6 @@ import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
-import dit4c.machineshop.docker.utils.DiskBasedChunker
 
 class DockerClientImpl(
     val baseUrl: Uri,
@@ -99,7 +98,6 @@ class DockerClientImpl(
     })(ec).map { imageId =>
       lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
       InputStreamSource(() =>docker.saveImageCmd(imageId).exec)
-        .transform(() => new DiskBasedChunker(250000))
         .map(v => { fRemoveImage; v }) // Remove image onces stream starts
     }
 
