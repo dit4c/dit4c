@@ -26,7 +26,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra" % specs2V % "test",
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
-    "org.scalatra.scalate" %% "scalate-core"    % "1.7.1",
+    "com.samskivert"      %   "jmustache"       % "1.11",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
     "org.bouncycastle"    %   "bcpkix-jdk15on"  % "1.52"
   )

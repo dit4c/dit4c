@@ -1,6 +1,7 @@
 package dit4c.switchboard
 
 import java.nio.file.Files
+import scala.collection.JavaConversions._
 import scala.sys.process.Process
 import scala.util._
 import java.nio.file.Path
@@ -8,9 +9,12 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.FileVisitResult
 import java.io.IOException
-import org.fusesource.scalate.TemplateEngine
 import com.typesafe.scalalogging.LazyLogging
 import scala.sys.process.ProcessLogger
+import com.samskivert.mustache.Mustache
+import com.samskivert.mustache.BasicCollector
+import java.util.concurrent.ConcurrentHashMap
+import com.samskivert.mustache.Template
 
 class NginxInstance(
     baseDomain: Option[String],
@@ -35,11 +39,16 @@ class NginxInstance(
         throw new Exception("Nginx binary not found in PATH")
     }
 
-  private val engine = new TemplateEngine
+  private val engine = Mustache.compiler().withCollector(ScalaCollector)
+
+  lazy val mainConfigTemplater =
+    engine.compile(readClasspathFile("nginx_main.tmpl.mustache"))
+  lazy val vhostConfigTemplater =
+    engine.compile(readClasspathFile("nginx_vhost.tmpl.mustache"))
 
   writeFile(mainConfig) {
     implicit def path2str(p: Path) = p.toAbsolutePath.toString
-    engine.layout("/nginx_main.tmpl.mustache",
+    mainConfigTemplater.execute(
       Map[String,Any](
         "basedir" -> baseDir,
         "cachedir" -> cacheDir,
@@ -98,7 +107,7 @@ class NginxInstance(
   }
 
   protected def vhostTmpl(route: Route) =
-    engine.layout("/nginx_vhost.tmpl.mustache",
+    vhostConfigTemplater.execute(
       Map(
         "https" -> tlsConfig.isDefined,
         "port" -> port.toString,
@@ -115,6 +124,9 @@ class NginxInstance(
         Map("extraconf" -> c)
       }
     )
+
+  protected def readClasspathFile(path: String) =
+    io.Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
 
   protected def writeFile(f: Path)(content: String): Path =
     Files.write(f, content.getBytes("utf-8"))
@@ -134,6 +146,45 @@ class NginxInstance(
 
   implicit private def optionMapToMap[A,B](om: Option[Map[A,B]]): Map[A,B] =
     om.getOrElse(Map.empty[A,B])
+
+  object ScalaCollector extends BasicCollector {
+    override def toIterator(obj: Object) = super.toIterator(obj match {
+      case v: Iterable[_] => asJavaIterable(v)
+      case _ => obj
+    })
+    override def createFetcher(ctx: Object, name: String) =
+      ctx match {
+        case m: Map[_,_] => MapFetcher
+        case seq: Seq[_] => SeqFetcher
+        case _ => super.createFetcher(ctx, name)
+      }
+    override def createFetcherCache[K,V]() = new ConcurrentHashMap[K,V]
+
+    object MapFetcher extends Mustache.VariableFetcher {
+      override def get(ctx: Object, name: String) =
+        ctx match {
+          case m: Map[_,_] => optionToObject(Option(m.get(name)))
+          case _ => Template.NO_FETCHER_FOUND
+        }
+    }
+
+    object SeqFetcher extends Mustache.VariableFetcher {
+      override def get(ctx: Object, name: String) =
+        ctx match {
+          case seq: Seq[_] => optionToObject(Try(seq(name.toInt)).toOption)
+          case _ => Template.NO_FETCHER_FOUND
+        }
+    }
+
+    def optionToObject(opt: Option[Any]) = opt match {
+      case Some(obj: Any) => obj match {
+        case m: Map[_,_] => mapAsJavaMap(m)
+        case _ => obj.asInstanceOf[AnyRef]
+      }
+      case v => Template.NO_FETCHER_FOUND
+    }
+
+  }
 
   class DeletingFileVisitor extends SimpleFileVisitor[Path] {
     override def visitFile(file: Path, attrs: BasicFileAttributes) = {

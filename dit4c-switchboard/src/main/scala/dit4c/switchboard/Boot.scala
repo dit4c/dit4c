@@ -11,7 +11,6 @@ import akka.stream.io.Framing
 import akka.util.ByteString
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import org.fusesource.scalate._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
