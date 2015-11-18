@@ -37,13 +37,12 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     val client = DockerClientBuilder.getInstance(hostDockerUri).build
     val tmpDir = Files.createTempDirectory("dit4c_mc_dind_test_")
     tmpDir.toFile.deleteOnExit
-    val dindId = client.createContainerCmd("docker.io/docker:1.8-dind")
+    val dindId = client.createContainerCmd("docker.io/docker:1.9-dind")
       .withPrivileged(true)
       .withAttachStdout(true)
       .withAttachStderr(true)
       .withName("dit4c_mc_dind_test-"+Random.alphanumeric.take(8).mkString)
       .withBinds(new Bind(tmpDir.toAbsolutePath.toString, new Volume("/var/run")))
-      //.withEnv("DOCKER_DAEMON_ARGS=--storage-driver=overlay")
       .exec
       .getId
     client.startContainerCmd(dindId).exec
