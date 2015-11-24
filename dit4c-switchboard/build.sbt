@@ -133,6 +133,7 @@ dockerfile in docker := {
     .user("nginx")
     .cmd("sh", "-c",
       """
+      JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
       SSL_OPTS=""
       KEY_FILE="/etc/ssl/server.key"
       CERT_FILE="/etc/ssl/server.crt"
@@ -148,7 +149,7 @@ dockerfile in docker := {
       if [ -e $EXTRA_VHOST_CONFIG ]; then
         CONFIG_FILE_OPTS="$CONFIG_FILE_OPTS --extra-vhost-config $EXTRA_VHOST_CONFIG"
       fi
-      /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 -d $DIT4C_DOMAIN $SSL_OPTS $CONFIG_FILE_OPTS
+      exec /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 -d $DIT4C_DOMAIN $SSL_OPTS $CONFIG_FILE_OPTS
       """)
     .expose(8080)
 }

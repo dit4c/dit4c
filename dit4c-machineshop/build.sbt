@@ -68,8 +68,9 @@ dockerfile in docker := {
     .volume("/etc/dit4c-machineshop")
     .cmd("sh", "-c", """
       set -e
+      JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
       dbus-uuidgen --ensure=/etc/dit4c-machineshop/machine-id
-      java -jar /opt/dit4c-machineshop.jar -i 0.0.0.0 -p 8080 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys --link dit4c_cnproxy:cnproxy --server-id-seed-file /etc/dit4c-machineshop/machine-id --image-update-interval 900 --known-images-file /etc/dit4c-machineshop/known_images.json
+      exec java -jar /opt/dit4c-machineshop.jar -i 0.0.0.0 -p 8080 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys --link dit4c_cnproxy:cnproxy --server-id-seed-file /etc/dit4c-machineshop/machine-id --image-update-interval 900 --known-images-file /etc/dit4c-machineshop/known_images.json
       """)
     .expose(8080)
 }
