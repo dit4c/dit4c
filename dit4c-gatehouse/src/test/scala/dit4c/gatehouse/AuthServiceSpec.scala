@@ -8,8 +8,10 @@ import akka.http.scaladsl.testkit.RouteTest
 import dit4c.Specs2TestInterface
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
+import scala.concurrent.duration._
+import org.specs2.time.NoTimeConversions
 
-class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterface {
+class AuthServiceSpec extends Specification with NoTimeConversions with RouteTest with Specs2TestInterface {
 
   import AuthServiceSpec._
   val authService = {
@@ -84,6 +86,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(InternalServerError)
+          implicit val timeout: Duration = 2.seconds
           responseAs[HttpEntity] must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
