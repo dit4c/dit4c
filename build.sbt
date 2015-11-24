@@ -15,6 +15,7 @@ scalacOptions in ThisBuild += "-target:jvm-1.8"
 javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 
 // Project definitions (automatically aggregated)
+lazy val common      = project in file("dit4c-common")
 
 lazy val gatehouse   = project in file("dit4c-gatehouse")
 
@@ -30,4 +31,3 @@ lazy val switchboard = project in file("dit4c-switchboard")
 releaseSettings
 
 crossScalaVersions := Nil
-
