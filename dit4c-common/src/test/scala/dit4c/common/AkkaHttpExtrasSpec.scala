@@ -20,8 +20,9 @@ import scala.concurrent.Future
 import scala.util._
 import org.specs2.matcher._
 import org.xbill.DNS._
+import org.specs2.specification.core.Fragments
 
-class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
+class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with SequenceMatchersCreation {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val system = ActorSystem()
@@ -65,32 +66,36 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
             " Something is wrong.")
     }
 
-    "allow requests that can fail over" >> {
+    "requests that can fail over" >> {
+      Seq("http","https").map { scheme =>
+        scheme.toUpperCase >> {
 
-      "implicitly" >> {
-        val req = HttpRequest(uri = Uri("https://google.com/"))
-        val res = Await.result(
-            Http().singleResilientRequest(req,
-                ClientConnectionSettings(system), None, log)
-            , 5.seconds)
+          "implicitly" >> {
+            val req = HttpRequest(uri = Uri(s"$scheme://google.com/"))
+            val res = Await.result(
+                Http().singleResilientRequest(req,
+                    ClientConnectionSettings(system), None, log)
+                , 5.seconds)
 
-        res.status.isRedirection must beTrue.setMessage(
-              s"Request to ${req.uri} failed. Something is wrong.")
-      }
+            res.status.isRedirection must beTrue.setMessage(
+                  s"Request to ${req.uri} failed. Something is wrong.")
+          }
 
-      "explicitly" >> {
-        val req = HttpRequest(uri = Uri("https://google.com/"))
-        val res = Await.result(
-            Http().singleResilientRequest(req,
-              req.uri.authority.host.inetAddresses.sortBy {
-                case _: Inet4Address => 1
-                case _ => 0
-              },
-              ClientConnectionSettings(system), None, log)
-            , 5.seconds)
-        res.status.isRedirection must beTrue.setMessage(
-              s"Request to ${req.uri} failed. Something is wrong.")
-      }
+          "explicitly" >> {
+            val req = HttpRequest(uri = Uri(s"$scheme://google.com/"))
+            val res = Await.result(
+                Http().singleResilientRequest(req,
+                  req.uri.authority.host.inetAddresses.sortBy {
+                    case _: Inet4Address => 1
+                    case _ => 0
+                  },
+                  ClientConnectionSettings(system), None, log)
+                , 5.seconds)
+            res.status.isRedirection must beTrue.setMessage(
+                  s"Request to ${req.uri} failed. Something is wrong.")
+          }
+        }
+      }.foldLeft(Fragments.empty)(_ append _)
     }
   }
 

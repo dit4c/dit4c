@@ -36,7 +36,7 @@ object AkkaHttpExtras {
         log: LoggingAdapter)(implicit fm: Materializer): Future[HttpResponse] = {
       implicit val ec = fm.executionContext
       val addr::remainingAddrs = addrs
-      val c = outgoingConnectionTls(addr, request.uri.effectivePort,
+      val c = outgoingConnection(addr, request.uri.effectivePort,
           None, settings,
           httpsContext orElse {
             if (request.uri.scheme == "https") Some(http.defaultClientHttpsContext)
