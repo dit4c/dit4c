@@ -77,7 +77,7 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
             val req = HttpRequest(uri = Uri(s"$scheme://google.com/"))
             val res = Await.result(
                 Http().singleResilientRequest(req, ccSettings, None, log)
-                , 5.seconds)
+                , 30.seconds)
             res.status.isRedirection must beTrue.setMessage(
                   s"Request to ${req.uri} failed. Something is wrong.")
           }
@@ -86,12 +86,9 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
             val req = HttpRequest(uri = Uri(s"$scheme://google.com/"))
             val res = Await.result(
                 Http().singleResilientRequest(req,
-                  req.uri.authority.host.inetAddresses.sortBy {
-                    case _: Inet4Address => 1
-                    case _ => 0
-                  },
+                  resolve(req.uri.authority.host.address),
                   ccSettings, None, log)
-                , 5.seconds)
+                , 30.seconds)
             res.status.isRedirection must beTrue.setMessage(
                   s"Request to ${req.uri} failed. Something is wrong.")
           }
