@@ -43,7 +43,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             addHeader("X-Server-Name", "foo") ~>
             route ~> check {
           status must be(Forbidden)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
         Get("/auth") ~>
@@ -51,7 +51,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             Cookie(HttpCookiePair("dit4c-jwt", badToken)) ~>
             route ~> check {
           status must be(Forbidden)
-          responseAs[HttpEntity] must_== HttpEntity(
+          responseEntity must_== HttpEntity(
             ContentTypes.`text/plain(UTF-8)`,"invalid token")
           header("X-Upstream-Port") must beNone
         }
@@ -63,7 +63,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(OK)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beSome
           header("X-Upstream-Port").get.value must_== "3.4.5.6:8080"
         }
@@ -75,7 +75,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(NotFound)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
       }
@@ -87,7 +87,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             route ~> check {
           status must be(InternalServerError)
           implicit val timeout: Duration = 2.seconds
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
       }
