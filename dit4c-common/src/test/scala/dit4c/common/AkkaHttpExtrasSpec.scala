@@ -18,8 +18,9 @@ import scala.concurrent.duration._
 import akka.http.scaladsl.model._
 import scala.concurrent.Future
 import scala.util._
+import org.specs2.matcher._
 
-class AkkaHttpExtrasSpec extends Specification {
+class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val system = ActorSystem()
@@ -58,10 +59,12 @@ class AkkaHttpExtrasSpec extends Specification {
         }
       }.mkString("\n")
 
-      results.filter({ case (k,v) => v.isSuccess }).size must
-        beGreaterThan(results.size / 2).setMessage(
-            s"A majority of $host servers did not respond. " +
-            s"Something is wrong.\n$statusTable")
+      {
+        results.filter({ case (k,v) => v.isSuccess }) must
+          haveSize(beGreaterThan(results.size / 2))
+      }.setMessage(statusTable +
+            s"\nA majority of $host servers did not respond." +
+            " Something is wrong.")
     }
 
     "allow requests that can fail over" >> {
