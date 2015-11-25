@@ -10,6 +10,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import scala.concurrent.duration._
 import org.specs2.time.NoTimeConversions
+import akka.http.scaladsl.testkit.RouteTestTimeout
 
 class AuthServiceSpec extends Specification with NoTimeConversions with RouteTest with Specs2TestInterface {
 
@@ -24,6 +25,8 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
   import authService._
 
   "AuthService" should {
+
+    implicit val timeout = RouteTestTimeout(2.seconds)
 
     "for GET requests to the auth path" >> {
 
@@ -86,7 +89,6 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(InternalServerError)
-          implicit val timeout: Duration = 2.seconds
           responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
