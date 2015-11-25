@@ -17,7 +17,7 @@ javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 // Project definitions (automatically aggregated)
 lazy val common      = project in file("dit4c-common")
 
-lazy val gatehouse   = project in file("dit4c-gatehouse")
+lazy val gatehouse   = (project in file("dit4c-gatehouse")).dependsOn(common)
 
 lazy val highcommand = (project in file("dit4c-highcommand")).
   enablePlugins(PlayScala, SbtWeb)

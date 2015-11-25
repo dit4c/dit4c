@@ -40,7 +40,9 @@ object Boot extends App with LazyLogging {
   )(Route.apply _)
 
   def monitorFeed(config: Config, nginx: NginxInstance, retryWait: FiniteDuration = 5.seconds): Unit =
-    Http().singleResilientRequest(HttpRequest(uri = config.feed.toString), ClientConnectionSettings(system), None, log)
+    Http().singleResilientRequest(
+        HttpRequest(uri = config.feed.toString),
+        ClientConnectionSettings(system), None, log)
       .map { response =>
         response.entity match {
           case HttpEntity.Chunked(mimeType, parts) if mimeType.mediaType.value == "text/event-stream" =>

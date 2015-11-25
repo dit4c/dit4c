@@ -9,6 +9,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.http.scaladsl.model._
+import akka.http.ClientConnectionSettings
 
 trait SignatureCheckerProvider {
 
@@ -21,7 +22,10 @@ trait SignatureCheckerProvider {
     import KeyLoader._
     log.info(s"Retrieving keys from $publicKeyLocation")
     if (publicKeyLocation.isAbsolute()) {
-      Http().singleRequest(HttpRequest(uri = Uri(publicKeyLocation.toASCIIString)))
+      import dit4c.common.AkkaHttpExtras._
+      Http().singleResilientRequest(
+          HttpRequest(uri = Uri(publicKeyLocation.toASCIIString)),
+          ClientConnectionSettings(system), None, log)
         .flatMap(Unmarshal(_).to[String])
         .map { content =>
           val keys = KeyLoader(content)
