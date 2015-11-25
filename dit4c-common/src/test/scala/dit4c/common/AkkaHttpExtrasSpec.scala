@@ -33,13 +33,16 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
 
   "Akka Http Extras" should {
 
+    val ccSettings = ClientConnectionSettings(system).copy(
+          connectingTimeout = 1.second)
+
     "allow outgoing connections to specify InetAddress" >> {
       val host = "google.com"
       val addrs = resolve(host)
 
       def makeRequest(addr: InetAddress): Future[Try[StatusCode]] = {
         val c = Http().outgoingConnectionTls(addr, 443,
-          None, ClientConnectionSettings(system), None, log)
+          None, ccSettings, None, log)
         val req = HttpRequest()
         Source.single(req).via(c)
           .runFold(Seq.empty[StatusCode])((rs, r) => rs :+ r.status)
@@ -73,10 +76,8 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
           "implicitly" >> {
             val req = HttpRequest(uri = Uri(s"$scheme://google.com/"))
             val res = Await.result(
-                Http().singleResilientRequest(req,
-                    ClientConnectionSettings(system), None, log)
+                Http().singleResilientRequest(req, ccSettings, None, log)
                 , 5.seconds)
-
             res.status.isRedirection must beTrue.setMessage(
                   s"Request to ${req.uri} failed. Something is wrong.")
           }
@@ -89,7 +90,7 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
                     case _: Inet4Address => 1
                     case _ => 0
                   },
-                  ClientConnectionSettings(system), None, log)
+                  ccSettings, None, log)
                 , 5.seconds)
             res.status.isRedirection must beTrue.setMessage(
                   s"Request to ${req.uri} failed. Something is wrong.")
