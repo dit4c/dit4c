@@ -51,16 +51,17 @@ class AkkaHttpExtrasSpec extends Specification {
         addrs.map { addr => makeRequest(addr).map((addr,_)) }
       }, 5.seconds).toMap
 
-      results.foreach { case (k,v) =>
-        log.debug(v match {
+      val statusTable = results.map { case (k,v) =>
+        v match {
           case Success(v) => s"$k → $v"
           case Failure(e) => s"$k → $e"
-        })
-      }
+        }
+      }.mkString("\n")
 
       results.filter({ case (k,v) => v.isSuccess }).size must
         beGreaterThan(results.size / 2).setMessage(
-            s"A majority of $host servers did not respond. Something is wrong.")
+            s"A majority of $host servers did not respond. " +
+            s"Something is wrong.\n$statusTable")
     }
 
     "allow requests that can fail over" >> {
