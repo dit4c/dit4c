@@ -11,7 +11,8 @@ libraryDependencies ++= {
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-http-testkit-experimental" % akkaHttpV % "test",
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
-    "org.specs2"          %%  "specs2-mock"     % specs2V % "test"
+    "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
+    "dnsjava"             % "dnsjava"           % "2.1.7" % "test"
   )
 }
 

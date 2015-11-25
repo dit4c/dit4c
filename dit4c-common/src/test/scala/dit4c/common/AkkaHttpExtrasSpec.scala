@@ -19,6 +19,7 @@ import akka.http.scaladsl.model._
 import scala.concurrent.Future
 import scala.util._
 import org.specs2.matcher._
+import org.xbill.DNS._
 
 class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
 
@@ -33,10 +34,7 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
 
     "allow outgoing connections to specify InetAddress" >> {
       val host = "google.com"
-      val addrs = InetAddress.getAllByName(host).toSeq.sortBy {
-        case _: Inet4Address => 1
-        case _ => 0
-      }
+      val addrs = resolve(host)
 
       def makeRequest(addr: InetAddress): Future[Try[StatusCode]] = {
         val c = Http().outgoingConnectionTls(addr, 443,
@@ -92,6 +90,18 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations {
             , 5.seconds)
         res.status.isRedirection must beTrue.setMessage(
               s"Request to ${req.uri} failed. Something is wrong.")
+      }
+    }
+  }
+
+  def resolve(s: String): Seq[InetAddress] = {
+    val resolver = new ExtendedResolver(Array[String]("8.8.8.8","8.8.4.4"))
+    Seq(Type.AAAA,Type.A).flatMap { t =>
+      val lookup = new Lookup(s, t)
+      lookup.setResolver(resolver)
+      lookup.run.toSeq.map {
+        case r: ARecord => r.getAddress
+        case r: AAAARecord => r.getAddress
       }
     }
   }
