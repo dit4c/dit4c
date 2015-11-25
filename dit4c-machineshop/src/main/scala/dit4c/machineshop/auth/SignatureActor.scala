@@ -127,7 +127,7 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
   protected def pipeline(req: HttpRequest) =
     for {
       res <- Http().singleRequest(req)
-      str <- stringUnmarshaller(mat)(res.entity)
+      str <- stringUnmarshaller(res.entity)
     } yield str
 }
 

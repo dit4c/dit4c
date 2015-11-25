@@ -72,7 +72,7 @@ class AkkaHttpExtrasSpec extends Specification {
                 ClientConnectionSettings(system), None, log)
             , 5.seconds)
 
-        res.status must beEqualTo(StatusCodes.Found).setMessage(
+        res.status.isRedirection must beTrue.setMessage(
               s"Request to ${req.uri} failed. Something is wrong.")
       }
 
@@ -86,7 +86,7 @@ class AkkaHttpExtrasSpec extends Specification {
               },
               ClientConnectionSettings(system), None, log)
             , 5.seconds)
-        res.status must beEqualTo(StatusCodes.Found).setMessage(
+        res.status.isRedirection must beTrue.setMessage(
               s"Request to ${req.uri} failed. Something is wrong.")
       }
     }

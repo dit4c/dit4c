@@ -14,7 +14,7 @@ dependencyOverrides := Set(
 
 libraryDependencies ++= {
   val akkaV = "2.3.6"
-  val akkaHttpV = "1.0"
+  val akkaHttpV = "2.0-M1"
   val specs2V = "3.6.4"
   Seq(
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,

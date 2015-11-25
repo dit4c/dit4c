@@ -6,7 +6,7 @@ import akka.event.LoggingAdapter
 import akka.http.scaladsl.model._
 import akka.http.ClientConnectionSettings
 import akka.stream.scaladsl.Flow
-import scala.concurrent.Future
+import scala.concurrent._
 import akka.http.scaladsl.Http.OutgoingConnection
 import akka.http.scaladsl.model.headers.Host
 import akka.stream.io._
@@ -35,19 +35,22 @@ object AkkaHttpExtras {
         httpsContext: Option[HttpsContext],
         log: LoggingAdapter)(implicit fm: Materializer): Future[HttpResponse] = {
       implicit val ec = fm.executionContext
-      val c = outgoingConnectionTls(addrs.head, request.uri.effectivePort,
+      val addr::remainingAddrs = addrs
+      val c = outgoingConnectionTls(addr, request.uri.effectivePort,
           None, settings,
           httpsContext orElse {
             if (request.uri.scheme == "https") Some(http.defaultClientHttpsContext)
             else None
           }, log)
+      val p = Promise[HttpResponse]()
       Source.single(request).via(c)
-        .runFold(Seq.empty[HttpResponse])((rs, r) => rs :+ r)
-        .map(_.head)
+        .runForeach((r) => p.trySuccess(r))
+        .onFailure({ case e: Throwable => p.tryFailure(e) })
+      p.future
         .recoverWith {
-          case e: akka.stream.StreamTcpException if addrs.size > 1 =>
+          case e: akka.stream.StreamTcpException if !remainingAddrs.isEmpty =>
             singleResilientRequest(request,
-                addrs.tail, settings, httpsContext, log)
+                remainingAddrs, settings, httpsContext, log)
         }
     }
 
