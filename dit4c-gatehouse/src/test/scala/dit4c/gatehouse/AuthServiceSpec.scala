@@ -26,7 +26,7 @@ class AuthServiceSpec extends Specification with NoTimeConversions with RouteTes
 
   "AuthService" should {
 
-    implicit val timeout = RouteTestTimeout(2.seconds)
+    implicit val timeout = RouteTestTimeout(20.seconds)
 
     "for GET requests to the auth path" >> {
 
