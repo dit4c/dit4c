@@ -49,6 +49,8 @@ object AkkaHttpExtras {
       p.future
         .recoverWith {
           case e: akka.stream.StreamTcpException if !remainingAddrs.isEmpty =>
+            log.warning(s"Request to $addr timed out. " +
+                s"Trying remaining ${remainingAddrs.size} addresses.")
             singleResilientRequest(request,
                 remainingAddrs, settings, httpsContext, log)
         }
