@@ -22,7 +22,7 @@ lazy val gatehouse   = (project in file("dit4c-gatehouse")).dependsOn(common)
 lazy val highcommand = (project in file("dit4c-highcommand")).
   enablePlugins(PlayScala, SbtWeb)
 
-lazy val machineshop = project in file("dit4c-machineshop")
+lazy val machineshop = (project in file("dit4c-machineshop")).dependsOn(common)
 
 lazy val switchboard = (project in file("dit4c-switchboard")).dependsOn(common)
 
