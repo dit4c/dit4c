@@ -16,6 +16,7 @@ import akka.stream.scaladsl.Tcp
 import akka.stream.scaladsl.Keep
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
+import scala.concurrent.duration.FiniteDuration
 
 object AkkaHttpExtras {
 
@@ -43,6 +44,15 @@ object AkkaHttpExtras {
             else None
           }, log)
       val p = Promise[HttpResponse]()
+      settings.idleTimeout match {
+        case timeout: FiniteDuration =>
+          fm.scheduleOnce(timeout, new Runnable() {
+            override def run() {
+              p.tryFailure(new TimeoutException(s"No response within $timeout"))
+            }
+          })
+        case _ => // No timeout
+      }
       Source.single(request).via(c)
         .runForeach((r) => p.trySuccess(r))
         .onFailure({ case e: Throwable => p.tryFailure(e) })
