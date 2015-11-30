@@ -19,6 +19,10 @@ class AuthorizationCheckerSpec extends Specification {
     "return false for malformed tokens" in {
       checker(malformedToken, "foo") must beLeft
     }
+
+    "return false for malformed JSON" in {
+      checker("null"+testToken, "foo") must beLeft
+    }
   }
 }
 
