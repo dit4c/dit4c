@@ -34,7 +34,7 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
   "Akka Http Extras" should {
 
     val ccSettings = ClientConnectionSettings(system).copy(
-          connectingTimeout = 1.second)
+          connectingTimeout = 1.second, idleTimeout = 5.seconds)
 
     "allow outgoing connections to specify InetAddress" >> {
       val host = "google.com"
