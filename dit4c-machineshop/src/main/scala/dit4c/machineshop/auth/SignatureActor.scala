@@ -18,11 +18,14 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers._
 import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.client.TransformerAux._
 import akka.http.scaladsl.model.HttpResponse
+import akka.http.ClientConnectionSettings
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor {
-  val log = Logging(context.system, this)
 
+  import dit4c.common.AkkaHttpExtras._
+
+  val log = Logging(context.system, this)
   implicit val executionContext = context.system.dispatcher
   implicit val actorRefFactory = context.system
   implicit val mat = ActorMaterializer()
@@ -126,8 +129,9 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
 
   protected def pipeline(req: HttpRequest) =
     for {
-      res <- Http().singleRequest(req)
-      str <- stringUnmarshaller(mat)(res.entity)
+      res <- Http().singleResilientRequest(req,
+          ClientConnectionSettings(context.system), None, log)
+      str <- stringUnmarshaller(res.entity)
     } yield str
 }
 

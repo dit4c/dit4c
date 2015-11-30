@@ -11,7 +11,7 @@ fork in run := true
 
 libraryDependencies ++= {
   val akkaV = "2.3.5"
-  val akkaHttpV = "1.0"
+  val akkaHttpV = "2.0-M1"
   Seq(
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
@@ -44,7 +44,12 @@ dockerfile in docker := {
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-basejre")
     .add(jarFile, "/opt/dit4c-gatehouse.jar")
-    .cmd("sh", "-c", "cd /opt && exec java -jar /opt/dit4c-gatehouse.jar -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys")
+    .cmd("sh", "-c", """
+      set -e
+      JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
+      cd /opt
+      exec java -jar /opt/dit4c-gatehouse.jar -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys
+      """)
     .expose(8080)
 }
 

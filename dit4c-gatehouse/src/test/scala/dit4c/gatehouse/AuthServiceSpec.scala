@@ -8,8 +8,11 @@ import akka.http.scaladsl.testkit.RouteTest
 import dit4c.Specs2TestInterface
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
+import scala.concurrent.duration._
+import org.specs2.time.NoTimeConversions
+import akka.http.scaladsl.testkit.RouteTestTimeout
 
-class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterface {
+class AuthServiceSpec extends Specification with NoTimeConversions with RouteTest with Specs2TestInterface {
 
   import AuthServiceSpec._
   val authService = {
@@ -22,6 +25,8 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
   import authService._
 
   "AuthService" should {
+
+    implicit val timeout = RouteTestTimeout(20.seconds)
 
     "for GET requests to the auth path" >> {
 
@@ -41,7 +46,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             addHeader("X-Server-Name", "foo") ~>
             route ~> check {
           status must be(Forbidden)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
         Get("/auth") ~>
@@ -49,7 +54,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             Cookie(HttpCookiePair("dit4c-jwt", badToken)) ~>
             route ~> check {
           status must be(Forbidden)
-          responseAs[HttpEntity] must_== HttpEntity(
+          responseEntity must_== HttpEntity(
             ContentTypes.`text/plain(UTF-8)`,"invalid token")
           header("X-Upstream-Port") must beNone
         }
@@ -61,7 +66,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(OK)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beSome
           header("X-Upstream-Port").get.value must_== "3.4.5.6:8080"
         }
@@ -73,7 +78,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(NotFound)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
       }
@@ -84,7 +89,7 @@ class AuthServiceSpec extends Specification with RouteTest with Specs2TestInterf
             Cookie(HttpCookiePair("dit4c-jwt", goodToken)) ~>
             route ~> check {
           status must be(InternalServerError)
-          responseAs[HttpEntity] must be(HttpEntity.Empty)
+          responseEntity must be(HttpEntity.Empty)
           header("X-Upstream-Port") must beNone
         }
       }

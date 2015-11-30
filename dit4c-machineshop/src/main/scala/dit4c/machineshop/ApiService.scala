@@ -2,17 +2,16 @@ package dit4c.machineshop
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
-
 import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
-
 import akka.actor._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
@@ -35,6 +34,7 @@ import akka.util.Timeout
 import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerContainer
 import spray.json._
+import akka.http.scaladsl.model.HttpResponse
 
 class ApiService(
     arf: ActorRefFactory,
@@ -57,10 +57,10 @@ class ApiService(
   implicit val mat = ActorMaterializer()
 
   implicit val newContainerRequestUnmarshaller: FromRequestUnmarshaller[NewContainerRequest] =
-    fromRequestUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader, mat))
+    fromRequestUnmarshaller(sprayJsonUnmarshaller(newContainerRequestReader))
 
   implicit val newImageRequestUnmarshaller: FromRequestUnmarshaller[NewImageRequest] =
-    fromRequestUnmarshaller(sprayJsonUnmarshaller(newImageRequestReader, mat))
+    fromRequestUnmarshaller(sprayJsonUnmarshaller(newImageRequestReader))
 
   def withContainer(name: String)(f: DockerContainer => Route): Route =
     onSuccess(client.containers.list) { containers =>
@@ -89,10 +89,7 @@ class ApiService(
               case AccessGranted =>
                 f
               case AccessDenied(msg) =>
-                val challengeHeaders = Nil
-                overrideStatusCode(StatusCodes.Forbidden) {
-                  complete(msg)
-                }
+                complete((StatusCodes.Forbidden, msg))
             }
           }
         } ~
@@ -100,11 +97,7 @@ class ApiService(
           val challengeHeaders = `WWW-Authenticate`(
               HttpChallenge("Signature", "",
                   Map("headers" -> "(request-target) date"))) :: Nil
-          overrideStatusCode(StatusCodes.Unauthorized) {
-            respondWithHeaders(challengeHeaders) {
-              complete(msg)
-            }
-          }
+          complete((StatusCodes.Unauthorized, challengeHeaders, msg))
         }
       }
       .getOrElse( f )
@@ -114,18 +107,15 @@ class ApiService(
       pathEndOrSingleSlash {
         get {
           onSuccess(client.containers.list) { containers =>
-            complete {
-              containers
-            }
+            complete(containers)
           }
         } ~
         post {
           entity(as[NewContainerRequest]) { npr =>
             signatureCheck {
               onSuccess(client.containers.create(npr.name, npr.image)) { container =>
-                overrideStatusCode(StatusCodes.Created) {
-                  complete(container)
-                }
+                implicit val m = fromToEntityMarshaller(StatusCodes.Created)
+                complete(container)
               }
             }
           }
@@ -144,9 +134,7 @@ class ApiService(
                 onComplete(container.delete) {
                   case _: Success[Unit] => complete(StatusCodes.NoContent)
                   case Failure(e) =>
-                    overrideStatusCode(StatusCodes.InternalServerError) {
-                      complete(e.getMessage)
-                    }
+                    complete((StatusCodes.InternalServerError, e.getMessage))
                 }
               }
             }
@@ -199,9 +187,7 @@ class ApiService(
               optionalHeaderValueByType[`If-None-Match`]() {
                 case Some(`If-None-Match`(EntityTagRange.Default(tags)))
                     if tags.contains(etag) =>
-                  overrideStatusCode(StatusCodes.NotModified) {
-                    complete(HttpEntity.Empty)
-                  }
+                  complete((StatusCodes.NotModified, HttpEntity.Empty))
                 case etag =>
                   respondWithHeader(ETag(EntityTag(stateId))) {
                     complete(images)
@@ -215,13 +201,11 @@ class ApiService(
               val addReq = AddImage(nir.displayName, nir.repository, nir.tag)
               onSuccess(imageMonitor ? addReq) {
                 case AddedImage(image) =>
-                  overrideStatusCode(StatusCodes.Created) {
-                    complete(image)
-                  }
+                  implicit val m = fromToEntityMarshaller(StatusCodes.Created)
+                  complete(image)
                 case ConflictingImages(images) =>
-                  overrideStatusCode(StatusCodes.Conflict) {
-                    complete(images)
-                  }
+                  implicit val m = fromToEntityMarshaller(StatusCodes.Conflict)
+                  complete(images)
               }
             }
           }
@@ -325,7 +309,8 @@ object ApiService {
 
     def fromRequestUnmarshaller[T](feu: FromEntityUnmarshaller[T]): FromRequestUnmarshaller[T] =
       new Unmarshaller[HttpRequest, T] {
-        override def apply(value: HttpRequest)(implicit ec: ExecutionContext) =
+        override def apply(value: HttpRequest)(
+            implicit ec: ExecutionContext, mat: akka.stream.Materializer) =
           feu(value.entity)
       }
 

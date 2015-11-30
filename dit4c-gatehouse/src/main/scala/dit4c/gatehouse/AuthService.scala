@@ -71,10 +71,7 @@ class AuthService(val actorRefFactory: ActorRefFactory, dockerIndex: ActorRef, a
               // Missing cookie
               complete(HttpResponse(403))
           }
-        } ~
-        overrideStatusCode(400) {
-          complete("A X-Server-Name header is required.")
-        }
+        } ~ complete((400, "A X-Server-Name header is required."))
       }
     }
 }

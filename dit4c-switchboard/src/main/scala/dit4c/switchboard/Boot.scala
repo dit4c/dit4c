@@ -16,12 +16,16 @@ import scala.concurrent.duration._
 import scala.util._
 import com.typesafe.scalalogging.LazyLogging
 import org.bouncycastle.openssl.PEMParser
+import dit4c.common.AkkaHttpExtras._
+import akka.event.Logging
+import akka.http.ClientConnectionSettings
 
 object Boot extends App with LazyLogging {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
+  lazy val log = Logging(system, this.getClass.getName)
 
   implicit val upstreamReads: Reads[Upstream] = (
     (__ \ "scheme").read[String] and
@@ -36,7 +40,9 @@ object Boot extends App with LazyLogging {
   )(Route.apply _)
 
   def monitorFeed(config: Config, nginx: NginxInstance, retryWait: FiniteDuration = 5.seconds): Unit =
-    Http().singleRequest(HttpRequest(uri = config.feed.toString))
+    Http().singleResilientRequest(
+        HttpRequest(uri = config.feed.toString),
+        ClientConnectionSettings(system), None, log)
       .map { response =>
         response.entity match {
           case HttpEntity.Chunked(mimeType, parts) if mimeType.mediaType.value == "text/event-stream" =>

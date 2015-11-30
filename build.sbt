@@ -14,20 +14,23 @@ scalacOptions in ThisBuild += "-target:jvm-1.8"
 
 javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 
-// Project definitions (automatically aggregated)
+// Attempt to fix cryptic Travis CI sbt.ForkMain error
+javaOptions in ThisBuild += "-Xmx1G"
 
-lazy val gatehouse   = project in file("dit4c-gatehouse")
+// Project definitions (automatically aggregated)
+lazy val common      = project in file("dit4c-common")
+
+lazy val gatehouse   = (project in file("dit4c-gatehouse")).dependsOn(common)
 
 lazy val highcommand = (project in file("dit4c-highcommand")).
   enablePlugins(PlayScala, SbtWeb)
 
-lazy val machineshop = project in file("dit4c-machineshop")
+lazy val machineshop = (project in file("dit4c-machineshop")).dependsOn(common)
 
-lazy val switchboard = project in file("dit4c-switchboard")
+lazy val switchboard = (project in file("dit4c-switchboard")).dependsOn(common)
 
 // Release settings
 
 releaseSettings
 
 crossScalaVersions := Nil
-
