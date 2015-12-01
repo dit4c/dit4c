@@ -1,6 +1,7 @@
 package testing
 
 import play.api.test.FakeApplication
+import scala.util.Random
 
 object TestUtils {
 
@@ -13,7 +14,7 @@ object TestUtils {
           "rapidaaf" -> Map(
               "id"   -> "RapidAAF",
               "url"  -> "http://example.test/",
-              "key"  -> "testkey"
+              "key"  -> Random.nextString(32)
           )
       ))
 }

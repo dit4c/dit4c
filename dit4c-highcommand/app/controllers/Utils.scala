@@ -88,7 +88,7 @@ trait Utils extends Results {
         r.withHeaders(ETAG -> etag)
     }
   }
-  
+
   protected def getCookieDomain(implicit request: Request[_]): Option[String] =
     if (request.host.matches(".+\\..+")) Some("."+request.host)
     else None
@@ -114,10 +114,11 @@ trait Utils extends Results {
           )
         json.toString
       }
-      val header = new JWSHeader(JWSAlgorithm.RS256)
-      // Keyset URL, which we'll set because we have one
-      header.setJWKURL(new java.net.URL(
+      val header = (new JWSHeader.Builder(JWSAlgorithm.RS256))
+        // Keyset URL, which we'll set because we have one
+        .jwkURL(new java.net.URI(
           routes.AuthController.publicKeys().absoluteURL(request.secure)))
+        .build
       val payload = new Payload(tokenString)
       val signer = new RSASSASigner(privateKey)
       val token = new JWSObject(header, payload)

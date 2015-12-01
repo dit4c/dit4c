@@ -15,6 +15,7 @@ import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import testing.TestUtils.fakeApp
 import utils.SpecUtils
+import scala.util.Random
 
 /**
  * Add your spec here.
@@ -126,9 +127,10 @@ class ApplicationSpec
              |  }
              |}""".stripMargin
         val jwsObject = new JWSObject(
-            new JWSHeader(JWSAlgorithm.HS512), new Payload(content))
+            new JWSHeader(JWSAlgorithm.HS256), new Payload(content))
         // Sign with altered key
-        jwsObject.sign(new MACSigner("testkey"))
+        jwsObject.sign(new MACSigner(
+            app.configuration.getString("rapidaaf.key", None).get))
         jwsObject.serialize
       }
       val res = route(base

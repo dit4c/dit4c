@@ -1,6 +1,7 @@
 package providers.auth
 
 import java.net.URL
+import scala.collection.JavaConversions._
 import scala.util.Random
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
@@ -16,20 +17,21 @@ class RapidAAFAuthProviderSpec extends PlaySpecification with ScalaCheck {
 
   "AAF Auth Provider" should {
 
-    val signingKeys = for {
-      s <- Arbitrary.arbString.arbitrary.suchThat(_.length > 10)
-    } yield s
+    def compatibleAlgorithms(key: String) =
+      MACSigner.getCompatibleAlgorithms(key.length * 8).toSet
+
+    val signingKeys = Arbitrary.arbString.arbitrary.suchThat(_.length >= 32)
 
     val targetedIDs = {
       def urlEncode(s: String) = java.net.URLEncoder.encode(s, "utf-8")
       val prefix = "https://rapid.aaf.edu.au!http://example.test!"
-      for {
-        s <- Gen.frequency(
-            1 -> Arbitrary.arbString.arbitrary.map(urlEncode),
-            1 -> Gen.identifier
-          ).map(prefix + _)
-           .suchThat(_.length <= 256)
-      } yield s
+      Gen.frequency(
+        1 -> Arbitrary.arbString.arbitrary.map(urlEncode),
+        1 -> Gen.identifier
+      ).map(prefix + _)
+       .suchThat { s =>
+         s.length <= 256 && s.startsWith(prefix) && s.length > prefix.length
+       }
     }
 
     "produce an identity from a properly formatted request" !
@@ -56,9 +58,10 @@ class RapidAAFAuthProviderSpec extends PlaySpecification with ScalaCheck {
               |    "edupersonscopedaffiliation": "staff@fictional.edu.au"
               |  }
               |}""".stripMargin
+        val alg = Random.shuffle(compatibleAlgorithms(key)).head
         val serializedToken: String = {
           val jwsObject = new JWSObject(
-              new JWSHeader(JWSAlgorithm.HS512), new Payload(content))
+              new JWSHeader(alg), new Payload(content))
           jwsObject.sign(new MACSigner(key))
           jwsObject.serialize
         }

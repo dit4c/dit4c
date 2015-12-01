@@ -22,6 +22,11 @@ class JWSVerifierSpec extends Specification {
 
   "JWS Verifier" should {
 
+    // Note that this is actually the minimum byte length, not string length,
+    // however a string of n characters will contain *at least* n bytes.
+    def minimumKeyLength(hmacAlg: JWSAlgorithm): Int =
+      hmacAlg.getName.replaceAll("[A-z]", "").toInt / 8
+
     val hmacAlgorithms = new Fixture[JWSAlgorithm]{
       def apply[R : AsResult](f: JWSAlgorithm => R) = {
         import JWSAlgorithm._
@@ -35,7 +40,7 @@ class JWSVerifierSpec extends Specification {
 
     "should return Some[String] on successful validation" ! hmacAlgorithms { hmacAlg =>
       val content = "Hello, world!"
-      val key: String = Random.nextString(20)
+      val key: String = Random.nextString(minimumKeyLength(hmacAlg))
       val serializedToken: String = {
         val jwsObject = new JWSObject(
             new JWSHeader(hmacAlg), new Payload(content))
@@ -51,7 +56,7 @@ class JWSVerifierSpec extends Specification {
 
     "should return None for invalid signatures" ! hmacAlgorithms { hmacAlg =>
       val content = "Hello, world!"
-      val key: String = Random.nextString(20)
+      val key: String = Random.nextString(minimumKeyLength(hmacAlg))
       val serializedToken: String = {
         val jwsObject = new JWSObject(
             new JWSHeader(hmacAlg), new Payload(content))
@@ -66,7 +71,7 @@ class JWSVerifierSpec extends Specification {
 
     "should return None if not signed" in {
       val content = "Hello, world!"
-      val key: String = Random.nextString(20)
+      val key: String = Random.nextString(256)
       val serializedToken: String = {
         val jwt = new PlainObject(new Payload(content))
         jwt.serialize
