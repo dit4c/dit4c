@@ -29,26 +29,29 @@ libraryDependencies ++= {
 
 Revolver.settings
 
-seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
+packSettings
+
+packMain := Map("dit4c-gatehouse" -> "dit4c.gatehouse.Boot")
 
 sbtdocker.Plugin.dockerSettings
 
 // Make docker depend on the package task, which generates a jar file of the application code
-docker <<= docker.dependsOn(oneJar)
+docker <<= docker.dependsOn(pack)
 
 // Docker build
 dockerfile in docker := {
   import sbtdocker.Instructions._
   import sbtdocker._
-  val jarFile = artifactPath.in(Compile, oneJar).value
+  val appDir = (packTargetDir / "pack").value
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-basejre")
-    .add(jarFile, "/opt/dit4c-gatehouse.jar")
+    .add(appDir, "/opt/dit4c-gatehouse")
+    .run("chmod", "+x", "/opt/dit4c-gatehouse/bin/dit4c-gatehouse")
     .cmd("sh", "-c", """
       set -e
       JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
       cd /opt
-      exec java -jar /opt/dit4c-gatehouse.jar -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys
+      exec /opt/dit4c-gatehouse/bin/dit4c-gatehouse -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys
       """)
     .expose(8080)
 }

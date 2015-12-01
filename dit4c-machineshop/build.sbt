@@ -47,30 +47,33 @@ javaOptions += "-Djava.util.logging.config.file=logging.properties"
 
 Revolver.settings
 
-seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
+packSettings
+
+packMain := Map("dit4c-machineshop" -> "dit4c.machineshop.Boot")
 
 sbtdocker.Plugin.dockerSettings
 
-// Make docker depend on the package task, which generates a jar file of the application code
-docker <<= docker.dependsOn(oneJar)
+// Make docker depend on the package task
+docker <<= docker.dependsOn(pack)
 
 // Docker build
 dockerfile in docker := {
   import sbtdocker.Instructions._
   import sbtdocker._
-  val jarFile = artifactPath.in(Compile, oneJar).value
+  val appDir = (packTargetDir / "pack").value
   val dockerResources = baseDirectory.value / "src" / "main" / "docker"
   val configs = dockerResources / "etc"
   immutable.Dockerfile.empty
     .from("dit4c/dit4c-platform-basejre")
     .run("opkg-install", "dbus")
-    .add(jarFile, "/opt/dit4c-machineshop.jar")
+    .add(appDir, "/opt/dit4c-machineshop")
+    .run("chmod", "+x", "/opt/dit4c-machineshop/bin/dit4c-machineshop")
     .volume("/etc/dit4c-machineshop")
     .cmd("sh", "-c", """
       set -e
       JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
       dbus-uuidgen --ensure=/etc/dit4c-machineshop/machine-id
-      exec java -jar /opt/dit4c-machineshop.jar -i 0.0.0.0 -p 8080 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys --link dit4c_cnproxy:cnproxy --server-id-seed-file /etc/dit4c-machineshop/machine-id --image-update-interval 900 --known-images-file /etc/dit4c-machineshop/known_images.json
+      exec /opt/dit4c-machineshop/bin/dit4c-machineshop -i 0.0.0.0 -p 8080 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys --link dit4c_cnproxy:cnproxy --server-id-seed-file /etc/dit4c-machineshop/machine-id --image-update-interval 900 --known-images-file /etc/dit4c-machineshop/known_images.json
       """)
     .expose(8080)
 }

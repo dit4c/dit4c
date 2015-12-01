@@ -34,15 +34,13 @@ libraryDependencies ++= {
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-seq(com.github.retronym.SbtOneJar.oneJarSettings: _*)
-
 packSettings
 
 packMain := Map("dit4c-switchboard" -> "dit4c.switchboard.Boot")
 
 sbtdocker.Plugin.dockerSettings
 
-// Make docker depend on the package task, which generates a jar file of the application code
+// Make docker depend on the package task
 docker <<= docker.dependsOn(pack)
 
 // Docker build
