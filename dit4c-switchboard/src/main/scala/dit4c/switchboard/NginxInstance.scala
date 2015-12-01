@@ -70,7 +70,8 @@ class NginxInstance(
   }
 
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
-  val nginxProcess: Process = Process(s"$nginxPath -c $mainConfig").run(pLog)
+  lazy val nginxProcess: Process =
+    Process(s"$nginxPath -c $mainConfig").run(pLog)
 
   def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
     recursivelyDelete(vhostDir)
@@ -103,6 +104,7 @@ class NginxInstance(
 
   protected def reloadAfter(f: => Unit) {
     f
+    nginxProcess
     Process(s"$nginxPath -c $mainConfig -s reload").run(pLog)
   }
 
