@@ -25,13 +25,13 @@ class RapidAAFAuthProviderSpec extends PlaySpecification with ScalaCheck {
     val targetedIDs = {
       def urlEncode(s: String) = java.net.URLEncoder.encode(s, "utf-8")
       val prefix = "https://rapid.aaf.edu.au!http://example.test!"
-      Gen.frequency(
-        1 -> Arbitrary.arbString.arbitrary.map(urlEncode),
-        1 -> Gen.identifier
-      ).map(prefix + _)
-       .suchThat { s =>
-         s.length <= 256 && s.startsWith(prefix) && s.length > prefix.length
-       }
+      for {
+        n <- Gen.choose(1, 256-prefix.length)
+        s <- Gen.frequency(
+          1 -> Gen.listOfN(n, Arbitrary.arbChar).map(_.mkString).map(urlEncode),
+          1 -> Gen.identifier
+        )
+      } yield prefix + s
     }
 
     "produce an identity from a properly formatted request" !
