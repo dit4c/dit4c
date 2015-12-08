@@ -18,7 +18,7 @@ import akka.util.Timeout
 import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerImage
 import java.nio.file.Files
-import akka.stream.io.InputStreamSource
+import akka.stream.scaladsl.Source
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -62,7 +62,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       .withAttachStdout
       .withAttachStderr
       .exec
-    InputStreamSource(client.execStartCmd(execCmd.getId).exec)
+    Source.inputStream(client.execStartCmd(execCmd.getId).exec)
       .runForeach { x => println(x.decodeString("utf-8")) }
     new DockerInDockerInstance() {
       val uri = s"unix://${tmpDir.toAbsolutePath}/docker.sock"
