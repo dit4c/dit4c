@@ -26,7 +26,7 @@ class NginxInstance(
         throw new Exception("Nginx binary not found in PATH")
     }
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
-  lazy val nginxProcess: Process =
+  val nginxProcess: Process =
     Process(s"$nginxPath -c ${config.mainConfig}").run(pLog)
 
   def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
@@ -52,7 +52,6 @@ class NginxInstance(
 
   protected def reloadAfter(f: => Unit) {
     f
-    nginxProcess
     val p = Process(s"$nginxPath -c ${config.mainConfig} -s reload").run(pLog)
     if (p.exitValue != 0) {
       throw new RuntimeException(s"Reload failed. Exit code: ${p.exitValue}")

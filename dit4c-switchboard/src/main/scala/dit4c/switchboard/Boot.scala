@@ -22,56 +22,8 @@ import akka.http.ClientConnectionSettings
 import dit4c.switchboard.nginx._
 
 object Boot extends App with LazyLogging {
-  import scala.concurrent.ExecutionContext.Implicits.global
-
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
-  lazy val log = Logging(system, this.getClass.getName)
-
-  import Route._
-
-  def monitorFeed(config: Config, nginx: NginxInstance, retryWait: FiniteDuration = 5.seconds): Unit =
-    Http().singleResilientRequest(
-        HttpRequest(uri = config.feed.toString),
-        ClientConnectionSettings(system), None, log)
-      .map { response =>
-        response.entity match {
-          case HttpEntity.Chunked(mimeType, parts) if mimeType.mediaType.value == "text/event-stream" =>
-            parts
-              .takeWithin(1.hour) // Avoid timeouts
-              .map(_.data)
-              .via(Framing.delimiter(ByteString("\n"), Int.MaxValue))
-              .map(v => new String(v.decodeString(mimeType.charset.value)))
-              .filter(_.startsWith("data: "))
-              .map(_.replaceFirst("data: ", ""))
-              .map(Json.parse(_))
-          case entity =>
-            throw new Exception(
-                "Feed should be a chunked EventSource stream: "+response)
-        }
-      }
-      .flatMap { source =>
-        source.runForeach { v =>
-          (v \ "op").as[String] match {
-            case "replace-all-routes" =>
-              nginx.replaceAllRoutes((v \ "routes").as[Seq[Route]])
-            case "set-route" =>
-              nginx.setRoute((v \ "route").as[Route])
-            case "delete-route" =>
-              nginx.deleteRoute((v \ "route").as[Route])
-          }
-        }
-      }
-      .onComplete {
-        case Success(()) =>
-          logger.warn("Disconnected from feed. Reconnecting...")
-          monitorFeed(config, nginx)
-        case Failure(e) =>
-          logger.error(s"Feed connection error: $e")
-          logger.error(s"Waiting $retryWait before retry...")
-          after(retryWait, system.scheduler)(Future.successful(()))
-            .onComplete { _ => monitorFeed(config, nginx) }
-      }
 
   ArgParser.parse(args, Config()) map { config =>
     val tlsConfig =
@@ -84,7 +36,16 @@ object Boot extends App with LazyLogging {
     }
     val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig,
         config.extraMainConfig, config.extraVHostConfig)
-    monitorFeed(config, nginx)
+    FeedMonitor(config) { v =>
+      (v \ "op").as[String] match {
+        case "replace-all-routes" =>
+          nginx.replaceAllRoutes((v \ "routes").as[Seq[Route]])
+        case "set-route" =>
+          nginx.setRoute((v \ "route").as[Route])
+        case "delete-route" =>
+          nginx.deleteRoute((v \ "route").as[Route])
+      }
+    }
   } getOrElse {
     // arguments are bad, error message will have been displayed
     System.exit(1)
