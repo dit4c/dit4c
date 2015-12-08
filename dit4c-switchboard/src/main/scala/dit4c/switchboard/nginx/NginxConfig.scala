@@ -20,6 +20,7 @@ class NginxConfig(
     val extraMainConfig: Option[String],
     val extraVHostConfig: Option[String]
     ) extends LazyLogging {
+  import scala.language.implicitConversions
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
 
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
