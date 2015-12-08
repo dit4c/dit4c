@@ -11,8 +11,6 @@ import java.nio.file.FileVisitResult
 import java.io.IOException
 import com.typesafe.scalalogging.LazyLogging
 import scala.sys.process.ProcessLogger
-import com.samskivert.mustache.Mustache
-import com.samskivert.mustache.BasicCollector
 import java.util.concurrent.ConcurrentHashMap
 import com.samskivert.mustache.Template
 
@@ -23,13 +21,8 @@ class NginxInstance(
     extraMainConfig: Option[String],
     extraVHostConfig: Option[String]) extends LazyLogging {
 
-  val baseDir = Files.createTempDirectory("nginx-")
-  val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
-  val configDir = Files.createDirectory(baseDir.resolve("conf"))
-  val proxyDir = Files.createDirectory(baseDir.resolve("proxy"))
-  val tmpDir = Files.createDirectory(baseDir.resolve("tmp"))
-  val vhostDir = Files.createDirectory(configDir.resolve("vhost.d"))
-  val mainConfig = configDir.resolve("nginx.conf")
+  val config =
+    NginxConfig(baseDomain, port, tlsConfig, extraMainConfig, extraVHostConfig)
 
   val nginxPath: String =
     try {
@@ -38,64 +31,25 @@ class NginxInstance(
       case e: Throwable =>
         throw new Exception("Nginx binary not found in PATH")
     }
-
-  private val engine = Mustache.compiler().withCollector(ScalaCollector)
-
-  lazy val mainConfigTemplater =
-    engine.compile(readClasspathFile("nginx_main.tmpl.mustache"))
-  lazy val vhostConfigTemplater =
-    engine.compile(readClasspathFile("nginx_vhost.tmpl.mustache"))
-
-  writeFile(mainConfig) {
-    implicit def path2str(p: Path) = p.toAbsolutePath.toString
-    mainConfigTemplater.execute(
-      Map[String,Any](
-        "basedir" -> baseDir,
-        "cachedir" -> cacheDir,
-        "proxydir" -> proxyDir,
-        "tmpdir" -> tmpDir,
-        "vhostdir" -> vhostDir,
-        "pidfile" -> baseDir.resolve("nginx.pid"),
-        "port" -> port.toString
-      ) ++ baseDomain.map(d => Map("domain" -> d))
-        ++ tlsConfig.map { c =>
-          Map("tls" -> Map(
-              "key" -> c.keyFile.getAbsolutePath,
-              "certificate" -> c.certificateFile.getAbsolutePath))
-        }
-        ++ extraMainConfig.map { c =>
-          Map("extraconf" -> c)
-        }
-    )
-  }
-
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
   lazy val nginxProcess: Process =
-    Process(s"$nginxPath -c $mainConfig").run(pLog)
+    Process(s"$nginxPath -c ${config.mainConfig}").run(pLog)
 
   def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
-    recursivelyDelete(vhostDir)
-    Files.createDirectory(vhostDir)
-    logger.info("Updating entire route set:")
-    routes.foreach { route =>
-      logger.info(route.domain)
-      writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
-    }
+    config.replaceAllRoutes(routes)
   }
 
   def setRoute(route: Route) = reloadAfter {
-    logger.info(s"Setting route: ${route.domain}")
-    writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
+    config.setRoute(route)
   }
 
   def deleteRoute(route: Route) = reloadAfter {
-    logger.info(s"Deleting route: ${route.domain}")
-    Files.delete(vhostDir.resolve(route.domain+".conf"))
+    config.deleteRoute(route)
   }
 
   def shutdown = {
     nginxProcess.destroy
-    recursivelyDelete(baseDir)
+    config.cleanup
   }
 
   // Guard against instance not being shutdown, as there's no valid case where
@@ -105,100 +59,10 @@ class NginxInstance(
   protected def reloadAfter(f: => Unit) {
     f
     nginxProcess
-    Process(s"$nginxPath -c $mainConfig -s reload").run(pLog)
-  }
-
-  protected def vhostTmpl(route: Route) =
-    vhostConfigTemplater.execute(
-      Map(
-        "https" -> tlsConfig.isDefined,
-        "port" -> port.toString,
-        "domain" -> route.domain,
-        "headers" -> route.headers.map {
-          case (k, v) => Map("name" -> k, "value" -> v)
-        },
-        "upstream" -> Map(
-          "scheme" -> route.upstream.scheme,
-          "host" -> route.upstream.host,
-          "port" -> route.upstream.port.toString
-        )
-      ) ++ extraVHostConfig.map { c =>
-        Map("extraconf" -> c)
-      }
-    )
-
-  protected def readClasspathFile(path: String) =
-    io.Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
-
-  protected def writeFile(f: Path)(content: String): Path =
-    Files.write(f, content.getBytes("utf-8"))
-
-  protected def recursivelyDelete(path: Path, retries: Int = 5) {
-    if (Files.exists(path)) {
-      try {
-        Files.walkFileTree(path, new DeletingFileVisitor)
-      } catch {
-        case e: java.nio.file.NoSuchFileException =>
-          if (retries > 0) {
-            recursivelyDelete(path, retries - 1)
-          }
-      }
+    val p = Process(s"$nginxPath -c ${config.mainConfig} -s reload").run(pLog)
+    if (p.exitValue != 0) {
+      throw new RuntimeException(s"Reload failed. Exit code: ${p.exitValue}")
     }
   }
 
-  implicit private def optionMapToMap[A,B](om: Option[Map[A,B]]): Map[A,B] =
-    om.getOrElse(Map.empty[A,B])
-
-  object ScalaCollector extends BasicCollector {
-    override def toIterator(obj: Object) = super.toIterator(obj match {
-      case v: Iterable[_] => asJavaIterable(v)
-      case _ => obj
-    })
-    override def createFetcher(ctx: Object, name: String) =
-      ctx match {
-        case m: Map[_,_] => MapFetcher
-        case seq: Seq[_] => SeqFetcher
-        case _ => super.createFetcher(ctx, name)
-      }
-    override def createFetcherCache[K,V]() = new ConcurrentHashMap[K,V]
-
-    object MapFetcher extends Mustache.VariableFetcher {
-      override def get(ctx: Object, name: String) =
-        ctx match {
-          case m: Map[_,_] => optionToObject(Option(m.get(name)))
-          case _ => Template.NO_FETCHER_FOUND
-        }
-    }
-
-    object SeqFetcher extends Mustache.VariableFetcher {
-      override def get(ctx: Object, name: String) =
-        ctx match {
-          case seq: Seq[_] => optionToObject(Try(seq(name.toInt)).toOption)
-          case _ => Template.NO_FETCHER_FOUND
-        }
-    }
-
-    def optionToObject(opt: Option[Any]) = opt match {
-      case Some(obj: Any) => obj match {
-        case m: Map[_,_] => mapAsJavaMap(m)
-        case _ => obj.asInstanceOf[AnyRef]
-      }
-      case v => Template.NO_FETCHER_FOUND
-    }
-
-  }
-
-  class DeletingFileVisitor extends SimpleFileVisitor[Path] {
-    override def visitFile(file: Path, attrs: BasicFileAttributes) = {
-      if (attrs.isRegularFile) {
-        Files.delete(file)
-      }
-      FileVisitResult.CONTINUE
-    }
-
-    override def postVisitDirectory(dir: Path, ioe: IOException) = {
-      Files.delete(dir)
-      FileVisitResult.CONTINUE
-    }
-  }
 }

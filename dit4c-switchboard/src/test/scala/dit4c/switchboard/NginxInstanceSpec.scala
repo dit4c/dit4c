@@ -19,10 +19,10 @@ class NginxInstanceSpec extends Specification with PathMatchers {
         instance.nginxProcess.exitValue
       }
       fExitValue.isCompleted must beFalse
-      instance.baseDir.toString must beAnExistingPath
+      instance.config.baseDir.toString must beAnExistingPath
       instance.shutdown
       Await.result(fExitValue, 2 seconds) must_== 0
-      instance.baseDir.toString must not(beAnExistingPath)
+      instance.config.baseDir.toString must not(beAnExistingPath)
     }
 
     "be able to set a new route" >> withNewInstance(55001) { instance =>
@@ -32,7 +32,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
         Upstream("https", "127.0.0.1", 443)
       )
       instance.setRoute(route)
-      val vhostFile = instance.vhostDir.resolve(s"${route.domain}.conf")
+      val vhostFile = instance.config.vhostDir.resolve(s"${route.domain}.conf")
       vhostFile.toString must beAnExistingPath
       val vhostContent = (new String(Files.readAllBytes(vhostFile), "utf-8"))
 
@@ -55,7 +55,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
         Upstream("https", "127.0.0.1", 443)
       )
       instance.setRoute(route)
-      val vhostFile = instance.vhostDir.resolve(s"${route.domain}.conf")
+      val vhostFile = instance.config.vhostDir.resolve(s"${route.domain}.conf")
       vhostFile.toString must beAnExistingPath
       instance.deleteRoute(route)
       vhostFile.toString must not(beAnExistingPath)
