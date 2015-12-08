@@ -1,18 +1,12 @@
-package dit4c.switchboard
+package dit4c.switchboard.nginx
 
-import java.nio.file.Files
 import scala.collection.JavaConversions._
 import scala.sys.process.Process
 import scala.util._
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.FileVisitResult
-import java.io.IOException
 import com.typesafe.scalalogging.LazyLogging
 import scala.sys.process.ProcessLogger
-import java.util.concurrent.ConcurrentHashMap
-import com.samskivert.mustache.Template
+import dit4c.switchboard.Route
+import dit4c.switchboard.TlsConfig
 
 class NginxInstance(
     baseDomain: Option[String],

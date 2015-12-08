@@ -19,6 +19,7 @@ import org.bouncycastle.openssl.PEMParser
 import dit4c.common.AkkaHttpExtras._
 import akka.event.Logging
 import akka.http.ClientConnectionSettings
+import dit4c.switchboard.nginx._
 
 object Boot extends App with LazyLogging {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -27,17 +28,7 @@ object Boot extends App with LazyLogging {
   implicit val materializer = ActorMaterializer()
   lazy val log = Logging(system, this.getClass.getName)
 
-  implicit val upstreamReads: Reads[Upstream] = (
-    (__ \ "scheme").read[String] and
-    (__ \ "host").read[String] and
-    (__ \ "port").read[Int]
-  )(Upstream.apply _)
-
-  implicit val routeReads: Reads[Route] = (
-    (__ \ "domain").read[String] and
-    (__ \ "headers").read[Map[String, String]] and
-    (__ \ "upstream").read[Upstream]
-  )(Route.apply _)
+  import Route._
 
   def monitorFeed(config: Config, nginx: NginxInstance, retryWait: FiniteDuration = 5.seconds): Unit =
     Http().singleResilientRequest(
@@ -109,18 +100,6 @@ case class Config(
   val sslKey: Option[File] = None,
   val extraMainConfig: Option[String] = None,
   val extraVHostConfig: Option[String] = None)
-
-case class Route(
-  domain: String,
-  headers: Map[String, String],
-  upstream: Upstream
-)
-
-case class Upstream(
-  scheme: String,
-  host: String,
-  port: Int
-)
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")

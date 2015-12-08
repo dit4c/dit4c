@@ -1,4 +1,4 @@
-package dit4c.switchboard
+package dit4c.switchboard.nginx
 
 import scala.collection.JavaConversions._
 import java.nio.file._
@@ -9,6 +9,8 @@ import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.ConcurrentHashMap
 import scala.util.Try
+import dit4c.switchboard.Route
+import dit4c.switchboard.TlsConfig
 
 class NginxConfig(
     val baseDir: Path,

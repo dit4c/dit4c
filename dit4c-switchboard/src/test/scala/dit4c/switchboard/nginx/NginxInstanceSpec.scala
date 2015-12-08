@@ -1,12 +1,13 @@
-package dit4c.switchboard
+package dit4c.switchboard.nginx
 
 import org.specs2.mutable.Specification
-import scala.sys.process.Process
 import java.nio.file.Files
 import scala.concurrent._
 import scala.concurrent.duration._
 import org.specs2.execute.Result
 import org.specs2.matcher.PathMatchers
+import scala.concurrent.ExecutionContext.Implicits
+import dit4c.switchboard.Route
 
 class NginxInstanceSpec extends Specification with PathMatchers {
 
@@ -29,7 +30,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
       val route = Route(
         "foo.example.test",
         Map("X-Foo" -> "bar"),
-        Upstream("https", "127.0.0.1", 443)
+        Route.Upstream("https", "127.0.0.1", 443)
       )
       instance.setRoute(route)
       val vhostFile = instance.config.vhostDir.resolve(s"${route.domain}.conf")
@@ -52,7 +53,7 @@ class NginxInstanceSpec extends Specification with PathMatchers {
       val route = Route(
         "foo.example.test",
         Map("X-Foo" -> "bar"),
-        Upstream("https", "127.0.0.1", 443)
+        Route.Upstream("https", "127.0.0.1", 443)
       )
       instance.setRoute(route)
       val vhostFile = instance.config.vhostDir.resolve(s"${route.domain}.conf")
