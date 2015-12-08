@@ -37,7 +37,7 @@ object AkkaHttpExtras {
         log: LoggingAdapter)(implicit fm: Materializer): Future[HttpResponse] = {
       implicit val ec = fm.executionContext
       val addr::remainingAddrs = addrs
-      val c = outgoingConnection(addr, request.uri.effectivePort,
+      val c = outgoingConnectionImpl(addr, request.uri.effectivePort,
           None, settings,
           httpsContext orElse {
             if (request.uri.scheme == "https") Some(http.defaultClientHttpsContext)
@@ -66,15 +66,22 @@ object AkkaHttpExtras {
         }
     }
 
+    def outgoingConnection(addr: InetAddress, port: Int,
+        localAddress: Option[InetSocketAddress],
+        settings: ClientConnectionSettings,
+        log: LoggingAdapter): Flow[HttpRequest, HttpResponse, Future[OutgoingConnection]] =
+      outgoingConnectionImpl(addr, port, localAddress, settings, None, log)
+
+
     def outgoingConnectionTls(addr: InetAddress, port: Int,
         localAddress: Option[InetSocketAddress],
         settings: ClientConnectionSettings,
         httpsContext: Option[HttpsContext],
         log: LoggingAdapter): Flow[HttpRequest, HttpResponse, Future[OutgoingConnection]] =
-      outgoingConnection(addr, port, localAddress, settings,
+      outgoingConnectionImpl(addr, port, localAddress, settings,
           httpsContext orElse Some(http.defaultClientHttpsContext), log)
 
-    private def outgoingConnection(addr: InetAddress, port: Int,
+    private def outgoingConnectionImpl(addr: InetAddress, port: Int,
         localAddress: Option[InetSocketAddress],
         settings: ClientConnectionSettings,
         httpsContext: Option[HttpsContext],

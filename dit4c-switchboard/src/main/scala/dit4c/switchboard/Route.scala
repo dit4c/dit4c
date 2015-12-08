@@ -14,7 +14,9 @@ object Route {
     scheme: String,
     host: String,
     port: Int
-  )
+  ) {
+    override def toString = s"$scheme://$host:$port"
+  }
 
   implicit val upstreamReads: Reads[Upstream] = (
     (__ \ "scheme").read[String] and

@@ -18,6 +18,7 @@ libraryDependencies ++= {
   val specs2V = "3.6.4"
   Seq(
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
+    "com.typesafe.akka"   %%  "akka-agent"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.play"   %%  "play-json"       % "2.4.3",
