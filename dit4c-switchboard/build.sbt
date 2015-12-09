@@ -149,7 +149,7 @@ dockerfile in docker := {
       if [ -e $EXTRA_VHOST_CONFIG ]; then
         CONFIG_FILE_OPTS="$CONFIG_FILE_OPTS --extra-vhost-config $EXTRA_VHOST_CONFIG"
       fi
-      exec /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 -d $DIT4C_DOMAIN $SSL_OPTS $CONFIG_FILE_OPTS
+      exec /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 $SSL_OPTS $CONFIG_FILE_OPTS
       """)
     .expose(8080)
 }
