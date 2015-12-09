@@ -90,35 +90,86 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
       }
     }
 
-    "return upstream based on Host header" ! prop { (routes: Map[String,Route]) =>
-      val serverInstance = Await.result(
-          AuthRequestServer.start(Agent(routes)), 5.seconds)
+    "return 503 Service Unavailable if route resolver isn't provided" >>
+       Prop.forAll(domainGenerator) { domainName =>
+         val serverInstance = Await.result(AuthRequestServer.start(
+             Agent(None)), 5.seconds)
 
-      val testRoute = Random.shuffle(routes.values).head
+         val req = HttpRequest().withHeaders(Host(Uri.Host(domainName)))
 
-      val req = HttpRequest().withHeaders(Host(Uri.Host(testRoute.domain)))
+         val res = Await.result({
+           val c = Http().outgoingConnection(
+             serverInstance.socket.getAddress,
+             serverInstance.socket.getPort,
+             None, ClientConnectionSettings(system), system.log)
+           val p = Promise[HttpResponse]()
+           Source.single(req).via(c)
+             .runForeach((r) => p.trySuccess(r))
+             .onFailure({ case e: Throwable => p.tryFailure(e) })
+           p.future
+         }, 500.milliseconds)
 
-      val res = Await.result({
-        val c = Http().outgoingConnection(
-          serverInstance.socket.getAddress,
-          serverInstance.socket.getPort,
-          None, ClientConnectionSettings(system), system.log)
-        val p = Promise[HttpResponse]()
-        Source.single(req).via(c)
-          .runForeach((r) => p.trySuccess(r))
-          .onFailure({ case e: Throwable => p.tryFailure(e) })
-        p.future
-      }, 500.milliseconds)
+         res.status must_== StatusCodes.ServiceUnavailable
 
-      res.status must_== StatusCodes.OK
-      res.headers must contain(
-          RawHeader("X-Target-Upstream", testRoute.upstream.toString))
+         Await.ready(serverInstance.shutdown(), 5.seconds)
+         done
+       }
 
-      Uri(testRoute.upstream.toString) must
-        (equalTo(Uri.Path.Empty) ^^ ((_: Uri).path))
+    "return 404 Not Found if route isn't present" >>
+       Prop.forAll(domainGenerator) { domainName =>
+         val serverInstance = Await.result(AuthRequestServer.start(
+             Agent(Some(Map.empty[String,Route].get))), 5.seconds)
 
-      Await.ready(serverInstance.shutdown(), 5.seconds)
-      done
-    }.set(minTestsOk = 10, minSize = 1, maxSize = 100000)
+         val req = HttpRequest().withHeaders(Host(Uri.Host(domainName)))
+
+         val res = Await.result({
+           val c = Http().outgoingConnection(
+             serverInstance.socket.getAddress,
+             serverInstance.socket.getPort,
+             None, ClientConnectionSettings(system), system.log)
+           val p = Promise[HttpResponse]()
+           Source.single(req).via(c)
+             .runForeach((r) => p.trySuccess(r))
+             .onFailure({ case e: Throwable => p.tryFailure(e) })
+           p.future
+         }, 500.milliseconds)
+
+         res.status must_== StatusCodes.NotFound
+
+         Await.ready(serverInstance.shutdown(), 5.seconds)
+         done
+       }
+
+    "return upstream based on Host header" >>
+      prop { (routes: Map[String,Route]) =>
+        val serverInstance = Await.result(
+            AuthRequestServer.start(Agent(Some(routes.get))), 5.seconds)
+
+        val testRoute = Random.shuffle(routes.values).head
+
+        val req = HttpRequest().withHeaders(Host(Uri.Host(testRoute.domain)))
+
+        val res = Await.result({
+          val c = Http().outgoingConnection(
+            serverInstance.socket.getAddress,
+            serverInstance.socket.getPort,
+            None, ClientConnectionSettings(system), system.log)
+          val p = Promise[HttpResponse]()
+          Source.single(req).via(c)
+            .runForeach((r) => p.trySuccess(r))
+            .onFailure({ case e: Throwable => p.tryFailure(e) })
+          p.future
+        }, 500.milliseconds)
+
+        res.status must_== StatusCodes.OK
+        res.headers must contain(
+            RawHeader("X-Target-Upstream", testRoute.upstream.toString))
+
+        Uri(testRoute.upstream.toString) must
+          (equalTo(Uri.Path.Empty) ^^ ((_: Uri).path))
+
+        Await.ready(serverInstance.shutdown(), 5.seconds)
+        done
+      }.set(minTestsOk = 10, minSize = 1, maxSize = 50000)
   }
 }

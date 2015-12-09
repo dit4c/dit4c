@@ -17,7 +17,7 @@ object AuthRequestServer {
   case class Instance(socket: InetSocketAddress, shutdown: () => Future[Unit])
 
   def start(
-      routes: Agent[Map[String, dit4c.switchboard.Route]],
+      routes: Agent[Option[String => Option[dit4c.switchboard.Route]]],
       interface: String = "localhost",
       port: Int = 0)(implicit system: ActorSystem): Future[Instance] = {
     implicit val materializer = ActorMaterializer()
@@ -31,11 +31,15 @@ object AuthRequestServer {
     val handler = {
       import akka.http.scaladsl.server.Directives._
       host(".*".r) { host =>
-        routes.get.get(host) match {
-          case Some(route) =>
-            complete(HttpResponse(headers = routeHeaders(route)))
-          case None =>
-            complete(HttpResponse(StatusCodes.Forbidden))
+        routes.get.map {
+          _(host) match {
+            case Some(route) =>
+              complete(HttpResponse(headers = routeHeaders(route)))
+            case None =>
+              complete(HttpResponse(StatusCodes.NotFound))
+          }
+        }.getOrElse {
+          complete(HttpResponse(StatusCodes.ServiceUnavailable))
         }
       }
     }
