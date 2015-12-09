@@ -50,6 +50,9 @@ http {
     '' $scheme;
   }
 
+  # Sensible default for resolver
+  resolver 8.8.8.8;
+
   {{#tls}}
   ssl_certificate       {{certificate}};
   ssl_certificate_key   {{key}};

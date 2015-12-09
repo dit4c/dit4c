@@ -50,7 +50,7 @@ object Boot extends App with LazyLogging {
         case "replace-all-routes" =>
           val newRoutes = (v \ "routes").as[Seq[Route]]
           routes.alter(Some(newRoutes.map(v => (v.domain,v)).toMap))
-            .foreach(rs => logger.info(s"Populated with ${rs.size} routes"))
+            .foreach(_ => logger.info(s"Populated with ${newRoutes.size} routes"))
         case "set-route" =>
           val newRoute = (v \ "route").as[Route]
           routes.alter { (routeMap: Option[Map[String,Route]]) =>
