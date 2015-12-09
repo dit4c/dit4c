@@ -75,8 +75,7 @@ case class Config(
   val port: Int = 9200,
   val sslCertificate: Option[File] = None,
   val sslKey: Option[File] = None,
-  val extraMainConfig: Option[String] = None,
-  val extraVHostConfig: Option[String] = None)
+  val extraMainConfig: Option[String] = None)
 
 object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   help("help") text("prints this usage text")
@@ -98,10 +97,4 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
       c.copy(extraMainConfig = Some(config))
     }
     .text("Include extra main (`http {...}`) config")
-  opt[File]("extra-vhost-config")
-    .action { (f, c) =>
-      val config = scala.io.Source.fromFile(f).mkString
-      c.copy(extraVHostConfig = Some(config))
-    }
-    .text("Include extra vhost (`server {...}`) config")
 }
