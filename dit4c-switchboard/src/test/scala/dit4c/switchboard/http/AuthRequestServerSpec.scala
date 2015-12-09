@@ -106,7 +106,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
              .runForeach((r) => p.trySuccess(r))
              .onFailure({ case e: Throwable => p.tryFailure(e) })
            p.future
-         }, 500.milliseconds)
+         }, 5.seconds)
 
          res.status must_== StatusCodes.Forbidden
 
@@ -131,7 +131,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
              .runForeach((r) => p.trySuccess(r))
              .onFailure({ case e: Throwable => p.tryFailure(e) })
            p.future
-         }, 500.milliseconds)
+         }, 5.seconds)
 
          res.status must_== StatusCodes.Forbidden
          res.headers must contain(
@@ -160,7 +160,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
             .runForeach((r) => p.trySuccess(r))
             .onFailure({ case e: Throwable => p.tryFailure(e) })
           p.future
-        }, 500.milliseconds)
+        }, 5.seconds)
 
         res.status must_== StatusCodes.OK
         res.headers must contain(
