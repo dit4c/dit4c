@@ -1,64 +1,53 @@
-package dit4c.switchboard
+package dit4c.switchboard.nginx
 
-import java.nio.file.Files
 import scala.collection.JavaConversions._
-import scala.sys.process.Process
-import scala.util._
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.FileVisitResult
-import java.io.IOException
-import com.typesafe.scalalogging.LazyLogging
+import java.nio.file._
 import scala.sys.process.ProcessLogger
-import com.samskivert.mustache.Mustache
-import com.samskivert.mustache.BasicCollector
+import com.typesafe.scalalogging.LazyLogging
+import com.samskivert.mustache._
+import java.io.IOException
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.ConcurrentHashMap
-import com.samskivert.mustache.Template
+import scala.util.Try
+import dit4c.switchboard.Route
+import dit4c.switchboard.TlsConfig
+import java.net.InetSocketAddress
 
-class NginxInstance(
-    baseDomain: Option[String],
-    port: Int,
-    tlsConfig: Option[TlsConfig],
-    extraMainConfig: Option[String],
-    extraVHostConfig: Option[String]) extends LazyLogging {
+class NginxConfig(
+    val baseDir: Path,
+    val port: Int,
+    val tlsConfig: Option[TlsConfig],
+    val extraMainConfig: Option[String],
+    val authSocket: InetSocketAddress
+    ) extends LazyLogging {
+  import scala.language.implicitConversions
+  protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
 
-  val baseDir = Files.createTempDirectory("nginx-")
   val cacheDir = Files.createDirectory(baseDir.resolve("cache"))
   val configDir = Files.createDirectory(baseDir.resolve("conf"))
   val proxyDir = Files.createDirectory(baseDir.resolve("proxy"))
   val tmpDir = Files.createDirectory(baseDir.resolve("tmp"))
-  val vhostDir = Files.createDirectory(configDir.resolve("vhost.d"))
   val mainConfig = configDir.resolve("nginx.conf")
-
-  val nginxPath: String =
-    try {
-      Process("which nginx").!!.stripLineEnd
-    } catch {
-      case e: Throwable =>
-        throw new Exception("Nginx binary not found in PATH")
-    }
 
   private val engine = Mustache.compiler().withCollector(ScalaCollector)
 
-  lazy val mainConfigTemplater =
-    engine.compile(readClasspathFile("nginx_main.tmpl.mustache"))
-  lazy val vhostConfigTemplater =
-    engine.compile(readClasspathFile("nginx_vhost.tmpl.mustache"))
+  lazy val configTemplater =
+    engine.compile(readClasspathFile("nginx.tmpl.mustache"))
 
   writeFile(mainConfig) {
     implicit def path2str(p: Path) = p.toAbsolutePath.toString
-    mainConfigTemplater.execute(
+    val authServer: String =
+      s"http://${authSocket.getHostString}:${authSocket.getPort}"
+    configTemplater.execute(
       Map[String,Any](
         "basedir" -> baseDir,
         "cachedir" -> cacheDir,
         "proxydir" -> proxyDir,
         "tmpdir" -> tmpDir,
-        "vhostdir" -> vhostDir,
+        "authserver" -> authServer,
         "pidfile" -> baseDir.resolve("nginx.pid"),
         "port" -> port.toString
-      ) ++ baseDomain.map(d => Map("domain" -> d))
-        ++ tlsConfig.map { c =>
+      ) ++ tlsConfig.map { c =>
           Map("tls" -> Map(
               "key" -> c.keyFile.getAbsolutePath,
               "certificate" -> c.certificateFile.getAbsolutePath))
@@ -69,63 +58,7 @@ class NginxInstance(
     )
   }
 
-  protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
-  lazy val nginxProcess: Process =
-    Process(s"$nginxPath -c $mainConfig").run(pLog)
-
-  def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
-    recursivelyDelete(vhostDir)
-    Files.createDirectory(vhostDir)
-    logger.info("Updating entire route set:")
-    routes.foreach { route =>
-      logger.info(route.domain)
-      writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
-    }
-  }
-
-  def setRoute(route: Route) = reloadAfter {
-    logger.info(s"Setting route: ${route.domain}")
-    writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
-  }
-
-  def deleteRoute(route: Route) = reloadAfter {
-    logger.info(s"Deleting route: ${route.domain}")
-    Files.delete(vhostDir.resolve(route.domain+".conf"))
-  }
-
-  def shutdown = {
-    nginxProcess.destroy
-    recursivelyDelete(baseDir)
-  }
-
-  // Guard against instance not being shutdown, as there's no valid case where
-  // it should be left running.
-  sys.addShutdownHook(shutdown)
-
-  protected def reloadAfter(f: => Unit) {
-    f
-    nginxProcess
-    Process(s"$nginxPath -c $mainConfig -s reload").run(pLog)
-  }
-
-  protected def vhostTmpl(route: Route) =
-    vhostConfigTemplater.execute(
-      Map(
-        "https" -> tlsConfig.isDefined,
-        "port" -> port.toString,
-        "domain" -> route.domain,
-        "headers" -> route.headers.map {
-          case (k, v) => Map("name" -> k, "value" -> v)
-        },
-        "upstream" -> Map(
-          "scheme" -> route.upstream.scheme,
-          "host" -> route.upstream.host,
-          "port" -> route.upstream.port.toString
-        )
-      ) ++ extraVHostConfig.map { c =>
-        Map("extraconf" -> c)
-      }
-    )
+  def cleanup = recursivelyDelete(baseDir)
 
   protected def readClasspathFile(path: String) =
     io.Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
@@ -201,4 +134,15 @@ class NginxInstance(
       FileVisitResult.CONTINUE
     }
   }
+}
+
+object NginxConfig {
+
+  def apply(
+      port: Int,
+      tlsConfig: Option[TlsConfig],
+      extraMainConfig: Option[String],
+      authSocket: InetSocketAddress) =
+        new NginxConfig(Files.createTempDirectory("nginx-"),
+            port, tlsConfig, extraMainConfig, authSocket)
 }

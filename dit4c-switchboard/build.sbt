@@ -18,6 +18,7 @@ libraryDependencies ++= {
   val specs2V = "3.6.4"
   Seq(
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
+    "com.typesafe.akka"   %%  "akka-agent"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.play"   %%  "play-json"       % "2.4.3",
@@ -26,6 +27,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra" % specs2V % "test",
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
+    "org.specs2"          %%  "specs2-scalacheck" % specs2V % "test",
     "com.samskivert"      %   "jmustache"       % "1.11",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
     "org.bouncycastle"    %   "bcpkix-jdk15on"  % "1.52"
@@ -147,7 +149,7 @@ dockerfile in docker := {
       if [ -e $EXTRA_VHOST_CONFIG ]; then
         CONFIG_FILE_OPTS="$CONFIG_FILE_OPTS --extra-vhost-config $EXTRA_VHOST_CONFIG"
       fi
-      exec /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 -d $DIT4C_DOMAIN $SSL_OPTS $CONFIG_FILE_OPTS
+      exec /opt/dit4c-switchboard/bin/dit4c-switchboard -f $DIT4C_ROUTE_FEED -p 8080 $SSL_OPTS $CONFIG_FILE_OPTS
       """)
     .expose(8080)
 }

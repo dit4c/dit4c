@@ -47,6 +47,7 @@ class RoutingMapController @Inject() (
   implicit val routeWrites: Writes[RoutingMapEmitter.Route] = Writes { route =>
     Json.obj(
       "domain" -> route.frontend.domain,
+      "name" -> route.frontend.name,
       "headers" -> Json.obj(
         "X-Server-Name" -> route.frontend.name
       ),
