@@ -2,6 +2,7 @@ package dit4c.switchboard
 
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
+import akka.http.scaladsl.model.Uri
 
 case class Route(
   domain: String,
@@ -15,7 +16,11 @@ object Route {
     host: String,
     port: Int
   ) {
-    override def toString = s"$scheme://$host:$port"
+    override def toString =
+      Uri./.withScheme(scheme)
+        .withAuthority(host, port)
+        .withPath(Uri.Path.Empty)
+        .toString
   }
 
   implicit val upstreamReads: Reads[Upstream] = (
