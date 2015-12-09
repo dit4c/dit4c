@@ -16,7 +16,7 @@ object Route {
     host: String,
     port: Int
   ) {
-    override def toString =
+    override val toString =
       Uri./.withScheme(scheme)
         .withAuthority(host, port)
         .withPath(Uri.Path.Empty)
