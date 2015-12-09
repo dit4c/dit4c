@@ -35,8 +35,8 @@ http {
   client_body_temp_path {{tmpdir}};
   proxy_temp_path {{proxydir}};
 
-  proxy_cache_path {{cachedir}} keys_zone=main:128m;
-  proxy_cache_key "$scheme$host$request_uri $http_accept";
+  proxy_cache_path {{cachedir}} keys_zone=auth:128m;
+  proxy_cache_key "$scheme$host$request_uri";
 
   index   index.html index.htm;
 
@@ -76,14 +76,15 @@ http {
       auth_request_set $upstreamServer  $upstream_http_x_target_upstream;
       auth_request_set $serverName      $upstream_http_x_server_name;
       auth_request_set $parentRedirect  $upstream_http_x_parent_host;
+      auth_request_set $routingResponseTime  $upstream_response_time;
       # Otherwise forbidden means service is unavailable
       error_page 403 = @error;
       proxy_pass $upstreamServer;
       proxy_http_version 1.1; # Need to stream image downloads
       proxy_buffering off;
       proxy_read_timeout 1d; # Allow websockets to idle
-      proxy_set_header Accept-Encoding "gzip"; # Force gzip for cache
-      add_header X-Proxy-Cache $upstream_cache_status;
+      add_header X-Compute-Time $upstream_header_time;
+      add_header X-Routing-Time $routingResponseTime;
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection $connection_upgrade;
       proxy_set_header X-Forwarded-Proto $user_proto;
@@ -94,6 +95,10 @@ http {
     location = /auth {
       internal;
       proxy_pass {{authserver}};
+      proxy_cache auth;
+      # Cache successful lookups, but not failures
+      proxy_cache_valid 200 1m;
+      proxy_cache_valid 403 0;
       proxy_pass_request_body off;
       proxy_set_header Host $host;
       proxy_set_header Content-Length "";
