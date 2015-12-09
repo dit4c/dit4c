@@ -36,7 +36,6 @@ http {
   proxy_temp_path {{proxydir}};
 
   proxy_cache_path {{cachedir}} keys_zone=auth:128m;
-  proxy_cache_key "$scheme$host$request_uri";
 
   index   index.html index.htm;
 
@@ -99,6 +98,7 @@ http {
       internal;
       proxy_pass {{authserver}};
       proxy_cache auth;
+      proxy_cache_key $host;
       # Cache successful lookups, but not failures
       proxy_cache_valid 200 1m;
       proxy_cache_valid 403 0;
