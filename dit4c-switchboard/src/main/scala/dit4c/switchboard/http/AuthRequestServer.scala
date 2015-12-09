@@ -17,7 +17,7 @@ object AuthRequestServer {
   case class Instance(socket: InetSocketAddress, shutdown: () => Future[Unit])
 
   def start(
-      routes: Agent[Option[String => Option[dit4c.switchboard.Route]]],
+      routeResolver: () => Option[String => Option[dit4c.switchboard.Route]],
       interface: String = "localhost",
       port: Int = 0)(implicit system: ActorSystem): Future[Instance] = {
     implicit val materializer = ActorMaterializer()
@@ -28,15 +28,17 @@ object AuthRequestServer {
         RawHeader(k,v).asInstanceOf[HttpHeader]
       }).toIndexedSeq :+ RawHeader("X-Target-Upstream", route.upstream.toString)
 
+    // Response codes as per:
+    // http://nginx.org/en/docs/http/ngx_http_auth_request_module.html
     val handler = {
       import akka.http.scaladsl.server.Directives._
       host(".*".r) { host =>
-        routes.get.map {
+        routeResolver().map {
           _(host) match {
             case Some(route) =>
               complete(HttpResponse(headers = routeHeaders(route)))
             case None =>
-              complete(HttpResponse(StatusCodes.NotFound))
+              complete(HttpResponse(StatusCodes.Forbidden))
           }
         }.getOrElse {
           complete(HttpResponse(StatusCodes.ServiceUnavailable))

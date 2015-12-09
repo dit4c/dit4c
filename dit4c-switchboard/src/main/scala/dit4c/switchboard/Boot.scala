@@ -3,6 +3,7 @@ package dit4c.switchboard
 import java.io._
 import java.net.URI
 import akka.actor._
+import akka.agent._
 import akka.pattern.after
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
@@ -20,10 +21,12 @@ import dit4c.common.AkkaHttpExtras._
 import akka.event.Logging
 import akka.http.ClientConnectionSettings
 import dit4c.switchboard.nginx._
+import dit4c.switchboard.http.AuthRequestServer
 
 object Boot extends App with LazyLogging {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
+  implicit val ec = system.dispatcher
 
   ArgParser.parse(args, Config()) map { config =>
     val tlsConfig =
@@ -36,14 +39,32 @@ object Boot extends App with LazyLogging {
     }
     val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig,
         config.extraMainConfig, config.extraVHostConfig)
+    val routes: Agent[Option[Map[String,Route]]] = Agent(None)
+    def routeResolver = routes.get.map(v => v.get(_))
+    AuthRequestServer.start(routeResolver _).foreach { instance =>
+      sys.addShutdownHook(instance.shutdown _)
+      logger.info(s"Auth Server listening on: ${instance.socket}")
+    }
+
     FeedMonitor(config) { v =>
       (v \ "op").as[String] match {
         case "replace-all-routes" =>
-          nginx.replaceAllRoutes((v \ "routes").as[Seq[Route]])
+          val newRoutes = (v \ "routes").as[Seq[Route]]
+          nginx.replaceAllRoutes(newRoutes)
+          routes.alter(Some(newRoutes.map(v => (v.domain,v)).toMap))
+            .foreach(rs => logger.info(s"Populated with ${rs.size} routes"))
         case "set-route" =>
-          nginx.setRoute((v \ "route").as[Route])
+          val newRoute = (v \ "route").as[Route]
+          nginx.setRoute(newRoute)
+          routes.alter { (routeMap: Option[Map[String,Route]]) =>
+            routeMap.map(_ + (newRoute.domain -> newRoute))
+          }.foreach(_ => logger.info(s"Added new route: $newRoute"))
         case "delete-route" =>
-          nginx.deleteRoute((v \ "route").as[Route])
+          val deletedRoute = (v \ "route").as[Route]
+          nginx.deleteRoute(deletedRoute)
+          routes.alter { (routeMap: Option[Map[String,Route]]) =>
+            routeMap.map(_ - deletedRoute.domain)
+          }.foreach(_ => logger.info(s"Deleted route: $deletedRoute"))
       }
     }
   } getOrElse {

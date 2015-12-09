@@ -13,7 +13,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import java.net.InetSocketAddress
 import akka.stream.ActorMaterializer
-import akka.agent.Agent
 import akka.http.scaladsl.model.headers.CustomHeader
 import akka.stream.scaladsl.Source
 import akka.http.ClientConnectionSettings
@@ -93,7 +92,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
     "return 503 Service Unavailable if route resolver isn't provided" >>
        Prop.forAll(domainGenerator) { domainName =>
          val serverInstance = Await.result(AuthRequestServer.start(
-             Agent(None)), 5.seconds)
+             () => None), 5.seconds)
 
          val req = HttpRequest().withHeaders(Host(Uri.Host(domainName)))
 
@@ -115,10 +114,10 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
          done
        }
 
-    "return 404 Not Found if route isn't present" >>
+    "return 403 Forbidden if route isn't present" >>
        Prop.forAll(domainGenerator) { domainName =>
          val serverInstance = Await.result(AuthRequestServer.start(
-             Agent(Some(Map.empty[String,Route].get))), 5.seconds)
+             () => Some((_: String) => None)), 5.seconds)
 
          val req = HttpRequest().withHeaders(Host(Uri.Host(domainName)))
 
@@ -134,7 +133,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
            p.future
          }, 500.milliseconds)
 
-         res.status must_== StatusCodes.NotFound
+         res.status must_== StatusCodes.Forbidden
 
          Await.ready(serverInstance.shutdown(), 5.seconds)
          done
@@ -142,8 +141,8 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
 
     "return upstream based on Host header" >>
       prop { (routes: Map[String,Route]) =>
-        val serverInstance = Await.result(
-            AuthRequestServer.start(Agent(Some(routes.get))), 5.seconds)
+        val serverInstance = Await.result(AuthRequestServer.start(
+            () => Some(routes.get)), 5.seconds)
 
         val testRoute = Random.shuffle(routes.values).head
 
