@@ -11,14 +11,14 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.util.Try
 import dit4c.switchboard.Route
 import dit4c.switchboard.TlsConfig
+import java.net.InetSocketAddress
 
 class NginxConfig(
     val baseDir: Path,
-    val baseDomain: Option[String],
     val port: Int,
     val tlsConfig: Option[TlsConfig],
     val extraMainConfig: Option[String],
-    val extraVHostConfig: Option[String]
+    val authSocket: InetSocketAddress
     ) extends LazyLogging {
   import scala.language.implicitConversions
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
@@ -27,29 +27,27 @@ class NginxConfig(
   val configDir = Files.createDirectory(baseDir.resolve("conf"))
   val proxyDir = Files.createDirectory(baseDir.resolve("proxy"))
   val tmpDir = Files.createDirectory(baseDir.resolve("tmp"))
-  val vhostDir = Files.createDirectory(configDir.resolve("vhost.d"))
   val mainConfig = configDir.resolve("nginx.conf")
 
   private val engine = Mustache.compiler().withCollector(ScalaCollector)
 
-  lazy val mainConfigTemplater =
-    engine.compile(readClasspathFile("nginx_main.tmpl.mustache"))
-  lazy val vhostConfigTemplater =
-    engine.compile(readClasspathFile("nginx_vhost.tmpl.mustache"))
+  lazy val configTemplater =
+    engine.compile(readClasspathFile("nginx.tmpl.mustache"))
 
   writeFile(mainConfig) {
     implicit def path2str(p: Path) = p.toAbsolutePath.toString
-    mainConfigTemplater.execute(
+    val authServer: String =
+      s"http://${authSocket.getHostString}:${authSocket.getPort}"
+    configTemplater.execute(
       Map[String,Any](
         "basedir" -> baseDir,
         "cachedir" -> cacheDir,
         "proxydir" -> proxyDir,
         "tmpdir" -> tmpDir,
-        "vhostdir" -> vhostDir,
+        "authserver" -> authServer,
         "pidfile" -> baseDir.resolve("nginx.pid"),
         "port" -> port.toString
-      ) ++ baseDomain.map(d => Map("domain" -> d))
-        ++ tlsConfig.map { c =>
+      ) ++ tlsConfig.map { c =>
           Map("tls" -> Map(
               "key" -> c.keyFile.getAbsolutePath,
               "certificate" -> c.certificateFile.getAbsolutePath))
@@ -60,46 +58,7 @@ class NginxConfig(
     )
   }
 
-  def replaceAllRoutes(routes: Seq[Route]) = {
-    recursivelyDelete(vhostDir)
-    Files.createDirectory(vhostDir)
-    logger.info("Updating entire route set:")
-    routes.foreach { route =>
-      logger.info(route.domain)
-      writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
-    }
-  }
-
-  def setRoute(route: Route) = {
-    logger.info(s"Setting route: ${route.domain}")
-    writeFile(vhostDir.resolve(route.domain+".conf"))(vhostTmpl(route))
-  }
-
-  def deleteRoute(route: Route) = {
-    logger.info(s"Deleting route: ${route.domain}")
-    Files.delete(vhostDir.resolve(route.domain+".conf"))
-  }
-
   def cleanup = recursivelyDelete(baseDir)
-
-  protected def vhostTmpl(route: Route) =
-    vhostConfigTemplater.execute(
-      Map(
-        "https" -> tlsConfig.isDefined,
-        "port" -> port.toString,
-        "domain" -> route.domain,
-        "headers" -> route.headers.map {
-          case (k, v) => Map("name" -> k, "value" -> v)
-        },
-        "upstream" -> Map(
-          "scheme" -> route.upstream.scheme,
-          "host" -> route.upstream.host,
-          "port" -> route.upstream.port.toString
-        )
-      ) ++ extraVHostConfig.map { c =>
-        Map("extraconf" -> c)
-      }
-    )
 
   protected def readClasspathFile(path: String) =
     io.Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
@@ -180,11 +139,10 @@ class NginxConfig(
 object NginxConfig {
 
   def apply(
-      baseDomain: Option[String],
       port: Int,
       tlsConfig: Option[TlsConfig],
       extraMainConfig: Option[String],
-      extraVHostConfig: Option[String]) =
+      authSocket: InetSocketAddress) =
         new NginxConfig(Files.createTempDirectory("nginx-"),
-            baseDomain, port, tlsConfig, extraMainConfig, extraVHostConfig)
+            port, tlsConfig, extraMainConfig, authSocket)
 }

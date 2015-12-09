@@ -89,7 +89,7 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
       }
     }
 
-    "return 503 Service Unavailable if route resolver isn't provided" >>
+    "return 403 Forbidden if route resolver isn't provided" >>
        Prop.forAll(domainGenerator) { domainName =>
          val serverInstance = Await.result(AuthRequestServer.start(
              () => None), 5.seconds)
@@ -108,13 +108,13 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
            p.future
          }, 500.milliseconds)
 
-         res.status must_== StatusCodes.ServiceUnavailable
+         res.status must_== StatusCodes.Forbidden
 
          Await.ready(serverInstance.shutdown(), 5.seconds)
          done
        }
 
-    "return 403 Forbidden if route isn't present" >>
+    "return 403 Forbidden with parent domain if route isn't present" >>
        Prop.forAll(domainGenerator) { domainName =>
          val serverInstance = Await.result(AuthRequestServer.start(
              () => Some((_: String) => None)), 5.seconds)
@@ -134,6 +134,8 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
          }, 500.milliseconds)
 
          res.status must_== StatusCodes.Forbidden
+         res.headers must contain(
+           RawHeader("X-Parent-Host", domainName.replaceAll("^[^\\.]*\\.","")))
 
          Await.ready(serverInstance.shutdown(), 5.seconds)
          done
@@ -161,6 +163,8 @@ class AuthRequestServerSpec extends Specification with ScalaCheck {
         }, 500.milliseconds)
 
         res.status must_== StatusCodes.OK
+        res.headers must contain(
+            RawHeader("X-Server-Name", testRoute.headers("X-Server-Name")))
         res.headers must contain(
             RawHeader("X-Target-Upstream", testRoute.upstream.toString))
 

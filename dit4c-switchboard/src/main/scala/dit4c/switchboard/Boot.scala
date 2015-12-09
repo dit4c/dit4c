@@ -37,31 +37,27 @@ object Boot extends App with LazyLogging {
       case None =>
         logger.info("Starting as HTTP server")
     }
-    val nginx = new NginxInstance(config.baseDomain, config.port, tlsConfig,
-        config.extraMainConfig, config.extraVHostConfig)
     val routes: Agent[Option[Map[String,Route]]] = Agent(None)
     def routeResolver = routes.get.map(v => v.get(_))
-    AuthRequestServer.start(routeResolver _).foreach { instance =>
+    val nginx = AuthRequestServer.start(routeResolver _).map { instance =>
       sys.addShutdownHook(instance.shutdown _)
       logger.info(s"Auth Server listening on: ${instance.socket}")
+      new NginxInstance(config.port, tlsConfig,
+          config.extraMainConfig, instance.socket)
     }
-
     FeedMonitor(config) { v =>
       (v \ "op").as[String] match {
         case "replace-all-routes" =>
           val newRoutes = (v \ "routes").as[Seq[Route]]
-          nginx.replaceAllRoutes(newRoutes)
           routes.alter(Some(newRoutes.map(v => (v.domain,v)).toMap))
             .foreach(rs => logger.info(s"Populated with ${rs.size} routes"))
         case "set-route" =>
           val newRoute = (v \ "route").as[Route]
-          nginx.setRoute(newRoute)
           routes.alter { (routeMap: Option[Map[String,Route]]) =>
             routeMap.map(_ + (newRoute.domain -> newRoute))
           }.foreach(_ => logger.info(s"Added new route: $newRoute"))
         case "delete-route" =>
           val deletedRoute = (v \ "route").as[Route]
-          nginx.deleteRoute(deletedRoute)
           routes.alter { (routeMap: Option[Map[String,Route]]) =>
             routeMap.map(_ - deletedRoute.domain)
           }.foreach(_ => logger.info(s"Deleted route: $deletedRoute"))
@@ -76,7 +72,6 @@ object Boot extends App with LazyLogging {
 
 case class Config(
   val feed: URI = new URI("https://example.test/routes"),
-  val baseDomain: Option[String] = None,
   val port: Int = 9200,
   val sslCertificate: Option[File] = None,
   val sslKey: Option[File] = None,
@@ -88,9 +83,6 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
   opt[URI]('f', "feed")
     .action { (x, c) => c.copy(feed = x) }
     .text("DIT4C Highcommand route feed")
-  opt[String]('d', "domain")
-    .action { (x, c) => c.copy(baseDomain = Some(x)) }
-    .text("DIT4C base domain (ie. where Highcommand is hosted)")
   opt[Int]('p', "port")
     .action { (x, c) => c.copy(port = x) }
     .text("port for Nginx to listen on")

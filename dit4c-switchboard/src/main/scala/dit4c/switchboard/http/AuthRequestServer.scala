@@ -28,6 +28,9 @@ object AuthRequestServer {
         RawHeader(k,v).asInstanceOf[HttpHeader]
       }).toIndexedSeq :+ RawHeader("X-Target-Upstream", route.upstream.toString)
 
+    def redirectHeader(host: String): HttpHeader =
+      RawHeader("X-Parent-Host", host.dropWhile(_!='.').substring(1) )
+
     // Response codes as per:
     // http://nginx.org/en/docs/http/ngx_http_auth_request_module.html
     val handler = {
@@ -38,10 +41,11 @@ object AuthRequestServer {
             case Some(route) =>
               complete(HttpResponse(headers = routeHeaders(route)))
             case None =>
-              complete(HttpResponse(StatusCodes.Forbidden))
+              complete(HttpResponse(StatusCodes.Forbidden,
+                  ISeq(redirectHeader(host))))
           }
         }.getOrElse {
-          complete(HttpResponse(StatusCodes.ServiceUnavailable))
+          complete(HttpResponse(StatusCodes.Forbidden))
         }
       }
     }

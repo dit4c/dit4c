@@ -67,21 +67,44 @@ http {
   # the same as the one seen publicly.
   port_in_redirect off;
 
-  include {{vhostdir}}/*.conf;
-
-  {{#domain}}
   server {
     listen       *:{{port}} {{#tls}}ssl http2{{/tls}};
     server_name  _;
 
     location / {
-      # Redirect to server wait page (unless that would cause a redirect loop)
-      if ($http_host != "{{domain}}") {
-        return 302 $scheme://{{domain}}/waiting/$scheme/$http_host$request_uri;
+      auth_request /auth;
+      auth_request_set $upstreamServer  $upstream_http_x_target_upstream;
+      auth_request_set $serverName      $upstream_http_x_server_name;
+      auth_request_set $parentRedirect  $upstream_http_x_parent_host;
+      # Otherwise forbidden means service is unavailable
+      error_page 403 = @error;
+      proxy_pass $upstreamServer;
+      proxy_http_version 1.1; # Need to stream image downloads
+      proxy_buffering off;
+      proxy_read_timeout 1d; # Allow websockets to idle
+      proxy_set_header Accept-Encoding "gzip"; # Force gzip for cache
+      add_header X-Proxy-Cache $upstream_cache_status;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header X-Forwarded-Proto $user_proto;
+      proxy_set_header X-Forwarded-Host $http_host;
+      proxy_set_header X-Server-Name    $serverName;
+    }
+
+    location = /auth {
+      internal;
+      proxy_pass {{authserver}};
+      proxy_pass_request_body off;
+      proxy_set_header Host $host;
+      proxy_set_header Content-Length "";
+    }
+
+    location @error {
+      internal;
+      if ($parentRedirect) {
+        return 302 $scheme://$parentRedirect/waiting/$scheme/$http_host$request_uri;
       }
-      # Otherwise service is unavailable
-      return 503;
+      return 499;
     }
   }
-  {{/domain}}
 }

@@ -7,16 +7,15 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.sys.process.ProcessLogger
 import dit4c.switchboard.Route
 import dit4c.switchboard.TlsConfig
+import java.net.InetSocketAddress
 
 class NginxInstance(
-    baseDomain: Option[String],
     port: Int,
     tlsConfig: Option[TlsConfig],
     extraMainConfig: Option[String],
-    extraVHostConfig: Option[String]) extends LazyLogging {
+    authSocket: InetSocketAddress) extends LazyLogging {
 
-  val config =
-    NginxConfig(baseDomain, port, tlsConfig, extraMainConfig, extraVHostConfig)
+  val config = NginxConfig(port, tlsConfig, extraMainConfig, authSocket)
 
   val nginxPath: String =
     try {
@@ -28,18 +27,6 @@ class NginxInstance(
   protected def pLog = ProcessLogger(logger.debug(_), logger.debug(_))
   val nginxProcess: Process =
     Process(s"$nginxPath -c ${config.mainConfig}").run(pLog)
-
-  def replaceAllRoutes(routes: Seq[Route]) = reloadAfter {
-    config.replaceAllRoutes(routes)
-  }
-
-  def setRoute(route: Route) = reloadAfter {
-    config.setRoute(route)
-  }
-
-  def deleteRoute(route: Route) = reloadAfter {
-    config.deleteRoute(route)
-  }
 
   def shutdown = {
     nginxProcess.destroy
