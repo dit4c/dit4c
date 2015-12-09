@@ -61,6 +61,7 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
       newEvents must allOf(beLike[JsValue] { case v: JsValue =>
         ((v \ "op").as[String] must_== "set-route") and
         ((v \ "route" \ "domain").as[String] must contain(".")) and
+        ((v \ "route" \ "name").as[String] must not(beEmpty)) and
         ((v \ "route" \ "headers").as[Map[String,String]] must haveKey("X-Server-Name")) and
         ((v \ "route" \ "upstream") match { case u =>
           ((u \ "scheme").as[String] must_== "https") and
