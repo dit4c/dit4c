@@ -14,7 +14,7 @@ import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.api.model.InternetProtocol
 
-class DockerClient(val uri: java.net.URI) {
+class DockerClient(val dockerClientConfig: DockerClientConfig) {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val timeout: Timeout = Timeout(15.seconds)
@@ -23,9 +23,6 @@ class DockerClient(val uri: java.net.URI) {
 
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
-  val dockerClientConfig = DockerClientConfig.createDefaultConfigBuilder
-    .withUri(uri.toASCIIString)
-    .build
   val dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build
 
   def containerPort(containerId: String): Future[Option[String]] =
@@ -80,5 +77,16 @@ class DockerClient(val uri: java.net.URI) {
     }
 
   }
+
+}
+
+object DockerClient {
+
+  def apply(uri: java.net.URI): DockerClient = apply(Some(uri))
+
+  def apply(maybeUri: Option[java.net.URI]): DockerClient = new DockerClient(
+    maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
+      b.withUri(uri.toASCIIString)
+    ).build)
 
 }

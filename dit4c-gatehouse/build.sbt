@@ -51,7 +51,7 @@ dockerfile in docker := {
       set -e
       JAVA_OPTS="-Dsun.net.inetaddr.ttl=60"
       cd /opt
-      exec /opt/dit4c-gatehouse/bin/dit4c-gatehouse -i 0.0.0.0 -H unix:///var/run/docker.sock -s $PORTAL_URL/public-keys
+      exec /opt/dit4c-gatehouse/bin/dit4c-gatehouse -i 0.0.0.0 -s $PORTAL_URL/public-keys
       """)
     .expose(8080)
 }

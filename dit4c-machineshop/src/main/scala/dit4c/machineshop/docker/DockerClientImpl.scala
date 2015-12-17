@@ -27,19 +27,14 @@ import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
 
 class DockerClientImpl(
-    val baseUrl: Uri,
+    val dockerConfig: DockerClientConfig,
     val newContainerLinks: Seq[ContainerLink] = Nil) extends DockerClient {
 
   // Uncapped ExecutionContext, so we can do sync network requests
   implicit val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
-  val docker: com.github.dockerjava.api.DockerClient = {
-    val config =
-      DockerClientConfig.createDefaultConfigBuilder
-        .withUri(baseUrl.toString)
-        .build
-    DockerClientBuilder.getInstance(config).build
-  }
+  val docker: com.github.dockerjava.api.DockerClient =
+    DockerClientBuilder.getInstance(dockerConfig).build
 
   override val images = ImagesImpl
   override val containers = ContainersImpl
@@ -160,3 +155,11 @@ class DockerClientImpl(
   }
 
 }
+
+object DockerClientImpl {
+  def apply(maybeUri: Option[java.net.URI], newContainerLinks: Seq[ContainerLink]): DockerClient = new DockerClientImpl(
+    maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
+      b.withUri(uri.toASCIIString)
+    ).build, newContainerLinks)
+}
+

@@ -30,8 +30,8 @@ object Boot extends App {
   def start(config: Config) {
     val route = {
       val knownImages = new KnownImages(config.knownImageFile)
-      val dockerClient = new DockerClientImpl(
-          Uri(config.dockerHost.toString), config.containerLinks)
+      val dockerClient =
+        DockerClientImpl(config.dockerHost, config.containerLinks)
       val signatureActor: Option[ActorRef] =
         config.publicKeyLocation.map { loc =>
           system.actorOf(
@@ -69,7 +69,7 @@ object Boot extends App {
 case class Config(
     val interface: String = "localhost",
     val port: Int = 8080,
-    val dockerHost: URI = URI.create("http://127.0.0.1:2375/"),
+    val dockerHost: Option[URI] = None,
     val serverId: String = null,
     val publicKeyLocation: Option[java.net.URI] = None,
     val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS),
@@ -93,7 +93,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
   opt[URI]('H', "docker-host")
-    .action { (x, c) => c.copy(dockerHost = x) }
+    .action { (x, c) => c.copy(dockerHost = Some(x)) }
     .text("Docker URI")
   opt[java.net.URI]('s', "signed-by")
     .action { (x, c) => c.copy(publicKeyLocation = Some(x)) }

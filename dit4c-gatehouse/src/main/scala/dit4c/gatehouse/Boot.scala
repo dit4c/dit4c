@@ -26,7 +26,7 @@ object Boot extends App {
 
   def start(config: Config) {
     val route = {
-      val dockerClient = new DockerClient(config.dockerHost)
+      val dockerClient = DockerClient(config.dockerHost)
       val dockerIndex = system.actorOf(
           Props(classOf[DockerIndexActor], dockerClient), "docker-index")
       val auth = system.actorOf(
@@ -55,7 +55,7 @@ object Boot extends App {
 case class Config(
   val interface: String = "localhost",
   val port: Int = 8080,
-  val dockerHost: URI = URI.create("http://127.0.0.1:2375/"),
+  val dockerHost: Option[URI] = None,
   val keyLocation: URI = null,
   val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS))
 
@@ -68,7 +68,7 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-gatehouse") {
     .action { (x, c) => c.copy(port = x) }
     .text("port to listen on")
   opt[URI]('H', "docker-host")
-    .action { (x, c) => c.copy(dockerHost = x) }
+    .action { (x, c) => c.copy(dockerHost = Some(x)) }
     .text("Docker URI")
   opt[URI]('s', "signed-by")
     .required()
