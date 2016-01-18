@@ -13,6 +13,7 @@ import java.net.URI
 import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.api.model.InternetProtocol
+import scala.util.Try
 
 class DockerClient(val dockerClientConfig: DockerClientConfig) {
 
@@ -29,7 +30,8 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
     Future {
       dockerClient.inspectContainerCmd(containerId).exec
     }.map { info =>
-      val exposedPorts = info.getConfig.getExposedPorts.toSet
+      val exposedPorts = Try(info.getConfig.getExposedPorts)
+        .getOrElse(Array.empty).toSet
         .filter(_.getProtocol == InternetProtocol.TCP)
         .map(_.getPort)
       POTENTIAL_SERVICE_PORTS

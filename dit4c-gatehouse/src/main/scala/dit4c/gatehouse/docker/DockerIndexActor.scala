@@ -58,7 +58,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
       case Success(m: Map[String, String]) =>
         self ! UpdatePortIndex(m)
       case Failure(e) =>
-        log.warning(s"Docker poll failed: $e")
+        log.warning(s"Docker poll failed: $e\n${e.getStackTrace.toSeq}")
     })
   }
 
