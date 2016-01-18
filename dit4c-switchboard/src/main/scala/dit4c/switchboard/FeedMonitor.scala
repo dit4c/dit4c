@@ -43,7 +43,10 @@ object FeedMonitor {
               .takeWithin(1.hour) // Avoid timeouts
               .map(_.data)
               .via(Framing.delimiter(ByteString("\n"), Int.MaxValue))
-              .map(v => new String(v.decodeString(mimeType.charset.value)))
+              .map({ v =>
+                val cs = mimeType.charsetOption.map(_.value).getOrElse("utf-8")
+                new String(v.decodeString(cs))
+              })
               .filter(_.startsWith("data: "))
               .map(_.replaceFirst("data: ", ""))
               .map(Json.parse(_))
