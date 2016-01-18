@@ -11,7 +11,7 @@ fork in run := true
 
 libraryDependencies ++= {
   val akkaV = "2.3.5"
-  val akkaHttpV = "2.0.2"
+  val akkaHttpV = "2.0-M2"
   Seq(
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,

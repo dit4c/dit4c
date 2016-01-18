@@ -18,7 +18,6 @@ import com.github.dockerjava.core.command.PullImageResultCallback
 
 import akka.http.scaladsl.model.Uri
 import akka.stream.scaladsl.Source
-import akka.stream.scaladsl.StreamConverters
 import akka.util.ByteString
 import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.docker.models.ContainerStatus
@@ -92,7 +91,7 @@ class DockerClientImpl(
       docker.commitCmd(id).exec
     })(ec).map { imageId =>
       lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
-      StreamConverters.fromInputStream(() => docker.saveImageCmd(imageId).exec)
+      Source.inputStream(() =>docker.saveImageCmd(imageId).exec)
         .map(v => { fRemoveImage; v }) // Remove image onces stream starts
     }
 

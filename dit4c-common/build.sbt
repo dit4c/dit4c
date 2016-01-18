@@ -5,7 +5,7 @@ crossScalaVersions := Nil
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaHttpV = "2.0.2"
+  val akkaHttpV = "2.0-M2"
   val specs2V = "3.6.4"
   Seq(
     "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
