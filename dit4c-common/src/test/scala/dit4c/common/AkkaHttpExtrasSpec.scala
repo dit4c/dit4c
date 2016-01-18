@@ -39,6 +39,9 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
     "allow outgoing connections to specify InetAddress" >> {
       val host = "google.com"
       val addrs = resolve(host)
+      if (addrs.size <= 2) {
+        skipped
+      }
 
       def makeRequest(addr: InetAddress): Future[Try[StatusCode]] = {
         val c = Http().outgoingConnectionTls(addr, 443,
