@@ -66,7 +66,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       .runForeach { x => println(x.decodeString("utf-8")) }
     new DockerInDockerInstance() {
       val uri = new java.net.URI(s"unix://${tmpDir.toAbsolutePath}/docker.sock")
-      def newClient = DockerClientImpl(Some(uri), Seq.empty)
+      def newClient = DockerClientImpl(Some(uri))
       def newDirectClient = DockerClientBuilder.getInstance(uri.toASCIIString).build
       override def destroy {
         client.removeContainerCmd(dindId).withForce.withRemoveVolumes(true).exec

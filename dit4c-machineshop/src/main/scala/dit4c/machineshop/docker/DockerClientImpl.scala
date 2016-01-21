@@ -19,7 +19,6 @@ import com.github.dockerjava.core.command.PullImageResultCallback
 import akka.http.scaladsl.model.Uri
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.docker.models.ContainerStatus
 import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerContainers
@@ -27,8 +26,7 @@ import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
 
 class DockerClientImpl(
-    val dockerConfig: DockerClientConfig,
-    val newContainerLinks: Seq[ContainerLink] = Nil) extends DockerClient {
+    val dockerConfig: DockerClientConfig) extends DockerClient {
 
   // Uncapped ExecutionContext, so we can do sync network requests
   implicit val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
@@ -116,7 +114,6 @@ class DockerClientImpl(
         .withAttachStdout(true)
         .withAttachStderr(true)
         .withCpuShares(2)
-        .withLinks(newContainerLinks.map(l => new Link(l.outside, l.inside)): _*)
         .withRestartPolicy(RestartPolicy.alwaysRestart)
         .exec
       new ContainerImpl(c.getId, name, ContainerStatus.Stopped)
@@ -157,9 +154,9 @@ class DockerClientImpl(
 }
 
 object DockerClientImpl {
-  def apply(maybeUri: Option[java.net.URI], newContainerLinks: Seq[ContainerLink]): DockerClient = new DockerClientImpl(
+  def apply(maybeUri: Option[java.net.URI]): DockerClient = new DockerClientImpl(
     maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
       b.withUri(uri.toASCIIString)
-    ).build, newContainerLinks)
+    ).build)
 }
 

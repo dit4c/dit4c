@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit
 import scalax.file.{FileSystem,Path}
 import scala.util.{Success,Failure}
 import dit4c.machineshop.docker.DockerClientImpl
-import dit4c.machineshop.docker.models.ContainerLink
 import dit4c.machineshop.images.{ImageManagementActor, KnownImages}
 import dit4c.machineshop.auth.SignatureActor
 
@@ -31,7 +30,7 @@ object Boot extends App {
     val route = {
       val knownImages = new KnownImages(config.knownImageFile)
       val dockerClient =
-        DockerClientImpl(config.dockerHost, config.containerLinks)
+        DockerClientImpl(config.dockerHost)
       val signatureActor: Option[ActorRef] =
         config.publicKeyLocation.map { loc =>
           system.actorOf(
@@ -74,7 +73,6 @@ case class Config(
     val publicKeyLocation: Option[java.net.URI] = None,
     val keyUpdateInterval: FiniteDuration = Duration.create(1, TimeUnit.HOURS),
     val imageUpdateInterval: Option[FiniteDuration] = None,
-    val containerLinks: Seq[ContainerLink] = Nil,
     val knownImageFile: scalax.file.Path =
       FileSystem.default.fromString("known_images.json"))
 
@@ -127,11 +125,6 @@ object ArgParser extends scopt.OptionParser[Config]("dit4c-machineshop") {
       c.copy(imageUpdateInterval = Some(Duration.create(x, "seconds")))
     }
     .text("pull image updates every <n> seconds")
-  opt[String]("link")
-    .action { (x, c) =>
-      c.copy(containerLinks = c.containerLinks :+ ContainerLink(x))
-    }
-    .text("container link to add to all new containers")
   checkConfig { c =>
     if (c.serverId == null) failure("server ID must be set")
     else success
