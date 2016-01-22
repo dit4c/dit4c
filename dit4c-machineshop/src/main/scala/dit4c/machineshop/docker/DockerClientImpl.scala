@@ -71,7 +71,7 @@ class DockerClientImpl(
     override def refresh = Future({
       val c = docker.inspectContainerCmd(id).exec
       val status =
-        if (c.getState.isRunning) ContainerStatus.Running
+        if (c.getState.getRunning) ContainerStatus.Running
         else ContainerStatus.Stopped
       new ContainerImpl(id, name, status)
     })(ec)

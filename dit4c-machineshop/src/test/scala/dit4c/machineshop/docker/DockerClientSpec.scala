@@ -19,6 +19,9 @@ import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerImage
 import java.nio.file.Files
 import akka.stream.scaladsl.Source
+import com.github.dockerjava.api.async.ResultCallback
+import java.io.Closeable
+import scala.concurrent.Promise
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -30,6 +33,29 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     def newClient: DockerClient
     def newDirectClient: com.github.dockerjava.api.DockerClient
     def destroy: Unit
+  }
+
+  class FutureCallback extends ResultCallback[Frame] {
+    protected val promise = Promise[ByteString]()
+    protected var bytes = ByteString()
+    def future = promise.future
+
+    def onStart(closeable: Closeable) {}
+
+    /** Called when an async result event occurs */
+    def onNext(obj: Frame) { bytes ++= ByteString(obj.getPayload) }
+
+    /** Called when an exception occurs while processing */
+    def onError(throwable: Throwable) {
+      promise.failure(throwable)
+    }
+
+    /** Called when processing was finished either by reaching the end or by aborting it */
+    def onComplete() {
+      promise.success(bytes)
+    }
+
+    def close() {}
   }
 
   def setupDockerInDocker: DockerInDockerInstance = {
@@ -46,7 +72,8 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       .exec
       .getId
     client.startContainerCmd(dindId).exec
-    client.logContainerCmd(dindId).withStdOut.withStdErr.withFollowStream
+    client.logContainerCmd(dindId)
+      .withStdOut(true).withStdErr(true).withFollowStream(true)
       .exec(new LogContainerResultCallback() {
         override def onNext(frame: Frame) = {
           val s = new String(frame.getPayload, "utf-8")
@@ -59,17 +86,20 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       .awaitCompletion(2, TimeUnit.MINUTES)
     val execCmd = client.execCreateCmd(dindId)
       .withCmd("sh","-c","chmod a+rwx /var/run/docker.sock")
-      .withAttachStdout
-      .withAttachStderr
+      .withAttachStdout(true)
+      .withAttachStderr(true)
       .exec
-    Source.inputStream(client.execStartCmd(execCmd.getId).exec)
-      .runForeach { x => println(x.decodeString("utf-8")) }
+    client.execStartCmd(execCmd.getId).exec(new FutureCallback()).future
+      .foreach(_.decodeString("utf-8"))
     new DockerInDockerInstance() {
       val uri = new java.net.URI(s"unix://${tmpDir.toAbsolutePath}/docker.sock")
       def newClient = DockerClientImpl(Some(uri))
       def newDirectClient = DockerClientBuilder.getInstance(uri.toASCIIString).build
       override def destroy {
-        client.removeContainerCmd(dindId).withForce.withRemoveVolumes(true).exec
+        client.removeContainerCmd(dindId)
+          .withForce(true)
+          .withRemoveVolumes(true)
+          .exec
       }
     }
   }
@@ -197,7 +227,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
         actualSize must_== expectedSize
         val images = dind.right.get.newDirectClient.listImagesCmd.exec
         images.size must_== numImages
-        actualSize must beGreaterThan(images.get(0).getVirtualSize)
+        actualSize must beGreaterThan[scala.Long](images.get(0).getVirtualSize)
       }
       "delete" >> {
         val client = newDockerClient
