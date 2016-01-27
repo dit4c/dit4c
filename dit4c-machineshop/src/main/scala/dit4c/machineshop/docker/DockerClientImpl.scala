@@ -107,6 +107,14 @@ class DockerClientImpl(
         throw new IllegalArgumentException(
             "Name must be a valid lower-case DNS label")
       }
+      val sharedVolumeName = "dit4c_shared"
+      try {
+        docker.inspectVolumeCmd(sharedVolumeName).exec
+      } catch {
+        case _: com.github.dockerjava.api.exception.NotFoundException =>
+          docker.createVolumeCmd().withName(sharedVolumeName).exec
+      }
+
       val c = docker.createContainerCmd(image)
         .withName(name)
         .withHostName(name)
@@ -115,6 +123,10 @@ class DockerClientImpl(
         .withAttachStderr(true)
         .withCpuShares(2)
         .withRestartPolicy(RestartPolicy.alwaysRestart)
+        .withBinds(new Bind(
+            sharedVolumeName,
+            new Volume("/mnt/shared"),
+            AccessMode.ro))
         .exec
       new ContainerImpl(c.getId, name, ContainerStatus.Stopped)
     })(ec)
