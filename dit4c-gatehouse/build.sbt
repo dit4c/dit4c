@@ -23,9 +23,12 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"     % "2.4.2" % "test",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
-    "com.github.docker-java" % "docker-java"    % "2.1.1"
+    "com.github.docker-java" % "docker-java"    % "3.0.0-SNAPSHOT"
   )
 }
+
+resolvers ++= Seq(
+  "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/")
 
 Revolver.settings
 
