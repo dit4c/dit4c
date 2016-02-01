@@ -14,22 +14,25 @@ import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.api.model.InternetProtocol
 import scala.util.Try
+import scala.concurrent.ExecutionContext
+import java.util.concurrent.Executors
 
 class DockerClient(val dockerClientConfig: DockerClientConfig) {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val timeout: Timeout = Timeout(15.seconds)
   import system.dispatcher // implicit execution context
+  
+  val cpec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
   val log = Logging(system, getClass)
 
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
   val dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build
 
-  def containerPort(containerId: String): Future[Option[String]] =
-    Future {
-      dockerClient.inspectContainerCmd(containerId).exec
-    }.map { info =>
+  def containerPort(containerId: String): Option[String] =
+    try {
+      val info = dockerClient.inspectContainerCmd(containerId).exec
       val exposedPorts = Try(info.getConfig.getExposedPorts)
         .getOrElse(Array.empty).toSet
         .filter(_.getProtocol == InternetProtocol.TCP)
@@ -38,10 +41,12 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
         .filter(exposedPorts.contains)
         .headOption
         .map(info.getNetworkSettings.getIpAddress+":"+_)
+    } catch {
+    	case e: com.github.dockerjava.api.NotFoundException => None
     }
 
   def containerPorts =
-    Future(dockerClient.listContainersCmd.exec.toSeq).flatMap { containers =>
+    Future(dockerClient.listContainersCmd.exec.toSeq).map { containers =>
       val nameMap =
         containers.flatMap { c =>
           c.getNames.toSeq
@@ -49,21 +54,19 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
             .map((_, c.getId))
         }.filter(_._1.isValidContainerName).toMap
       // Future id => port map
-      val fPortMap = Future.sequence {
+      val portMap = {
           // Futures for each container
           nameMap.values.toSet.map { id: String =>
             // Get container port, wrapping name into the Option response
-            containerPort(id).map(maybePort => maybePort.map { (id, _) })
+            containerPort(id).map { (id, _) }
           }
-        }.map(_.flatten.toMap) // Turn into map, removing None lookups
+        }.flatten.toMap // Turn into map, removing None lookups
       // Merge the names and ports
-      fPortMap.map { portMap =>
-        nameMap
-          .filter { case (name, id) => portMap.contains(id) }
-          .map { case (name, id) =>
-            (name, portMap(id))
-          }
-      }
+      nameMap
+        .filter { case (name, id) => portMap.contains(id) }
+        .map { case (name, id) =>
+          (name, portMap(id))
+        }
     }
 
   implicit class ContainerNameTester(str: String) {

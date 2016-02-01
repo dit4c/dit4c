@@ -25,22 +25,28 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 
   // Common Receive logic
   private val commonReceive: Receive = {
-    case "tick" =>
-      pollDocker
     case UpdatePortIndex(newIndex) =>
-      context.become(respondWith(newIndex))
+      context.become(respondWith(newIndex, false))
+      log.info(s"Using new index: $newIndex")
   }
 
   // Enqueue until we've got some data
   val receive: Receive = commonReceive orElse {
+    case "tick" =>
+      pollDocker
     case query: PortQuery =>
       queue = queue enqueue DelayedQuery(sender, query)
   }
 
   // Respond using index
-  def respondWith(index: Map[String, String]): Receive = {
+  def respondWith(index: Map[String, String], waiting: Boolean): Receive = {
     clearQueue
     commonReceive orElse {
+      case "tick" =>
+        if (!waiting) {
+          pollDocker
+          context.become(respondWith(index, true))
+        } else log.info("waiting on Docker poll")
       case DelayedQuery(originalSender, PortQuery(containerName)) =>
         originalSender ! PortReply(index.get(containerName))
       case PortQuery(containerName) =>
