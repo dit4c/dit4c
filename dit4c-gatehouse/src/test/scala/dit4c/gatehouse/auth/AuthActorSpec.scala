@@ -13,10 +13,12 @@ import java.io.{BufferedWriter, FileWriter}
 import dit4c.gatehouse.auth.AuthActor.AuthCheck
 import akka.pattern.ask
 import akka.util.Timeout
-import org.specs2.time.NoTimeConversions
 import java.util.concurrent.TimeUnit
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.matcher.Matcher
+import scalaz.concurrent.Future
 
-class AuthActorSpec extends Specification with NoTimeConversions {
+class AuthActorSpec extends Specification {
   import scala.concurrent.duration._
   import AuthActor._
   implicit val system = ActorSystem("testSystem")
@@ -39,7 +41,7 @@ class AuthActorSpec extends Specification with NoTimeConversions {
       actorRef.underlyingActor must not beNull
     }
 
-    "should grant access to valid tokens and deny to invalid tokens" in {
+    "should grant access to valid tokens and deny to invalid tokens" in {  implicit ee: ExecutionEnv =>
 
       val keyFile = File.createTempFile("dit4c-", "-testkeyfile")
       keyFile.deleteOnExit()
@@ -82,7 +84,8 @@ class AuthActorSpec extends Specification with NoTimeConversions {
       val actorRef = newActor(keyFile)
 
       (actorRef ? AuthCheck(token, "foo")) must be_==(AccessGranted).await
-      (actorRef ? AuthCheck(token, "invalid")) must beAnInstanceOf[AccessDenied].await
+
+      (actorRef ? AuthCheck(token, "invalid")) must beAnInstanceOf[AccessDenied].asInstanceOf[Matcher[Any]].await
     }
 
 

@@ -20,9 +20,10 @@ libraryDependencies ++= {
     "io.spray"            %%  "spray-json"      % "1.3.1",
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
-    "org.specs2"          %%  "specs2-core"     % "2.4.2" % "test",
+    "org.specs2"          %%  "specs2-core"     % "3.6.4" % "test",
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
+    "com.google.code.findbugs" % "jsr305"       % "3.0.1",
     "com.github.docker-java" % "docker-java"    % "3.0.0-SNAPSHOT"
   )
 }

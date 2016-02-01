@@ -3,14 +3,15 @@ package dit4c.gatehouse.docker
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import org.specs2.mutable.Specification
-import org.specs2.time.NoTimeConversions
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.util.Timeout.intToTimeout
 import com.github.dockerjava.core.DockerClientConfig
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.specification.BeforeAfterAll
 
-class DockerIndexActorSpec extends Specification with NoTimeConversions {
+class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.duration._
 
   val system = ActorSystem("testSystem")
@@ -21,9 +22,15 @@ class DockerIndexActorSpec extends Specification with NoTimeConversions {
       Promise.successful(Map("foo" -> "1.2.3.4:8080", "bar" -> "2.3.4.5:8888")).future
   }
 
+  override def beforeAll = {}
+
+  override def afterAll = {
+    system.shutdown()
+  }
+
   "DockerIndexActor" should {
 
-    "respond to queries" in {
+    "respond to queries" in { implicit ee: ExecutionEnv =>
       import DockerIndexActor._
       val index: ActorRef = system.actorOf(Props(classOf[DockerIndexActor], client))
 
