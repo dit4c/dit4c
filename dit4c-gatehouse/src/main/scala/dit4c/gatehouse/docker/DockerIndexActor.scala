@@ -13,6 +13,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   val log = Logging(context.system, this)
   val tick =
     context.system.scheduler.schedule(1000 millis, 1000 millis, self, "tick")
+  val maxWaitTicks = 30
 
   import DockerIndexActor._
 
@@ -23,30 +24,31 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 
   override def preStart = pollDocker
 
-  // Common Receive logic
-  private val commonReceive: Receive = {
-    case UpdatePortIndex(newIndex) =>
-      context.become(respondWith(newIndex, false))
-      log.info(s"Using new index: $newIndex")
-  }
-
   // Enqueue until we've got some data
-  val receive: Receive = commonReceive orElse {
+  val receive: Receive = {
     case "tick" =>
       pollDocker
+    case UpdatePortIndex(newIndex) =>
+      context.become(respondWith(newIndex, 0))
+      log.info(s"Using new index: $newIndex")
     case query: PortQuery =>
       queue = queue enqueue DelayedQuery(sender, query)
   }
 
   // Respond using index
-  def respondWith(index: Map[String, String], waiting: Boolean): Receive = {
-    clearQueue
-    commonReceive orElse {
-      case "tick" =>
-        if (!waiting) {
-          pollDocker
-          context.become(respondWith(index, true))
-        } else log.info("waiting on Docker poll")
+  def respondWith(index: Map[String, String], waiting: Int): Receive = {
+    clearQueue;
+    {
+      case "tick" if waiting <= 0 =>
+        pollDocker
+        context.become(respondWith(index, waiting + 1))
+      case "tick" if waiting > 0 =>
+        log.info("waiting on Docker poll")
+        // Increment wait ticks, but loop to zero if we've waited too long
+        context.become(respondWith(index, (waiting + 1) % maxWaitTicks))
+      case UpdatePortIndex(newIndex) =>
+        context.become(respondWith(newIndex, 0))
+        log.info(s"Using new index: $newIndex")
       case DelayedQuery(originalSender, PortQuery(containerName)) =>
         originalSender ! PortReply(index.get(containerName))
       case PortQuery(containerName) =>
