@@ -185,7 +185,7 @@ class DockerClientSpec extends Specification {
       }
     }
 
-    "container ports" >> {
+    "container IDs" >> {
       val client = newDockerClient
       val containers = 1.to(50).map { i =>
         val containerId = directClient.createContainerCmd(image)
@@ -197,11 +197,8 @@ class DockerClientSpec extends Specification {
         directClient.startContainerCmd(containerId).exec
         containerId
       }
-      val containerPorts = client.containerPorts.await
-      println(containerPorts)
-      1.to(50).map { i =>
-        containerPorts must haveKey(s"testports-$i")
-      }.reduce(_ and _)
+      val retrievedContainerIds = client.containerIds.await
+      retrievedContainerIds must_== containers.toSet
     }
   }
 }

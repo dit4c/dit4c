@@ -85,20 +85,11 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       }
     }
 
-
-  def containerIds =
+  def containerIds: Future[Set[String]] =
     Future(dockerClient.listContainersCmd.exec.toSeq).map { containers =>
       containers.filter { c =>
         c.getNames.toSeq.exists(_.stripPrefix("/").isValidContainerName)
-      }.map(_.getId)
-    }
-
-  def containerPorts: Future[Map[String,String]] =
-    containerIds.flatMap { ids =>
-      Future.sequence(ids.map(containerPort)).map(_.flatten)
-    }.map { containers =>
-      containers.map { m => (m.containerName, m.networkPort) }
-        .toMap
+      }.map(_.getId).toSet
     }
 
   implicit class ContainerNameTester(str: String) {

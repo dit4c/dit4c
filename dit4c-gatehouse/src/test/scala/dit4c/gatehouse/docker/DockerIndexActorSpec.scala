@@ -18,8 +18,20 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   implicit val timeout = Timeout(100.millis)
 
   def client = new DockerClient(DockerClientConfig.createDefaultConfigBuilder.build) {
-    override def containerPorts: Future[Map[String, String]] =
-      Promise.successful(Map("foo" -> "1.2.3.4:8080", "bar" -> "2.3.4.5:8888")).future
+    import DockerClient.ContainerPortMapping
+    override def containerPort(
+        containerId: String): Future[Option[ContainerPortMapping]] =
+          Future.successful {
+            containerId match {
+              case s if s == "0001" =>
+                Some(ContainerPortMapping(s, "foo", "1.2.3.4:8080"))
+              case s if s == "0002" =>
+                Some(ContainerPortMapping(s, "bar", "2.3.4.5:8888"))
+              case _ => None
+            }
+          }
+    override def containerIds: Future[Set[String]] =
+      Future.successful(Set("0001","0002"))
   }
 
   override def beforeAll = {}
