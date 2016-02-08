@@ -31,7 +31,7 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
 
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
-  import DockerClient.ContainerEvent
+  import DockerClient.{ContainerEvent,ContainerPortMapping}
   val NOTABLE_CONTAINER_EVENTS = Set("die", "rename", "start", "stop")
 
   val dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build
@@ -62,7 +62,7 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       def close() {}
     }).futures
 
-  def containerPort(containerId: String): Option[String] =
+  def containerPort(containerId: String): Option[ContainerPortMapping] =
     try {
       val info = dockerClient.inspectContainerCmd(containerId).exec
       val exposedPorts = Try(info.getConfig.getExposedPorts)
@@ -72,33 +72,27 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       POTENTIAL_SERVICE_PORTS
         .filter(exposedPorts.contains)
         .headOption
-        .map(info.getNetworkSettings.getIpAddress+":"+_)
+        .map { p =>
+          ContainerPortMapping(info.getId, info.getName.stripPrefix("/"),
+            info.getNetworkSettings.getIpAddress+":"+p)
+        }
     } catch {
         case e: com.github.dockerjava.api.exception.NotFoundException => None
     }
 
-  def containerPorts =
+  def containerIds =
     Future(dockerClient.listContainersCmd.exec.toSeq).map { containers =>
-      val nameMap =
-        containers.flatMap { c =>
-          c.getNames.toSeq
-            .map(_.stripPrefix("/"))
-            .map((_, c.getId))
-        }.filter(_._1.isValidContainerName).toMap
-      // Future id => port map
-      val portMap = {
-          // Futures for each container
-          nameMap.values.toSet.map { id: String =>
-            // Get container port, wrapping name into the Option response
-            containerPort(id).map { (id, _) }
-          }
-        }.flatten.toMap // Turn into map, removing None lookups
-      // Merge the names and ports
-      nameMap
-        .filter { case (name, id) => portMap.contains(id) }
-        .map { case (name, id) =>
-          (name, portMap(id))
-        }
+      containers.filter { c =>
+        c.getNames.toSeq.exists(_.stripPrefix("/").isValidContainerName)
+      }.map(_.getId)
+    }
+
+  def containerPorts: Future[Map[String,String]] =
+    containerIds.map { ids =>
+      ids.map(containerPort)
+        .flatten
+        .map { m => (m.containerName, m.networkPort) }
+        .toMap
     }
 
   implicit class ContainerNameTester(str: String) {
@@ -120,6 +114,8 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
 object DockerClient {
 
   case class ContainerEvent(containerId: String, eventType: String)
+  case class ContainerPortMapping(
+      containerId: String, containerName: String, networkPort: String)
 
   def apply(uri: java.net.URI): DockerClient = apply(Some(uri))
 
