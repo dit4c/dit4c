@@ -10,6 +10,7 @@ import akka.util.Timeout.intToTimeout
 import com.github.dockerjava.core.DockerClientConfig
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.BeforeAfterAll
+import scala.concurrent.ExecutionContext
 
 class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.duration._
@@ -20,7 +21,7 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   def client = new DockerClient(DockerClientConfig.createDefaultConfigBuilder.build) {
     import DockerClient.ContainerPortMapping
     override def containerPort(
-        containerId: String): Future[Option[ContainerPortMapping]] =
+        containerId: String)(implicit ec: ExecutionContext): Future[Option[ContainerPortMapping]] =
           Future.successful {
             containerId match {
               case s if s == "0001" =>
@@ -30,7 +31,7 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
               case _ => None
             }
           }
-    override def containerIds: Future[Set[String]] =
+    override def containerIds(implicit ec: ExecutionContext): Future[Set[String]] =
       Future.successful(Set("0001","0002"))
   }
 

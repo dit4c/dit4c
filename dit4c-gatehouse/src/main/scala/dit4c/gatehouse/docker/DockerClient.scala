@@ -15,19 +15,13 @@ import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.api.model.InternetProtocol
 import scala.util.Try
 import scala.concurrent.ExecutionContext
-import java.util.concurrent.Executors
 import com.github.dockerjava.api.model.Event
 import com.github.dockerjava.api.async.ResultCallback
 import scala.concurrent.Promise
 import java.io.Closeable
 
 class DockerClient(val dockerClientConfig: DockerClientConfig) {
-  implicit val system: ActorSystem = ActorSystem()
   implicit val timeout: Timeout = Timeout(15.seconds)
-  import system.dispatcher // implicit execution context
-
-  val cpec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
-  val log = Logging(system, getClass)
 
   val POTENTIAL_SERVICE_PORTS = Seq(80, 8080, 8888)
 
@@ -62,7 +56,7 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       def close() {}
     }).futures
 
-  def containerPort(containerId: String): Future[Option[ContainerPortMapping]] =
+  def containerPort(containerId: String)(implicit ec: ExecutionContext): Future[Option[ContainerPortMapping]] =
     Future {
       try {
         Some(dockerClient.inspectContainerCmd(containerId).exec)
@@ -85,7 +79,7 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       }
     }
 
-  def containerIds: Future[Set[String]] =
+  def containerIds(implicit ec: ExecutionContext): Future[Set[String]] =
     Future(dockerClient.listContainersCmd.exec.toSeq).map { containers =>
       containers.filter { c =>
         c.getNames.toSeq.exists(_.stripPrefix("/").isValidContainerName)

@@ -8,13 +8,15 @@ import akka.event.LoggingReceive
 import akka.event.Logging
 import scala.util.{Success,Failure}
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
+import java.util.concurrent.Executors
 
 class DockerIndexActor(dockerClient: DockerClient) extends Actor {
   import context.dispatcher
   val log = Logging(context.system, this)
   val tick =
     context.system.scheduler.schedule(1000 millis, 1000 millis, self, "tick")
-  val maxWaitTicks = 30
+  val cpec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   import DockerIndexActor._
 
@@ -71,7 +73,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
       val dest = self
       val futures =
         (newContainerIds diff knownContainerIds).map { id =>
-          dockerClient.containerPort(id).map {
+          dockerClient.containerPort(id)(cpec).map {
             case Some(mapping) => dest ! AddMapping(mapping)
             case None => dest ! RemoveMapping(id)
           }.recover {
