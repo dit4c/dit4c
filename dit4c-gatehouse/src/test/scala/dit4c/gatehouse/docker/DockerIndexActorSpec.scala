@@ -11,6 +11,7 @@ import com.github.dockerjava.core.DockerClientConfig
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.BeforeAfterAll
 import scala.concurrent.ExecutionContext
+import java.io.Closeable
 
 class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.duration._
@@ -19,7 +20,14 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   implicit val timeout = Timeout(100.millis)
 
   def client = new DockerClient(DockerClientConfig.createDefaultConfigBuilder.build) {
-    import DockerClient.ContainerPortMapping
+    import DockerClient.{ContainerEvent,ContainerPortMapping}
+    override def events(callback: (ContainerEvent) => Unit): (Future[Closeable], Future[Unit]) = {
+      // TODO: Mimic event feed. For now, do nothing
+      val p = Promise[Unit]()
+      val closer = new Closeable() { override def close = p.success(()) }
+      (Future.successful(closer), p.future)
+    }
+
     override def containerPort(
         containerId: String)(implicit ec: ExecutionContext): Future[Option[ContainerPortMapping]] =
           Future.successful {
