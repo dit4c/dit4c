@@ -187,14 +187,21 @@ class DockerClientSpec extends Specification {
 
     "container ports" >> {
       val client = newDockerClient
-      val container = directClient.createContainerCmd(image)
-        .withName("testports")
-        .withExposedPorts(new ExposedPort(8888, InternetProtocol.TCP))
-        .withCmd("/bin/sh","-c","while true; do echo foo; sleep 1; done")
-        .exec
-      directClient.startContainerCmd(container.getId).exec
+      val containers = 1.to(50).map { i =>
+        val containerId = directClient.createContainerCmd(image)
+          .withName(s"testports-$i")
+          .withExposedPorts(new ExposedPort(8888, InternetProtocol.TCP))
+          .withCmd("/bin/sh","-c","while true; do echo foo; sleep 5; done")
+          .exec
+          .getId
+        directClient.startContainerCmd(containerId).exec
+        containerId
+      }
       val containerPorts = client.containerPorts.await
-      containerPorts must haveKey("testports")
+      println(containerPorts)
+      1.to(50).map { i =>
+        containerPorts must haveKey(s"testports-$i")
+      }.reduce(_ and _)
     }
   }
 }

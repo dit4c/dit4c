@@ -62,23 +62,29 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
       def close() {}
     }).futures
 
-  def containerPort(containerId: String): Option[ContainerPortMapping] =
-    try {
-      val info = dockerClient.inspectContainerCmd(containerId).exec
-      val exposedPorts = Try(info.getConfig.getExposedPorts)
-        .getOrElse(Array.empty).toSet
-        .filter(_.getProtocol == InternetProtocol.TCP)
-        .map(_.getPort)
-      POTENTIAL_SERVICE_PORTS
-        .filter(exposedPorts.contains)
-        .headOption
-        .map { p =>
-          ContainerPortMapping(info.getId, info.getName.stripPrefix("/"),
-            info.getNetworkSettings.getIpAddress+":"+p)
-        }
-    } catch {
+  def containerPort(containerId: String): Future[Option[ContainerPortMapping]] =
+    Future {
+      try {
+        Some(dockerClient.inspectContainerCmd(containerId).exec)
+      } catch {
         case e: com.github.dockerjava.api.exception.NotFoundException => None
+      }
+    }.map { maybeInfo =>
+      maybeInfo.flatMap { info =>
+        val exposedPorts = Try(info.getConfig.getExposedPorts)
+          .getOrElse(Array.empty).toSet
+          .filter(_.getProtocol == InternetProtocol.TCP)
+          .map(_.getPort)
+        POTENTIAL_SERVICE_PORTS
+          .filter(exposedPorts.contains)
+          .headOption
+          .map { p =>
+            ContainerPortMapping(info.getId, info.getName.stripPrefix("/"),
+              info.getNetworkSettings.getIpAddress+":"+p)
+          }
+      }
     }
+
 
   def containerIds =
     Future(dockerClient.listContainersCmd.exec.toSeq).map { containers =>
@@ -88,10 +94,10 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
     }
 
   def containerPorts: Future[Map[String,String]] =
-    containerIds.map { ids =>
-      ids.map(containerPort)
-        .flatten
-        .map { m => (m.containerName, m.networkPort) }
+    containerIds.flatMap { ids =>
+      Future.sequence(ids.map(containerPort)).map(_.flatten)
+    }.map { containers =>
+      containers.map { m => (m.containerName, m.networkPort) }
         .toMap
     }
 
