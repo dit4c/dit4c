@@ -19,15 +19,15 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   val system = ActorSystem("testSystem")
   implicit val timeout = Timeout(100.millis)
 
-  def client = new DockerClient(DockerClientConfig.createDefaultConfigBuilder.build) {
+  def client = new DockerClient(null /* Not a real client, so OK */) {
     import DockerClient.{ContainerEvent,ContainerPortMapping}
+    override lazy val dockerClient = ???
     override def events(callback: (ContainerEvent) => Unit): (Future[Closeable], Future[Unit]) = {
       // TODO: Mimic event feed. For now, do nothing
       val p = Promise[Unit]()
       val closer = new Closeable() { override def close = p.success(()) }
       (Future.successful(closer), p.future)
     }
-
     override def containerPort(
         containerId: String)(implicit ec: ExecutionContext): Future[Option[ContainerPortMapping]] =
           Future.successful {

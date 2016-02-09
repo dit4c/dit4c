@@ -28,7 +28,7 @@ class DockerClient(val dockerClientConfig: DockerClientConfig) {
   import DockerClient.{ContainerEvent,ContainerPortMapping}
   val NOTABLE_CONTAINER_EVENTS = Set("die", "rename", "start", "stop")
 
-  val dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build
+  lazy val dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build
 
   def events(callback: (ContainerEvent) => Unit): (Future[Closeable], Future[Unit]) =
     dockerClient.eventsCmd.exec(new ResultCallback[Event]() {

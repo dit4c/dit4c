@@ -21,16 +21,6 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 
   import DockerIndexActor._
 
-  type ContainerId = String
-
-  private object BecomeActive
-  private object ResetEventFeed
-  private case class DelayedQuery(sender: ActorRef, query: PortQuery)
-  private case class UpdatePortIndex(index: Map[String, String])
-
-  private case class AddMapping(mapping: ContainerPortMapping)
-  private case class RemoveMapping(id: ContainerId)
-
   private var queue: Queue[DelayedQuery] = Queue.empty
 
   override def preStart = {
@@ -112,4 +102,14 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
 object DockerIndexActor {
   case class PortQuery(containerName: String)
   case class PortReply(port: Option[String])
+
+  protected object BecomeActive
+  protected object ResetEventFeed
+  protected case class DelayedQuery(sender: ActorRef, query: PortQuery)
+  protected case class UpdatePortIndex(index: Map[String, String])
+
+  import DockerClient.{ContainerEvent,ContainerPortMapping}
+  type ContainerId = String
+  protected case class AddMapping(mapping: ContainerPortMapping)
+  protected case class RemoveMapping(id: ContainerId)
 }
