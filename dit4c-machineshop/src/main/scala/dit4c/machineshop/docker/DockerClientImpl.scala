@@ -168,7 +168,7 @@ class DockerClientImpl(
 object DockerClientImpl {
   def apply(maybeUri: Option[java.net.URI]): DockerClient = new DockerClientImpl(
     maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
-      b.withUri(uri.toASCIIString)
+      b.withDockerHost(uri.toASCIIString)
     ).build)
 }
 
