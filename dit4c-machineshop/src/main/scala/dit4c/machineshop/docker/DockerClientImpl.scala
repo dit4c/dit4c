@@ -3,19 +3,16 @@ package dit4c.machineshop.docker
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.Executors
-
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-
 import com.github.dockerjava.api.model.Link
 import com.github.dockerjava.api.model.RestartPolicy
 import com.github.dockerjava.api.model._
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.command.PullImageResultCallback
-
 import akka.http.scaladsl.model.Uri
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -24,6 +21,7 @@ import dit4c.machineshop.docker.models.DockerContainer
 import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
+import com.github.dockerjava.core.DockerClientConfig.DockerClientConfigBuilder
 
 class DockerClientImpl(
     val dockerConfig: DockerClientConfig) extends DockerClient {
@@ -166,9 +164,23 @@ class DockerClientImpl(
 }
 
 object DockerClientImpl {
-  def apply(maybeUri: Option[java.net.URI]): DockerClient = new DockerClientImpl(
-    maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
-      b.withDockerHost(uri.toASCIIString)
-    ).build)
+  def apply(maybeUri: Option[java.net.URI]): DockerClient =
+    new DockerClientImpl(
+        DockerClientConfig.createDefaultConfigBuilder
+          .withUri(maybeUri)
+          .fixTLS
+          .build)
+
+  implicit private class BuilderAddons(b: DockerClientConfigBuilder) {
+    def withUri(maybeUri: Option[java.net.URI]): DockerClientConfigBuilder =
+      maybeUri.map(uri => b.withDockerHost(uri.toASCIIString)).getOrElse(b)
+    def fixTLS: DockerClientConfigBuilder =
+      b.withDockerTlsVerify(false).build.getDockerHost.getScheme match {
+        case "unix" =>
+          b.withDockerTlsVerify(false)
+        case _ =>
+          b
+      }
+  }
 }
 

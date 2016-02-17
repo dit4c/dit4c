@@ -19,6 +19,7 @@ import com.github.dockerjava.api.model.Event
 import com.github.dockerjava.api.async.ResultCallback
 import scala.concurrent.Promise
 import java.io.Closeable
+import com.github.dockerjava.core.DockerClientConfig.DockerClientConfigBuilder
 
 class DockerClient(val dockerClientConfig: DockerClientConfig) {
   implicit val timeout: Timeout = Timeout(15.seconds)
@@ -111,8 +112,21 @@ object DockerClient {
   def apply(uri: java.net.URI): DockerClient = apply(Some(uri))
 
   def apply(maybeUri: Option[java.net.URI]): DockerClient = new DockerClient(
-    maybeUri.foldLeft(DockerClientConfig.createDefaultConfigBuilder)((b,uri) =>
-      b.withDockerHost(uri.toASCIIString)
-    ).build)
+    DockerClientConfig.createDefaultConfigBuilder
+          .withUri(maybeUri)
+          .fixTLS
+          .build)
+
+  implicit private class BuilderAddons(b: DockerClientConfigBuilder) {
+    def withUri(maybeUri: Option[java.net.URI]): DockerClientConfigBuilder =
+      maybeUri.map(uri => b.withDockerHost(uri.toASCIIString)).getOrElse(b)
+    def fixTLS: DockerClientConfigBuilder =
+      b.withDockerTlsVerify(false).build.getDockerHost.getScheme match {
+        case "unix" =>
+          b.withDockerTlsVerify(false)
+        case _ =>
+          b
+      }
+  }
 
 }
