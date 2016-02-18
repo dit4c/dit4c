@@ -166,12 +166,11 @@ class ApiService(
           get {
             signatureCheck {
               withContainer(name) { container =>
-                onSuccess(container.export) { byteSource =>
-                  val contentType = ContentType(MediaTypes.`application/x-tar`)
-                  val content =
-                    byteSource.transform(() => new ApiService.ChunkingStage)
-                  complete(HttpEntity.Chunked(contentType, content))
-                }
+                val byteSource = container.export
+                val contentType = ContentType(MediaTypes.`application/x-tar`)
+                val content =
+                  byteSource.transform(() => new ApiService.ChunkingStage)
+                complete(HttpEntity.Chunked(contentType, content))
               }
             }
           }

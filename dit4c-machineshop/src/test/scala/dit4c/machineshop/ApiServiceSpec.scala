@@ -64,10 +64,8 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
       })
       override def export = {
         val data: Array[Byte] = Array.fill(16)(0) // Empty tar
-        Future.successful {
-          Source(ByteString(data).grouped(8).toStream)
-            .mapMaterializedValue(_ => Future.successful(data.length))
-        }
+        Source(ByteString(data).grouped(8).toStream)
+          .mapMaterializedValue(_ => Future.successful(data.length))
       }
       override def delete = Future.successful({
         containerList = containerList.filterNot(_ == this)

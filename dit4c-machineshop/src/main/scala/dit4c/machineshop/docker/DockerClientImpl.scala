@@ -22,6 +22,10 @@ import dit4c.machineshop.docker.models.DockerContainers
 import dit4c.machineshop.docker.models.DockerImage
 import dit4c.machineshop.docker.models.DockerImages
 import com.github.dockerjava.core.DockerClientConfig.DockerClientConfigBuilder
+import java.util.concurrent.atomic.AtomicLong
+import scala.concurrent.Promise
+import akka.stream.stage.Context
+import akka.stream.stage.PushStage
 
 class DockerClientImpl(
     val dockerConfig: DockerClientConfig) extends DockerClient {
@@ -83,12 +87,18 @@ class DockerClientImpl(
         .withTimeout(Math.max(0, timeout.toSeconds.toInt)).exec
     })(ec).flatMap(_ => this.refresh)
 
-    override def export: Future[Source[ByteString, Future[Long]]] = Future({
-      docker.commitCmd(id).exec
-    })(ec).map { imageId =>
-      lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
-      Source.inputStream(() =>docker.saveImageCmd(imageId).exec)
-        .map(v => { fRemoveImage; v }) // Remove image onces stream starts
+    override def export: Source[ByteString, Future[Long]] = {
+      val byteCounter = new AtomicLong(0)
+      val completerStage = new DockerClientImpl.CompleterStage[ByteString]()
+      Source(Future{
+        docker.commitCmd(id).exec
+      }).flatMapConcat { imageId =>
+        lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
+        Source.inputStream(() =>docker.saveImageCmd(imageId).exec)
+          .map(v => { fRemoveImage; v }) // Remove image onces stream starts
+      }.map { bs => byteCounter.addAndGet(bs.size); bs }
+       .transform { () => completerStage }
+       .mapMaterializedValue(_ => completerStage.future.map(_ => byteCounter.get))
     }
 
     override def delete = Future({
@@ -184,5 +194,20 @@ object DockerClientImpl {
           b.withDockerTlsVerify(false)
       }
   }
+
+  protected class CompleterStage[T] extends PushStage[T, T] {
+    private val p = Promise[Unit]()
+    def future = p.future
+    def onPush(elem: T, ctx: Context[T]) = ctx.push(elem)
+    override def onUpstreamFailure(cause: Throwable, ctx: Context[T]) = {
+      p.failure(cause)
+      super.onUpstreamFailure(cause, ctx)
+    }
+    override def onUpstreamFinish(ctx: Context[T]) = {
+      p.success(())
+      super.onUpstreamFinish(ctx)
+    }
+  }
+
 }
 

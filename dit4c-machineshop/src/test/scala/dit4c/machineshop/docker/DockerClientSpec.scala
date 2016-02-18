@@ -22,6 +22,8 @@ import akka.stream.scaladsl.Source
 import com.github.dockerjava.api.async.ResultCallback
 import java.io.Closeable
 import scala.concurrent.Promise
+import com.github.dockerjava.core.DockerClientConfig.DockerClientConfigBuilder
+import com.github.dockerjava.core.DockerClientConfig
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -59,15 +61,14 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
   }
 
   def setupDockerInDocker: DockerInDockerInstance = {
-    val hostDockerUri = "unix:///var/run/docker.sock"
-    val client = DockerClientBuilder.getInstance(hostDockerUri).build
+    val client = DockerClientBuilder.getInstance.build
     val tmpDir = Files.createTempDirectory("dit4c_mc_dind_test_")
     tmpDir.toFile.deleteOnExit
     val dindId = client.createContainerCmd("docker.io/docker:1.9-dind")
       .withPrivileged(true)
       .withAttachStdout(true)
       .withAttachStderr(true)
-      .withName("dit4c_mc_dind_test-"+Random.alphanumeric.take(8).mkString)
+      .withName(tmpDir.getFileName.toString)
       .withBinds(new Bind(tmpDir.toAbsolutePath.toString, new Volume("/var/run")))
       .exec
       .getId
@@ -89,12 +90,17 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       .withAttachStdout(true)
       .withAttachStderr(true)
       .exec
-    client.execStartCmd(execCmd.getId).exec(new FutureCallback()).future
-      .foreach(_.decodeString("utf-8"))
+    val execOutput =
+      client.execStartCmd(execCmd.getId).exec(new FutureCallback()).future.await
+    println(execOutput.decodeString("utf-8"))
     new DockerInDockerInstance() {
       val uri = new java.net.URI(s"unix://${tmpDir.toAbsolutePath}/docker.sock")
       def newClient = DockerClientImpl(Some(uri))
-      def newDirectClient = DockerClientBuilder.getInstance(uri.toASCIIString).build
+      def newDirectClient = DockerClientBuilder.getInstance({
+        DockerClientConfig.createDefaultConfigBuilder
+          .withDockerTlsVerify(false)
+          .withDockerHost(uri.toASCIIString)
+      }).build
       override def destroy {
         client.removeContainerCmd(dindId)
           .withForce(true)
@@ -216,7 +222,7 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
             and haveName(dc.name)
             and beStopped)
         val numImages = dind.right.get.newDirectClient.listImagesCmd.exec.size
-        val exportSource = dc.export.await
+        val exportSource = dc.export
         val sink = Sink.fold[Long,ByteString](0L) { (count, str) =>
           count + str.length
         }
