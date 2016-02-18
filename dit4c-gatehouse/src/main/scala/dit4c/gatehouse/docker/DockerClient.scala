@@ -121,11 +121,13 @@ object DockerClient {
     def withUri(maybeUri: Option[java.net.URI]): DockerClientConfigBuilder =
       maybeUri.map(uri => b.withDockerHost(uri.toASCIIString)).getOrElse(b)
     def fixTLS: DockerClientConfigBuilder =
-      b.withDockerTlsVerify(false).build.getDockerHost.getScheme match {
-        case "unix" =>
+      b.withDockerTlsVerify(false).build.getDockerHost match {
+        case uri if uri.getScheme == "unix" =>
           b.withDockerTlsVerify(false)
-        case _ =>
-          b
+        case uri if uri.getScheme == "tcp" && uri.getPort == 2376 =>
+          b.withDockerTlsVerify(true)
+        case uri if uri.getScheme == "tcp" && uri.getPort == 2375 =>
+          b.withDockerTlsVerify(false)
       }
   }
 
