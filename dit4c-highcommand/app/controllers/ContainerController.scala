@@ -63,7 +63,6 @@ class ContainerController @Inject() (
           for {
             container <- containerDao.create(request.user, name, image, node)
             p <- createComputeNodeContainer(container)
-            _ <- hipache.put(container, node)
             cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
             result = Created(Json.obj(
               "id" -> container.id,
@@ -190,7 +189,6 @@ class ContainerController @Inject() (
             for {
               _ <- container.delete
               _ <- deleteOrIgnore(possibleContainer)
-              _ <- hipache.delete(container)
             } yield NoContent
           }.recover {
             case e: java.net.ConnectException =>

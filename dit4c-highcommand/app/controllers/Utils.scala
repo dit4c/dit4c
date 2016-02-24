@@ -140,36 +140,6 @@ trait Utils extends Results {
 
     implicit val timeout = Timeout(10, TimeUnit.SECONDS)
 
-    def remapAll(node: ComputeNode) =
-      withHipache { hipache =>
-        for {
-          containers <- containerDao.listFor(node)
-          _ <- Future.sequence(containers.map(hipache.put(_, node)))
-        } yield ()
-      }
-
-    def put(container: Container, node: ComputeNode) =
-      withHipache { hipache =>
-        hipache.put(container, node)
-      }
-
-    def delete(container: Container) =
-      withHipache { hipache =>
-        hipache.delete(container)
-      }
-
-    private def withHipache[A](f: HipacheClient => Future[A]): Future[Unit] =
-      hipacheClient.map {
-        case Some(client) => f(client).map(_ => ())
-        case None => Future.successful(())
-      }
-
-    private def hipacheClient: Future[Option[HipacheClient]] =
-      Play.current.plugin[HipachePlugin] match {
-        case Some(plugin) => plugin.client
-        case None => Future.successful(None)
-      }
-
     private implicit def asFrontend(c: Container): Frontend =
       containerResolver.asFrontend(c)
 

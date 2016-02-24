@@ -13,7 +13,7 @@ import providers.hipache.Hipache
 import akka.actor.ActorRef
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
-import providers.hipache.{ContainerResolver, HipachePlugin}
+import providers.hipache.ContainerResolver
 import providers.machineshop.{MachineShop, ContainerProvider}
 import scala.util.Try
 import java.net.ConnectException
@@ -92,10 +92,6 @@ class ComputeNodeController @Inject() (
           .withManagementUrl((json \ "managementUrl").as[String])
           .withBackend((json \ "backend").as[Hipache.Backend])
           .exec()
-        _ <- if (computeNode.backend == updated.backend)
-               Future.successful(())
-             else
-               HipacheInterface(containerResolver).remapAll(updated)
       } yield Ok(Json.toJson(updated))
     })
   }
@@ -108,8 +104,6 @@ class ComputeNodeController @Inject() (
           _ <- Future.sequence(tokens.map(_.delete))
           nodeContainers <- containerDao.listFor(computeNode)
           _ <- Future.sequence(nodeContainers.map(_.delete))
-          _ <- Future.sequence(
-              nodeContainers.map(HipacheInterface(containerResolver).delete(_)))
           _ <- computeNode.delete
         } yield NoContent
       })
@@ -297,7 +291,6 @@ class ComputeNodeController @Inject() (
               _ <- dockerContainer
                     .map(_.delete)
                     .getOrElse(Future.successful(()))
-              _ <- HipacheInterface(containerResolver).delete(container)
             } yield NoContent
         }
       })
