@@ -20,7 +20,7 @@ import org.joda.time.Interval
 @RunWith(classOf[JUnitRunner])
 class KeyDAOSpec extends PlaySpecification with SpecUtils {
 
-  def millisSinceCreation(dt: DateTime): Long =
+  def millisSince(dt: DateTime): Long =
     (new Interval(dt, DateTime.now)).toDurationMillis
 
   "KeyDAO" should {
@@ -28,9 +28,10 @@ class KeyDAOSpec extends PlaySpecification with SpecUtils {
     "create a new key" in new WithApplication(fakeApp) {
       val dao = new KeyDAO(db(app))
       val namespace = "localhost.localdomain"
+      val beforeKeyCreation = DateTime.now
       val key = await(dao.create(namespace, 512))
       key.namespace must_== namespace
-      millisSinceCreation(key.createdAt) must beBetween(0, 2000L)
+      millisSince(key.createdAt) must beLessThan(millisSince(beforeKeyCreation))
       key.publicId must_== s"$namespace ${key.createdAt} [${key.id}]"
       // Check database has data
       val couchResponse =
