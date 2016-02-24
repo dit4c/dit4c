@@ -54,7 +54,14 @@ define(['./app'], (app) ->
           $http
             .get('/containers')
             .then (response) ->
-              response.data
+              containers = response.data
+              containers.forEach (container) ->
+                $http
+                  .get('/containers/'+container.id)
+                  .then (response) ->
+                    for c, i in containers
+                      containers[i] = response.data if c.id == container.id
+              containers
             .catch (e) ->
               $location.path('/login').replace() if e.status == 403
               []

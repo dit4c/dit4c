@@ -120,9 +120,9 @@ class ContainerController @Inject() (
   }
 
   def list = Authenticated.async { implicit request =>
-    containerPairs.map { pairs =>
+    containerDao.list.map { containers =>
       val user = request.user
-      val json = JsArray(pairs.map((toJson _).tupled))
+      val json = JsArray(containers.map(toJson))
       Ok(json)
     }
   }
@@ -255,14 +255,16 @@ class ContainerController @Inject() (
   private def cncName(container: models.Container) =
     containerResolver.asFrontend(container).name
 
-  private def toJson(c: Container, cnc: Option[MachineShop.Container]) =
-      Json.obj(
-        "id" -> c.id,
-        "name" -> c.name,
-        "computeNodeId" -> c.computeNodeId,
-        "image" -> c.image,
-        "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
-      )
+  private def toJson(c: Container): JsObject =
+    Json.obj(
+      "id" -> c.id,
+      "name" -> c.name,
+      "computeNodeId" -> c.computeNodeId,
+      "image" -> c.image
+    )
+  
+  private def toJson(c: Container, cnc: Option[MachineShop.Container]): JsObject =
+    toJson(c) ++ Json.obj("active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active)))
 
   // Given a function which returns a future optional object, catch any
   // errors with the future and resolve with "None" instead.

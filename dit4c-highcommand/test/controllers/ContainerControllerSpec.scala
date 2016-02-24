@@ -58,7 +58,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       containers.zip(jsObjs).foreach { case (container, json) =>
         (json \ "id").as[String] must_== container.id
         (json \ "name").as[String] must_== container.name
-        (json \ "active").as[Boolean] must beFalse
+        // List no longer checks state of container on compute node for performance reasons
       }
       header("Cache-Control", threeResponse) must beSome("private, must-revalidate")
     }
