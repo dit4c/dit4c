@@ -44,6 +44,16 @@ object AkkaHttpExtras {
             else None
           }, log)
       val p = Promise[HttpResponse]()
+      // Result must be made recursive before resolution attempts are made, or
+      // else a short-circuit is possible.
+      val fResult = p.future
+        .recoverWith {
+          case e: akka.stream.StreamTcpException if !remainingAddrs.isEmpty =>
+            log.warning(s"Request to $addr failed. " +
+                s"Trying remaining ${remainingAddrs.size} addresses.")
+            singleResilientRequest(request,
+                remainingAddrs, settings, httpsContext, log)
+        }
       settings.idleTimeout match {
         case timeout: FiniteDuration =>
           fm.scheduleOnce(timeout, new Runnable() {
@@ -56,14 +66,7 @@ object AkkaHttpExtras {
       Source.single(request).via(c)
         .runForeach((r) => p.trySuccess(r))
         .onFailure({ case e: Throwable => p.tryFailure(e) })
-      p.future
-        .recoverWith {
-          case e: akka.stream.StreamTcpException if !remainingAddrs.isEmpty =>
-            log.warning(s"Request to $addr timed out. " +
-                s"Trying remaining ${remainingAddrs.size} addresses.")
-            singleResilientRequest(request,
-                remainingAddrs, settings, httpsContext, log)
-        }
+      fResult
     }
 
     def outgoingConnection(addr: InetAddress, port: Int,
