@@ -9,11 +9,11 @@ import scala.concurrent.ExecutionContext
 import models._
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
-import providers.hipache.Hipache
 import akka.actor.ActorRef
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
-import providers.hipache.ContainerResolver
+import providers.ContainerResolver
+import providers.RoutingMapEmitter
 import providers.machineshop.{MachineShop, ContainerProvider}
 import scala.util.Try
 import java.net.ConnectException
@@ -24,7 +24,7 @@ class ComputeNodeController @Inject() (
     mainController: Application,
     containerResolver: ContainerResolver) extends Controller with Utils {
 
-  import Hipache.hipacheBackendFormat
+  import RoutingMapEmitter.routingBackendFormat
 
   def index: Action[AnyContent] = Action.async { implicit request =>
     render.async {
@@ -37,7 +37,7 @@ class ComputeNodeController @Inject() (
     val json = request.body
     val name = (json \ "name").as[String]
     val managementUrl = (json \ "managementUrl").as[String]
-    val backend = (json \ "backend").as[Hipache.Backend]
+    val backend = (json \ "backend").as[RoutingMapEmitter.Backend]
 
     // Check this is a new server
     val fServerId: Future[Either[String, String]] =
@@ -90,7 +90,7 @@ class ComputeNodeController @Inject() (
         updated <- computeNode.update
           .withName((json \ "name").as[String])
           .withManagementUrl((json \ "managementUrl").as[String])
-          .withBackend((json \ "backend").as[Hipache.Backend])
+          .withBackend((json \ "backend").as[RoutingMapEmitter.Backend])
           .exec()
       } yield Ok(Json.toJson(updated))
     })

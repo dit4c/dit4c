@@ -15,7 +15,7 @@ import play.api.test.WithApplication
 import play.api.Play
 import providers.InjectorPlugin
 import utils.SpecUtils
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 import play.api.{Application => App}
 import scala.util.Random
 import scala.concurrent.Future
@@ -129,7 +129,7 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
           val cnHostname = randomAlpha
           (new ComputeNodeDAO(db(app), new KeyDAO(db(app)))).create(
               user, cnHostname, s"id-$cnHostname", s"http://$cnHostname:8080/",
-              Hipache.Backend(cnHostname, 80, "http"))
+              RoutingMapEmitter.Backend(cnHostname, 80, "http"))
         }.take(Random.nextInt(3)+1)
       }
       containers <- Future.sequence {

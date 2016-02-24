@@ -6,6 +6,8 @@ import org.specs2.runner.JUnitRunner
 import models.Container
 import utils.SpecUtils
 import play.api.test.WithApplication
+import providers.RoutingMapEmitter
+import providers.ContainerResolver
 
 @RunWith(classOf[JUnitRunner])
 class ContainerResolverSpec extends Specification with SpecUtils {
@@ -57,9 +59,9 @@ class ContainerResolverSpec extends Specification with SpecUtils {
       resolver.isContainerFrontend(
           resolver.asFrontend(container)) must beTrue
       resolver.isContainerFrontend(
-          Hipache.Frontend("portal", "localhost.localdomain")) must beFalse
+          RoutingMapEmitter.Frontend("portal", "localhost.localdomain")) must beFalse
       resolver.isContainerFrontend(
-          Hipache.Frontend("other", "c-foo.example.test")) must beFalse
+          RoutingMapEmitter.Frontend("other", "c-foo.example.test")) must beFalse
     }
   }
 

@@ -15,10 +15,11 @@ import java.security.Signature
 import com.nimbusds.jose.util.Base64
 import play.api.libs.ws.InMemoryBody
 import java.security.MessageDigest
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 import providers.machineshop.ContainerProvider
 import providers.machineshop.MachineShop
 import gnieh.sohva.async.View
+import providers.RoutingMapEmitter
 
 class ComputeNodeDAO @Inject() (
     protected val db: CouchDB.Database,
@@ -35,7 +36,7 @@ class ComputeNodeDAO @Inject() (
       name: String,
       serverId: String,
       managementUrl: String,
-      backend: Hipache.Backend): Future[ComputeNode] =
+      backend: RoutingMapEmitter.Backend): Future[ComputeNode] =
     utils.create { id =>
       ComputeNodeImpl(id, None,
           name, serverId, managementUrl, backend, Set(user.id), Set(user.id))
@@ -45,15 +46,13 @@ class ComputeNodeDAO @Inject() (
 
   def get(id: String) = utils.get(id)
 
-  import Hipache.hipacheBackendFormat
-
   implicit val computeNodeFormat: Format[ComputeNodeImpl] = (
     (__ \ "_id").format[String] and
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").format[String] and
     (__ \ "serverID").format[String] and
     (__ \ "managementURL").format[String] and
-    (__ \ "backend").format[Hipache.Backend] and
+    (__ \ "backend").format[RoutingMapEmitter.Backend] and
     (__ \ "ownerIDs").format[Set[String]] and
     (__ \ "userIDs").format[Set[String]]
   )(ComputeNodeImpl.apply _, unlift(ComputeNodeImpl.unapply))
@@ -67,7 +66,7 @@ class ComputeNodeDAO @Inject() (
       name: String,
       serverId: String,
       managementUrl: String,
-      backend: Hipache.Backend,
+      backend: RoutingMapEmitter.Backend,
       ownerIDs: Set[String],
       userIDs: Set[String]
       )(implicit ec: ExecutionContext)
@@ -111,7 +110,7 @@ class ComputeNodeDAO @Inject() (
         override def withManagementUrl(url: String) =
           model.copy(managementUrl = url)
 
-        override def withBackend(backend: Hipache.Backend) =
+        override def withBackend(backend: RoutingMapEmitter.Backend) =
           model.copy(backend = backend)
 
         override def withOwners(ids: Set[String]) =
@@ -129,7 +128,7 @@ trait ComputeNode extends OwnableModel with UsableModel {
   def name: String
   def serverId: String
   def managementUrl: String
-  def backend: Hipache.Backend
+  def backend: RoutingMapEmitter.Backend
 
   def containers: ContainerProvider
 
@@ -148,7 +147,7 @@ object ComputeNode {
   trait UpdateOp extends UpdateOperation[ComputeNode] {
     def withName(name: String): UpdateOp
     def withManagementUrl(url: String): UpdateOp
-    def withBackend(backend: Hipache.Backend): UpdateOp
+    def withBackend(backend: RoutingMapEmitter.Backend): UpdateOp
     def withOwners(ids: Set[String]): UpdateOp
     def withUsers(ids: Set[String]): UpdateOp
   }

@@ -22,9 +22,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
 import models._
-import providers.hipache._
 import akka.util.Timeout
 import java.util.concurrent.TimeUnit
+import providers.ContainerResolver
 
 trait Utils extends Results {
   import scala.language.implicitConversions
@@ -133,20 +133,6 @@ trait Utils extends Results {
       case None =>
         throw new RuntimeException("No valid private keys are available!")
     }
-
-
-  case class HipacheInterface(containerResolver: ContainerResolver) {
-    import Hipache._
-
-    implicit val timeout = Timeout(10, TimeUnit.SECONDS)
-
-    private implicit def asFrontend(c: Container): Frontend =
-      containerResolver.asFrontend(c)
-
-    private implicit def asBackend(node: ComputeNode): Backend =
-      node.backend
-
-  }
 
   implicit lazy val userWriter = new Writes[User]() {
     override def writes(u: User) = Json.obj(

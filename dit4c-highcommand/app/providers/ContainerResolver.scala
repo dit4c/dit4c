@@ -1,4 +1,4 @@
-package providers.hipache
+package providers
 
 import com.google.inject.Inject
 
@@ -6,14 +6,14 @@ class ContainerResolver @Inject() ( app: play.api.Application) {
 
   def asName(container: models.Container): String = dnsLabel(container)
 
-  def asFrontend(container: models.Container): Hipache.Frontend =
-    Hipache.Frontend(asName(container),
+  def asFrontend(container: models.Container): RoutingMapEmitter.Frontend =
+    RoutingMapEmitter.Frontend(asName(container),
         s"${dnsLabel(container)}.${baseDomain}")
 
   def asUrl(container: models.Container): java.net.URL = 
     new java.net.URL(s"$scheme://${asFrontend(container).domain}/")
 
-  def isContainerFrontend(frontend: Hipache.Frontend): Boolean =
+  def isContainerFrontend(frontend: RoutingMapEmitter.Frontend): Boolean =
     frontend.domain.startsWith(containerPrefix) &&
     frontend.domain.endsWith(baseDomain)
 

@@ -18,7 +18,7 @@ import utils.jwt._
 import providers.auth._
 import com.google.inject.Inject
 import providers.db.CouchDB
-import providers.hipache.ContainerResolver
+import providers.ContainerResolver
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader

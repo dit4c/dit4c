@@ -17,7 +17,7 @@ import play.api.test.WithApplication
 import play.api.Play
 import providers.InjectorPlugin
 import utils.SpecUtils
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 import play.api.libs.iteratee._
 import play.api.mvc.Results
 import akka.agent.Agent
@@ -49,7 +49,7 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val containers = Seq(
         await(containerDao.create(session.user, "name1", testImage, computeNode)),
         await(containerDao.create(session.user, "name2", testImage, computeNode)),

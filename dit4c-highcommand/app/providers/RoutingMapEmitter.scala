@@ -3,7 +3,6 @@ package providers
 import com.google.inject._
 import providers.db.CouchDB
 import play.api.libs.iteratee.Enumerator
-import providers.hipache.Hipache
 import play.api.libs.iteratee.Concurrent
 import play.api.Environment
 import gnieh.sohva.{Change, LastSeq}
@@ -11,12 +10,12 @@ import play.api.libs.json.Json
 import models._
 import scala.language.implicitConversions
 import akka.agent.Agent
-import providers.hipache.ContainerResolver
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.api.libs.iteratee.Iteratee
 import play.api.libs.json.Format
 import scala.concurrent.Promise
+import play.api.libs.json.JsPath
 
 class RoutingMapEmitter @Inject() @Singleton() (
     changeFeed: ChangeFeed,
@@ -25,7 +24,6 @@ class RoutingMapEmitter @Inject() @Singleton() (
     containerResolver: ContainerResolver)(
         implicit executionContext: ExecutionContext) {
   import RoutingMapEmitter._
-  import Hipache.{Frontend, Backend}
 
   val (eventBus, channel) = Concurrent.broadcast[Event]
 
@@ -148,14 +146,33 @@ class RoutingMapEmitter @Inject() @Singleton() (
 object RoutingMapEmitter {
 
   type Id = String
+  
+  case class Frontend(
+      name: String,
+      domain: String)
+
+  case class Backend(
+      host: String,
+      port: Int = 80,
+      scheme: String = "http") {
+    override def toString = s"$scheme://$host:$port"
+  }
 
   case class Route(
-      val frontend: Hipache.Frontend,
-      val backend: Hipache.Backend)
+      val frontend: Frontend,
+      val backend: Backend)
 
   sealed trait Event
   case class SetRoute(route: Route) extends Event
   case class DeleteRoute(route: Route) extends Event
   case class ReplaceAllRoutes(routes: Set[Route]) extends Event
 
+  implicit val routingBackendFormat: Format[RoutingMapEmitter.Backend] = {
+    import play.api.libs.functional.syntax._
+    (
+      (JsPath \ "host").format[String] and
+      (JsPath \ "port").format[Int] and
+      (JsPath \ "scheme").format[String]
+    )(RoutingMapEmitter.Backend.apply _, unlift(RoutingMapEmitter.Backend.unapply))
+  }
 }

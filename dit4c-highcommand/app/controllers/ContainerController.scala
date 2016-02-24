@@ -13,7 +13,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import play.mvc.Http.RequestHeader
 import providers.machineshop.MachineShop
-import providers.hipache.ContainerResolver
+import providers.ContainerResolver
 import spray.http.StatusCodes.ServerError
 import play.api.libs.iteratee.Enumeratee
 import akka.util.ByteString
@@ -251,8 +251,6 @@ class ContainerController @Inject() (
         computeNode.managementUrl,
         () => keyDao.bestSigningKey.map(_.get.toJWK))
     }
-
-  private def hipache = HipacheInterface(containerResolver)
 
   private def cncName(container: models.Container) =
     containerResolver.asFrontend(container).name

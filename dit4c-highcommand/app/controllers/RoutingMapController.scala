@@ -7,7 +7,7 @@ import play.api.libs.json._
 import providers.db.CouchDB
 import play.api.libs.json.Json
 import java.security.MessageDigest
-import providers.hipache.ContainerResolver
+import providers.ContainerResolver
 import rx.lang.scala.Subscription
 import play.api.libs.iteratee.Concurrent
 import providers.RoutingMapEmitter
@@ -23,6 +23,8 @@ class RoutingMapController @Inject() (
     val db: CouchDB.Database,
     val routingMapEmitter: RoutingMapEmitter)
     extends Controller with Utils {
+  
+  import RoutingMapEmitter.routingBackendFormat
 
   def comment(msg: String) = new EventSource.Event(msg, None, None) {
     override lazy val formatted = """(?m)^""".r.replaceAllIn(msg, "; ")+"\n"

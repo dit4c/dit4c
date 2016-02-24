@@ -12,6 +12,7 @@ import providers.db.CouchDB
 import java.util.Collections.EmptySet
 import utils.SpecUtils
 import play.api.test.WithApplication
+import providers.RoutingMapEmitter
 
 @RunWith(classOf[JUnitRunner])
 class ContainerDAOSpec extends PlaySpecification with SpecUtils {
@@ -75,7 +76,7 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
 
   case class MockComputeNode(val id: String) extends ComputeNode {
     override def _rev: Option[String] = ???
-    override def backend: providers.hipache.Hipache.Backend = ???
+    override def backend: RoutingMapEmitter.Backend = ???
     override def containers: providers.machineshop.ContainerProvider = ???
     override def managementUrl: String = ???
     override def name: String = ???

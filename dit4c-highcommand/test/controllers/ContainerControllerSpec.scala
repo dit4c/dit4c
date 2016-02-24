@@ -18,7 +18,8 @@ import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
 import utils.SpecUtils
 import providers.machineshop.MachineShop
-import providers.hipache.{ContainerResolver,Hipache}
+import providers.RoutingMapEmitter
+import providers.ContainerResolver
 
 /**
  * Add your spec here.
@@ -44,7 +45,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode = 
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val containers = Seq(
         await(containerDao.create(session.user, "name1", testImage, computeNode)),
         await(containerDao.create(session.user, "name2", testImage, computeNode)),
@@ -73,7 +74,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val container =
         await(containerDao.create(session.user, "name1", testImage, computeNode))
       val response = controller.get(container.id)(session.newRequest)
@@ -98,7 +99,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val container =
         await(containerDao.create(session.user, "test", testImage, computeNode))
       val response = controller.redirect(container.id)(session.newRequest)
@@ -118,7 +119,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode = 
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val badRequestResponse  = 
         controller.create(session.newRequest[JsValue](Json.obj(
           "name"->"",
@@ -147,7 +148,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val container =
         await(containerDao.create(session.user, "test", testImage, computeNode))
       val response  = 

@@ -12,7 +12,7 @@ import providers.auth.Identity
 import providers.db.CouchDB
 import play.api.test.WithApplication
 import utils.SpecUtils
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 
 @RunWith(classOf[JUnitRunner])
 class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
@@ -27,12 +27,12 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
           "Local",
           "fakeid",
           "http://localhost:8080/",
-          Hipache.Backend("localhost", 6000)
+          RoutingMapEmitter.Backend("localhost", 6000)
       ))
       node.name must_== "Local"
       node.serverId must_== "fakeid"
       node.managementUrl must_== "http://localhost:8080/"
-      node.backend must_== Hipache.Backend("localhost", 6000)
+      node.backend must_== RoutingMapEmitter.Backend("localhost", 6000)
       // Check database has data
       val couchResponse =
         await(db(app).asSohvaDb.getDocById[JsValue](node.id, None))
@@ -60,7 +60,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
           "Local",
           "fakeid",
           "http://localhost:8080/",
-          Hipache.Backend("localhost", 6000)
+          RoutingMapEmitter.Backend("localhost", 6000)
       ))
       await(dao.list) must haveSize(1)
     }
@@ -73,7 +73,7 @@ class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
           "Local",
           "fakeid",
           "http://localhost:8080/",
-          Hipache.Backend("localhost", 6000)
+          RoutingMapEmitter.Backend("localhost", 6000)
       ))
       await(dao.get(node.id)) must beSome(node)
     }

@@ -16,8 +16,7 @@ import providers.InjectorPlugin
 import scala.concurrent.Future
 import play.api.mvc.AnyContentAsEmpty
 import utils.SpecUtils
-import providers.hipache.Hipache.Backend
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 
 /**
  * Add your spec here.
@@ -43,7 +42,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
 
       await(dao.create(
           session.user, "Local", "fakeid", "http://localhost:5000/",
-          Hipache.Backend("localhost", 8080, "https")))
+          RoutingMapEmitter.Backend("localhost", 8080, "https")))
 
       val nonEmptyResponse = controller.list(session.newRequest)
       status(nonEmptyResponse) must_== 200
@@ -74,7 +73,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       ))
       val cn = await(cnDao.create(creatingSession.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
       val token = await(atDao.create(AccessToken.AccessType.Share, cn))
 
       cn.userIDs must contain(creatingSession.user.id)
@@ -100,7 +99,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
 
       val body: JsValue = Json.obj("type" -> "share")
       val req = session.newRequest.withBody(body)
@@ -122,7 +121,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
 
       val emptyResponse = controller.listTokens(cn.id)(session.newRequest)
       status(emptyResponse) must_== 200
@@ -147,7 +146,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
 
       val response = controller.listOwners(cn.id)(session.newRequest)
       status(response) must_== 200
@@ -174,7 +173,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       )))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
 
       // Should not be able to remove last owner
       val forbiddenResponse =
@@ -198,7 +197,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
       val session = new UserSession(db(app))
       val cn = await(cnDao.create(session.user,
           "test", "fakeid", "http://example.test/",
-          Hipache.Backend("example.test", 80, "https")))
+          RoutingMapEmitter.Backend("example.test", 80, "https")))
 
       val response = controller.listUsers(cn.id)(session.newRequest)
       status(response) must_== 200
@@ -227,7 +226,7 @@ class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
         for {
           cn <- cnDao.create(session.user,
             "test", "fakeid", "http://example.test/",
-            Hipache.Backend("example.test", 80, "https"))
+            RoutingMapEmitter.Backend("example.test", 80, "https"))
           cnWithUser <- cn.addUser(newUser)
         } yield cnWithUser
       )

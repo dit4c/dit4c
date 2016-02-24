@@ -8,7 +8,7 @@ import play.api.test._
 import play.api.libs.json._
 import models._
 import utils.SpecUtils
-import providers.hipache.Hipache
+import providers.RoutingMapEmitter
 import play.api.libs.iteratee._
 
 @RunWith(classOf[JUnitRunner])
@@ -30,7 +30,7 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
-            Hipache.Backend("localhost", 8080, "https")))
+            RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val containers = IndexedSeq(
         await(containerDao.create(session.user, "name1", testImage, computeNode)),
         await(containerDao.create(session.user, "name2", testImage, computeNode)),
