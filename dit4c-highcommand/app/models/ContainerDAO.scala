@@ -22,8 +22,7 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
       computeNode: ComputeNode): Future[Container] =
     list.flatMap { containers =>
       utils.create { id =>
-        ContainerImpl(id, None, name, image, computeNode.id,
-          Set(user.id))
+        ContainerImpl(id, None, name, image, computeNode.id, user.id)
       }
     }
 
@@ -35,6 +34,11 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
     for {
       containers <- list
     } yield containers.filter(_.computeNodeId == node.id)
+    
+  private val ownerFormat: OFormat[Container.OwnerID] = OFormat(
+      (__ \ "ownerID").read[Container.OwnerID].orElse(
+        (__ \ "ownerIDs").read[Set[Container.OwnerID]].map(vs => vs.head)),
+      (__ \ "ownerID").write[Container.OwnerID])
 
   implicit val containerFormat: Format[ContainerImpl] = (
     (__ \ "_id").format[String] and
@@ -42,7 +46,7 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
     (__ \ "name").format[String] and
     (__ \ "image").format[String] and
     (__ \ "computeNodeId").format[String] and
-    (__ \ "ownerIDs").format[Set[String]]
+    ownerFormat
   )(ContainerImpl.apply _, unlift(ContainerImpl.unapply))
     .withTypeAttribute(typeValue)
 
@@ -54,7 +58,7 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
       name: String,
       image: String,
       computeNodeId: String,
-      ownerIDs: Set[String])
+      ownerID: String)
       extends Container
       with DAOModel[ContainerImpl]
       with UpdatableModel[Container.UpdateOp] {
@@ -71,19 +75,20 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
       new utils.UpdateOp(model) with Container.UpdateOp {
         override def withName(name: String) =
           model.copy(name = name)
-        override def withOwners(ids: Set[String]) =
-          model.copy(ownerIDs = ids)
+        override def withOwner(id: Container.OwnerID) =
+          model.copy(ownerID = id)
       }
 
   }
 
 }
 
-trait Container extends OwnableModel {
+trait Container extends BaseModel {
 
   def name: String
   def image: String
   def computeNodeId: String
+  def ownerID: Container.OwnerID
 
   def update: Container.UpdateOp
   def delete: Future[Unit]
@@ -91,8 +96,10 @@ trait Container extends OwnableModel {
 }
 
 object Container {
+  type OwnerID = String
+  
   trait UpdateOp extends UpdateOperation[Container] {
     def withName(name: String): UpdateOp
-    def withOwners(ids: Set[String]): UpdateOp
+    def withOwner(id: OwnerID): UpdateOp
   }
 }

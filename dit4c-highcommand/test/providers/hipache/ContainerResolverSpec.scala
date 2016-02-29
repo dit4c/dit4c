@@ -25,7 +25,7 @@ class ContainerResolverSpec extends Specification with SpecUtils {
     def update: models.Container.UpdateOp = ???
 
     // Members declared in models.OwnableModel
-    def ownerIDs: Set[String] = ???
+    def ownerID: String = ???
   }
 
   "ContainerResolver" >> {

@@ -231,7 +231,7 @@ class ComputeNodeController @Inject() (
           "name" -> c.name,
           "computeNodeId" -> c.computeNodeId,
           "image" -> c.image,
-          "ownerIDs" -> c.ownerIDs,
+          "ownerIDs" -> Set(c.ownerID),
           "active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active))
         )
       }))
@@ -263,7 +263,7 @@ class ComputeNodeController @Inject() (
                 "name" -> container.name,
                 "computeNodeId" -> container.computeNodeId,
                 "image" -> container.image,
-                "ownerIDs" -> container.ownerIDs,
+                "ownerIDs" -> Set(container.ownerID),
                 "active" -> JsBoolean(false)
               ))
             case None => NotFound

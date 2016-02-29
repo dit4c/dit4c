@@ -104,8 +104,8 @@ class AuthControllerSpec extends PlaySpecification with SpecUtils {
       val allComputeNodeIDs =
         (primaryContainers ++ secondaryContainers).map(_.computeNodeId).distinct
       await(containerDao.list)
-        .filter(_.ownerIDs.contains(primaryUser.id))
-        .map(_.id) must contain(allOf(allContainerIDs: _*))
+        .filter(_.ownerID == primaryUser.id)
+        .map(_.id).sorted must contain(allOf(allContainerIDs.sorted: _*))
       val computeNodes = await(computeNodeDao.list)
       computeNodes
         .filter(_.ownerIDs.contains(primaryUser.id))

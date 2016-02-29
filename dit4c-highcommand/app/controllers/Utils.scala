@@ -95,7 +95,7 @@ trait Utils extends Results {
 
   protected def userContainers(user: User): Future[Seq[Container]] =
     containerDao.list.map { containers =>
-      containers.filter(_.ownerIDs.contains(user.id))
+      containers.filter(_.ownerID == user.id)
     }
 
   protected def fetchUser(implicit request: Request[_]): Future[Option[User]] =

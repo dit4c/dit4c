@@ -170,7 +170,7 @@ class ContainerController @Inject() (
       .flatMap[Result] {
         case None =>
           Future.successful(NotFound)
-        case Some(container) if !container.ownerIDs.contains(request.user.id) =>
+        case Some(container) if container.ownerID != request.user.id =>
           Future.successful(Forbidden)
         case Some(container) =>
           // If resolution is successful, but doesn't return a container, then
@@ -216,7 +216,7 @@ class ContainerController @Inject() (
 
   private def userContainers(implicit request: AuthenticatedRequest[_]): 
       Future[Seq[Container]] =
-    containerDao.list.map(_.filter(_.ownerIDs.contains(request.user.id)))
+    containerDao.list.map(_.filter(_.ownerID == request.user.id))
       
   private def containerPairs(implicit request: AuthenticatedRequest[_]):
       Future[Seq[(Container, Option[MachineShop.Container])]] = {

@@ -71,7 +71,7 @@ class AuthController @Inject() (
         for {
           containers <- containerDao.list
           computeNodes <- computeNodeDao.list
-          userContainers = containers.filter(_.ownerIDs.contains(mergeUser.id))
+          userContainers = containers.filter(_.ownerID == mergeUser.id)
           userComputeNodes = computeNodes.filter { cn =>
             (cn.ownerIDs ++ cn.userIDs).contains(mergeUser.id)
           }
@@ -81,7 +81,7 @@ class AuthController @Inject() (
           }
           _ <- Future.sequence {
             userContainers.map { container =>
-              container.update.withOwners(replaceID(container.ownerIDs))
+              container.update.withOwner(request.user.id)
             }.map(_.exec)
           }
           _ <- Future.sequence {

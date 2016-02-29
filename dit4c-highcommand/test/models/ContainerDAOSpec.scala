@@ -29,7 +29,7 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
       Seq(
         ("test", ""),
         ("test", "A test description.")
-      ).foreach { case (name, desc) =>
+      ).map { case (name, desc) =>
         val cn = MockComputeNode("mockcontainerid")
         val container = await(dao.create(session.user, name, dummyImage, cn))
         container.name must be(container.name)
@@ -39,15 +39,14 @@ class ContainerDAOSpec extends PlaySpecification with SpecUtils {
           await(db(app).asSohvaDb.getDocById[JsValue](container.id, None))
         couchResponse must beSome
         val json = couchResponse.get
-        (json \ "type").as[String] must_== "Container"
-        (json \ "_id").as[String] must_== container.id
-        (json \ "_rev").asOpt[String] must_== container._rev
-        (json \ "name").as[String] must_== container.name
-        (json \ "image").as[String] must_== container.image
-        (json \ "computeNodeId").as[String] must_== container.computeNodeId
-        (json \ "ownerIDs").as[Set[String]] must contain(session.user.id)
-      }
-      done
+        (json \ "type").as[String].must_==("Container") and
+        (json \ "_id").as[String].must_==(container.id) and
+        (json \ "_rev").asOpt[String].must_==(container._rev) and
+        (json \ "name").as[String].must_==(container.name) and
+        (json \ "image").as[String].must_==(container.image) and
+        (json \ "computeNodeId").as[String].must_==(container.computeNodeId) and
+        (json \ "ownerID").as[String].must_==(session.user.id)
+      }.reduce(_ and _)
     }
 
     "get by ID" in new WithApplication(fakeApp) {
