@@ -120,7 +120,7 @@ class ContainerController @Inject() (
   }
 
   def list = Authenticated.async { implicit request =>
-    containerDao.list.map { containers =>
+    userContainers.map { containers =>
       val user = request.user
       val json = JsArray(containers.map(toJson))
       Ok(json)
@@ -214,10 +214,13 @@ class ContainerController @Inject() (
       val expr: String => Boolean,
       val msg: String)
 
+  private def userContainers(implicit request: AuthenticatedRequest[_]): 
+      Future[Seq[Container]] =
+    containerDao.list.map(_.filter(_.ownerIDs.contains(request.user.id)))
+      
   private def containerPairs(implicit request: AuthenticatedRequest[_]):
       Future[Seq[(Container, Option[MachineShop.Container])]] = {
-    containerDao.list.flatMap { containers =>
-      val userContainers = containers.filter(_.ownerIDs.contains(request.user.id))
+    userContainers.flatMap { userContainers =>
       // Use a single resolver instance, and catch errors in resolution
       val r = fallbackToMissing(resolveComputeNodeContainer)
       Future.sequence(

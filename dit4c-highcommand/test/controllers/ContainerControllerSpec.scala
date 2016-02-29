@@ -36,6 +36,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
 
     "provide JSON list of containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db(app))
+      val otherSession = new UserSession(db(app),MockIdentity("testing:other-user", Some("Other User"), None))
       val controller = getMockedController(app)
       val computeNodeDao = new ComputeNodeDAO(db(app), new KeyDAO(db(app)))
       val containerDao = new ContainerDAO(db(app))
@@ -51,6 +52,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
         await(containerDao.create(session.user, "name2", testImage, computeNode)),
         await(containerDao.create(session.user, "name3", testImage, computeNode))
       )
+      await(containerDao.create(otherSession.user, "name4", testImage, computeNode))
       val threeResponse = controller.list(session.newRequest)
       status(threeResponse) must_== 200
       val jsObjs = contentAsJson(threeResponse).as[Seq[JsObject]]
