@@ -78,7 +78,8 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
       case Some(mapping) => dest ! AddMapping(mapping)
       case None => dest ! RemoveMapping(containerId)
     }.recover {
-      case _ => ()
+      case e: Throwable =>
+        log.error(s"Docker port lookup failed: $e\n${e.getStackTrace.toSeq}")
     }
   }
 
