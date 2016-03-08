@@ -22,10 +22,16 @@ import play.api.libs.iteratee._
 import play.api.mvc.Results
 import akka.agent.Agent
 import play.api.libs.concurrent.Promise
+import play.api.http.HttpEntity
+import akka.stream.ActorMaterializer
+import akka.stream.Materializer
+import play.api.libs.streams.Streams
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 
 @RunWith(classOf[JUnitRunner])
 class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
-
+  
   val testImage = "dit4c/dit4c-container-ipython"
 
   "RoutingMapController" should {
@@ -90,7 +96,8 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
   }
 
 
-  def contentAsJsonEnumerator(fResult: Future[Result]): Enumerator[JsValue] = {
+  def contentAsJsonEnumerator(
+      fResult: Future[Result])(implicit mat: Materializer): Enumerator[JsValue] = {
     contentAsStringEnumerator(fResult) &> Enumeratee.mapConcat { text =>
       text.split("\n").flatMap {
         case s if s.startsWith("data: ") =>
@@ -101,17 +108,16 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
     }
   }
 
-  def contentAsStringEnumerator(fResult: Future[Result]): Enumerator[String] = {
+  def contentAsStringEnumerator(
+      fResult: Future[Result])(implicit mat: Materializer): Enumerator[String] = {
     val encoding = charset(fResult).getOrElse("utf-8")
     Enumerator.flatten(fResult.map { r =>
-      val byteEnumerator = r.header.headers.get(TRANSFER_ENCODING) match {
-        case Some("chunked") => r.body &> Results.dechunk
-        case _ => r.body
+      val stringConv = Enumeratee.map[ByteString] { bytes =>
+        bytes.decodeString(encoding)
       }
-      val stringConv = Enumeratee.map[Array[Byte]] { bytes =>
-        new String(bytes, encoding)
-      }
-      byteEnumerator &> stringConv
+      val publisher = r.body.dataStream.runWith(
+          Sink.asPublisher[ByteString](false))
+      Streams.publisherToEnumerator(publisher) &> stringConv
     })
   }
 }

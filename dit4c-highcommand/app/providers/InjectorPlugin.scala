@@ -7,7 +7,6 @@ import scala.util.Try
 import com.google.inject.AbstractModule
 import com.google.inject.Guice
 import com.google.inject.Injector
-import play.api.Plugin
 import play.twirl.api.Html
 import providers.auth._
 import providers.db.CouchDB
@@ -24,6 +23,7 @@ import play.api.inject.ApplicationLifecycle
 import javax.inject.Singleton
 import play.twirl.api.Html
 import com.github.rjeschke.txtmark;
+import play.api.libs.ws.WSClient
 
 class InjectorPlugin(
     environment: Environment,
@@ -32,11 +32,12 @@ class InjectorPlugin(
 
   lazy val log = play.api.Logger
 
-  lazy val authProviders = AuthProviders(
-      RapidAAFAuthProvider(configuration) ++
-      GitHubProvider(configuration) ++
-      TwitterProvider(configuration) ++
-      DummyProvider(configuration))
+  @Singleton @Provides def authProviders(ws: WSClient) =
+    AuthProviders(
+      RapidAAFAuthProvider(configuration, ws) ++
+      GitHubProvider(configuration, ws) ++
+      TwitterProvider(configuration, ws) ++
+      DummyProvider(configuration, ws))
 
   val dbName = configuration.getString("couchdb.database").get
 
@@ -92,9 +93,7 @@ class InjectorPlugin(
       } yield db,
       1.minute)
 
-  def configure {
-    bind(classOf[AuthProviders]).toInstance(authProviders)
-  }
+  def configure {}
 
   private def parseUrl(str: String): Option[java.net.URL] =
     Try(new java.net.URL(str)).toOption

@@ -3,6 +3,7 @@ package providers.auth
 import play.twirl.api.Html
 import scala.concurrent.Future
 import play.api.mvc.Results
+import play.api.libs.ws.WSClient
 
 class DummyProvider extends AuthProvider {
   override def name = "dummy"
@@ -34,7 +35,9 @@ class DummyProvider extends AuthProvider {
 
 object DummyProvider extends AuthProviderFactory {
 
-  def apply(c: play.api.Configuration): Iterable[AuthProvider] =
+  override def apply(
+      c: play.api.Configuration,
+      ws: WSClient): Iterable[AuthProvider] =
     if (c.getBoolean("dummyauth").getOrElse(false))
       Some(new DummyProvider)
     else

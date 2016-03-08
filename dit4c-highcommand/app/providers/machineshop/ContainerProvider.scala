@@ -6,6 +6,7 @@ import play.api.libs.json._
 import play.api.libs.ws._
 import scala.util.Try
 import com.nimbusds.jose.jwk.RSAKey
+import akka.util.ByteString
 
 class ContainerProvider(
     managementUrl: String,
@@ -24,8 +25,8 @@ class ContainerProvider(
       .signed { ws: WSRequest =>
         ws.withMethod("POST")
           .withHeaders("Content-Type" -> "application/json; charset=utf-8")
-          .withBody(InMemoryBody(Json.stringify(
-              Json.obj("name" -> name, "image" -> image)).getBytes))
+          .withBody(InMemoryBody(ByteString(Json.stringify(
+              Json.obj("name" -> name, "image" -> image)).getBytes)))
       }
       .map(rethrowErrors(_.json.as[Container]))
 

@@ -9,6 +9,7 @@ import play.api.libs.json._
 import play.twirl.api.Html
 import scala.concurrent.Future
 import play.api.mvc.Results
+import play.api.libs.ws.WSClient
 
 class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProvider {
 
@@ -68,7 +69,9 @@ class RapidAAFAuthProvider(config: RapidAAFAuthProvider.Config) extends AuthProv
 object RapidAAFAuthProvider extends AuthProviderFactory {
   case class Config(url: java.net.URL, key: String)
 
-  def apply(config: play.api.Configuration) =
+  def apply(
+      config: play.api.Configuration,
+      ws: WSClient): Iterable[AuthProvider] =
     for {
       c <- config.getConfig("rapidaaf")
       urlStr <- c.getString("url")

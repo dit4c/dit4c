@@ -42,7 +42,7 @@ object MachineShop {
 
     def apply(path: String, timeout: FiniteDuration = 2.minutes) =
       new RequestHolder(WS.url(s"$managementUrl$path")
-          .withRequestTimeout(timeout.toMillis))
+          .withRequestTimeout(timeout))
 
     class RequestHolder(ws: WSRequest) {
       import play.api.libs.iteratee.Enumerator
@@ -122,7 +122,7 @@ object MachineShop {
     def calculateDigest: WSRequest = request.body match {
       case InMemoryBody(bytes) =>
         val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(bytes)
+        digest.update(bytes.toArray)
         request.withHeaders(
           "Digest" -> s"SHA-256=${Base64.encode(digest.digest)}"
         )

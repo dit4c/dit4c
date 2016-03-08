@@ -4,6 +4,7 @@ import play.api.mvc.{Request, Result}
 import play.api.mvc.AnyContent
 import play.twirl.api.Html
 import scala.concurrent.Future
+import play.api.libs.ws.WSClient
 
 trait AuthProvider {
   def name: String
@@ -12,7 +13,7 @@ trait AuthProvider {
 }
 
 trait AuthProviderFactory {
-  def apply(config: play.api.Configuration): Iterable[AuthProvider]
+  def apply(config: play.api.Configuration, ws: WSClient): Iterable[AuthProvider]
 }
 
 sealed trait CallbackResult

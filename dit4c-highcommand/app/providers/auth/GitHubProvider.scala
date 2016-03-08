@@ -13,11 +13,11 @@ import play.api.mvc.Results
 import play.api.Play
 import play.api.libs.concurrent.Execution
 import play.api.libs.ws.WSResponse
+import play.api.libs.ws.WSClient
 
-class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
+class GitHubProvider(config: GitHubProvider.Config, ws: WSClient) extends AuthProvider {
 
   import play.api.libs.functional.syntax._
-  import Play.current
   import Execution.Implicits.defaultContext
 
   override def name = "github"
@@ -50,7 +50,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
     tokenRequest(code).flatMap(retreiveIdentityWithEmail)
 
   protected def tokenRequest(code: String): Future[String] =
-    WS.url("https://github.com/login/oauth/access_token")
+    ws.url("https://github.com/login/oauth/access_token")
       .withHeaders("Accept" -> "application/json")
       .post(Map(
           "code" -> Seq(code),
@@ -74,7 +74,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
 
 
   protected def retrieveEmails(token: String): Future[Seq[String]] =
-    WS.url("https://api.github.com/user/emails")
+    ws.url("https://api.github.com/user/emails")
       .withHeaders(
           "Authorization" -> s"token $token",
           "Accept" -> "application/json")
@@ -89,7 +89,7 @@ class GitHubProvider(config: GitHubProvider.Config) extends AuthProvider {
       }
 
   protected def retrieveIdentity(token: String): Future[GitHubIdentity] =
-    WS.url("https://api.github.com/user")
+    ws.url("https://api.github.com/user")
       .withHeaders(
           "Authorization" -> s"token $token",
           "Accept" -> "application/json")
@@ -135,12 +135,13 @@ object GitHubProvider extends AuthProviderFactory {
 
   case class Config(id: String, secret: String)
 
-  def apply(config: play.api.Configuration) =
+  def apply(
+      config: play.api.Configuration,
+      ws: WSClient): Iterable[AuthProvider] =
     for {
       c <- config.getConfig("github")
       id <- c.getString("id")
       secret <- c.getString("secret")
-    } yield new GitHubProvider(
-        new GitHubProvider.Config(id, secret))
+    } yield new GitHubProvider(GitHubProvider.Config(id, secret), ws)
 
 }

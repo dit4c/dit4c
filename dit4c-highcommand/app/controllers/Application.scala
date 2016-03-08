@@ -13,9 +13,11 @@ import play.api.libs.Codecs
 import scala.util.Try
 import play.api.http.ContentTypes
 import play.api.libs.json._
+import akka.actor.ActorSystem
 
 @Singleton
 class Application @Inject() (
+    actorSystem: ActorSystem,
     authProviders: AuthProviders,
     webConfig: providers.WebConfig,
     val db: CouchDB.Database)
@@ -77,7 +79,7 @@ class Application @Inject() (
           }
         // Non-HTML should just wait a bit then redirect back
         case _ =>
-          val scheduler = Akka.system(Play.current).scheduler
+          val scheduler = actorSystem.scheduler
           val waitTime = Duration(5, "seconds")
           after(waitTime, scheduler) {
             successful {

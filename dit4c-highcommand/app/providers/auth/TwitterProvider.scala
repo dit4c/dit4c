@@ -16,11 +16,11 @@ import play.api.libs.ws.WSResponse
 import play.api.libs.oauth._
 import java.net.URL
 import oauth.signpost.exception.OAuthException
+import play.api.libs.ws.WSClient
 
-class TwitterProvider(info: ServiceInfo) extends AuthProvider {
+class TwitterProvider(info: ServiceInfo, ws: WSClient) extends AuthProvider {
 
   import play.api.libs.functional.syntax._
-  import Play.current
   import Execution.Implicits.defaultContext
 
   override def name = "twitter"
@@ -39,7 +39,7 @@ class TwitterProvider(info: ServiceInfo) extends AuthProvider {
     } yield {
       Future(oauth.retrieveAccessToken(token, verifier)).flatMap {
         case Right(accessToken: RequestToken) =>
-          WS.url("https://api.twitter.com/1.1/account/verify_credentials.json")
+          ws.url("https://api.twitter.com/1.1/account/verify_credentials.json")
             .sign(OAuthCalculator(info.key, accessToken))
             .get
             .map {
@@ -87,7 +87,9 @@ class TwitterProvider(info: ServiceInfo) extends AuthProvider {
 
 object TwitterProvider extends AuthProviderFactory {
 
-  def apply(config: play.api.Configuration) =
+  def apply(
+      config: play.api.Configuration,
+      ws: WSClient): Iterable[AuthProvider] =
     for {
       baseUrl <- config.getString("application.baseUrl")
       c <- config.getConfig("twitter")
@@ -100,6 +102,6 @@ object TwitterProvider extends AuthProviderFactory {
         "https://api.twitter.com/oauth/authenticate",
         consumerKey
       )
-    } yield new TwitterProvider(info)
+    } yield new TwitterProvider(info, ws)
 
 }

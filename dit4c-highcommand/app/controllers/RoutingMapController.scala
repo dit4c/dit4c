@@ -42,7 +42,7 @@ class RoutingMapController @Inject() (
       val feed = routingMapEmitter.newFeed &>
          Enumeratee.map(Json.toJson(_)) &>
          EventSource() interleave keepAlive
-      Ok.stream(feed).as("text/event-stream")
+      Ok.feed(feed).as("text/event-stream")
     }
   }
 

@@ -18,6 +18,7 @@ import providers.machineshop.{MachineShop, ContainerProvider}
 import scala.util.Try
 import java.net.ConnectException
 import models.AccessToken.AccessType
+import akka.util.ByteString
 
 class ComputeNodeController @Inject() (
     val db: CouchDB.Database,
@@ -169,8 +170,8 @@ class ComputeNodeController @Inject() (
           .signed { ws =>
             ws.withMethod("POST")
               .withHeaders("Content-Type" -> "application/json; charset=utf-8")
-              .withBody(InMemoryBody(
-                Json.prettyPrint(request.body).getBytes("utf-8")))
+              .withBody(InMemoryBody(ByteString(
+                Json.prettyPrint(request.body).getBytes("utf-8"))))
           }
           .map { response =>
             Status(response.status)(response.json)
