@@ -117,7 +117,7 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       createdAt: DateTime,
       retired: Boolean,
       keyPair: WrappedRSAKey)(implicit ec: ExecutionContext)
-      extends Key with DAOModel[KeyImpl] 
+      extends Key with BaseModel 
       with UpdatableModel[Key.UpdateOp] {
     import scala.language.implicitConversions
     

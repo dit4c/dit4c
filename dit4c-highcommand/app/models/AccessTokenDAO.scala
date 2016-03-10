@@ -100,7 +100,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
       code: String,
       accessType: AccessType.Value,
       resource: Resource
-    ) extends AccessToken with DAOModel[AccessTokenImpl] {
+    ) extends AccessToken with BaseModel {
 
     def delete: Future[Unit] = utils.delete(this)
 

@@ -60,7 +60,7 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
       computeNodeId: String,
       ownerID: String)
       extends Container
-      with DAOModel[ContainerImpl]
+      with BaseModel
       with UpdatableModel[Container.UpdateOp] {
     import scala.language.implicitConversions
 

@@ -108,7 +108,7 @@ trait DAOUtils {
         response <- db.saveDoc(Json.toJson(changed))
       } yield fromJson[M](response).get
 
-    class UpdateOp[M <: DAOModel[M]](model: M)(
+    class UpdateOp[M <: BaseModel](model: M)(
         implicit rjs: Reads[M], wjs: Writes[M]) extends UpdateOperation[M] {
       override def exec() = update(model)
 
@@ -124,8 +124,6 @@ trait BaseModel {
   def id: String
   def _rev: Option[String]
 }
-
-trait DAOModel[M <: DAOModel[M]] extends BaseModel {}
 
 trait OwnableModel extends BaseModel {
   def ownerIDs: Set[String]

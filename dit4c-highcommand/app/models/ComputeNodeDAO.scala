@@ -71,7 +71,7 @@ class ComputeNodeDAO @Inject() (
       userIDs: Set[String]
       )(implicit ec: ExecutionContext)
       extends ComputeNode
-      with DAOModel[ComputeNodeImpl]
+      with BaseModel
       with UpdatableModel[ComputeNode.UpdateOp] {
     import scala.language.implicitConversions
 

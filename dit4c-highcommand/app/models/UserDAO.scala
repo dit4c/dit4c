@@ -83,7 +83,7 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
       val identities: Seq[String]
       )(implicit ec: ExecutionContext)
       extends User
-      with DAOModel[UserImpl]
+      with BaseModel
       with UpdatableModel[User.UpdateOp] {
     import scala.language.implicitConversions
 
