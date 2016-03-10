@@ -67,7 +67,7 @@ trait DAOUtils {
 
   object utils {
 
-    def create[M <: DAOModel[M]](newModelFunc: String => M)(
+    def create[M <: BaseModel](newModelFunc: String => M)(
         implicit rjs: Reads[M], wjs: Writes[M]): Future[M] =
       for {
         id <- db.newID
@@ -75,13 +75,13 @@ trait DAOUtils {
         model <- update(newModel)
       } yield model
 
-    def get[M <: DAOModel[M]](id: String)(
+    def get[M <: BaseModel](id: String)(
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =
       for {
         possibleDoc <- db.getDocById[JsValue](id)
       } yield possibleDoc.flatMap(fromJson[M])
       
-    def list[M <: DAOModel[M]](typeValue: String)(
+    def list[M <: BaseModel](typeValue: String)(
         implicit wjs: Writes[M], rjs: Reads[M]): Future[Seq[M]] =
       for {
         result <-
@@ -102,7 +102,7 @@ trait DAOUtils {
         }
       }.map(_ => ())
 
-    def update[M <: DAOModel[M]](changed: => M)(
+    private def update[M <: BaseModel](changed: => M)(
         implicit rjs: Reads[M], wjs: Writes[M]): Future[M] =
       for {
         response <- db.saveDoc(Json.toJson(changed))
@@ -125,9 +125,7 @@ trait BaseModel {
   def _rev: Option[String]
 }
 
-trait DAOModel[M <: DAOModel[M]] extends BaseModel {
-  def revUpdate(newRev: String): M
-}
+trait DAOModel[M <: DAOModel[M]] extends BaseModel {}
 
 trait OwnableModel extends BaseModel {
   def ownerIDs: Set[String]

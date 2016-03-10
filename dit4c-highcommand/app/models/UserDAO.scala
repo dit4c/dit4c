@@ -87,8 +87,6 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
       with UpdatableModel[User.UpdateOp] {
     import scala.language.implicitConversions
 
-    override def revUpdate(rev: String) = this.copy(_rev = Some(rev))
-
     override def update = updateOp(this)
     override def delete = utils.delete(this)
 

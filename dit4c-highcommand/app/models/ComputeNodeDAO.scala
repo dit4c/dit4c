@@ -84,22 +84,23 @@ class ComputeNodeDAO @Inject() (
     override def update = updateOp(this)
 
     override def addOwner(user: User) =
-      utils.update(this.copy(
-          ownerIDs = ownerIDs + user.id,
-          userIDs = userIDs + user.id))
+      update.withOwners(ownerIDs + user.id)
+            .withUsers(userIDs + user.id)
+            .execIfDifferent(this)
 
     override def addUser(user: User) =
-      utils.update(this.copy(userIDs = userIDs + user.id))
+      update.withUsers(userIDs + user.id)
+            .execIfDifferent(this)
 
     override def removeOwner(userId: String) =
-      utils.update(this.copy(ownerIDs = userIDs - userId))
+      update.withOwners(ownerIDs - userId)
+            .execIfDifferent(this)
 
     override def removeUser(userId: String) =
-      utils.update(this.copy(userIDs = userIDs - userId))
+      update.withUsers(userIDs - userId)
+            .execIfDifferent(this)
 
     override def delete: Future[Unit] = utils.delete(this)
-
-    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
     // Used to update multiple attributes at once
     implicit def updateOp(model: ComputeNodeImpl): ComputeNode.UpdateOp =

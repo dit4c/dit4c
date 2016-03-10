@@ -117,16 +117,18 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       createdAt: DateTime,
       retired: Boolean,
       keyPair: WrappedRSAKey)(implicit ec: ExecutionContext)
-      extends Key with DAOModel[KeyImpl] {
-
+      extends Key with DAOModel[KeyImpl] 
+      with UpdatableModel[Key.UpdateOp] {
+    import scala.language.implicitConversions
+    
     import play.api.libs.functional.syntax._
     import play.api.Play.current
 
     override def publicId: String = s"$namespace $createdAt [$id]"
 
-    override def retire: Future[Key] = utils.update {
-      this.copy(retired = true)
-    }
+    override def update = updateOp(this)
+    
+    override def retire: Future[Key] = update.retire.execIfDifferent(this)
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
@@ -138,8 +140,13 @@ class KeyDAO @Inject() (protected val db: CouchDB.Database)
       keyPair.rsaKey.getAlgorithm,
       publicId,
       null, null, null)
-
-    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
+    
+    
+    // Used to update multiple attributes at once
+    implicit def updateOp(model: KeyImpl): Key.UpdateOp =
+      new utils.UpdateOp(model) with Key.UpdateOp {
+        override def retire = model.copy(retired = true)
+      }
 
   }
 
@@ -156,8 +163,14 @@ trait Key {
   def publicId: String
   def toJWK: RSAKey
 
+  def update: Key.UpdateOp
   def retire: Future[Key]
   def delete: Future[Unit]
 
 }
 
+object Key {
+  trait UpdateOp extends UpdateOperation[Key] {
+    def retire: UpdateOp
+  }
+}

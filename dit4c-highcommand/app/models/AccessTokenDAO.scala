@@ -42,7 +42,7 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
       AccessTokenImpl(id, None, newCode, accessType, new Resource(computeNode))
     }
 
-  def get(id: String): Future[Option[AccessToken]] = utils.get(id)
+  def get(id: String): Future[Option[AccessToken]] = utils.get[AccessTokenImpl](id)
 
   def listFor(computeNode: ComputeNode): Future[Seq[AccessToken]] =
       for {
@@ -101,8 +101,6 @@ class AccessTokenDAO @Inject() (protected val db: CouchDB.Database)
       accessType: AccessType.Value,
       resource: Resource
     ) extends AccessToken with DAOModel[AccessTokenImpl] {
-
-    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
 
     def delete: Future[Unit] = utils.delete(this)
 

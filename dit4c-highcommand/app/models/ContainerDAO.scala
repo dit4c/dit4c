@@ -66,8 +66,6 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
 
     override def delete: Future[Unit] = utils.delete(id, _rev.get)
 
-    override def revUpdate(newRev: String) = this.copy(_rev = Some(newRev))
-
     override def update = updateOp(this)
 
     // Used to update multiple attributes at once
