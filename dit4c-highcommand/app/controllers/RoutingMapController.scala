@@ -18,6 +18,8 @@ import play.api.libs.concurrent.Promise
 import scala.concurrent.duration._
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
+import akka.stream.scaladsl.Source
+import play.api.libs.streams.Streams
 
 class RoutingMapController @Inject() (
     val db: CouchDB.Database,
@@ -30,19 +32,19 @@ class RoutingMapController @Inject() (
     override lazy val formatted = """(?m)^""".r.replaceAllIn(msg, "; ")+"\n"
   }
 
-  val keepAlive: Enumerator[EventSource.Event] = {
-    val fmt = ISODateTimeFormat.dateHourMinuteSecond()
-    Enumerator.repeatM {
-      Promise.timeout(comment(fmt.print(new DateTime())), 10.seconds)
-    }
+  val keepAliveGenerator: () => EventSource.Event = {
+    val fmt = ISODateTimeFormat.dateHourMinuteSecond();
+    { () => comment(fmt.print(new DateTime())) }
   }
 
   def feed = Action.async { implicit request =>
     Future.successful {
       val feed = routingMapEmitter.newFeed &>
-         Enumeratee.map(Json.toJson(_)) &>
-         EventSource() interleave keepAlive
-      Ok.feed(feed).as("text/event-stream")
+         Enumeratee.map(Json.toJson(_))
+      val source = Source.fromPublisher(Streams.enumeratorToPublisher(feed))
+        .via(EventSource.flow)
+        .keepAlive(10.seconds, keepAliveGenerator)
+      Ok.chunked(source).as("text/event-stream")
     }
   }
 

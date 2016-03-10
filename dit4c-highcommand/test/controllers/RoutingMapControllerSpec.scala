@@ -28,6 +28,8 @@ import akka.stream.Materializer
 import play.api.libs.streams.Streams
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
+import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.Flow
 
 @RunWith(classOf[JUnitRunner])
 class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
@@ -87,9 +89,9 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
   }
 
 
-  def collectionAgent[A](e: Enumerator[A]): Agent[Seq[A]] = {
+  def collectionAgent[A](e: Source[A, Any])(implicit mat: Materializer): Agent[Seq[A]] = {
     val agent: Agent[Seq[A]] = Agent(Nil)
-    e run Iteratee.foreach { v =>
+    e.runForeach { v =>
       agent send { _ :+ v }
     }
     agent
@@ -97,27 +99,20 @@ class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
 
 
   def contentAsJsonEnumerator(
-      fResult: Future[Result])(implicit mat: Materializer): Enumerator[JsValue] = {
-    contentAsStringEnumerator(fResult) &> Enumeratee.mapConcat { text =>
-      text.split("\n").flatMap {
+      fResult: Future[Result])(implicit mat: Materializer): Source[JsValue, Any] = {
+    contentAsStringSource(fResult).flatMapConcat { text =>
+      Source.fromIterator(() => text.lines.flatMap {
         case s if s.startsWith("data: ") =>
           Some(Json.parse(s.replaceFirst("data: ","")))
         case _ =>
           None
-      }
+      })
     }
   }
 
-  def contentAsStringEnumerator(
-      fResult: Future[Result])(implicit mat: Materializer): Enumerator[String] = {
+  def contentAsStringSource(
+      fResult: Future[Result])(implicit mat: Materializer): Source[String, Any] = {
     val encoding = charset(fResult).getOrElse("utf-8")
-    Enumerator.flatten(fResult.map { r =>
-      val stringConv = Enumeratee.map[ByteString] { bytes =>
-        bytes.decodeString(encoding)
-      }
-      val publisher = r.body.dataStream.runWith(
-          Sink.asPublisher[ByteString](false))
-      Streams.publisherToEnumerator(publisher) &> stringConv
-    })
+    fResult.value.get.get.body.dataStream.map(_.decodeString(encoding))
   }
 }
