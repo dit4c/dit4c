@@ -23,10 +23,12 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import play.mvc.Http.RequestHeader
 import models._
+import java.time.Instant
 
 class AuthController @Inject() (
     authProviders: AuthProviders,
     containerResolver: ContainerResolver,
+    eventDao: EventDAO,
     val db: CouchDB.Database)
     extends Controller with Utils {
 
@@ -157,11 +159,13 @@ class AuthController @Inject() (
                 case (None, Some(user)) =>
                   log.info(s"Login (${user.id}): $identity")
                   userDao.updateWithIdentity(user, identity)
+                    .map(createLoginEvent(identity))
                     .flatMap(redirectAfterLogin)
                 // New user
                 case (None, None) =>
                   log.info(s"New User: $identity")
                   userDao.createWith(identity)
+                    .map(createLoginEvent(identity))
                     .flatMap(redirectAfterLogin)
               }
             } yield r
@@ -187,5 +191,10 @@ class AuthController @Inject() (
 
   protected def providerWithName(name: String): Option[AuthProvider] =
     authProviders.providers.find(_.name == name)
+
+  protected def createLoginEvent(identity: Identity)(user: User): User = {
+    eventDao.createLogin(user, identity, Instant.now)
+    user
+  }
 
 }
