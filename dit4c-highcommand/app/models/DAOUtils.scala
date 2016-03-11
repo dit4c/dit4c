@@ -22,13 +22,13 @@ trait DAOUtils {
   protected def db: CouchDB.Database
 
   implicit def toSohvaDb(db: CouchDB.Database): SohvaDatabase = db.asSohvaDb
-  
+
   implicit def idRevJsValue[JsValue](json: play.api.libs.json.JsValue) =
     new IdRev {
       val _id = (json \ "_id").as[String]
       withRev((json \ "_rev").asOpt[String])
     }
-  
+
   implicit def idRev[M <: BaseModel](model: M): IdRev =
     new IdRev {
       val _id = model.id
@@ -53,10 +53,21 @@ trait DAOUtils {
   implicit def js2ViewDoc(map: JavaScript): ViewDoc = ViewDoc(map.body, None)
 
   implicit class FormatWrapper[A](format: Format[A]) {
-    def withTypeAttribute(typeName: String): Format[A] =
+    val typePropertyName = "type"
+    /**
+     * Add a property that should always be present on reads, and always
+     * written on writes.
+     */
+    def withFixedProperty(name: String, value: JsValue): Format[A] =
       Format(
-          format.asInstanceOf[Reads[A]].withTypeAttribute(typeName),
-          format.asInstanceOf[Writes[A]].withTypeAttribute(typeName))
+          format.withRequiredProperty(name, value),
+          format.withAdditionalProperty(name, value))
+
+    /**
+     * Convenience method for adding an object type property
+     */
+    def withTypeAttribute(typeName: String): Format[A] =
+      withFixedProperty(typePropertyName, JsString(typeName))
   }
 
   implicit class ReadsWrapper[A](reads: Reads[A]) {
@@ -64,9 +75,9 @@ trait DAOUtils {
     /**
      * Check that the "type" property matches the intended type.
      */
-    def withTypeAttribute(typeName: String): Reads[A] =
+    def withRequiredProperty(name: String, value: JsValue): Reads[A] =
       reads.compose(__.read[JsObject].filter { jsObj =>
-        jsObj.fields.contains(("type", JsString(typeName)))
+        jsObj.fields.contains((name, value))
       })
   }
 
@@ -74,10 +85,10 @@ trait DAOUtils {
     /**
      * Write an additional type field with the provided name.
      */
-    def withTypeAttribute(typeName: String): Writes[A] =
+    def withAdditionalProperty(name: String, value: JsValue): Writes[A] =
       writes.transform {
         // We need a type for searching
-        _.as[JsObject] ++ Json.obj( "type" -> typeName )
+        _.as[JsObject] ++ Json.obj(name -> value)
       }
   }
 
@@ -96,7 +107,7 @@ trait DAOUtils {
       for {
         possibleDoc <- db.getDocById[JsValue](id)
       } yield possibleDoc.flatMap(fromJson[M])
-      
+
     def list[M <: BaseModel](typeValue: String)(
         implicit rjs: Reads[M]): Future[Seq[M]] =
       for {
