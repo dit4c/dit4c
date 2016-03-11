@@ -54,10 +54,26 @@ trait DAOUtils {
 
   implicit class FormatWrapper[A](format: Format[A]) {
     def withTypeAttribute(typeName: String): Format[A] =
-      Format(format, format.asInstanceOf[Writes[A]].withTypeAttribute(typeName))
+      Format(
+          format.asInstanceOf[Reads[A]].withTypeAttribute(typeName),
+          format.asInstanceOf[Writes[A]].withTypeAttribute(typeName))
+  }
+
+  implicit class ReadsWrapper[A](reads: Reads[A]) {
+    import play.api.libs.json._
+    /**
+     * Check that the "type" property matches the intended type.
+     */
+    def withTypeAttribute(typeName: String): Reads[A] =
+      reads.compose(__.read[JsObject].filter { jsObj =>
+        jsObj.fields.contains(("type", JsString(typeName)))
+      })
   }
 
   implicit class WritesWrapper[A](writes: Writes[A]) {
+    /**
+     * Write an additional type field with the provided name.
+     */
     def withTypeAttribute(typeName: String): Writes[A] =
       writes.transform {
         // We need a type for searching
@@ -76,13 +92,13 @@ trait DAOUtils {
       } yield model
 
     def get[M <: BaseModel](id: String)(
-        implicit wjs: Writes[M], rjs: Reads[M]): Future[Option[M]] =
+        implicit rjs: Reads[M]): Future[Option[M]] =
       for {
         possibleDoc <- db.getDocById[JsValue](id)
       } yield possibleDoc.flatMap(fromJson[M])
       
     def list[M <: BaseModel](typeValue: String)(
-        implicit wjs: Writes[M], rjs: Reads[M]): Future[Seq[M]] =
+        implicit rjs: Reads[M]): Future[Seq[M]] =
       for {
         result <-
           db.design("main").view("all_by_type")
