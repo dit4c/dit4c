@@ -31,20 +31,20 @@ class EventDAOSpec extends PlaySpecification with SpecUtils {
       (event.userId must_== session.user.id) and
       (event.identity must_== session.user.identities.head) and
       (event.name must_== session.user.name) and
-      (event.email must_== session.user.email) and
-      {
+      (event.email must_== session.user.email) and {
         // Check database has data
         val couchResponse =
           await(db(app).asSohvaDb.getDocById[JsValue](event.id, None))
-        (couchResponse must beSome)
-        val json = couchResponse.get
-        ((json \ "type").as[String] must_== "Event") and
-        ((json \ "subtype").as[String] must_== "Login") and
-        ((json \ "_id").as[String] must_== event.id) and
-        ((json \ "_rev").asOpt[String] must_== event._rev)
-        ((json \ "timestamp").as[String] must_== event.timestamp.toString) and
-        ((json \ "name").asOpt[String] must_== event.name) and
-        ((json \ "email").asOpt[String] must_== event.email)
+        (couchResponse must beSome) and {
+          val json = couchResponse.get
+          ((json \ "type").as[String] must_== "Event") and
+          ((json \ "subtype").as[String] must_== "Login") and
+          ((json \ "_id").as[String] must_== event.id) and
+          ((json \ "_rev").asOpt[String] must_== event._rev)
+          ((json \ "timestamp").as[String] must_== event.timestamp.toString) and
+          ((json \ "name").asOpt[String] must_== event.name) and
+          ((json \ "email").asOpt[String] must_== event.email)
+        }
       }
     }
 
