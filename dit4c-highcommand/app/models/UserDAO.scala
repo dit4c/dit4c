@@ -17,8 +17,8 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
 
   def createWith(identity: Identity): Future[User] =
     utils.create { id =>
-      UserImpl(id, None,
-          identity.name, identity.emailAddress, Seq(identity.uniqueId))
+      UserImpl(id, None, identity.name, identity.emailAddress,
+          Seq(identity.uniqueId), Set.empty)
     }
 
   def findWith(identity: Identity): Future[Option[User]] =
@@ -61,7 +61,12 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
     (__ \ "_rev").formatNullable[String] and
     (__ \ "name").formatNullable[String] and
     (__ \ "email").formatNullable[String] and
-    (__ \ "identities").format[Seq[String]]
+    (__ \ "identities").format[Seq[String]] and {
+      val path = (__ \ "roles")
+      OFormat(
+          path.readNullable[Set[String]].map(_.getOrElse(Set.empty[String])),
+          path.write[Set[String]])
+    }
   )(UserImpl.apply _, unlift(UserImpl.unapply))
     .withTypeAttribute("User")
 
@@ -80,7 +85,8 @@ class UserDAO @Inject() (protected val db: CouchDB.Database)
       val _rev: Option[String],
       val name: Option[String],
       val email: Option[String],
-      val identities: Seq[String]
+      val identities: Seq[String],
+      val roles: Set[String]
       )(implicit ec: ExecutionContext)
       extends User
       with BaseModel
@@ -111,6 +117,7 @@ trait User extends BaseModel {
   def name: Option[String]
   def email: Option[String]
   def identities: Seq[String]
+  def roles: Set[String]
 
   def update: User.UpdateOp
   def delete: Future[Unit]

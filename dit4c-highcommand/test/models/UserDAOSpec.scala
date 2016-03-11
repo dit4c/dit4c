@@ -27,7 +27,8 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
       (user._rev must beSome) and
       (user.identities must_== Set(identity.uniqueId)) and
       (user.name must_== identity.name) and
-      (user.email must_== identity.emailAddress) and {
+      (user.email must_== identity.emailAddress) and
+      (user.roles must beEmpty) and {
         // Check database has data
         val couchResponse =
           await(db(app).asSohvaDb.getDocById[JsValue](user.id, None))
@@ -35,9 +36,10 @@ class UserDAOSpec extends PlaySpecification with SpecUtils {
           val json = couchResponse.get
           ((json \ "type").as[String] must_== "User") and
           ((json \ "_id").as[String] must_== user.id) and
-          ((json \ "_rev").asOpt[String] must_== user._rev)
+          ((json \ "_rev").asOpt[String] must_== user._rev) and
           ((json \ "name").asOpt[String] must_== user.name) and
-          ((json \ "email").asOpt[String] must_== user.email)
+          ((json \ "email").asOpt[String] must_== user.email) and
+          ((json \ "roles").as[Set[String]] must_== Set.empty)
         }
       }
     }

@@ -40,7 +40,7 @@ class EventDAOSpec extends PlaySpecification with SpecUtils {
           ((json \ "type").as[String] must_== "Event") and
           ((json \ "subtype").as[String] must_== "Login") and
           ((json \ "_id").as[String] must_== event.id) and
-          ((json \ "_rev").asOpt[String] must_== event._rev)
+          ((json \ "_rev").asOpt[String] must_== event._rev) and
           ((json \ "timestamp").as[String] must_== event.timestamp.toString) and
           ((json \ "name").asOpt[String] must_== event.name) and
           ((json \ "email").asOpt[String] must_== event.email)
