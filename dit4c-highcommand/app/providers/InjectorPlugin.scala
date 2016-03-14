@@ -64,9 +64,7 @@ class InjectorPlugin(
       lifecycle: ApplicationLifecycle)(
           implicit system: ActorSystem): CouchDB.Instance = {
     val instance =
-      if (configuration.getBoolean("couchdb.testing").getOrElse(false)) {
-        new EphemeralCouchDBInstance
-      } else if (configuration.getString("couchdb.url").isDefined) {
+      if (configuration.getString("couchdb.url").isDefined) {
         new ExternalCouchDBInstance(new java.net.URL(
           configuration.getString("couchdb.url").get))
       } else {
