@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
   "com.nimbusds"        %   "nimbus-jose-jwt" % "4.8",
   "com.osinka.slugify"  %%  "slugify"         % "1.2.1",
   "net.nikore.etcd"     %%  "scala-etcd"      % "0.7",
-  "org.gnieh"           %%  "sohva-dm"        % "1.1.0-dit4c-pre1",
+  "org.gnieh"           %%  "sohva-dm"        % "1.1.1",
   "com.github.rjeschke" %   "txtmark"         % "0.13",
   "com.typesafe.akka"   %%  "akka-agent"      % "2.3.11",
   "org.mapdb"           %   "mapdb"           % "1.0.8",
