@@ -20,6 +20,10 @@ libraryDependencies ++= Seq(
   "org.specs2"          %%  "specs2-core"     % "3.6"       % "test",
   "org.specs2"          %%  "specs2-junit"    % "3.6"       % "test",
   "org.specs2"          %%  "specs2-scalacheck" % "3.6"     % "test",
+  "com.couchbase.lite" % "couchbase-lite-java" % "1.2.0" % "test",
+  "com.couchbase.lite" % "couchbase-lite-java-forestdb" % "1.2.0" % "test",
+  "com.couchbase.lite" % "couchbase-lite-java-listener" % "1.2.0" % "test",
+  "com.couchbase.lite" % "couchbase-lite-java-javascript" % "1.2.0" % "test",
   // WebJars for client-side dependencies
   "org.webjars"         %%  "webjars-play"    % "2.4.0-2",
   // AngularJS
