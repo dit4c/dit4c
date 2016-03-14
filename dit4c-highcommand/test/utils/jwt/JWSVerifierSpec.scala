@@ -20,6 +20,8 @@ import org.specs2.execute.AsResult
 @RunWith(classOf[JUnitRunner])
 class JWSVerifierSpec extends Specification {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "JWS Verifier" should {
 
     // Note that this is actually the minimum byte length, not string length,

@@ -20,6 +20,8 @@ import org.joda.time.Interval
 @RunWith(classOf[JUnitRunner])
 class KeyDAOSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   def millisSince(dt: DateTime): Long =
     (new Interval(dt, DateTime.now)).toDurationMillis
 

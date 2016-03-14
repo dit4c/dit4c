@@ -24,6 +24,8 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "Application controller" should {
 
     "provide a waiting resource" >> {

@@ -17,7 +17,7 @@ import providers.RoutingMapEmitter
 @RunWith(classOf[JUnitRunner])
 class ContainerDAOSpec extends PlaySpecification with SpecUtils {
 
-  import testing.TestUtils.fakeApp
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val dummyImage = "testimage"
 

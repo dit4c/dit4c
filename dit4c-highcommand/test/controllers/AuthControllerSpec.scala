@@ -28,6 +28,8 @@ import scala.concurrent.Future
 @RunWith(classOf[JUnitRunner])
 class AuthControllerSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "AuthController" should {
 
     "provide JSON for public keys" in new WithApplication(fakeApp) {

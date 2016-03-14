@@ -17,6 +17,8 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class AccessTokenDAOSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "AccessTokenDAO" should {
 
     "create a token" in new WithApplication(fakeApp) {

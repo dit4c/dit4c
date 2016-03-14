@@ -17,6 +17,8 @@ import providers.RoutingMapEmitter
 @RunWith(classOf[JUnitRunner])
 class ComputeNodeDAOSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "ComputeNodeDAO" should {
 
     "create a compute node" in new WithApplication(fakeApp) {

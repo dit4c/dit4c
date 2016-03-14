@@ -18,6 +18,8 @@ import java.time.Instant
 @RunWith(classOf[JUnitRunner])
 class EventDAOSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "EventDAO" should {
 
     "create a login event" in new WithApplication(fakeApp) {

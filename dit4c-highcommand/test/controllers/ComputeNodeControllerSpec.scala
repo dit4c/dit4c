@@ -25,7 +25,8 @@ import providers.RoutingMapEmitter
  */
 @RunWith(classOf[JUnitRunner])
 class ComputeNodeControllerSpec extends PlaySpecification with SpecUtils {
-  import play.api.Play.current
+
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val testImage = "dit4c/dit4c-container-ipython"
 

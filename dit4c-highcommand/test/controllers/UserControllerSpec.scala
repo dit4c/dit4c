@@ -19,6 +19,8 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class UserControllerSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "UserController" should {
 
     "provide JSON for users" in new WithApplication(fakeApp) {

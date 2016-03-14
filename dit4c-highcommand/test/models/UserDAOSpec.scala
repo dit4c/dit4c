@@ -17,6 +17,8 @@ import utils.SpecUtils
 @RunWith(classOf[JUnitRunner])
 class UserDAOSpec extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   "UserDAO" should {
 
     "create a user" in new WithApplication(fakeApp) {

@@ -13,6 +13,8 @@ import play.api.libs.iteratee._
 
 @RunWith(classOf[JUnitRunner])
 class ChangeFeedSpec extends PlaySpecification with SpecUtils {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
   import ChangeFeed._
 
   val testImage = "dit4c/dit4c-container-ipython"

@@ -26,6 +26,7 @@ import scala.util.Random
 class ApplicationSpec
     extends PlaySpecification with SpecUtils {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
   import play.api.http.HeaderNames._
 
   override implicit def defaultAwaitTimeout: Timeout = 60.seconds

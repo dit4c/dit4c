@@ -33,6 +33,8 @@ import akka.stream.scaladsl.Flow
 
 @RunWith(classOf[JUnitRunner])
 class RoutingMapControllerSpec extends PlaySpecification with SpecUtils {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
   
   val testImage = "dit4c/dit4c-container-ipython"
 

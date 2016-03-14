@@ -12,6 +12,8 @@ import scala.concurrent.Promise
 
 @RunWith(classOf[JUnitRunner])
 class RoutingMapEmitterSpec extends PlaySpecification with SpecUtils {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
   import RoutingMapEmitter._
 
   val testImage = "dit4c/dit4c-container-ipython"
