@@ -6,6 +6,7 @@ import providers.db.CouchDB
 import play.api.libs.json._
 import gnieh.sohva.async.View
 import com.google.inject.Inject
+import akka.stream.scaladsl.Source
 
 class ContainerDAO @Inject() (protected val db: CouchDB.Database)
   (implicit protected val ec: ExecutionContext)
@@ -29,6 +30,8 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
   def get(id: String): Future[Option[Container]] = utils.get(id)
 
   def list: Future[Seq[Container]] = utils.list[ContainerImpl](typeValue)
+  
+  def changes = utils.changes[ContainerImpl](typeValue)
 
   def listFor(node: ComputeNode): Future[Seq[Container]] =
     for {

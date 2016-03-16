@@ -20,6 +20,7 @@ import providers.machineshop.ContainerProvider
 import providers.machineshop.MachineShop
 import gnieh.sohva.async.View
 import providers.RoutingMapEmitter
+import akka.stream.scaladsl.Source
 
 class ComputeNodeDAO @Inject() (
     protected val db: CouchDB.Database,
@@ -43,6 +44,8 @@ class ComputeNodeDAO @Inject() (
     }
 
   def list: Future[Seq[ComputeNode]] = utils.list[ComputeNodeImpl](typeValue)
+  
+  def changes = utils.changes[ComputeNodeImpl](typeValue)
 
   def get(id: String) = utils.get(id)
 

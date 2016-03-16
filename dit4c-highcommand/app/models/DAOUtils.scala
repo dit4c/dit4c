@@ -11,6 +11,8 @@ import scala.concurrent.ExecutionContext
 import gnieh.sohva.{IdRev, ViewDoc, ViewResult}
 import gnieh.sohva.async.{Database => SohvaDatabase}
 import net.liftweb.{json => lift}
+import akka.stream.scaladsl.Source
+import akka.agent.Agent
 
 trait DAOUtils {
   import scala.language.implicitConversions
@@ -116,6 +118,34 @@ trait DAOUtils {
             .query[String, JsValue, JsValue](
                 key=Some(typeValue), include_docs=true)
       } yield fromJson[M](result.rows.flatMap(_.doc))
+      
+    def changes[M <: BaseModel](typeValue: String)(
+        implicit rjs: Reads[M]): Future[(Seq[M],Source[ChangeFeed.Change[M], _])] =
+      for {
+        result <-
+          db.design("main").view("all_by_type")
+            .query[String, JsValue, JsValue](
+                key=Some(typeValue), include_docs=true, update_seq=true)
+        objs = fromJson[M](result.rows.flatMap(_.doc))
+        idAgent = Agent[Set[String]](objs.map(_.id).toSet)
+        changes =
+          changesFeed[M](result.update_seq).mapAsync(1) { change =>
+            change match { 
+              case ChangeFeed.Update(id, obj) =>
+                idAgent.alter(_ + obj.id)
+                  .map(_ => Some(change))
+              case ChangeFeed.Deletion(id) =>
+                idAgent.future.map(_.contains(id))
+                  .map { exists =>
+                    if (exists) Some(change)
+                    else None
+                  }
+            }
+          }.mapConcat {
+            case Some(v) => v :: Nil
+            case None => Nil
+          }
+      } yield (objs, changes)
 
     def delete[M <: BaseModel](model: M): Future[Unit] = {
       db.deleteDoc(model).map(_ => ())
@@ -143,6 +173,10 @@ trait DAOUtils {
       override def execIfDifferent[N >: M](other: N) =
         if (model == other) Future.successful(other) else exec()
     }
+    
+    private def changesFeed[M](
+        updateSeqNum: Option[Int])(implicit rjs: Reads[M]) =
+      (new ChangeFeed(db)).changes(updateSeqNum)
   }
 
 }

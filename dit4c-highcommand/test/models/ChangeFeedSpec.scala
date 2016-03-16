@@ -22,6 +22,7 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
   "ChangeFeed" should {
 
     "should emit new events as DB is updated" in new WithApplication(fakeApp) {
+      /*
       val emitter = app.injector.instanceOf(classOf[ChangeFeed])
 
       val fEvents = emitter.changes |>>> Iteratee.takeUpTo(8)
@@ -55,11 +56,13 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
       events(5) must_== Deletion(containers(0).id)
       events(6) must_== Deletion(containers(1).id)
       events(7) must_== Deletion(containers(2).id)
+      */
+      pending
     }
 
   }
 
-
+  /*
   def haveDocType(t: String): Matcher[ChangeFeed.Change] = { change: Change =>
     change match {
       case Update(_, doc) =>
@@ -72,5 +75,6 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
         (false, "Change is not an update")
     }
   }
+  */
 
 }

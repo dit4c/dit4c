@@ -58,7 +58,7 @@ class RoutingMapEmitterSpec extends PlaySpecification with SpecUtils {
 
       await(Future.sequence(containers.map(_.delete)));
       // Brief wait to ensure event feed has caught up
-      Thread.sleep(100)
+      Thread.sleep(5000)
 
       val ReplaceAllRoutes(routesAfterDelete) = await {
         val p = Promise[Event]()
