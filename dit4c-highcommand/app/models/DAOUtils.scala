@@ -120,21 +120,26 @@ trait DAOUtils {
       } yield fromJson[M](result.rows.flatMap(_.doc))
       
     def changes[M <: BaseModel](typeValue: String)(
-        implicit rjs: Reads[M]): Future[(Seq[M],Source[ChangeFeed.Change[M], _])] =
+        implicit rjs: Reads[M]): Future[(Seq[M],Source[ChangeFeed.Change[M], Future[Unit]])] =
       for {
+        // Get current state
         result <-
           db.design("main").view("all_by_type")
             .query[String, JsValue, JsValue](
                 key=Some(typeValue), include_docs=true, update_seq=true)
         objs = fromJson[M](result.rows.flatMap(_.doc))
+        // Pool of known IDs for objects of this type
         idAgent = Agent[Set[String]](objs.map(_.id).toSet)
+        // Get all changes made after the base query 
         changes =
           changesFeed[M](result.update_seq).mapAsync(1) { change =>
             change match { 
               case ChangeFeed.Update(id, obj) =>
+                // Update our pool of known IDs
                 idAgent.alter(_ + obj.id)
                   .map(_ => Some(change))
               case ChangeFeed.Deletion(id) =>
+                // Filter out previously unknown objects
                 idAgent.future.map(_.contains(id))
                   .map { exists =>
                     if (exists) Some(change)

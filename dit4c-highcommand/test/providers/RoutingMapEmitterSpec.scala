@@ -48,8 +48,8 @@ class RoutingMapEmitterSpec extends PlaySpecification with SpecUtils {
 
       val ReplaceAllRoutes(routes) = await {
         val p = Promise[Event]()
-        emitter.newFeed |>>> Iteratee.foreach {
-          p.success(_)
+        emitter.newFeed |>>> Iteratee.foreach { v =>
+          p.success(v)
         }
         p.future
       }

@@ -11,21 +11,21 @@ import rx.RxReactiveStreams
 import rx.lang.scala.JavaConversions
 import play.api.libs.streams.Streams
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 class ChangeFeed @Inject() @Singleton() (
     db: CouchDB.Database)(implicit ec: ExecutionContext) {
   import ChangeFeed._
 
-  def changes[T](updateSeqNum: Option[Int])(implicit rjs: Reads[T]): Source[Change[T], _] = {
+  def changes[T](updateSeqNum: Option[Int])(implicit rjs: Reads[T]): Source[Change[T], Future[Unit]] = {
     import net.liftweb.json._
     val changeStream = db.asSohvaDb.changes(updateSeqNum, None)
     val publisher = RxReactiveStreams.toPublisher(
         JavaConversions.toJavaObservable(changeStream.stream))
-    val source = Source.fromPublisher(publisher)
-    source.mapConcat[Change[T]] {
+    val source = Source.fromPublisher(publisher).mapConcat[Change[T]] {
       case (docId, Some(doc)) =>
         Json.fromJson[T](Json.parse(compact(render(doc)))) match {
-          case JsSuccess(obj, _) =>
+          case JsSuccess(obj, path) =>
             Update(docId, obj) :: Nil // Was of correct type
           case JsError(errors) =>
             Nil
@@ -34,6 +34,12 @@ class ChangeFeed @Inject() @Singleton() (
         Deletion[T](docId) :: Nil
       case _ =>
         Nil
+    }
+    // Materialize with future marking the end of the change stream
+    source.watchTermination() { (_, f) =>
+      // Add hook to close the stream
+      f.onComplete { _ => changeStream.close }
+      f.map(_ => ())
     }
   }
 

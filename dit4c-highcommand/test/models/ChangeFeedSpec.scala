@@ -10,6 +10,7 @@ import models._
 import utils.SpecUtils
 import providers.RoutingMapEmitter
 import play.api.libs.iteratee._
+import akka.stream.scaladsl.Sink
 
 @RunWith(classOf[JUnitRunner])
 class ChangeFeedSpec extends PlaySpecification with SpecUtils {
@@ -22,14 +23,16 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
   "ChangeFeed" should {
 
     "should emit new events as DB is updated" in new WithApplication(fakeApp) {
-      /*
       val emitter = app.injector.instanceOf(classOf[ChangeFeed])
-
-      val fEvents = emitter.changes |>>> Iteratee.takeUpTo(8)
-
-      val session = new UserSession(db(app))
       val computeNodeDao = app.injector.instanceOf(classOf[ComputeNodeDAO])
       val containerDao = app.injector.instanceOf(classOf[ContainerDAO])
+
+      val fEvents = emitter.changes(None)(containerDao.containerFormat)
+        .take(6)
+        .runWith(Sink.fold(
+            IndexedSeq.empty[Change[_ <: Container]])((m,v) => m :+ v))
+
+      val session = new UserSession(db(app))
       val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
@@ -46,35 +49,16 @@ class ChangeFeedSpec extends PlaySpecification with SpecUtils {
         }
       }
 
-      val events: IndexedSeq[Change] = await(fEvents).toIndexedSeq
-      events must haveSize(8)
-      events(0) must haveDocType("User")
-      events(1) must haveDocType("ComputeNode")
-      events(2) must haveDocType("Container")
-      events(3) must haveDocType("Container")
-      events(4) must haveDocType("Container")
-      events(5) must_== Deletion(containers(0).id)
-      events(6) must_== Deletion(containers(1).id)
-      events(7) must_== Deletion(containers(2).id)
-      */
-      pending
+      val events = await(fEvents)
+      events.must(haveSize(6)) and
+      events(0).must_==(Update(containers(0).id, containers(0))) and
+      events(1).must_==(Update(containers(1).id, containers(1))) and
+      events(2).must_==(Update(containers(2).id, containers(2))) and
+      events(3).must_==(Deletion(containers(0).id)) and
+      events(4).must_==(Deletion(containers(1).id)) and
+      events(5).must_==(Deletion(containers(2).id))
     }
 
   }
-
-  /*
-  def haveDocType(t: String): Matcher[ChangeFeed.Change] = { change: Change =>
-    change match {
-      case Update(_, doc) =>
-        (doc \ "type").asOpt[String] match {
-          case Some(`t`) => (true, "")
-          case Some(s) => (false, s"Doc type does not match: $s != $t")
-          case None => (false, "Doc type is missing from document")
-        }
-      case _: Change =>
-        (false, "Change is not an update")
-    }
-  }
-  */
 
 }
