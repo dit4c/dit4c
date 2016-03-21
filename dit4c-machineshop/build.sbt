@@ -8,9 +8,7 @@ crossScalaVersions := Nil
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaV = "2.3.6"
-  val sprayV = "1.3.3"
-  val akkaHttpV = "2.0-M2"
+  val akkaV = "2.4.2"
   val scalaioV = "0.4.3-1"
   val specs2V = "3.6.4"
   Seq(
@@ -18,14 +16,12 @@ libraryDependencies ++= {
     "com.github.scala-incubator.io" %% "scala-io-file" % scalaioV,
     "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
     "com.github.docker-java" % "docker-java"    % "3.0.0-SNAPSHOT",
-    "com.typesafe.akka"   %%  "akka-http-experimental" % akkaHttpV,
-    "io.spray"            %%  "spray-json"      % "1.3.0",
     "ch.qos.logback"      %   "logback-classic" % "1.1.3",
-    "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaHttpV,
-    "com.typesafe.akka"   %%  "akka-http-testkit-experimental" % akkaHttpV % "test",
-    "com.typesafe.akka"   %%  "akka-http-xml-experimental" % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-actor"      % akkaV,
+    "com.typesafe.akka"   %%  "akka-http-spray-json-experimental" % akkaV,
+    "com.typesafe.akka"   %%  "akka-http-xml-experimental" % akkaV,
     "com.typesafe.akka"   %%  "akka-testkit"    % akkaV   % "test",
+    "com.typesafe.akka"   %%  "akka-http-testkit" % akkaV % "test",
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
     "org.mockito"         %   "mockito-all"     % "1.10.8" % "test",

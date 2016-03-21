@@ -8,7 +8,7 @@ import akka.pattern.after
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.stream.io.Framing
+import akka.stream.scaladsl.Framing
 import akka.util.ByteString
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -19,7 +19,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.bouncycastle.openssl.PEMParser
 import dit4c.common.AkkaHttpExtras._
 import akka.event.Logging
-import akka.http.ClientConnectionSettings
+import akka.http.scaladsl.settings.ClientConnectionSettings
 import dit4c.switchboard.nginx._
 import dit4c.switchboard.http.AuthRequestServer
 

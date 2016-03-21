@@ -6,7 +6,6 @@ import org.specs2.mutable.Specification
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
-import akka.util.Timeout.intToTimeout
 import com.github.dockerjava.core.DockerClientConfig
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.BeforeAfterAll
@@ -71,5 +70,3 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
     }
   }
 }
-
-

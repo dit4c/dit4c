@@ -15,7 +15,7 @@ import java.net.InetSocketAddress
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model.headers.CustomHeader
 import akka.stream.scaladsl.Source
-import akka.http.ClientConnectionSettings
+import akka.http.scaladsl.settings.ClientConnectionSettings
 import akka.http.scaladsl.model.headers._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
