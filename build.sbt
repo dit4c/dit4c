@@ -34,3 +34,5 @@ lazy val switchboard = (project in file("dit4c-switchboard")).dependsOn(common)
 releaseSettings
 
 crossScalaVersions := Nil
+
+parallelExecution in ThisBuild := false
