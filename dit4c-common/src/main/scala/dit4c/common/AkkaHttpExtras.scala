@@ -2,20 +2,17 @@ package dit4c.common
 
 import java.net._
 import akka.http.scaladsl._
+import akka.stream.scaladsl._
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model._
-import akka.http.ClientConnectionSettings
-import akka.stream.scaladsl.Flow
+import akka.http.scaladsl.settings.ClientConnectionSettings
 import scala.concurrent._
+import akka.stream.Client
 import akka.http.scaladsl.Http.OutgoingConnection
 import akka.http.scaladsl.model.headers.Host
-import akka.stream.io._
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http.OutgoingConnection
-import akka.stream.scaladsl.Tcp
-import akka.stream.scaladsl.Keep
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import scala.concurrent.duration.FiniteDuration
 
 object AkkaHttpExtras {
@@ -24,7 +21,7 @@ object AkkaHttpExtras {
 
     def singleResilientRequest(request: HttpRequest,
         settings: ClientConnectionSettings,
-        httpsContext: Option[HttpsContext],
+        httpsContext: Option[HttpsConnectionContext],
         log: LoggingAdapter)(implicit fm: Materializer): Future[HttpResponse] =
       singleResilientRequest(request,
           request.uri.authority.host.inetAddresses,
@@ -33,11 +30,11 @@ object AkkaHttpExtras {
     def singleResilientRequest(request: HttpRequest,
         addrs: Seq[InetAddress],
         settings: ClientConnectionSettings,
-        httpsContext: Option[HttpsContext],
+        httpsContext: Option[HttpsConnectionContext],
         log: LoggingAdapter)(implicit fm: Materializer): Future[HttpResponse] = {
       implicit val ec = fm.executionContext
       val addr::remainingAddrs = addrs
-      val c = outgoingConnectionImpl(addr, request.uri.effectivePort,
+      val c = outgoingConnectionImpl(addr, request.uri.authority.port,
           None, settings,
           httpsContext orElse {
             if (request.uri.scheme == "https") Some(http.defaultClientHttpsContext)
@@ -79,7 +76,7 @@ object AkkaHttpExtras {
     def outgoingConnectionTls(addr: InetAddress, port: Int,
         localAddress: Option[InetSocketAddress],
         settings: ClientConnectionSettings,
-        httpsContext: Option[HttpsContext],
+        httpsContext: Option[HttpsConnectionContext],
         log: LoggingAdapter): Flow[HttpRequest, HttpResponse, Future[OutgoingConnection]] =
       outgoingConnectionImpl(addr, port, localAddress, settings,
           httpsContext orElse Some(http.defaultClientHttpsContext), log)
@@ -87,23 +84,30 @@ object AkkaHttpExtras {
     private def outgoingConnectionImpl(addr: InetAddress, port: Int,
         localAddress: Option[InetSocketAddress],
         settings: ClientConnectionSettings,
-        httpsContext: Option[HttpsContext],
+        httpsContext: Option[HttpsConnectionContext],
         log: LoggingAdapter): Flow[HttpRequest, HttpResponse, Future[OutgoingConnection]] = {
+      val host = addr.getHostName.stripSuffix(".")
+      val effectivePort = port match {
+        case 0 if httpsContext.isEmpty => 80
+        case 0 => 443
+        case _ => port
+      }
       val layer = {
-        val hostHeader = port match {
-          case 80 if httpsContext.isEmpty => Host(addr.getHostName)
-          case 443 if httpsContext.isDefined => Host(addr.getHostName)
-          case _ => Host(addr.getHostName, port)
+        val hostHeader = effectivePort match {
+          case 80 if httpsContext.isEmpty => Host(host)
+          case 443 if httpsContext.isDefined => Host(host)
+          case _ => Host(host, port)
         }
         http.clientLayer(hostHeader, settings, log)
       }
       val tlsStage = httpsContext match {
-        case Some(hctx) => SslTls(hctx.sslContext, hctx.firstSession, Client,
-            hostInfo = Some(addr.getHostName -> port))
-        case None => SslTlsPlacebo.forScala
+        case Some(hctx) =>
+          TLS(hctx.sslContext, hctx.firstSession, Client,
+              hostInfo = Some(host -> effectivePort))
+        case None => TLSPlacebo()
       }
       val transportFlow = Tcp().outgoingConnection(
-          new InetSocketAddress(addr, port), localAddress,
+          new InetSocketAddress(addr, effectivePort), localAddress,
           settings.socketOptions, halfClose = true,
           settings.connectingTimeout, settings.idleTimeout)
       val tmp = tlsStage.joinMat(transportFlow) { (_, f) =>

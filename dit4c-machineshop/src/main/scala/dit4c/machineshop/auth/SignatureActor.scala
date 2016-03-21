@@ -18,7 +18,7 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers._
 import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.client.TransformerAux._
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.ClientConnectionSettings
+import akka.http.scaladsl.settings.ClientConnectionSettings
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor {

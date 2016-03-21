@@ -6,7 +6,7 @@ import scala.collection.JavaConversions._
 import java.net.Inet4Address
 import akka.http.scaladsl.Http
 import akka.actor.ActorSystem
-import akka.http.ClientConnectionSettings
+import akka.http.scaladsl.settings.ClientConnectionSettings
 import akka.event.Logging
 import akka.http.scaladsl.model.HttpRequest
 import akka.stream.scaladsl.Source
@@ -33,8 +33,9 @@ class AkkaHttpExtrasSpec extends Specification with NoThrownExpectations with Se
 
   "Akka Http Extras" should {
 
-    val ccSettings = ClientConnectionSettings(system).copy(
-          connectingTimeout = 1.second, idleTimeout = 5.seconds)
+    val ccSettings = ClientConnectionSettings(system)
+        .withConnectingTimeout(1.second)
+        .withIdleTimeout(5.seconds)
 
     "allow outgoing connections to specify InetAddress" >> {
       val host = "google.com"

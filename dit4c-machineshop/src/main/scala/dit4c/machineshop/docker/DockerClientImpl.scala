@@ -14,7 +14,7 @@ import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.command.PullImageResultCallback
 import akka.http.scaladsl.model.Uri
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Source, StreamConverters}
 import akka.util.ByteString
 import dit4c.machineshop.docker.models.ContainerStatus
 import dit4c.machineshop.docker.models.DockerContainer
@@ -90,11 +90,11 @@ class DockerClientImpl(
     override def export: Source[ByteString, Future[Long]] = {
       val byteCounter = new AtomicLong(0)
       val completerStage = new DockerClientImpl.CompleterStage[ByteString]()
-      Source(Future{
+      Source.fromFuture(Future {
         docker.commitCmd(id).exec
       }).flatMapConcat { imageId =>
         lazy val fRemoveImage = Future(docker.removeImageCmd(imageId).exec)(ec)
-        Source.inputStream(() =>docker.saveImageCmd(imageId).exec)
+        StreamConverters.fromInputStream(() =>docker.saveImageCmd(imageId).exec)
           .map(v => { fRemoveImage; v }) // Remove image onces stream starts
       }.map { bs => byteCounter.addAndGet(bs.size); bs }
        .transform { () => completerStage }
@@ -210,4 +210,3 @@ object DockerClientImpl {
   }
 
 }
-
