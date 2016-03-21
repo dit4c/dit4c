@@ -52,14 +52,16 @@ class Application @Inject() (
       case s if s.length >= 20 && s.matches("[0-9a-f]+") => true
       case _ => false
     }
+    def isJavascript(response: Result): Boolean =
+      response.body.contentType
+        .map(_.contains("javascript"))
+        .getOrElse(false)
     Assets.versioned("/public/javascripts", file)(request).map { response =>
-
       if (!isVersioned &&
           response.header.status == 200 &&
-          response.header.headers(CONTENT_TYPE).contains("javascript")) {
+          isJavascript(response)) {
         seenJsAssets.send(_ + path)
       }
-
       response
     }
   }
