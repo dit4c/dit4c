@@ -9,14 +9,14 @@ import org.slf4j.LoggerFactory
 import com.typesafe.scalalogging.Logger
 import com.typesafe.scalalogging.Seq
 import akka.actor.ActorSystem
-import akka.http.ClientConnectionSettings
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.Uri.apply
+import akka.http.scaladsl.settings.ClientConnectionSettings
 import akka.pattern.after
 import akka.stream.Materializer
-import akka.stream.io.Framing
+import akka.stream.scaladsl.Framing
 import akka.util.ByteString
 import dit4c.common.AkkaHttpExtras
 import play.api.libs.json.JsValue.jsValueToJsLookup
@@ -43,7 +43,7 @@ object FeedMonitor {
               .takeWithin(1.hour) // Avoid timeouts
               .map(_.data)
               .via(Framing.delimiter(ByteString("\n"), Int.MaxValue))
-              .map(v => new String(v.decodeString(mimeType.charset.value)))
+              .map(v => new String(v.decodeString(mimeType.charsetOption.map(_.value).getOrElse("utf-8"))))
               .filter(_.startsWith("data: "))
               .map(_.replaceFirst("data: ", ""))
               .map(Json.parse(_))
@@ -56,7 +56,7 @@ object FeedMonitor {
         source.runForeach(eventProcessor)
       }
       .onComplete {
-        case Success(()) =>
+        case Success(akka.Done) =>
           logger.warn("Disconnected from feed. Reconnecting...")
           FeedMonitor(config, retryWait)(eventProcessor)
         case Failure(e) =>
