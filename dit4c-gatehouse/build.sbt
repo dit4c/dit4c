@@ -45,7 +45,8 @@ dockerfile in docker := {
   import sbtdocker._
   val appDir = (packTargetDir / "pack").value
   immutable.Dockerfile.empty
-    .from("dit4c/dit4c-platform-basejre")
+    .from("alpine:3.3")
+    .run("sh", "-c", "apk add --update openjdk8-jre-base && rm -rf /var/cache/apk/*")
     .add(appDir, "/opt/dit4c-gatehouse")
     .run("chmod", "+x", "/opt/dit4c-gatehouse/bin/dit4c-gatehouse")
     .cmd("sh", "-c", """

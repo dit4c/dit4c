@@ -63,8 +63,8 @@ dockerfile in docker := {
   val dockerResources = baseDirectory.value / "src" / "main" / "docker"
   val configs = dockerResources / "etc"
   immutable.Dockerfile.empty
-    .from("dit4c/dit4c-platform-basejre")
-    .run("opkg-install", "dbus")
+    .from("alpine:3.3")
+    .run("sh", "-c", "apk add --update openjdk8-jre-base dbus && rm -rf /var/cache/apk/*")
     .add(appDir, "/opt/dit4c-machineshop")
     .run("chmod", "+x", "/opt/dit4c-machineshop/bin/dit4c-machineshop")
     .volume("/etc/dit4c-machineshop")
