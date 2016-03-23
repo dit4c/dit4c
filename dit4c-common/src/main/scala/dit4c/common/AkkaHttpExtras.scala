@@ -14,8 +14,14 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http.OutgoingConnection
 import akka.stream.Materializer
 import scala.concurrent.duration.FiniteDuration
+import akka.http.scaladsl.HttpsConnectionContext
+import javax.net.ssl.SSLContext
 
 object AkkaHttpExtras {
+
+  val modernHttpsConnectionContext = new HttpsConnectionContext(
+        SSLContext.getDefault,
+        enabledProtocols = Some("TLSv1.2" :: "TLSv1.1" :: Nil))
 
   implicit class Extras(http: HttpExt)(implicit system: ActorSystem) {
 

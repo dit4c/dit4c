@@ -19,6 +19,7 @@ import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.client.TransformerAux._
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.settings.ClientConnectionSettings
+import dit4c.common.AkkaHttpExtras
 
 class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDuration)
     extends Actor {
@@ -127,12 +128,17 @@ class SignatureActor(publicKeySource: java.net.URI, keyUpdateInterval: FiniteDur
     }
   }
 
-  protected def pipeline(req: HttpRequest) =
+  protected def pipeline(req: HttpRequest) = {
+    val http = Http()
+    http.setDefaultClientHttpsContext(
+        AkkaHttpExtras.modernHttpsConnectionContext)
     for {
-      res <- Http().singleResilientRequest(req,
-          ClientConnectionSettings(context.system), None, log)
+      res <- http.singleResilientRequest(req,
+          ClientConnectionSettings(context.system), 
+          None, log)
       str <- stringUnmarshaller(res.entity)
     } yield str
+  }
 }
 
 

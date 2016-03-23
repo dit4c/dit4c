@@ -23,9 +23,13 @@ trait SignatureCheckerProvider {
     log.info(s"Retrieving keys from $publicKeyLocation")
     if (publicKeyLocation.isAbsolute()) {
       import dit4c.common.AkkaHttpExtras._
-      Http().singleResilientRequest(
+      val http = Http()
+      http.setDefaultClientHttpsContext(modernHttpsConnectionContext)
+      http.singleResilientRequest(
           HttpRequest(uri = Uri(publicKeyLocation.toASCIIString)),
-          ClientConnectionSettings(system), None, log)
+          ClientConnectionSettings(system),
+          Some(modernHttpsConnectionContext), 
+          log)
         .flatMap(Unmarshal(_).to[String])
         .map { content =>
           val keys = KeyLoader(content)
