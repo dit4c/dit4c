@@ -56,15 +56,15 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
 
       (index ask PortQuery("foo"))
         .mapTo[PortReply] must equalTo(PortReply(Some("1.2.3.4:8080")))
-        .await(retries = 2, timeout = 200.millis)
+        .await(retries = 2, timeout = 500.millis)
 
       (index ask PortQuery("bar"))
         .mapTo[PortReply] must equalTo(PortReply(Some("2.3.4.5:8888")))
-        .await(retries = 2, timeout = 200.millis)
+        .await(retries = 2, timeout = 500.millis)
 
       (index ask PortQuery("doesnotexist"))
         .mapTo[PortReply] must equalTo(PortReply(None))
-        .await(retries = 2, timeout = 200.millis)
+        .await(retries = 2, timeout = 500.millis)
 
       done
     }
