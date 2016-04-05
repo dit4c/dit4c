@@ -50,7 +50,7 @@ class DockerIndexActor(dockerClient: DockerClient) extends Actor {
           case ContainerEvent(id, t) if t == "start" || t == "rename" =>
             lookupPort(id)
         }
-        fStop.onComplete { case _ => ResetEventFeed }
+        fStop.onComplete { case _ => self ! ResetEventFeed }
       case BecomeActive =>
         queue.foreach(self ! _)
         context.become(respondWith(mappings, Queue.empty, true))
