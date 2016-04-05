@@ -119,8 +119,9 @@ dockerfile in docker := {
       """)
     .run("sh", "-c",
       """
-      yum install java-1.8.0-openjdk -y
+      yum install java-1.8.0-openjdk which -y
       """)
+    .run("which", "java")
     .run("sh", "-c",
       """
       set -e
