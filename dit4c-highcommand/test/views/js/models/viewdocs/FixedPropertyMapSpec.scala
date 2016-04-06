@@ -6,20 +6,18 @@ import org.specs2.mutable.Specification
 import org.junit.runner.RunWith
 import org.mozilla.javascript._
 import scala.collection.JavaConversions._
+import org.specs2.ScalaCheck
 
 @RunWith(classOf[JUnitRunner])
-class FixedPropertyMapSpec extends Specification {
+class FixedPropertyMapSpec extends Specification with ScalaCheck {
+
+  type Ks = Seq[String]
+  type KVs = Seq[(String,String)]
 
   "FixedPropertyMap" should {
 
-    "produce compilable JS" in {
-      fixed_property_map(Seq.empty, Seq.empty).body.must(compileAsJs) and
-      fixed_property_map(
-          ("type", "Foo") :: Nil,
-          Seq.empty).body.must(compileAsJs) and
-      fixed_property_map(
-          ("type", "Event") :: ("subtype", "Dummy") :: Nil,
-          "id" :: "createdAt" :: Nil).body.must(compileAsJs)
+    "produce compilable JS" ! prop { (pairs: KVs, sortKeys: Ks) =>
+      fixed_property_map(pairs, sortKeys).body must compileAsJs
     }
 
   }

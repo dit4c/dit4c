@@ -4,11 +4,13 @@
 
 @import play.api.libs.json._
 
+@js(v: Any) = { JavaScript(Json.asciiStringify(Json.toJson(v))) }
+
 function(doc) {
   @for((k, v) <- pairs) {
-	 if (doc['@k'] != '@v') return;
+  if (doc[@js(k)] != @js(v)) return;
   }
-  var sortKey = @JavaScript(JsArray(sortKeys.map(JsString(_))).toString)
+  var sortKey = @js(sortKeys)
     .map(function(v) { return doc[v]; })
     .join('-');
   emit(sortKey, null);
