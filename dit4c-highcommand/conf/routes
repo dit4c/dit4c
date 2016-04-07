@@ -71,3 +71,6 @@ PUT     /containers/:id             @controllers.ContainerController.update(id)
 DELETE  /containers/:id             @controllers.ContainerController.delete(id)
 GET     /containers/:id/export      @controllers.ContainerController.export(id)
 GET     /containers/:id/redirect    @controllers.ContainerController.redirect(id)
+
+# Events
+GET     /events/logins              @controllers.EventMonitoringController.listLoginEvents
