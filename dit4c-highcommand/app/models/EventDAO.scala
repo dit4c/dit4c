@@ -25,6 +25,16 @@ class EventDAO @Inject() (protected val db: CouchDB.Database)
           user.email.orElse(identity.emailAddress))
     }
 
+  def listLogins(from: Option[Instant], to: Option[Instant]): Future[Seq[Event.Login]] =
+      for {
+        result <-
+          db.design("main").view("login_events")
+            .query[JsValue, JsValue, JsValue](
+                startkey=from.map(Json.toJson(_)),
+                endkey=to.map(Json.toJson(_)),
+                inclusive_end=false, include_docs=true)
+      } yield fromJson[LoginImpl](result.rows.flatMap(_.doc))
+
   def get(id: String): Future[Option[Event]] = utils.get[Event](id)
 
   implicit val loginFormat: Format[LoginImpl] = (

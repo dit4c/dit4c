@@ -15,12 +15,17 @@ object ViewManager {
     View("user_identities", user_identities()) ::
     View("containers_by_compute_node",
         fixed_property_map(Seq(("type","Container")), Seq("computeNodeId"))) ::
+    View("login_events",
+        fixed_property_map(
+            ("type", "Event") :: ("subtype", "Login") :: Nil,
+            "timestamp" :: Nil)) ::
     Nil
   }
 
   val filters: Iterable[Filter] = {
     import _root_.views.js.models.filters._
-    Filter("type/Event", fixed_property_filter(("type","Event") :: Nil)) ::
+    Filter("login_events", fixed_property_filter(
+        ("type","Event") :: ("subtype","Login") :: Nil)) ::
     Nil
   }
 
