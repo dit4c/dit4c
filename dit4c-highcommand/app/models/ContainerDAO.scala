@@ -30,14 +30,17 @@ class ContainerDAO @Inject() (protected val db: CouchDB.Database)
   def get(id: String): Future[Option[Container]] = utils.get(id)
 
   def list: Future[Seq[Container]] = utils.list[ContainerImpl](typeValue)
-  
+
   def changes = utils.changes[ContainerImpl](typeValue)
 
   def listFor(node: ComputeNode): Future[Seq[Container]] =
     for {
-      containers <- list
-    } yield containers.filter(_.computeNodeId == node.id)
-    
+      result <-
+        db.design("main").view("containers_by_compute_node")
+          .query[String, JsValue, JsValue](
+              key=Some(node.id), include_docs=true)
+    } yield fromJson[ContainerImpl](result.rows.flatMap(_.doc))
+
   private val ownerFormat: OFormat[Container.OwnerID] = OFormat(
       (__ \ "ownerID").read[Container.OwnerID].orElse(
         (__ \ "ownerIDs").read[Set[Container.OwnerID]].map(vs => vs.head)),
@@ -98,7 +101,7 @@ trait Container extends BaseModel {
 
 object Container {
   type OwnerID = String
-  
+
   trait UpdateOp extends UpdateOperation[Container] {
     def withName(name: String): UpdateOp
     def withOwner(id: OwnerID): UpdateOp
