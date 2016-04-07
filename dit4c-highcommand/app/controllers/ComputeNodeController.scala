@@ -26,6 +26,7 @@ class ComputeNodeController @Inject() (
     containerResolver: ContainerResolver) extends Controller with Utils {
 
   import RoutingMapEmitter.routingBackendFormat
+  import Future.successful
 
   def index: Action[AnyContent] = Action.async { implicit request =>
     render.async {
@@ -45,7 +46,7 @@ class ComputeNodeController @Inject() (
       for {
         serverId <- MachineShop.fetchServerId(managementUrl)
             .map(Some(_))
-            .fallbackTo(sync2async(None))
+            .fallbackTo(successful(None))
         existingNodes <- computeNodeDao.list
         attrs = (f: ComputeNode => String) => existingNodes.map(f)
       } yield {
@@ -65,7 +66,7 @@ class ComputeNodeController @Inject() (
       }
 
     fServerId.flatMap {
-      case Left(msg) => sync2async(BadRequest(msg))
+      case Left(msg) => successful(BadRequest(msg))
       case Right(serverId) =>
         for {
           node <- computeNodeDao.create(request.user,
@@ -304,9 +305,9 @@ class ComputeNodeController @Inject() (
     Authenticated.async { implicit request =>
       withComputeNode(nodeId)(asOwner {
         case node if !node.ownerIDs.contains(userId) =>
-          sync2async(NotFound("Specified owner doesn't exist."))
+          successful(NotFound("Specified owner doesn't exist."))
         case node if node.ownerIDs.size < 2 =>
-          sync2async(Forbidden("Cannot remove last owner."))
+          successful(Forbidden("Cannot remove last owner."))
         case node =>
           for {
             _ <- node.removeOwner(userId)
@@ -321,7 +322,7 @@ class ComputeNodeController @Inject() (
       withComputeNode(nodeId)(asOwner {
         case node if !node.userIDs.contains(userId) =>
           throw new Exception(node.toString)
-          sync2async(NotFound("Specified user doesn't exist."))
+          successful(NotFound("Specified user doesn't exist."))
         case node =>
           for {
             _ <- node.removeUser(userId)
@@ -349,8 +350,6 @@ class ComputeNodeController @Inject() (
       computeNode.managementUrl,
       () => keyDao.bestSigningKey.map(_.get.toJWK))
 
-  protected def sync2async[A](obj: A) = Future.successful(obj)
-
   protected def withToken(
         computeNode: ComputeNode,
         code: String
@@ -362,7 +361,7 @@ class ComputeNodeController @Inject() (
       possibleToken = tokens.find(_.code == code)
       result <- possibleToken match {
         case Some(token) => action(token)
-        case None => sync2async(NotFound("Access code does not exist."))
+        case None => successful(NotFound("Access code does not exist."))
       }
     } yield result
 
@@ -375,7 +374,7 @@ class ComputeNodeController @Inject() (
       possibleNode <- computeNodeDao.get(nodeId)
       result <- possibleNode match {
         case Some(node) => action(node)
-        case None => sync2async(NotFound("Compute Node does not exist."))
+        case None => successful(NotFound("Compute Node does not exist."))
       }
     } yield result
 
@@ -385,7 +384,7 @@ class ComputeNodeController @Inject() (
         implicit request: AuthenticatedRequest[_]
       ): ComputeNode => Future[Result] = {
     case node if node.ownerIDs.contains(request.user.id) => action(node)
-    case _ => sync2async(Forbidden("You do not own this compute node."))
+    case _ => successful(Forbidden("You do not own this compute node."))
   }
 
   implicit def nodeWriter(implicit request: AuthenticatedRequest[_]) =

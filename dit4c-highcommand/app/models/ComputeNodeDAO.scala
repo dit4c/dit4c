@@ -28,7 +28,6 @@ class ComputeNodeDAO @Inject() (
     )(implicit protected val ec: ExecutionContext)
   extends DAOUtils {
   import play.api.libs.functional.syntax._
-  import play.api.Play.current
 
   val typeValue = "ComputeNode"
 
@@ -44,7 +43,7 @@ class ComputeNodeDAO @Inject() (
     }
 
   def list: Future[Seq[ComputeNode]] = utils.list[ComputeNodeImpl](typeValue)
-  
+
   def changes = utils.changes[ComputeNodeImpl](typeValue)
 
   def get(id: String) = utils.get(id)
@@ -77,8 +76,6 @@ class ComputeNodeDAO @Inject() (
       with BaseModel
       with UpdatableModel[ComputeNode.UpdateOp] {
     import scala.language.implicitConversions
-
-    import play.api.Play.current
 
     val containers = new ContainerProvider(
       managementUrl,
