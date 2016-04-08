@@ -1,4 +1,5 @@
 import sbtdocker.{ImageName, Dockerfile}
+import play.sbt.routes.RoutesKeys
 import DockerKeys._
 
 name := "dit4c-highcommand"
@@ -40,6 +41,11 @@ resolvers ++= Seq(
   "Sonatype snapshots" at "https://oss.sonatype.org/content/groups/staging/")
 
 version <<= version in ThisBuild
+
+RoutesKeys.routesImport ++= Seq(
+  "java.time._",
+  "extensions.Binders._"
+)
 
 crossScalaVersions := Nil
 

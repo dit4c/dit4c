@@ -73,4 +73,4 @@ GET     /containers/:id/export      @controllers.ContainerController.export(id)
 GET     /containers/:id/redirect    @controllers.ContainerController.redirect(id)
 
 # Events
-GET     /events/logins              @controllers.EventMonitoringController.listLoginEvents
+GET     /events/logins              @controllers.EventMonitoringController.listLoginEvents(from: Option[Instant] ?= None, to: Option[Instant] ?= None)
