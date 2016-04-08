@@ -87,7 +87,7 @@ dockerfile in docker := {
  val prodConfig = dockerResources / "opt" / "dit4c-highcommand" / "prod.conf"
  immutable.Dockerfile.empty
    .from("alpine:3.3")
-   .run("sh", "-c", "apk add --update openjdk8-jre-base && rm -rf /var/cache/apk/*")
+   .run("sh", "-c", "apk add --update openjdk8-jre-base bash && rm -rf /var/cache/apk/*")
    .add(stageDir, "/opt/dit4c-highcommand/")
    .add(prodConfig, "/opt/dit4c-highcommand/prod.conf")
    .add(configs, "/etc")
