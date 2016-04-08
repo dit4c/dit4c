@@ -25,7 +25,7 @@ object ViewManager {
   val filters: Iterable[Filter] = {
     import _root_.views.js.models.filters._
     Filter("login_events", fixed_property_filter(
-        ("type","Event") :: ("subtype","Login") :: Nil)) ::
+        ("type","Event") :: ("subtype","Login") :: Nil, false)) ::
     Nil
   }
 

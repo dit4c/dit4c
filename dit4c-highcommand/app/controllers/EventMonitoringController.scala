@@ -9,6 +9,11 @@ import java.time.Instant
 import scala.concurrent.Future
 import play.api.mvc.Result
 import play.api.mvc.AnyContent
+import play.api.http.HttpEntity
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
+import play.api.libs.EventSource
+import play.api.http.ContentTypes
 
 class EventMonitoringController @Inject() (
     val db: CouchDB.Database,
@@ -24,6 +29,18 @@ class EventMonitoringController @Inject() (
       } yield Ok(Json.toJson(events))
     }
 
+  def liveLoginEvents(from: Option[Instant]) =
+    asAdmin { request =>
+      for {
+        (existingEvents, newEvents) <- eventDao.streamLogins(
+            from.orElse(Some(Instant.now))) // None shouldn't get entire DB
+        stream = Source.fromIterator(() => existingEvents.toIterator)
+          .concat(newEvents)
+          .map(Json.toJson(_))
+          .map(Json.stringify(_))
+          .via(EventSource.flow)
+      } yield Ok.chunked(stream).as(ContentTypes.EVENT_STREAM)
+    }
 
   private implicit val writesLoginEvent: Writes[Event.Login] =
     Writes { event =>

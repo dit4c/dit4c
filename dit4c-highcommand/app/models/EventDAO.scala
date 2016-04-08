@@ -7,6 +7,7 @@ import scala.concurrent.ExecutionContext
 import providers.db.CouchDB
 import providers.auth.Identity
 import java.time.Instant
+import akka.stream.scaladsl.Source
 
 class EventDAO @Inject() (protected val db: CouchDB.Database)
     (implicit protected val ec: ExecutionContext)
@@ -34,6 +35,30 @@ class EventDAO @Inject() (protected val db: CouchDB.Database)
                 endkey=to.map(Json.toJson(_)),
                 inclusive_end=false, include_docs=true)
       } yield fromJson[LoginImpl](result.rows.flatMap(_.doc))
+
+  def streamLogins(from: Option[Instant]): Future[(Seq[Event.Login],Source[Event.Login, Future[Unit]])]=
+      for {
+        // Get current state
+        result <-
+          db.design("main").view("login_events")
+            .query[JsValue, JsValue, JsValue](
+                startkey=from.map(Json.toJson(_)),
+                include_docs=true, update_seq=true)
+        objs = fromJson[LoginImpl](result.rows.flatMap(_.doc))
+        // Get all changes made after the base query
+        changes =
+          (new ChangeFeed(db))
+              .changes[LoginImpl](result.update_seq, Some("main/login_events"))
+              .mapAsync(1) { change =>
+            change match {
+              case ChangeFeed.Update(id, obj) => Future.successful(Some(obj))
+              case ChangeFeed.Deletion(id) => Future.successful(None)
+            }
+          }.mapConcat {
+            case Some(v) => v :: Nil
+            case None => Nil
+          }
+      } yield (objs, changes)
 
   def get(id: String): Future[Option[Event]] = utils.get[Event](id)
 

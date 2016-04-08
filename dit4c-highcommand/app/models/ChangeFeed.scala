@@ -17,9 +17,10 @@ class ChangeFeed @Inject() @Singleton() (
     db: CouchDB.Database)(implicit ec: ExecutionContext) {
   import ChangeFeed._
 
-  def changes[T](updateSeqNum: Option[Int])(implicit rjs: Reads[T]): Source[Change[T], Future[Unit]] = {
+  def changes[T](updateSeqNum: Option[Int], filter: Option[String] = None)(
+      implicit rjs: Reads[T]): Source[Change[T], Future[Unit]] = {
     import net.liftweb.json._
-    val changeStream = db.asSohvaDb.changes(updateSeqNum, None)
+    val changeStream = db.asSohvaDb.changes(updateSeqNum, filter)
     val publisher = RxReactiveStreams.toPublisher(
         JavaConversions.toJavaObservable(changeStream.stream))
     val source = Source.fromPublisher(publisher).mapConcat[Change[T]] {

@@ -17,7 +17,8 @@ class FixedPropertyFilterSpec extends Specification with ScalaCheck {
   "FixedPropertyFilter" should {
 
     "produce compilable JS" ! prop { (pairs: KVs) =>
-      fixed_property_filter(pairs).body must compileAsJs
+      (fixed_property_filter(pairs, false).body must compileAsJs) and
+      (fixed_property_filter(pairs, true).body must compileAsJs)
     }
 
   }

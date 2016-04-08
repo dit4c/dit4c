@@ -74,3 +74,4 @@ GET     /containers/:id/redirect    @controllers.ContainerController.redirect(id
 
 # Events
 GET     /events/logins              @controllers.EventMonitoringController.listLoginEvents(from: Option[Instant] ?= None, to: Option[Instant] ?= None)
+GET     /events/logins/live         @controllers.EventMonitoringController.liveLoginEvents(from: Option[Instant] ?= None)

@@ -1,17 +1,17 @@
-@(pairs: Seq[(String, String)])
+@(pairs: Seq[(String, String)], includeDeletions: Boolean)
 
 @import play.twirl.api.JavaScript
 
 @import play.api.libs.json._
 
-@js(v: Any) = { JavaScript(Json.asciiStringify(Json.toJson(v))) }
+@jsStr(v: String) = @{JavaScript(Json.asciiStringify(Json.toJson(v)))}
 
 function(doc, req) {
   // All deleted documents go through by default
-  if (doc._deleted) return true;
+  @if(includeDeletions) { if (doc._deleted) return true; }
   // Check each pair in sequence
   @for((k, v) <- pairs) {
-  if (doc[@js(k)] != @js(v)) return false;
+  if (doc[@jsStr(k)] != @jsStr(v)) return false;
   }
   // All pairs match, so we want this document
   return true;
