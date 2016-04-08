@@ -14,6 +14,9 @@ scalacOptions in ThisBuild += "-target:jvm-1.8"
 
 javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 
+// Attempt to fix cryptic Travis CI sbt.ForkMain error
+javaOptions in ThisBuild += "-Xmx1G"
+
 // Project definitions (automatically aggregated)
 lazy val common      = project in file("dit4c-common")
 
