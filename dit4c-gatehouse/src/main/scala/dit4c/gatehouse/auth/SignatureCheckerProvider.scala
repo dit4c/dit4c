@@ -25,10 +25,12 @@ trait SignatureCheckerProvider {
       import dit4c.common.AkkaHttpExtras._
       val http = Http()
       http.setDefaultClientHttpsContext(modernHttpsConnectionContext)
+      val uri = Uri(publicKeyLocation.toASCIIString)
       http.singleResilientRequest(
-          HttpRequest(uri = Uri(publicKeyLocation.toASCIIString)),
+          HttpRequest(uri = uri),
           ClientConnectionSettings(system),
-          Some(modernHttpsConnectionContext), 
+          if (uri.scheme == "https") Some(modernHttpsConnectionContext)
+          else None,
           log)
         .flatMap(Unmarshal(_).to[String])
         .map { content =>
