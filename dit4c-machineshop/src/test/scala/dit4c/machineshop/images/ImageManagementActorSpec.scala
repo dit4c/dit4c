@@ -224,7 +224,7 @@ class ImageManagementActorSpec extends Specification with Mockito {
   }
 
   class MockDockerContainers extends DockerContainers {
-    override def create(name: String, image: String) = ???
+    override def create(name: String, image: String, sharedWritable: Boolean) = ???
     override def list = ???
   }
 

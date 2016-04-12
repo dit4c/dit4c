@@ -20,13 +20,17 @@ class ContainerProvider(
 
   val client = new Client(managementUrl, privateKeyProvider)
 
-  def create(name: String, image: String) =
+  def create(name: String, image: String, sharedWritable: Boolean) =
     client("containers")
       .signed { ws: WSRequest =>
         ws.withMethod("POST")
           .withHeaders("Content-Type" -> "application/json; charset=utf-8")
           .withBody(InMemoryBody(ByteString(Json.stringify(
-              Json.obj("name" -> name, "image" -> image)).getBytes)))
+              Json.obj(
+                "name" -> name,
+                "image" -> image,
+                "sharedWritable" -> sharedWritable
+              )).getBytes)))
       }
       .map(rethrowErrors(_.json.as[Container]))
 

@@ -94,7 +94,10 @@ class ApiServiceSpec extends Specification with RouteTest with Specs2TestInterfa
     }
 
     override val containers = new DockerContainers {
-      override def create(name: String, image: DockerImage) = Future.successful({
+      override def create(
+          name: String,
+          image: DockerImage,
+          sharedWritable: Boolean) = Future.successful({
         val newContainer =
           new MockDockerContainer(sha1(s"$name:$image"), name, image)
         containerList = containerList ++ Seq(newContainer)

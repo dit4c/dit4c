@@ -113,7 +113,7 @@ class ApiService(
         post {
           entity(as[NewContainerRequest]) { npr =>
             signatureCheck {
-              onSuccess(client.containers.create(npr.name, npr.image)) { container =>
+              onSuccess(client.containers.create(npr.name, npr.image, npr.sharedWritable.getOrElse(false))) { container =>
                 implicit val m = fromToEntityMarshaller(StatusCodes.Created)
                 complete(container)
               }
@@ -244,7 +244,10 @@ class ApiService(
 
 object ApiService {
 
-  case class NewContainerRequest(val name: String, val image: String)
+  case class NewContainerRequest(
+      val name: String,
+      val image: String,
+      val sharedWritable: Option[Boolean])
 
   case class NewImageRequest(
     val displayName: String,
@@ -259,7 +262,7 @@ object ApiService {
     new ApiService(actorRefFactory, client, imageMonitor, signatureActor)
 
   object marshallers extends DefaultJsonProtocol with SprayJsonSupport {
-    implicit val newContainerRequestReader = jsonFormat2(NewContainerRequest)
+    implicit val newContainerRequestReader = jsonFormat3(NewContainerRequest)
     implicit val newImageRequestReader = jsonFormat3(NewImageRequest)
 
     implicit val containerWriter = new RootJsonWriter[DockerContainer] {

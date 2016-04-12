@@ -62,7 +62,7 @@ class ContainerController @Inject() (
         case Some(node) =>
           for {
             container <- containerDao.create(request.user, name, image, node)
-            p <- createComputeNodeContainer(container)
+            p <- createComputeNodeContainer(request.user, container)
             cnContainer <- if (shouldBeActive) p.start else Future.successful(p)
             result = Created(Json.obj(
               "id" -> container.id,
@@ -198,10 +198,13 @@ class ContainerController @Inject() (
       }
   }
 
-  protected def createComputeNodeContainer(container: Container) =
+  protected def createComputeNodeContainer(user: User, container: Container) =
       for {
         node <- computeNodeDao.get(container.computeNodeId)
-        c <- node.get.containers.create(cncName(container), container.image)
+        c <- node.get.containers.create(
+            cncName(container),
+            container.image,
+            node.get.ownedBy(user))
       } yield c
 
   protected def resolveComputeNodeContainer(container: Container) =
@@ -214,10 +217,10 @@ class ContainerController @Inject() (
       val expr: String => Boolean,
       val msg: String)
 
-  private def userContainers(implicit request: AuthenticatedRequest[_]): 
+  private def userContainers(implicit request: AuthenticatedRequest[_]):
       Future[Seq[Container]] =
     containerDao.list.map(_.filter(_.ownerID == request.user.id))
-      
+
   private def containerPairs(implicit request: AuthenticatedRequest[_]):
       Future[Seq[(Container, Option[MachineShop.Container])]] = {
     userContainers.flatMap { userContainers =>
@@ -265,7 +268,7 @@ class ContainerController @Inject() (
       "computeNodeId" -> c.computeNodeId,
       "image" -> c.image
     )
-  
+
   private def toJson(c: Container, cnc: Option[MachineShop.Container]): JsObject =
     toJson(c) ++ Json.obj("active" -> cnc.map[JsBoolean](cnc => JsBoolean(cnc.active)))
 

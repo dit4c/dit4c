@@ -110,7 +110,10 @@ class DockerClientImpl(
 
   object ContainersImpl extends DockerContainers {
 
-    override def create(name: String, image: DockerImage) = Future({
+    override def create(
+        name: String,
+        image: DockerImage,
+        sharedWritable: Boolean) = Future({
       if (!name.isValidContainerName) {
         throw new IllegalArgumentException(
             "Name must be a valid lower-case DNS label")
@@ -134,7 +137,7 @@ class DockerClientImpl(
         .withBinds(new Bind(
             sharedVolumeName,
             new Volume("/mnt/shared"),
-            AccessMode.ro))
+            if (sharedWritable) AccessMode.rw else AccessMode.ro))
         .exec
       new ContainerImpl(c.getId, name, ContainerStatus.Stopped)
     })(ec)
