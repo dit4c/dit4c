@@ -30,7 +30,7 @@ import providers.ContainerResolver
 class ContainerControllerSpec extends PlaySpecification with SpecUtils {
 
   import scala.concurrent.ExecutionContext.Implicits.global
-  
+
   val testImage = "dit4c/dit4c-container-ipython"
 
   "ContainerController" should {
@@ -44,7 +44,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val emptyResponse = controller.list(session.newRequest)
       status(emptyResponse) must_== 200
       contentAsJson(emptyResponse) must_== JsArray()
-      val computeNode = 
+      val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
             RoutingMapEmitter.Backend("localhost", 8080, "https")))
@@ -119,27 +119,27 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
       val key = keyDao.create("localhost.localdomain",512)
       val computeNodeDao = new ComputeNodeDAO(db(app), keyDao)
       val containerDao = new ContainerDAO(db(app))
-      val computeNode = 
+      val computeNode =
         await(computeNodeDao.create(
             session.user, "Local", "fakeid", "http://localhost:5000/",
             RoutingMapEmitter.Backend("localhost", 8080, "https")))
-      val badRequestResponse  = 
+      val badRequestResponse  =
         controller.create(session.newRequest[JsValue](Json.obj(
           "name"->"",
           "image" -> "test",
           "computeNodeId"->computeNode.id,
-          "active"->true))) 
+          "active"->true)))
       status(badRequestResponse) must_== 400
-      val okResponse  = 
+      val okResponse  =
         controller.create(session.newRequest[JsValue](Json.obj(
           "name"->"test",
           "image" -> "test",
           "computeNodeId"->computeNode.id,
-          "active"->true))) 
+          "active"->true)))
       status(okResponse) must_== 201
       header("Cache-Control", okResponse) must beSome("private, must-revalidate")
     }
-    
+
     "update containers" in new WithApplication(fakeApp) {
       val session = new UserSession(db(app))
       val controller = getMockedController(app)
@@ -154,12 +154,12 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
             RoutingMapEmitter.Backend("localhost", 8080, "https")))
       val container =
         await(containerDao.create(session.user, "test", testImage, computeNode))
-      val response  = 
+      val response  =
         controller.update(container.id)(session.newRequest[JsValue](Json.obj(
           "name" -> "changed",
           "image" -> "test",
           "computeNodeId" -> computeNode.id,
-          "active" -> true))) 
+          "active" -> true)))
       status(response) must_== 200
       val json = contentAsJson(response).as[JsObject]
       (json \ "id").as[String] must_== container.id
@@ -175,7 +175,7 @@ class ContainerControllerSpec extends PlaySpecification with SpecUtils {
         db(app),
         injector(app).instanceOf(classOf[Application]),
         injector(app).instanceOf(classOf[ContainerResolver])) {
-      override def createComputeNodeContainer(container: Container) =
+      override def createComputeNodeContainer(user: User, container: Container) =
         Future.successful(MockMCC(container.name, false))
 
       override def resolveComputeNodeContainer(container: Container) =
