@@ -35,6 +35,16 @@ import dit4c.machineshop.docker.DockerClient
 import dit4c.machineshop.docker.models.DockerContainer
 import spray.json._
 import akka.http.scaladsl.model.HttpResponse
+import akka.stream.stage.GraphStage
+import akka.stream.FlowShape
+import scala.concurrent.Promise
+import akka.stream.Inlet
+import akka.stream.Outlet
+import akka.stream.stage.GraphStageLogic
+import akka.stream.Attributes
+import akka.stream.stage.InHandler
+import akka.stream.stage.OutHandler
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ApiService(
     arf: ActorRefFactory,
@@ -169,7 +179,7 @@ class ApiService(
                 val byteSource = container.export
                 val contentType = ContentType(MediaTypes.`application/x-tar`)
                 val content =
-                  byteSource.transform(() => new ApiService.ChunkingStage)
+                  byteSource.via(new ApiService.ChunkingStage)
                 complete(HttpEntity.Chunked(contentType, content))
               }
             }
@@ -330,18 +340,35 @@ object ApiService {
 
   }
 
-  class ChunkingStage extends PushPullStage[ByteString,ChunkStreamPart]() {
+  protected class ChunkingStage extends GraphStage[FlowShape[ByteString,ChunkStreamPart]] {
+    val isFinishing = new AtomicBoolean(false)
+    val in = Inlet[ByteString]("Chunking.in")
+    val out = Outlet[ChunkStreamPart]("Chunking.out")
 
-    override def onPush(elem: ByteString, ctx: Context[ChunkStreamPart]) =
-      ctx.push(HttpEntity.Chunk(elem.toArray))
+    override val shape = FlowShape.of(in, out)
 
-    override def onPull(ctx: Context[ChunkStreamPart]) =
-      if (!ctx.isFinishing) ctx.pull
-      else ctx.pushAndFinish(HttpEntity.LastChunk)
-
-    override def onUpstreamFinish(ctx: Context[ChunkStreamPart]) =
-      ctx.absorbTermination
-
+    override def createLogic(attr: Attributes): GraphStageLogic =
+      new GraphStageLogic(shape) {
+        setHandler(in, new InHandler {
+          override def onPush(): Unit = {
+            push(out, HttpEntity.Chunk(grab(in)))
+          }
+          override def onUpstreamFailure(cause: Throwable) = {
+            super.onUpstreamFailure(cause)
+          }
+          override def onUpstreamFinish() = {
+            isFinishing.set(true)
+          }
+        })
+        setHandler(out, new OutHandler {
+          override def onPull =
+            if (isFinishing.get) {
+              push(out, HttpEntity.LastChunk)
+              completeStage()
+            } else pull(in)
+        })
+      }
   }
+
 
 }

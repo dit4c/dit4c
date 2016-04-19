@@ -26,6 +26,14 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.Promise
 import akka.stream.stage.Context
 import akka.stream.stage.PushStage
+import akka.stream.Inlet
+import akka.stream.Outlet
+import akka.stream.FlowShape
+import akka.stream.stage.GraphStageLogic
+import akka.stream.stage.InHandler
+import akka.stream.Attributes
+import akka.stream.stage.GraphStage
+import akka.stream.stage.OutHandler
 
 class DockerClientImpl(
     val dockerConfig: DockerClientConfig) extends DockerClient {
@@ -97,7 +105,7 @@ class DockerClientImpl(
         StreamConverters.fromInputStream(() =>docker.saveImageCmd(imageId).exec)
           .map(v => { fRemoveImage; v }) // Remove image onces stream starts
       }.map { bs => byteCounter.addAndGet(bs.size); bs }
-       .transform { () => completerStage }
+       .via(completerStage)
        .mapMaterializedValue(_ => completerStage.future.map(_ => byteCounter.get))
     }
 
@@ -198,18 +206,33 @@ object DockerClientImpl {
       }
   }
 
-  protected class CompleterStage[T] extends PushStage[T, T] {
+  protected class CompleterStage[T] extends GraphStage[FlowShape[T, T]] {
     private val p = Promise[Unit]()
     def future = p.future
-    def onPush(elem: T, ctx: Context[T]) = ctx.push(elem)
-    override def onUpstreamFailure(cause: Throwable, ctx: Context[T]) = {
-      p.failure(cause)
-      super.onUpstreamFailure(cause, ctx)
-    }
-    override def onUpstreamFinish(ctx: Context[T]) = {
-      p.success(())
-      super.onUpstreamFinish(ctx)
-    }
+    val in = Inlet[T]("Completer.in")
+    val out = Outlet[T]("Completer.out")
+
+    override val shape = FlowShape.of(in, out)
+
+    override def createLogic(attr: Attributes): GraphStageLogic =
+      new GraphStageLogic(shape) {
+        setHandler(in, new InHandler {
+          override def onPush(): Unit = {
+            push(out, grab(in))
+          }
+          override def onUpstreamFailure(cause: Throwable) = {
+            p.failure(cause)
+            super.onUpstreamFailure(cause)
+          }
+          override def onUpstreamFinish() = {
+            p.success(())
+            super.onUpstreamFinish()
+          }
+        })
+        setHandler(out, new OutHandler {
+          override def onPull = pull(in)
+        })
+      }
   }
 
 }
