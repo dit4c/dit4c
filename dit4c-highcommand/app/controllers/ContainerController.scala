@@ -194,6 +194,9 @@ class ContainerController @Inject() (
             case e: java.net.ConnectException =>
               Logger.warn(s"${e.getMessage} ⇒ aborting delete")
               InternalServerError("Unable to contact compute node.")
+            case e: Throwable =>
+              Logger.warn(e.getMessage)
+              InternalServerError(e.getMessage)
           }
       }
   }
