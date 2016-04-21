@@ -36,3 +36,9 @@ releaseSettings
 crossScalaVersions := Nil
 
 parallelExecution in ThisBuild := false
+
+buildOptions in docker in ThisBuild := BuildOptions(
+  cache = false,
+  removeIntermediateContainers = BuildOptions.Remove.Always,
+  pullBaseImage = BuildOptions.Pull.Always
+)

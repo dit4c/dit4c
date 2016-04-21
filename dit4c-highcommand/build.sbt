@@ -1,6 +1,4 @@
-import sbtdocker.{ImageName, Dockerfile}
 import play.sbt.routes.RoutesKeys
-import DockerKeys._
 
 name := "dit4c-highcommand"
 
@@ -69,7 +67,7 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, version, cacheDirecto
 
 pipelineStages := Seq(digest, gzip)
 
-sbtdocker.Plugin.dockerSettings
+enablePlugins(sbtdocker.DockerPlugin)
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 

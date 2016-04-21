@@ -1,6 +1,3 @@
-import sbtdocker.{ImageName, Dockerfile}
-import DockerKeys._
-
 name := "dit4c-switchboard"
 
 fork in run := true
@@ -41,7 +38,7 @@ packSettings
 
 packMain := Map("dit4c-switchboard" -> "dit4c.switchboard.Boot")
 
-sbtdocker.Plugin.dockerSettings
+enablePlugins(sbtdocker.DockerPlugin)
 
 // Make docker depend on the package task
 docker <<= docker.dependsOn(pack)

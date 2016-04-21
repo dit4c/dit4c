@@ -1,6 +1,3 @@
-import sbtdocker.{ImageName, Dockerfile}
-import DockerKeys._
-
 name  := "dit4c-machineshop"
 
 crossScalaVersions := Nil
@@ -50,7 +47,7 @@ packSettings
 
 packMain := Map("dit4c-machineshop" -> "dit4c.machineshop.Boot")
 
-sbtdocker.Plugin.dockerSettings
+enablePlugins(sbtdocker.DockerPlugin)
 
 // Make docker depend on the package task
 docker <<= docker.dependsOn(pack)

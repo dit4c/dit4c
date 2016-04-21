@@ -1,6 +1,3 @@
-import sbtdocker.{ImageName, Dockerfile}
-import DockerKeys._
-
 name := "dit4c-gatehouse"
 
 crossScalaVersions := Nil
@@ -34,7 +31,7 @@ packSettings
 
 packMain := Map("dit4c-gatehouse" -> "dit4c.gatehouse.Boot")
 
-sbtdocker.Plugin.dockerSettings
+enablePlugins(sbtdocker.DockerPlugin)
 
 // Make docker depend on the package task, which generates a jar file of the application code
 docker <<= docker.dependsOn(pack)
