@@ -38,7 +38,7 @@ object Boot extends App {
       case Success(b) =>
         log.info(s"Successfully bound to ${b.localAddress}")
       case Failure(msg) =>
-        system.shutdown()
+        system.terminate()
         log.error(msg.getMessage)
         System.exit(1)
     }

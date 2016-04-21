@@ -45,7 +45,7 @@ class DockerIndexActorSpec extends Specification with BeforeAfterAll {
   override def beforeAll = {}
 
   override def afterAll = {
-    system.shutdown()
+    system.terminate()
   }
 
   "DockerIndexActor" should {
