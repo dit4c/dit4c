@@ -34,6 +34,7 @@ import akka.stream.stage.InHandler
 import akka.stream.Attributes
 import akka.stream.stage.GraphStage
 import akka.stream.stage.OutHandler
+import com.github.dockerjava.api.exception.NotModifiedException
 
 class DockerClientImpl(
     val dockerConfig: DockerClientConfig) extends DockerClient {
@@ -88,12 +89,12 @@ class DockerClientImpl(
 
     override def start = Future({
       docker.startContainerCmd(id).exec
-    })(ec).flatMap(_ => this.refresh)
+    })(ec).recover(notModifiedIsFine).flatMap(_ => this.refresh)
 
     override def stop(timeout: Duration) = Future({
       docker.stopContainerCmd(id)
         .withTimeout(Math.max(0, timeout.toSeconds.toInt)).exec
-    })(ec).flatMap(_ => this.refresh)
+    })(ec).recover(notModifiedIsFine).flatMap(_ => this.refresh)
 
     override def export: Source[ByteString, Future[Long]] = {
       val byteCounter = new AtomicLong(0)
@@ -113,6 +114,10 @@ class DockerClientImpl(
       docker.removeContainerCmd(id).withRemoveVolumes(true).exec
       () // Need to return Unit, not Void
     })(ec)
+
+    private val notModifiedIsFine: PartialFunction[Throwable, Unit] = {
+      case _: NotModifiedException => // All good - do nothing
+    }
 
   }
 

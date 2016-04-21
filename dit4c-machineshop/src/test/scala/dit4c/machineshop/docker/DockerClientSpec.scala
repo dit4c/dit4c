@@ -24,6 +24,7 @@ import java.io.Closeable
 import scala.concurrent.Promise
 import com.github.dockerjava.core.DockerClientConfig.DockerClientConfigBuilder
 import com.github.dockerjava.core.DockerClientConfig
+import org.specs2.matcher.MatchResult
 
 class DockerClientSpec extends Specification with BeforeAfterAll {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -145,6 +146,8 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
     def await(implicit timeout: Timeout) = Await.result(f, timeout.duration)
   }
 
+  def twice[A](f: () => MatchResult[A]) = 1.to(2).map(_ => f()).reduce(_ and _)
+
   val image = "busybox:latest"
 
   // This spec must be run sequentially
@@ -187,19 +190,22 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
       "refresh" >> {
         val client = newDockerClient
         val dc = client.containers.create("testrefresh", image).await
-        val refreshed = dc.refresh.await
-        refreshed must (haveId(dc.id)
-            and haveName(dc.name)
-            and beStopped
-            and be(dc).not)
+        twice { () =>
+          val refreshed = dc.refresh.await
+          refreshed must (haveId(dc.id)
+              and haveName(dc.name)
+              and beStopped
+              and be(dc).not)
+        }
       }
       "start" >> {
         val client = newDockerClient
         val dc = client.containers.create("teststart", image).await
-        val refreshed = dc.start.await
-        refreshed must (haveId(dc.id)
-            and haveName(dc.name)
-            and beRunning)
+        twice { () =>
+          dc.start.await must (haveId(dc.id)
+              and haveName(dc.name)
+              and beRunning)
+        }
       }
       "stop" >> {
         val client = newDockerClient
@@ -208,11 +214,11 @@ class DockerClientSpec extends Specification with BeforeAfterAll {
         dc must (haveId(dc.id)
             and haveName(dc.name)
             and beRunning)
-        val refreshed =
-          dc.stop().await
-        refreshed must (haveId(dc.id)
-            and haveName(dc.name)
-            and beStopped)
+        twice { () =>
+          dc.stop().await must (haveId(dc.id)
+              and haveName(dc.name)
+              and beStopped)
+        }
       }
       "export" >> {
         val client = newDockerClient

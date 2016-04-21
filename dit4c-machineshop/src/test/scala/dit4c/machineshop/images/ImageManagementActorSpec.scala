@@ -154,7 +154,7 @@ class ImageManagementActorSpec extends Specification with Mockito {
               expectMsg(ListImages())
             }
           } finally {
-            system.shutdown()
+            system.terminate()
           }
         }
         done
@@ -176,14 +176,12 @@ class ImageManagementActorSpec extends Specification with Mockito {
               }
             }
           } finally {
-            system.shutdown()
+            system.terminate()
           }
         }
         done
       }
     }
-
-
   }
 
   def newActor: ActorRef =
