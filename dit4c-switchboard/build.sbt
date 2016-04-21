@@ -55,8 +55,8 @@ dockerfile in docker := {
       set -e
       set -x
       # Statically compile nginx, then remove build tools
-      export NGINX_VERSION=1.9.7
-      export NPS_VERSION=1.9.32.10
+      export NGINX_VERSION=1.9.15
+      export NPS_VERSION=1.11.33.0
       export NGINX_CACHE_DIR=/var/cache/nginx
       export NGINX_LOG_DIR=/var/log/nginx
       export NGINX_RUN_DIR=/var/run/nginx
