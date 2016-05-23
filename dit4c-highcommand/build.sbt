@@ -69,8 +69,6 @@ pipelineStages := Seq(digest, gzip)
 
 enablePlugins(sbtdocker.DockerPlugin)
 
-net.virtualvoid.sbt.graph.Plugin.graphSettings
-
 // Make docker depend on the package task, which generates a jar file of the application code
 docker <<= docker.dependsOn(com.typesafe.sbt.packager.Keys.stage)
 

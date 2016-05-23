@@ -32,8 +32,6 @@ libraryDependencies ++= {
   )
 }
 
-net.virtualvoid.sbt.graph.Plugin.graphSettings
-
 packSettings
 
 packMain := Map("dit4c-switchboard" -> "dit4c.switchboard.Boot")
