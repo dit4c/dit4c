@@ -37,7 +37,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-rjs" % "1.0.7")
 // Spray //
 ///////////
 
-addSbtPlugin("io.spray" % "sbt-revolver" % "0.7.1")
+addSbtPlugin("io.spray" % "sbt-revolver" % "0.8.0")
 
 ///////////
 // Other //
