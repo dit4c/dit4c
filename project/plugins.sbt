@@ -43,9 +43,6 @@ addSbtPlugin("io.spray" % "sbt-revolver" % "0.7.1")
 // Other //
 ///////////
 
-// Eclipse helper
-addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "2.4.0")
-
 // Bundle to single jar
 addSbtPlugin("org.scala-sbt.plugins" % "sbt-onejar" % "0.8")
 
