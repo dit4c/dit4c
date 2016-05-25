@@ -1,3 +1,5 @@
+import SharedDependencyVersions._
+
 name  := "dit4c-common"
 
 crossScalaVersions := Nil
@@ -5,8 +7,6 @@ crossScalaVersions := Nil
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaV = "2.4.2"
-  val specs2V = "3.6.4"
   Seq(
     "com.typesafe.akka"   %%  "akka-http-core"  % akkaV,
     "com.typesafe.akka"   %%  "akka-http-testkit" % akkaV % "test",

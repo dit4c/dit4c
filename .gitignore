@@ -24,3 +24,4 @@ activator-*.sbt
 /dit4c-machineshop/known_images*.json
 **/.cache-main
 **/.cache-tests
+/dit4c-*/bin/
