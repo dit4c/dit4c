@@ -25,3 +25,4 @@ activator-*.sbt
 **/.cache-main
 **/.cache-tests
 /dit4c-*/bin/
+/dit4c-scheduler/rkt-test-image.aci
