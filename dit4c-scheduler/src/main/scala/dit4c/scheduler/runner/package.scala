@@ -17,13 +17,32 @@ package object runner {
        OutputStream    // StdErr
       ) => Future[Int] // Exit code
 
+  implicit class CommandExecutorHelper(ce: CommandExecutor) {
+
+    def apply(command: String, in: InputStream = emptyInputStream)(
+        implicit ec: ExecutionContext): Future[String] = {
+      val out = new ByteArrayOutputStream()
+      val err = new ByteArrayOutputStream()
+      ce(command, in, out, err).flatMap {
+        case 0 => Future.successful(out.getAsString)
+        case _ => Future.failed(new Exception(err.getAsString))
+      }
+    }
+
+    private def emptyInputStream = new InputStream() { override def read = -1 }
+
+    implicit class BaosHelper(os: ByteArrayOutputStream) {
+      def getAsString = new String(os.toByteArray, "utf8")
+    }
+  }
+
   class RktRunner(
-      val commandExecutor: CommandExecutor,
+      val ce: CommandExecutor,
       val dir: Path)(implicit ec: ExecutionContext) {
 
     def list: Future[Set[RktPod]] =
       privilegedRktCmd
-        .flatMap { rktCmd => exec(s"$rktCmd list --full --no-legend") }
+        .flatMap { rktCmd => ce(s"$rktCmd list --full --no-legend") }
         .map(_.trim) // Get rid of trailing new line
         .map { output =>
           output.lines.map { line =>
@@ -34,7 +53,7 @@ package object runner {
         }
 
     protected def rktCmd: Future[String] =
-      exec("which rkt")
+      ce("which rkt")
         .map(_.trim)
         .map {
           case s if s.isEmpty => throw new Exception("`which rkt` was blank")
@@ -45,19 +64,6 @@ package object runner {
         }
     protected def privilegedRktCmd: Future[String] = rktCmd.map("sudo -n -- "+_)
 
-    protected def exec(command: String): Future[String] = {
-      val in = new ByteArrayInputStream(Array.empty[Byte])
-      val out = new ByteArrayOutputStream()
-      val err = new ByteArrayOutputStream()
-      commandExecutor(command, in, out, err).flatMap {
-        case 0 => Future.successful(out.getAsString)
-        case _ => Future.failed(new Exception(err.getAsString))
-      }
-    }
-
-    implicit class BaosHelper(os: ByteArrayOutputStream) {
-      def getAsString = new String(os.toByteArray, "utf8")
-    }
   }
 
   case class RktPod(uuid: String, state: RktPod.States.Value)

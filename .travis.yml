@@ -1,5 +1,5 @@
 language: scala
-sudo: false
+sudo: true
 jdk:
   - oraclejdk8
 scala:
@@ -44,10 +44,17 @@ before_install:
     rm -rf $BASE/nginx-release-1.9.5) && \
     ls -laR $BASE/nginx && \
     export PATH=$BASE/nginx/sbin:$PATH
+  - |
+    BASE=$HOME && \
+    test -f $BASE/rkt/rkt || \
+    curl -L https://github.com/coreos/rkt/releases/download/v1.6.0/rkt-v1.6.0.tar.gz | tar xzv -C $BASE && \
+    mv $BASE/rkt-v1.6.0 $BASE/rkt && \
+    export PATH=$BASE/rkt:$PATH
 before_script:
   - echo $PATH
   - couchdb -V
   - nginx -V
+  - rkt version
 script:
   # Test script
   - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean coverage test && sbt coverageAggregate
