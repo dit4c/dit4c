@@ -18,6 +18,11 @@ import java.nio.file.Paths
 import org.specs2.matcher.MatcherMacros
 import scala.concurrent.duration._
 import scala.concurrent.Promise
+import java.io.PipedOutputStream
+import java.io.PipedInputStream
+import java.io.ByteArrayOutputStream
+import scala.util.Random
+import scala.concurrent.Await
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
     extends Specification with ScalaCheck with MatcherMacros {
@@ -61,7 +66,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           Process(s"which rkt").lineStream.mkString.trim,
           s" --dir=${rkt.dir}").mkString(" ")
         // Run a pod
-        Process(s"$rktCmd run --insecure-options=image --net=none $testImage --exec /bin/true").lineStream.mkString
+        Process(s"$rktCmd run --insecure-options=image --net=none $testImage --exec /bin/true").!!
         // Check listing
         rkt.list must {
           haveSize[Set[RktPod]](1) and contain(
@@ -70,6 +75,67 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
               .state(be(RktPod.States.Exited))
           )
         }.awaitFor(1.minute)
+      }
+
+      "should show prepared pods" >> {
+        import scala.language.experimental.macros
+        import scala.concurrent.ExecutionContext.Implicits.global
+        val rkt = new RktRunner(
+            LocalCommandExecutor.apply,
+            Files.createTempDirectory("rkt-tmp"))
+        val rktCmd = Seq("sudo", "-n",
+          Process(s"which rkt").lineStream.mkString.trim,
+          s" --dir=${rkt.dir}").mkString(" ")
+        // Prepared a pod
+        Process(s"$rktCmd prepare --insecure-options=image $testImage --exec /bin/true").!!
+        // Check listing
+        rkt.list must {
+          haveSize[Set[RktPod]](1) and contain(
+            matchA[RktPod]
+              .uuid(not(beEmpty[String]))
+              .state(be(RktPod.States.Prepared))
+          )
+        }.awaitFor(1.minute)
+      }
+
+      "should show running pods" >> {
+        import scala.language.experimental.macros
+        import scala.concurrent.ExecutionContext.Implicits.global
+        val rkt = new RktRunner(
+            LocalCommandExecutor.apply,
+            Files.createTempDirectory("rkt-tmp"))
+        val rktCmd = Seq("sudo", "-n",
+          Process(s"which rkt").lineStream.mkString.trim,
+          s" --dir=${rkt.dir}").mkString(" ")
+        // Run a pod
+        val runOutput = new ByteArrayOutputStream()
+        val p = Promise[Int]()
+        val toProc = new InputStream() {
+          override def read = Await.result(p.future, 2.minutes)
+        }
+        val readyToken = Random.alphanumeric.take(40).mkString
+        val proc = Future {
+          Process(s"$rktCmd run --interactive  --insecure-options=image --net=none $testImage --exec /bin/sh -- -c 'echo $readyToken; cat'")
+            .#<(toProc)
+            .#>(runOutput)
+            .!!
+        }
+        // Wait for the pod to start
+        while (!runOutput.toByteArray.containsSlice(readyToken.getBytes)) {
+          Thread.sleep(100)
+        }
+        // Check listing
+        try {
+          rkt.list must {
+            haveSize[Set[RktPod]](1) and contain(
+              matchA[RktPod]
+                .uuid(not(beEmpty[String]))
+                .state(be(RktPod.States.Running))
+            )
+          }.awaitFor(1.minute)
+        } finally {
+          p.success(-1)
+        }
       }
 
     }
