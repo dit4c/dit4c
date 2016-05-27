@@ -40,6 +40,9 @@ package object runner {
       val ce: CommandExecutor,
       val dir: Path)(implicit ec: ExecutionContext) {
 
+    /**
+     * List rkt pods. Runs as root.
+     */
     def list: Future[Set[RktPod]] =
       privilegedRktCmd
         .flatMap { rktCmd => ce(s"$rktCmd list --full --no-legend") }

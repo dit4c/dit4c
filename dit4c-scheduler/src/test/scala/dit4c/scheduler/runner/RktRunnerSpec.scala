@@ -65,9 +65,9 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             commandExecutor,
-            Files.createTempDirectory("rkt-tmp"))
+            createTemporaryRktDir)
         val rktCmd = Seq("sudo", "-n",
-          Process(s"which rkt").lineStream.mkString.trim,
+          rktBinaryPath,
           s" --dir=${rkt.dir}").mkString(" ")
         // Prepared a pod
         Await.ready(
@@ -87,10 +87,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         import scala.language.experimental.macros
         import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+            commandExecutor,
+            createTemporaryRktDir)
         val rktCmd = Seq("sudo", "-n",
-          Process(s"which rkt").lineStream.mkString.trim,
+          rktBinaryPath,
           s" --dir=${rkt.dir}").mkString(" ")
         // Run a pod
         val runOutput = new ByteArrayOutputStream()
@@ -126,10 +126,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         import scala.language.experimental.macros
         import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+            commandExecutor,
+            createTemporaryRktDir)
         val rktCmd = Seq("sudo", "-n",
-          Process(s"which rkt").lineStream.mkString.trim,
+          rktBinaryPath,
           s" --dir=${rkt.dir}").mkString(" ")
         // Run a pod
         Await.ready(
@@ -149,10 +149,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         import scala.language.experimental.macros
         import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+            commandExecutor,
+            createTemporaryRktDir)
         val rktCmd = Seq("sudo", "-n",
-          Process(s"which rkt").lineStream.mkString.trim,
+          rktBinaryPath,
           s" --dir=${rkt.dir}").mkString(" ")
         // Prepared a bunch of pods
         val numOfPods = 10
@@ -171,6 +171,20 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
     }
 
+  }
+
+  lazy val rktBinaryPath =
+    Await.result(commandExecutor(s"which rkt"), 10.seconds)
+
+  private def createTemporaryRktDir = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val dir = Files.createTempDirectory("rkt-tmp-")
+    dir.toFile.deleteOnExit
+    commandExecutor(Seq(
+        rktBinaryPath,
+        s" --dir=$dir",
+        "list").mkString(" "))
+    dir
   }
 
   private val nullLogger = ProcessLogger(_ => (), _ => ())
