@@ -1,7 +1,6 @@
 package dit4c.scheduler.runner
 
 import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
 import java.io.InputStream
 import java.io.OutputStream
 import scala.sys.process.Process
@@ -24,9 +23,10 @@ import java.io.ByteArrayOutputStream
 import scala.util.Random
 import scala.concurrent.Await
 import scala.sys.process.ProcessLogger
+import org.specs2.specification.BeforeEach
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
-    extends Specification with ScalaCheck with MatcherMacros {
+    extends Specification with BeforeEach with MatcherMacros {
 
   import dit4c.scheduler.runner.CommandExecutorHelper
 
@@ -47,13 +47,23 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
   val testImage = testImageFile.toAbsolutePath.toString
   val commandExecutor = (LocalCommandExecutor.apply _)
+  implicit val executionContext = ExecutionContext.fromExecutorService(
+      Executors.newCachedThreadPool())
+
+  def before = {
+    // Check we have sudo to root
+    val sb = new StringBuffer
+    Process("sudo -nv").!<(ProcessLogger(s => sb.append(s))) match {
+      case 0 => ok // We have root
+      case _ => skipped(sb.toString)
+    }
+  }
 
   "RktRunner" >> {
 
     "list" >> {
 
       "initially return empty" >> {
-        import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             LocalCommandExecutor.apply,
             Files.createTempDirectory("rkt-tmp"))
@@ -62,7 +72,6 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
       "should show prepared pods" >> {
         import scala.language.experimental.macros
-        import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
@@ -85,7 +94,6 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
       "should show running pods" >> {
         import scala.language.experimental.macros
-        import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
@@ -124,7 +132,6 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
       "should show exited pods" >> {
         import scala.language.experimental.macros
-        import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
@@ -147,7 +154,6 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
       "should list multiple pods" >> {
         import scala.language.experimental.macros
-        import scala.concurrent.ExecutionContext.Implicits.global
         val rkt = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
