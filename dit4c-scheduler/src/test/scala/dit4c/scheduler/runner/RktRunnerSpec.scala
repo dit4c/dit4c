@@ -106,7 +106,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         val toProc = new InputStream() {
           override def read = Await.result(p.future, 2.minutes)
         }
-        val readyToken = Random.alphanumeric.take(40).mkString
+        val readyToken = "ready-"+Random.alphanumeric.take(40).mkString
         commandExecutor(
           s"$rktCmd run --interactive  --insecure-options=image --net=none $testImage --exec /bin/sh -- -c 'echo $readyToken; cat'",
           toProc,
@@ -172,7 +172,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
               .uuid(not(beEmpty[String]))
               .state(be(RktPod.States.Prepared))
           )
-        }.awaitFor(1.minute)
+        }.awaitFor(2.minutes)
       }
 
     }
