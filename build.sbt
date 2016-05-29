@@ -17,6 +17,12 @@ javacOptions in ThisBuild ++= Seq("-source", "1.8",  "-target", "1.8")
 // Attempt to fix cryptic Travis CI sbt.ForkMain error
 javaOptions in ThisBuild += "-Xmx1G"
 
+// Stop sub-projects from running their tests interwoven
+concurrentRestrictions in Global := Seq(
+  Tags.exclusive(Tags.Test),
+  Tags.limit(Tags.Test, 1)
+)
+
 // Project definitions (automatically aggregated)
 lazy val common      = project in file("dit4c-common")
 
@@ -36,8 +42,6 @@ lazy val switchboard = (project in file("dit4c-switchboard")).dependsOn(common)
 releaseSettings
 
 crossScalaVersions := Nil
-
-parallelExecution in ThisBuild := false
 
 buildOptions in docker in ThisBuild := BuildOptions(
   pullBaseImage = BuildOptions.Pull.Always
