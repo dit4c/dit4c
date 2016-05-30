@@ -107,9 +107,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           override def read = Await.result(p.future, 2.minutes)
         }
         val readyToken = "ready-"+Random.alphanumeric.take(40).mkString
-        val imageId =
-          Process(s"$rktCmd fetch --insecure-options=image $testImage")
-            .!!(nullLogger).trim
+        val imageId = Await.result(
+            commandExecutor(
+              s"$rktCmd fetch --insecure-options=image $testImage"),
+            1.minute).trim
         val manifestFile = {
           val manifest = s"""|{
                              |    "acVersion": "0.8.4",
@@ -193,9 +194,12 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           s" --dir=${rkt.dir}").mkString(" ")
         // Prepared a bunch of pods
         val numOfPods = 10
-        Await.ready(Future.sequence(1.to(numOfPods).map { _ =>
-          commandExecutor(s"$rktCmd prepare --insecure-options=image $testImage --exec /bin/true")
-        }), 1.minute)
+        1.to(numOfPods).foreach { _ =>
+          Await.ready(
+            commandExecutor(
+                s"$rktCmd prepare --no-overlay --insecure-options=image $testImage --exec /bin/true"),
+            1.minute)
+        }
         // Check listing
         rkt.list must {
           haveSize[Set[RktPod]](numOfPods) and contain(
@@ -203,7 +207,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
               .uuid(not(beEmpty[String]))
               .state(be(RktPod.States.Prepared))
           )
-        }.awaitFor(2.minutes)
+        }.awaitFor(1.minutes)
       }
 
     }
