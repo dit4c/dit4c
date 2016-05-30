@@ -11,7 +11,7 @@ import java.io.ByteArrayOutputStream
 package object runner {
 
   type CommandExecutor =
-    (  String,         // Command to run
+    (  Seq[String],    // Command to run
        InputStream,    // StdIn
        OutputStream,   // StdOut
        OutputStream    // StdErr
@@ -19,13 +19,13 @@ package object runner {
 
   implicit class CommandExecutorHelper(ce: CommandExecutor) {
 
-    def apply(command: String, in: InputStream = emptyInputStream)(
+    def apply(command: Seq[String], in: InputStream = emptyInputStream)(
         implicit ec: ExecutionContext): Future[String] = {
       val out = new ByteArrayOutputStream()
       val err = new ByteArrayOutputStream()
       ce(command, in, out, err).flatMap {
         case 0 => Future.successful(out.getAsString)
-        case _ => Future.failed(new Exception(err.getAsString))
+        case _ => Future.failed(new Exception(err.getAsString+" from "+command))
       }
     }
 
@@ -38,38 +38,66 @@ package object runner {
 
   class RktRunner(
       val ce: CommandExecutor,
-      val dir: Path)(implicit ec: ExecutionContext) {
+      val rktDir: Path,
+      val systemdUnitPrefix: String = "dit4c-instance-")(
+          implicit ec: ExecutionContext) {
+
+    def start(instanceId: String, imageName: String) = ???
+
+    protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
+      systemctlCmd
+        .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"$systemdUnitPrefix*") }
+        .map(_.trim)
+        .map { output =>
+          output.lines.map { line =>
+            var parts = line.split("""\s+""").toList
+            val (name :: _) = parts
+            SystemdUnit(name)
+          }.toSet
+        }
 
     /**
      * List rkt pods. Runs as root.
      */
-    def list: Future[Set[RktPod]] =
+    protected[runner] def listRktPods: Future[Set[RktPod]] =
       privilegedRktCmd
-        .flatMap { rktCmd => ce(s"$rktCmd list --full --no-legend") }
-        .map(_.trim) // Get rid of trailing new line
+        .flatMap { rktCmd => ce(rktCmd :+ "list" :+ "--full" :+ "--no-legend") }
+        .map(_.trim)
         .map { output =>
-          output.lines.map { line =>
+          output.lines.toSeq.map { line =>
             var parts = line.split("""(\t|\s\s+)""").toList
             val (uuid :: app :: imageName :: imageId :: state :: _) = parts
             RktPod(uuid, RktPod.States.fromString(state).get)
           }.toSet
         }
 
-    protected def rktCmd: Future[String] =
-      ce("which rkt")
+    protected def rktCmd: Future[Seq[String]] = which("rkt").map(_ :+ s"--dir=$rktDir")
+
+    protected def systemdRunCmd: Future[Seq[String]] = which("systemd-run")
+
+    protected def systemctlCmd: Future[Seq[String]] = which("systemctl")
+
+    protected def privilegedRktCmd: Future[Seq[String]] =
+      rktCmd.map(Seq("sudo", "-n", "--") ++ _)
+
+    private def which(cmd: String): Future[Seq[String]] =
+      ce(Seq("which", cmd))
         .map(_.trim)
         .map {
-          case s if s.isEmpty => throw new Exception("`which rkt` was blank")
-          case s => s
+          case s if s.isEmpty => throw new Exception(s"`which $cmd` was blank")
+          case s => Seq(s)
         }
-        .map { (rktPath: String) =>
-          Seq(rktPath.trim, s" --dir=${dir}").mkString(" ")
-        }
-    protected def privilegedRktCmd: Future[String] = rktCmd.map("sudo -n -- "+_)
 
   }
 
+  case class Instance(
+      instanceId: String,
+      rktPod: Option[RktPod],
+      systemdUnit: Option[SystemdUnit])
+
   case class RktPod(uuid: String, state: RktPod.States.Value)
+
+  case class SystemdUnit(name: String)
 
   object RktPod {
     object States extends Enumeration {
