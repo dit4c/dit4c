@@ -107,8 +107,39 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           override def read = Await.result(p.future, 2.minutes)
         }
         val readyToken = "ready-"+Random.alphanumeric.take(40).mkString
+        val imageId =
+          Process(s"$rktCmd fetch --insecure-options=image $testImage")
+            .!!(nullLogger).trim
+        val manifestFile = {
+          val manifest = s"""|{
+                             |    "acVersion": "0.8.4",
+                             |    "acKind": "PodManifest",
+                             |    "apps": [
+                             |        {
+                             |            "name": "running-test",
+                             |            "image": {
+                             |                "id": "$imageId"
+                             |            },
+                             |            "app": {
+                             |                "exec": [
+                             |                    "/bin/sh",
+                             |                    "-c",
+                             |                    "echo $readyToken && cat -"
+                             |                ],
+                             |                "group": "99",
+                             |                "user": "99"
+                             |            },
+                             |            "readOnlyRootFS": true
+                             |        }
+                             |    ]
+                             |}""".stripMargin
+          val path = Files.createTempFile("manifest-", ".json")
+          Files.write(path, manifest.getBytes)
+          path.toFile.deleteOnExit
+          path
+        }
         commandExecutor(
-          s"$rktCmd run --interactive  --insecure-options=image --net=none $testImage --exec /bin/sh -- -c 'echo $readyToken; cat'",
+          s"$rktCmd run --interactive --pod-manifest=$manifestFile",
           toProc,
           runOutput,
           nullOutputStream)
@@ -180,7 +211,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
   }
 
   lazy val rktBinaryPath =
-    Await.result(commandExecutor(s"which rkt"), 10.seconds)
+    Await.result(commandExecutor(s"which rkt"), 10.seconds).trim
 
   private def createTemporaryRktDir = {
     import scala.concurrent.ExecutionContext.Implicits.global
