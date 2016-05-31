@@ -1,5 +1,7 @@
 language: scala
 sudo: true
+services:
+  - docker
 jdk:
   - oraclejdk8
 scala:
@@ -9,6 +11,10 @@ cache:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
     - $HOME/nginx
+addons:
+  apt:
+    packages:
+    - couchdb
 before_install:
   - |
     BASE=$HOME && \
@@ -45,16 +51,22 @@ before_install:
     ls -laR $BASE/nginx && \
     export PATH=$BASE/nginx/sbin:$PATH
   - |
-    BASE=$HOME && \
-    test -f $BASE/rkt/rkt || \
-    curl -L https://github.com/coreos/rkt/releases/download/v1.6.0/rkt-v1.6.0.tar.gz | tar xzv -C $BASE && \
-    mv $BASE/rkt-v1.6.0 $BASE/rkt && \
-    export PATH=$BASE/rkt:$PATH
+    RKT_VERSION=v1.7.0 &&
+    docker build -t rkt-systemd - <<< "
+    FROM fedora/systemd-systemd
+    RUN dnf install -y tar which sudo && \
+      cd /opt && \
+      curl -sL https://github.com/coreos/rkt/releases/download/$RKT_VERSION/rkt-$RKT_VERSION.tar.gz | tar xz && \
+      mv rkt-$RKT_VERSION rkt && \
+      ln -s /opt/rkt/rkt /usr/bin/rkt"
+  - docker run --name=rkt-systemd --privileged -dt -e 'container=docker' -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v ${HOME}:${HOME}:ro rkt-systemd
 before_script:
   - echo $PATH
   - couchdb -V
   - nginx -V
-  - rkt version
+  - docker exec -i rkt-systemd /lib/systemd/systemd --version
+  - docker exec -i rkt-systemd /opt/rkt/rkt version
+  - docker exec -i rkt-systemd sudo -nv
 script:
   # Test script
   - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean coverage test && sbt coverageAggregate
@@ -63,6 +75,8 @@ script:
   - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
 after_success:
   - sbt coveralls
+after_script:
+  - docker logs rkt-systemd && docker exec rkt-systemd journalctl --boot && docker rm -f rkt-systemd
 notifications:
   webhooks:
     urls:

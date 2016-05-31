@@ -4,7 +4,6 @@ import org.specs2.mutable.Specification
 import java.io.InputStream
 import java.io.OutputStream
 import scala.sys.process.Process
-import org.apache.sshd.common.util.io.IoUtils
 import scala.concurrent.ExecutionContext
 import java.util.concurrent.Executors
 import scala.concurrent.Future
@@ -24,6 +23,9 @@ import scala.util.Random
 import scala.concurrent.Await
 import scala.sys.process.ProcessLogger
 import org.specs2.specification.BeforeEach
+import org.bouncycastle.util.io.TeeInputStream
+import scala.sys.process.BasicIO
+import java.io.ByteArrayInputStream
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
     extends Specification with BeforeEach with MatcherMacros {
@@ -51,12 +53,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
       Executors.newCachedThreadPool())
 
   def before = {
-    // Check we have sudo to root
-    val sb = new StringBuffer
-    Process("sudo -nv").!<(ProcessLogger(s => sb.append(s))) match {
-      case 0 => ok // We have root
-      case _ => skipped(sb.toString)
-    }
+    Await.result(
+      commandExecutor(Seq("sudo", "-nv"))
+        .map { _ => ok }
+        .recover { case e => skipped(e.getMessage) },
+      1.minute)
   }
 
   sequential
@@ -172,13 +173,27 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
                              |                "user": "99"
                              |            },
                              |            "readOnlyRootFS": true
+                             |        },
+                             |        {
+                             |            "name": "redherring",
+                             |            "image": {
+                             |                "id": "$imageId"
+                             |            },
+                             |            "app": {
+                             |                "exec": [
+                             |                    "/bin/true"
+                             |                ],
+                             |                "group": "99",
+                             |                "user": "99"
+                             |            },
+                             |            "readOnlyRootFS": true
                              |        }
                              |    ]
                              |}""".stripMargin
-          val path = Files.createTempFile("manifest-", ".json")
+          val path = Files.createTempFile(Paths.get("."), "manifest-", ".json")
           Files.write(path, manifest.getBytes)
           path.toFile.deleteOnExit
-          path
+          path.toAbsolutePath
         }
         commandExecutor(
           rktCmd ++ Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
@@ -288,32 +303,24 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         in: InputStream,
         out: OutputStream,
         err: OutputStream): Future[Int] = {
-      val (pIO, done) = processIO(in, out, err)
-      Future(Process(cmd).run(pIO).exitValue)
-        .flatMap(exitValue => done.map(_ => exitValue))
+      // Use Docker container when testing on Travis CI
+      val prependCmd =
+        if (sys.env.contains("TRAVIS")) {
+          Seq("docker", "exec", "-i", "rkt-systemd")
+        } else Seq()
+      val actualCmd = prependCmd ++ cmd
+      // Travis CI will stall unless input is provided via <#(in) instead of
+      // ProcessIO. It probably has something to do with subtle differences
+      // in the way input is read from the stream.
+      val process = Process(actualCmd).#<(in).run(processIO(out, err))
+      Future(process.exitValue)
     }
 
-    protected def processIO(
-        in: InputStream,
-        out: OutputStream,
-        err: OutputStream): (ProcessIO, Future[Unit]) =  {
-      def pComplete[A](f: A => Future[Unit], p: Promise[Unit]): A => Unit =
-        f.andThen(f => f.foreach(_ => p.trySuccess(())))
-      // Three streams to complete => three promises to fulfill
-      val (p1, p2, p3) = (Promise[Unit](), Promise[Unit](), Promise[Unit]())
-      val cIn = pComplete(copyInput(in), p1)
-      val cOut = pComplete(copyOutput(out), p2)
-      val cErr = pComplete(copyOutput(err), p3)
-      // Future completes after all streams have closed
-      (new ProcessIO(cIn, cOut, cErr),
-          Future.sequence(Seq(p1.future, p2.future, p3.future)).map(_ => ()))
-    }
+    private def processIO(out: OutputStream, err: OutputStream): ProcessIO =
+      new ProcessIO(_ => (), copyOutput(out), copyOutput(err), true)
 
-    def copyInput(from: InputStream) = (to: OutputStream) => copy(from, to)
-    def copyOutput(to: OutputStream) = (from: InputStream) => copy(from, to)
-
-    def copy(from: InputStream, to: OutputStream): Future[Unit] =
-      Future(IoUtils.copy(from, to))
+    private def copyOutput(to: OutputStream) =
+      (from: InputStream) => BasicIO.transferFully(from, to)
 
   }
 

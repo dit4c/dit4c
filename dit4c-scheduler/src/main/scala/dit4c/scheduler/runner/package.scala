@@ -52,7 +52,7 @@ package object runner {
           output.lines.map { line =>
             var parts = line.split("""\s+""").toList
             val (name :: _) = parts
-            SystemdUnit(name)
+            SystemdUnit(name.stripSuffix(".service"))
           }.toSet
         }
 
@@ -64,10 +64,13 @@ package object runner {
         .flatMap { rktCmd => ce(rktCmd :+ "list" :+ "--full" :+ "--no-legend") }
         .map(_.trim)
         .map { output =>
-          output.lines.toSeq.map { line =>
-            var parts = line.split("""(\t|\s\s+)""").toList
-            val (uuid :: app :: imageName :: imageId :: state :: _) = parts
-            RktPod(uuid, RktPod.States.fromString(state).get)
+          output.lines.toSeq.flatMap {
+            case line if line.matches("""\s.*""") =>
+              None
+            case line =>
+              var parts = line.split("""(\t|\s\s+)""").toList
+              val (uuid :: _ :: _ :: _ :: state :: _) = parts
+              Some(RktPod(uuid, RktPod.States.fromString(state).get))
           }.toSet
         }
 
