@@ -58,7 +58,8 @@ before_install:
       cd /opt && \
       curl -sL https://github.com/coreos/rkt/releases/download/$RKT_VERSION/rkt-$RKT_VERSION.tar.gz | tar xz && \
       mv rkt-$RKT_VERSION rkt && \
-      ln -s /opt/rkt/rkt /usr/bin/rkt"
+      ln -s /opt/rkt/rkt /usr/bin/rkt && \
+      groupadd -r rkt"
   - docker run --name=rkt-systemd --privileged -dt -e 'container=docker' -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v ${HOME}:${HOME}:ro rkt-systemd
 before_script:
   - echo $PATH

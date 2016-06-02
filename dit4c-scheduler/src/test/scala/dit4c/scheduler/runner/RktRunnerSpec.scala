@@ -117,12 +117,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         val runner = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
-        val rktCmd = Seq("sudo", "-n", "--",
-          rktBinaryPath,
-          "--dir=" + runner.rktDir)
         // Prepared a pod
         Await.ready(
-          commandExecutor(rktCmd ++ Seq("prepare", "--insecure-options=image", testImage, "--exec", "/bin/true")),
+          commandExecutor(
+              rktCmd(runner.rktDir) ++
+              Seq("prepare", "--insecure-options=image", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
         runner.listRktPods must {
@@ -139,20 +138,18 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         val runner = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
-        val rktCmd = Seq("sudo", "-n", "--",
-          rktBinaryPath,
-          "--dir=" + runner.rktDir)
         // Run a pod
+        val imageId = Await.result(
+            commandExecutor(
+              rktCmd(runner.rktDir) ++
+              Seq("fetch", "--insecure-options=image", testImage)),
+            1.minute).trim
         val runOutput = new ByteArrayOutputStream()
         val p = Promise[Int]()
         val toProc = new InputStream() {
           override def read = Await.result(p.future, 2.minutes)
         }
         val readyToken = "ready-"+Random.alphanumeric.take(40).mkString
-        val imageId = Await.result(
-            commandExecutor(
-              rktCmd ++ Seq("fetch", "--insecure-options=image", testImage)),
-            1.minute).trim
         val manifestFile = {
           val manifest = s"""|{
                              |    "acVersion": "0.8.4",
@@ -196,7 +193,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           path.toAbsolutePath
         }
         commandExecutor(
-          rktCmd ++ Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
+          rktCmd(runner.rktDir) ++
+          Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
           toProc,
           runOutput,
           nullOutputStream)
@@ -223,13 +221,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         val runner = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
-        val rktCmd = Seq("sudo", "-n", "--",
-          rktBinaryPath,
-          "--dir=" + runner.rktDir)
         // Run a pod
         Await.ready(
           commandExecutor(
-              rktCmd ++ Seq("run", "--insecure-options=image", "--net=none", testImage, "--exec", "/bin/true")),
+              rktCmd(runner.rktDir) ++
+              Seq("run", "--insecure-options=image", "--net=none", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
         runner.listRktPods must {
@@ -246,15 +242,13 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         val runner = new RktRunner(
             commandExecutor,
             createTemporaryRktDir)
-        val rktCmd = Seq("sudo", "-n", "--",
-          rktBinaryPath,
-          "--dir=" + runner.rktDir)
         // Prepared a bunch of pods
         val numOfPods = 10
         1.to(numOfPods).foreach { _ =>
           Await.ready(
             commandExecutor(
-                rktCmd ++ Seq("prepare", "--no-overlay", "--insecure-options=image", testImage, "--exec", "/bin/true")),
+                rktCmd(runner.rktDir) ++
+                Seq("prepare", "--no-overlay", "--insecure-options=image", testImage, "--exec", "/bin/true")),
             1.minute)
         }
         // Check listing
@@ -273,6 +267,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
   lazy val rktBinaryPath =
     Await.result(commandExecutor(Seq("which", "rkt")), 10.seconds).trim
+
+  private def rktCmd(rktDir: Path) = sudoCmd(rktBinaryPath, "--dir=" + rktDir)
+
+  private def sudoCmd(xs: String*): Seq[String] = Seq("sudo", "-n", "--") ++ xs
 
   private def createTemporaryRktDir = {
     import scala.concurrent.ExecutionContext.Implicits.global
