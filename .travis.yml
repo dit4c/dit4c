@@ -68,9 +68,10 @@ before_script:
   - docker exec -i rkt-systemd /lib/systemd/systemd --version
   - docker exec -i rkt-systemd /opt/rkt/rkt version
   - docker exec -i rkt-systemd sudo -nv
+  - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
 script:
   # Test script
-  - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean coverage test && sbt coverageAggregate
+  - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M coverage test && sbt coverageAggregate
   # Tricks to avoid unnecessary cache updates
   - find $HOME/.sbt -name "*.lock" | xargs rm
   - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
