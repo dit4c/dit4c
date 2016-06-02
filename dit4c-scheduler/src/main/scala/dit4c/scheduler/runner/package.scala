@@ -39,14 +39,25 @@ package object runner {
   class RktRunner(
       val ce: CommandExecutor,
       val rktDir: Path,
-      val systemdUnitPrefix: String = "dit4c-instance-")(
+      val instanceNamePrefix: String = "dit4c-instance-")(
           implicit ec: ExecutionContext) {
 
-    def start(instanceId: String, imageName: String) = ???
+    type ImageId = String
+
+    def fetch(imageName: String): Future[ImageId] =
+      privilegedRktCmd
+        .flatMap { rktCmd =>
+          ce(rktCmd :+ "fetch" :+
+              "--insecure-options=image" :+ "--full" :+
+              imageName)
+        }
+        .map(_.trim)
+
+    def start(instanceId: String, image: ImageId): Future[Instance] = ???
 
     protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
       systemctlCmd
-        .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"$systemdUnitPrefix*") }
+        .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"$instanceNamePrefix*") }
         .map(_.trim)
         .map { output =>
           output.lines.map { line =>

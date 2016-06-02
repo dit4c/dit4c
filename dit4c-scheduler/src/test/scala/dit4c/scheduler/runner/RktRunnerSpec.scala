@@ -265,6 +265,29 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
     }
 
+    "fetch" >> {
+
+      "should work with local files" >> {
+        val runner = new RktRunner(
+            LocalCommandExecutor.apply,
+            Files.createTempDirectory("rkt-tmp"))
+        runner.fetch(testImage) must {
+          beMatching("sha512-[0-9a-f]{64}".r)
+        }.awaitFor(1.minutes)
+      }
+
+      "should not work with image IDs" >> {
+        val runner = new RktRunner(
+            LocalCommandExecutor.apply,
+            Files.createTempDirectory("rkt-tmp"))
+        val imageId = Await.result(runner.fetch(testImage), 1.minute)
+        runner.fetch(imageId) must {
+          throwA[Exception]
+        }.awaitFor(1.minutes)
+      }
+
+    }
+
   }
 
   lazy val rktBinaryPath =
