@@ -172,7 +172,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
                              |            "readOnlyRootFS": true
                              |        },
                              |        {
-                             |            "name": "redherring",
+                             |            "name": "red-herring",
                              |            "image": {
                              |                "id": "$imageId"
                              |            },
@@ -208,6 +208,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
             haveSize[Set[RktPod]](1) and contain(
               matchA[RktPod]
                 .uuid(not(beEmpty[String]))
+                .apps(be_==(Set("running-test", "red-herring")))
                 .state(be(RktPod.States.Running))
             )
           }.awaitFor(1.minute)

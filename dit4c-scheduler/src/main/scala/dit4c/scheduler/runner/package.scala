@@ -64,13 +64,17 @@ package object runner {
         .flatMap { rktCmd => ce(rktCmd :+ "list" :+ "--full" :+ "--no-legend") }
         .map(_.trim)
         .map { output =>
-          output.lines.toSeq.flatMap {
-            case line if line.matches("""\s.*""") =>
-              None
-            case line =>
-              var parts = line.split("""(\t|\s\s+)""").toList
-              val (uuid :: _ :: _ :: _ :: state :: _) = parts
-              Some(RktPod(uuid, RktPod.States.fromString(state).get))
+          output.lines.foldLeft(List.empty[RktPod]) { (m, l) =>
+            l match {
+              case line if line.matches("""\s.*""") =>
+                val appName =
+                  line.dropWhile(_.isWhitespace).takeWhile(!_.isWhitespace)
+                m.init :+ m.last.copy(apps = m.last.apps + appName)
+              case line =>
+                var parts = line.split("""(\t|\s\s+)""").toList
+                val (uuid :: appName :: _ :: _ :: state :: _) = parts
+                m :+ RktPod(uuid, Set(appName), RktPod.States.fromString(state))
+            }
           }.toSet
         }
 
@@ -98,16 +102,18 @@ package object runner {
       rktPod: Option[RktPod],
       systemdUnit: Option[SystemdUnit])
 
-  case class RktPod(uuid: String, state: RktPod.States.Value)
+  case class RktPod(uuid: String, apps: Set[String], state: RktPod.States.Value)
 
   case class SystemdUnit(name: String)
 
   object RktPod {
     object States extends Enumeration {
-      val Prepared, Running, Exited = Value
+      val Prepared, Running, Exited, Unknown = Value
 
       def fromString(v: String) =
-        values.find(s => s.toString.toLowerCase.equals(v.toLowerCase))
+        values
+          .find(s => s.toString.toLowerCase.equals(v.toLowerCase))
+          .getOrElse(Unknown)
     }
   }
 
