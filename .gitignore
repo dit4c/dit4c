@@ -27,3 +27,4 @@ activator-*.sbt
 /dit4c-*/bin/
 /dit4c-scheduler/rkt-test-image.aci
 /dit4c-scheduler/manifest-*.json
+/*/.tmpBin
