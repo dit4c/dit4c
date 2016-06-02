@@ -26,32 +26,37 @@ import org.specs2.specification.BeforeEach
 import org.bouncycastle.util.io.TeeInputStream
 import scala.sys.process.BasicIO
 import java.io.ByteArrayInputStream
-import scala.util.Try
+import scala.util._
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
     extends Specification with BeforeEach with MatcherMacros {
 
+  implicit val executionContext = ExecutionContext.fromExecutorService(
+      Executors.newCachedThreadPool())
+
   import dit4c.scheduler.runner.CommandExecutorHelper
+  val commandExecutor = (LocalCommandExecutor.apply _)
 
   val testImageUrl: URL = new URL(
     "https://quay.io/c1/aci/quay.io/prometheus/busybox/latest/aci/linux/amd64/")
-  val testImageFile: Path = {
-    val imagePath = Paths.get("rkt-test-image.aci")
-    if (Files.exists(imagePath)) {
-      imagePath
-    } else {
-      import sys.process._
-      val tempFilePath = Files.createTempFile("rkt-", "-test-image.aci")
-      testImageUrl.#>(tempFilePath.toFile).!!
-      Files.move(tempFilePath, imagePath)
-      imagePath
-    }
+  val testImage: String = {
+    val imagePath = "/tmp/rkt-test-image.aci"
+    Await.result(
+      commandExecutor(Seq("stat", imagePath))
+        .map(_ => imagePath)
+        .recover {
+          case _ =>
+            import sys.process._
+            val os = new PipedOutputStream()
+            val is = new PipedInputStream(os)
+            // Create stream to write input to a file
+            commandExecutor(Seq("sh", "-c", s"cat - > $imagePath"), is)
+            // Stream from the provided URL to the piped output
+            testImageUrl.#>(os).!!
+            imagePath
+        },
+      1.minute)
   }
-
-  val testImage = testImageFile.toAbsolutePath.toString
-  val commandExecutor = (LocalCommandExecutor.apply _)
-  implicit val executionContext = ExecutionContext.fromExecutorService(
-      Executors.newCachedThreadPool())
 
   def before = {
     Await.result(
@@ -109,7 +114,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
       "initially return empty" >> {
         val runner = new RktRunner(
             LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+            createTemporaryRktDir)
         runner.listRktPods must beEmpty[Set[RktPod]].awaitFor(10.seconds)
       }
 
@@ -151,54 +156,55 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
           override def read = Await.result(p.future, 2.minutes)
         }
         val readyToken = "ready-"+Random.alphanumeric.take(40).mkString
-        val manifestFile = {
-          val manifest = s"""|{
-                             |    "acVersion": "0.8.4",
-                             |    "acKind": "PodManifest",
-                             |    "apps": [
-                             |        {
-                             |            "name": "running-test",
-                             |            "image": {
-                             |                "id": "$imageId"
-                             |            },
-                             |            "app": {
-                             |                "exec": [
-                             |                    "/bin/sh",
-                             |                    "-c",
-                             |                    "echo $readyToken && cat -"
-                             |                ],
-                             |                "group": "99",
-                             |                "user": "99"
-                             |            },
-                             |            "readOnlyRootFS": true
-                             |        },
-                             |        {
-                             |            "name": "red-herring",
-                             |            "image": {
-                             |                "id": "$imageId"
-                             |            },
-                             |            "app": {
-                             |                "exec": [
-                             |                    "/bin/true"
-                             |                ],
-                             |                "group": "99",
-                             |                "user": "99"
-                             |            },
-                             |            "readOnlyRootFS": true
-                             |        }
-                             |    ]
-                             |}""".stripMargin
-          val path = Files.createTempFile(Paths.get("."), "manifest-", ".json")
-          Files.write(path, manifest.getBytes)
-          path.toFile.deleteOnExit
-          path.toAbsolutePath
-        }
+        val manifest =
+          s"""|{
+              |    "acVersion": "0.8.4",
+              |    "acKind": "PodManifest",
+              |    "apps": [
+              |        {
+              |            "name": "running-test",
+              |            "image": {
+              |                "id": "$imageId"
+              |            },
+              |            "app": {
+              |                "exec": [
+              |                    "/bin/sh",
+              |                    "-c",
+              |                    "echo $readyToken && cat -"
+              |                ],
+              |                "group": "99",
+              |                "user": "99"
+              |            },
+              |            "readOnlyRootFS": true
+              |        },
+              |        {
+              |            "name": "red-herring",
+              |            "image": {
+              |                "id": "$imageId"
+              |            },
+              |            "app": {
+              |                "exec": [
+              |                    "/bin/true"
+              |                ],
+              |                "group": "99",
+              |                "user": "99"
+              |            },
+              |            "readOnlyRootFS": true
+              |        }
+              |    ]
+              |}""".stripMargin
         commandExecutor(
-          rktCmd(runner.rktDir) ++
-          Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
-          toProc,
-          runOutput,
-          nullOutputStream)
+            Seq("sh", "-c", "TMPFILE=$(mktemp /tmp/manifest-json-XXXXXXXX) && cat > $TMPFILE && echo $TMPFILE"),
+            new ByteArrayInputStream((manifest+"\n").getBytes))
+          .map(_.trim)
+          .flatMap { manifestFile =>
+            commandExecutor(
+              rktCmd(runner.rktDir) ++
+              Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
+              toProc,
+              runOutput,
+              nullOutputStream)
+          }
         // Wait for the pod to start
         while (!runOutput.toByteArray.containsSlice(readyToken.getBytes)) {
           Thread.sleep(100)

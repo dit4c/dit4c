@@ -60,7 +60,7 @@ before_install:
       mv rkt-$RKT_VERSION rkt && \
       ln -s /opt/rkt/rkt /usr/bin/rkt && \
       groupadd -r rkt"
-  - docker run --name=rkt-systemd --privileged -dt -e 'container=docker' -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v ${HOME}:${HOME}:ro rkt-systemd
+  - docker run --name=rkt-systemd --privileged -dt -e 'container=docker' -v /sys/fs/cgroup:/sys/fs/cgroup:ro rkt-systemd
 before_script:
   - echo $PATH
   - couchdb -V
