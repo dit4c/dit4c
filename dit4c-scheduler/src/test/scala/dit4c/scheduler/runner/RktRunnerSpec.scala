@@ -26,6 +26,7 @@ import org.specs2.specification.BeforeEach
 import org.bouncycastle.util.io.TeeInputStream
 import scala.sys.process.BasicIO
 import java.io.ByteArrayInputStream
+import scala.util.Try
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
     extends Specification with BeforeEach with MatcherMacros {
@@ -312,7 +313,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
       // We could use a future, but this is a simpler way to wait for exitValue
       // on its own thread.
       val pExitValue = Promise[Int]()
-      spawn(pExitValue.success(process.exitValue))
+      spawn(pExitValue.complete(Try(process.exitValue)))
       pExitValue.future
     }
 
