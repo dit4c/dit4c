@@ -295,9 +295,6 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
    */
   object LocalCommandExecutor {
 
-    implicit val executionContext = ExecutionContext.fromExecutorService(
-        Executors.newCachedThreadPool())
-
     def apply(
         cmd: Seq[String],
         in: InputStream,
@@ -313,8 +310,17 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
       // ProcessIO. It probably has something to do with subtle differences
       // in the way input is read from the stream.
       val process = Process(actualCmd).#<(in).run(processIO(out, err))
-      Future(process.exitValue)
+      // We could use a future, but this is a simpler way to wait for exitValue
+      // on its own thread.
+      val pExitValue = Promise[Int]()
+      spawn(pExitValue.success(process.exitValue))
+      pExitValue.future
     }
+
+    private def spawn(block: => Unit): Unit =
+      (new Thread(new Runnable() {
+        def run = block
+      })).start
 
     private def processIO(out: OutputStream, err: OutputStream): ProcessIO =
       new ProcessIO(_ => (), copyOutput(out), copyOutput(err), true)
