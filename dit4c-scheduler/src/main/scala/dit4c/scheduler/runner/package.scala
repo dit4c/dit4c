@@ -116,16 +116,16 @@ package object runner {
           }.toSet
         }
 
-    protected def rktCmd: Future[Seq[String]] = which("rkt").map(_ :+ s"--dir=$rktDir")
+    private def rktCmd = which("rkt").map(_ :+ s"--dir=$rktDir")
 
-    protected def systemdRunCmd: Future[Seq[String]] = which("systemd-run")
+    private def systemdRunCmd = which("systemd-run")
 
-    protected def systemctlCmd: Future[Seq[String]] = which("systemctl")
+    private def systemctlCmd = which("systemctl")
 
-    protected def privileged(cmd: Future[Seq[String]]): Future[Seq[String]] =
+    private def privileged(cmd: Future[Seq[String]]): Future[Seq[String]] =
       cmd.map(Seq("sudo", "-n", "--") ++ _)
 
-    private def which(cmd: String): Future[Seq[String]] =
+    protected[runner] def which(cmd: String): Future[Seq[String]] =
       ce(Seq("which", cmd))
         .map(_.trim)
         .map {

@@ -30,9 +30,10 @@ import scala.util._
 import org.specs2.specification.ForEach
 import org.specs2.execute.AsResult
 import org.specs2.execute.Result
+import org.specs2.ScalaCheck
 
-class RktRunnerSpec(implicit ee: ExecutionEnv)
-    extends Specification with BeforeEach with ForEach[RktRunner] with MatcherMacros {
+class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
+    with BeforeEach with ScalaCheck with ForEach[RktRunner] with MatcherMacros {
 
   implicit val executionContext = ExecutionContext.fromExecutorService(
       Executors.newCachedThreadPool())
@@ -79,6 +80,16 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
   sequential
 
   "RktRunner" >> {
+
+    "which" >> {
+
+      "fails if no command exists" >> { runner: RktRunner =>
+        runner.which("doesnotexist") must {
+          throwAn[Exception]
+        }.awaitFor(1.minute)
+      }
+
+    }
 
     "listSystemdUnits" >> {
 
@@ -280,6 +291,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
     }
 
     "start/stop" >> {
+
+      "only accepts lowercase alphanumeric prefixes" >> { runner: RktRunner =>
+        runner.start("NotGood", "sha512-"+Stream.fill(64)("0").mkString) must
+          throwAn[IllegalArgumentException]
+      }
 
       "should work with image IDs" >> { runner: RktRunner =>
         import scala.language.experimental.macros
