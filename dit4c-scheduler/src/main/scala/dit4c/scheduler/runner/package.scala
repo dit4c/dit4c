@@ -42,10 +42,14 @@ package object runner {
       val instanceNamePrefix: String = "dit4c-instance-")(
           implicit ec: ExecutionContext) {
 
+    if (!instanceNamePrefix.matches("""[a-z0-9\-]+"""))
+      throw new IllegalArgumentException(
+          "Only lower-case alphanumerics & '-' allowed for instance prefix")
+
     type ImageId = String
 
     def fetch(imageName: String): Future[ImageId] =
-      privilegedRktCmd
+      privileged(rktCmd)
         .flatMap { rktCmd =>
           ce(rktCmd :+ "fetch" :+
               "--insecure-options=image" :+ "--full" :+
@@ -53,7 +57,30 @@ package object runner {
         }
         .map(_.trim)
 
-    def start(instanceId: String, image: ImageId): Future[Instance] = ???
+    def start(instanceId: String, image: ImageId): Future[Unit] =
+      if (instanceId.matches("""[a-z0-9\-]+"""))
+        for {
+          manifestFile <- generateManifestFile(instanceId, image)
+          systemdRun <- privileged(systemdRunCmd)
+          rkt <- rktCmd
+          output <- ce(
+              systemdRun ++
+              Seq(s"--unit=${instanceNamePrefix}-${instanceId}.service") ++
+              rkt ++
+              Seq("run", "--no-overlay", s"--pod-manifest=$manifestFile")
+          )
+        } yield ()
+      else throw new IllegalArgumentException(
+        "Only lower-case alphanumerics & '-' allowed in instance IDs")
+
+    def stop(instanceId: String): Future[Unit] =
+      privileged(systemctlCmd)
+        .flatMap { systemctl =>
+          ce(
+            systemctl :+ "stop" :+
+            s"${instanceNamePrefix}-${instanceId}.service")
+        }
+        .map { _ => () }
 
     protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
       systemctlCmd
@@ -71,7 +98,7 @@ package object runner {
      * List rkt pods. Runs as root.
      */
     protected[runner] def listRktPods: Future[Set[RktPod]] =
-      privilegedRktCmd
+      privileged(rktCmd)
         .flatMap { rktCmd => ce(rktCmd :+ "list" :+ "--full" :+ "--no-legend") }
         .map(_.trim)
         .map { output =>
@@ -95,8 +122,8 @@ package object runner {
 
     protected def systemctlCmd: Future[Seq[String]] = which("systemctl")
 
-    protected def privilegedRktCmd: Future[Seq[String]] =
-      rktCmd.map(Seq("sudo", "-n", "--") ++ _)
+    protected def privileged(cmd: Future[Seq[String]]): Future[Seq[String]] =
+      cmd.map(Seq("sudo", "-n", "--") ++ _)
 
     private def which(cmd: String): Future[Seq[String]] =
       ce(Seq("which", cmd))
@@ -105,6 +132,29 @@ package object runner {
           case s if s.isEmpty => throw new Exception(s"`which $cmd` was blank")
           case s => Seq(s)
         }
+
+    private def generateManifestFile(
+        instanceId: String, image: ImageId): Future[String] = {
+      val manifest =
+        s"""|{
+            |    "acVersion": "0.8.4",
+            |    "acKind": "PodManifest",
+            |    "apps": [
+            |        {
+            |            "name": "${instanceNamePrefix}-${instanceId}",
+            |            "image": {
+            |                "id": "${image}"
+            |            }
+            |        }
+            |    ]
+            |}""".stripMargin
+      ce(Seq("sh", "-c", Seq(
+          "TMPFILE=$(mktemp --tmpdir manifest-json-XXXXXXXX)",
+          "cat > $TMPFILE",
+          "test -f $TMPFILE",
+          "echo $TMPFILE").mkString(" && ")),
+        new ByteArrayInputStream((manifest+"\n").getBytes)).map(_.trim)
+    }
 
   }
 

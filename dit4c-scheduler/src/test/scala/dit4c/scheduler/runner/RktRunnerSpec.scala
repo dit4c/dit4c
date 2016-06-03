@@ -27,9 +27,12 @@ import org.bouncycastle.util.io.TeeInputStream
 import scala.sys.process.BasicIO
 import java.io.ByteArrayInputStream
 import scala.util._
+import org.specs2.specification.ForEach
+import org.specs2.execute.AsResult
+import org.specs2.execute.Result
 
 class RktRunnerSpec(implicit ee: ExecutionEnv)
-    extends Specification with BeforeEach with MatcherMacros {
+    extends Specification with BeforeEach with ForEach[RktRunner] with MatcherMacros {
 
   implicit val executionContext = ExecutionContext.fromExecutorService(
       Executors.newCachedThreadPool())
@@ -66,26 +69,26 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
       1.minute)
   }
 
+  override def foreach[R: AsResult](f: RktRunner => R) = withRktDir { rktDir =>
+    val runner = new RktRunner(commandExecutor, rktDir,
+        "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase)
+    AsResult(f(runner))
+  }
+
+
   sequential
 
   "RktRunner" >> {
 
     "listSystemdUnits" >> {
 
-      "initially return empty" >> {
-        val runner = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+      "initially return empty" >> { runner: RktRunner =>
         runner.listSystemdUnits must beEmpty[Set[SystemdUnit]].awaitFor(10.seconds)
       }
 
-      "should show running units with prefix" >> {
+      "should show running units with prefix" >> { runner: RktRunner =>
         import scala.language.experimental.macros
-        val prefix = "listSystemdUnits-test-"
-        val runner = new RktRunner(
-            commandExecutor,
-            createTemporaryRktDir,
-            prefix)
+        val prefix = runner.instanceNamePrefix
         val systemdRunCmd = Seq("sudo", "-n", "--", "systemd-run")
         val instanceId = Random.alphanumeric.take(40).mkString
         // Prepared a unit
@@ -111,23 +114,17 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
     "listRktPods" >> {
 
-      "initially return empty" >> {
-        val runner = new RktRunner(
-            LocalCommandExecutor.apply,
-            createTemporaryRktDir)
+      "initially return empty" >> { runner: RktRunner =>
         runner.listRktPods must beEmpty[Set[RktPod]].awaitFor(10.seconds)
       }
 
-      "should show prepared pods" >> {
+      "should show prepared pods" >> { runner: RktRunner =>
         import scala.language.experimental.macros
-        val runner = new RktRunner(
-            commandExecutor,
-            createTemporaryRktDir)
         // Prepared a pod
         Await.ready(
           commandExecutor(
               rktCmd(runner.rktDir) ++
-              Seq("prepare", "--insecure-options=image", testImage, "--exec", "/bin/true")),
+              Seq("prepare", "--insecure-options=image", "--no-overlay", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
         runner.listRktPods must {
@@ -139,11 +136,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         }.awaitFor(1.minute)
       }
 
-      "should show running pods" >> {
+      "should show running pods" >> { runner: RktRunner =>
         import scala.language.experimental.macros
-        val runner = new RktRunner(
-            commandExecutor,
-            createTemporaryRktDir)
         // Run a pod
         val imageId = Await.result(
             commandExecutor(
@@ -194,13 +188,16 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
               |    ]
               |}""".stripMargin
         commandExecutor(
-            Seq("sh", "-c", "TMPFILE=$(mktemp /tmp/manifest-json-XXXXXXXX) && cat > $TMPFILE && echo $TMPFILE"),
+            Seq("sh", "-c", Seq(
+                "TMPFILE=$(mktemp --tmpdir manifest-json-XXXXXXXX)",
+                "cat > $TMPFILE",
+                "echo $TMPFILE").mkString(" && ")),
             new ByteArrayInputStream((manifest+"\n").getBytes))
           .map(_.trim)
           .flatMap { manifestFile =>
             commandExecutor(
               rktCmd(runner.rktDir) ++
-              Seq("run", "--interactive", s"--pod-manifest=$manifestFile"),
+              Seq("run", "--interactive", "--no-overlay", "--net=none", s"--pod-manifest=$manifestFile"),
               toProc,
               runOutput,
               nullOutputStream)
@@ -224,16 +221,13 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         }
       }
 
-      "should show exited pods" >> {
+      "should show exited pods" >> { runner: RktRunner =>
         import scala.language.experimental.macros
-        val runner = new RktRunner(
-            commandExecutor,
-            createTemporaryRktDir)
         // Run a pod
         Await.ready(
           commandExecutor(
               rktCmd(runner.rktDir) ++
-              Seq("run", "--insecure-options=image", "--net=none", testImage, "--exec", "/bin/true")),
+              Seq("run", "--insecure-options=image", "--no-overlay", "--net=none", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
         runner.listRktPods must {
@@ -245,18 +239,15 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
         }.awaitFor(1.minute)
       }
 
-      "should list multiple pods" >> {
+      "should list multiple pods" >> { runner: RktRunner =>
         import scala.language.experimental.macros
-        val runner = new RktRunner(
-            commandExecutor,
-            createTemporaryRktDir)
         // Prepared a bunch of pods
         val numOfPods = 10
         1.to(numOfPods).foreach { _ =>
           Await.ready(
             commandExecutor(
                 rktCmd(runner.rktDir) ++
-                Seq("prepare", "--no-overlay", "--insecure-options=image", testImage, "--exec", "/bin/true")),
+                Seq("prepare", "--insecure-options=image", "--no-overlay", testImage, "--exec", "/bin/true")),
             1.minute)
         }
         // Check listing
@@ -273,23 +264,64 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
     "fetch" >> {
 
-      "should work with local files" >> {
-        val runner = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+      "should work with local files" >> { runner: RktRunner =>
         runner.fetch(testImage) must {
           beMatching("sha512-[0-9a-f]{64}".r)
         }.awaitFor(1.minutes)
       }
 
-      "should not work with image IDs" >> {
-        val runner = new RktRunner(
-            LocalCommandExecutor.apply,
-            Files.createTempDirectory("rkt-tmp"))
+      "should not work with image IDs" >> { runner: RktRunner =>
         val imageId = Await.result(runner.fetch(testImage), 1.minute)
         runner.fetch(imageId) must {
           throwA[Exception]
         }.awaitFor(1.minutes)
+      }
+
+    }
+
+    "start/stop" >> {
+
+      "should work with image IDs" >> { runner: RktRunner =>
+        import scala.language.experimental.macros
+        // Use a long-running image for this test
+        val imageId = Await.result(
+            runner.fetch("quay.io/coreos/etcd"), 1.minute)
+        val instanceId = Random.alphanumeric.take(40).mkString.toLowerCase;
+        // Start image
+        {
+          runner.start(instanceId, imageId) must {
+            not(throwA[Exception])
+          }.awaitFor(1.minutes)
+        } and {
+          runner.listSystemdUnits must {
+            haveSize[Set[SystemdUnit]](1) and contain(
+              matchA[SystemdUnit]
+                .name(s"${runner.instanceNamePrefix}-${instanceId}")
+            )
+          }.awaitFor(1.minute)
+        } and {
+          Future(Thread.sleep(5000)).flatMap(_ => runner.listRktPods) must {
+            haveSize[Set[RktPod]](1) and contain(
+              matchA[RktPod]
+                .uuid(not(beEmpty[String]))
+                .apps(Set(s"${runner.instanceNamePrefix}-${instanceId}"))
+                .state(be(RktPod.States.Running))
+            )
+          }.awaitFor(1.minutes)
+        } and {
+          runner.stop(instanceId) must {
+            not(throwA[Exception])
+          }.awaitFor(1.minutes)
+        } and {
+          runner.listRktPods must {
+            haveSize[Set[RktPod]](1) and contain(
+              matchA[RktPod]
+                .uuid(not(beEmpty[String]))
+                .apps(Set(s"${runner.instanceNamePrefix}-${instanceId}"))
+                .state(be(RktPod.States.Exited))
+            )
+          }.awaitFor(1.minutes)
+        }
       }
 
     }
@@ -303,15 +335,25 @@ class RktRunnerSpec(implicit ee: ExecutionEnv)
 
   private def sudoCmd(xs: String*): Seq[String] = Seq("sudo", "-n", "--") ++ xs
 
-  private def createTemporaryRktDir = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    val dir = Files.createTempDirectory("rkt-tmp-")
-    dir.toFile.deleteOnExit
-    commandExecutor(Seq(
-        rktBinaryPath,
-        s"--dir=$dir",
-        "list"))
-    dir
+  private def withRktDir[A](f: Path => A) = {
+    val rktDir = Await.result({
+      import scala.concurrent.ExecutionContext.Implicits.global
+      for {
+        dir <- commandExecutor(Seq("mktemp", "--tmpdir", "-d", "rkt-tmp-XXXXXX")).map(_.trim)
+        _ <- commandExecutor(Seq(
+          rktBinaryPath,
+          s"--dir=$dir",
+          "list"))
+        path = Paths.get(dir)
+      } yield path
+    }, 1.minute)
+    try {
+      f(rktDir)
+    } finally {
+      /*Await.ready({
+        commandExecutor(Seq("rm", "-rf", rktDir.toString))
+      }, 1.minute)*/
+    }
   }
 
   private val nullLogger = ProcessLogger(_ => (), _ => ())
