@@ -366,9 +366,9 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
     try {
       f(rktDir)
     } finally {
-      /*Await.ready({
+      Await.ready({
         commandExecutor(Seq("rm", "-rf", rktDir.toString))
-      }, 1.minute)*/
+      }, 1.minute)
     }
   }
 
