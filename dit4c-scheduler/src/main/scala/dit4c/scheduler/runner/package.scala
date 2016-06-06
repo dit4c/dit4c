@@ -7,6 +7,7 @@ import java.nio.file.Path
 import scala.concurrent.ExecutionContext
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import play.api.libs.json.{Json, JsObject}
 
 package object runner {
 
@@ -56,6 +57,21 @@ package object runner {
               imageName)
         }
         .map(_.trim)
+
+    def guessServicePort(image: ImageId): Future[Int] = {
+      privileged(rktCmd)
+        .flatMap { rktCmd => ce(rktCmd :+ "image" :+ "cat-manifest" :+ image) }
+        .map(Json.parse)
+        .map { json =>
+          // Extract all registered TCP ports
+          val possiblePorts: Seq[Int] =
+            (json \ "app" \ "ports").as[Seq[JsObject]]
+              .filter(v => (v \ "protocol").as[String] == "tcp")
+              .map(v => (v \ "port").as[Int])
+          // Pick the lowest
+          possiblePorts.min
+        }
+    }
 
     def start(instanceId: String, image: ImageId): Future[Unit] =
       if (instanceId.matches("""[a-z0-9\-]+"""))

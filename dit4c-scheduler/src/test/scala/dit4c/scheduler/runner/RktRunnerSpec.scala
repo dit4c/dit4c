@@ -290,6 +290,23 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     }
 
+
+    "guessServicePort" >> {
+      "should work for" >> {
+        def testImage(imageName: String, expectedPort: Int) =
+          { runner: RktRunner =>
+            // Use a long-running image for this test
+            val imageId = Await.result(runner.fetch(imageName), 1.minute)
+            runner.guessServicePort(imageId) must {
+              be_==(expectedPort)
+            }.awaitFor(1.minutes)
+          }
+
+        "nginx" >> testImage("docker://nginx:alpine", 80)
+        "dit4c/gotty" >> testImage("docker://dit4c/gotty", 8080)
+      }
+    }
+
     "start/stop" >> {
 
       "only accepts lowercase alphanumeric prefixes" >> { runner: RktRunner =>
@@ -367,7 +384,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
       f(rktDir)
     } finally {
       Await.ready({
-        commandExecutor(Seq("rm", "-rf", rktDir.toString))
+        commandExecutor(sudoCmd("rm", "-rf", rktDir.toString))
       }, 1.minute)
     }
   }
