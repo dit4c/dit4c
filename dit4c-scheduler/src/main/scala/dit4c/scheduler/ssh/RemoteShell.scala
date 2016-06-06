@@ -79,7 +79,13 @@ object RemoteShell {
   protected def escapeAndJoin(cmd: Seq[String]): String =
     cmd.map(_.flatMap(escape)).mkString(" ")
 
-  protected def escape(c: Char): Seq[Char] = Seq('\\', c)
+  /**
+   * Escape normal characters and strip out control characters.
+   */
+  protected def escape(c: Char): Seq[Char] = c match {
+    case c if c <= '\u001f' || c == '\u001f' => Seq.empty
+    case c => Seq('\\', c)
+  }
 
   def toOpenSshPrivateKey(priv: RSAPrivateKey, pub: RSAPublicKey): String = {
     import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers

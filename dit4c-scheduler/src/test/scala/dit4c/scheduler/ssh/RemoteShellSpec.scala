@@ -66,10 +66,10 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
 
     "can handle commands with arguments" >> { ce: CommandExecutor =>
       prop({ s: String =>
-        ce(Seq("echo", s)).map(_.trim) must {
-          be_==(s)
+        ce(Seq("echo","-n", s)) must {
+          be_==(withoutControlCharacters(s))
         }.awaitFor(1.minute)
-      }).setGen(Arbitrary.arbString.arbitrary.suchThat(!_.contains("\u0000")))
+      })
     }
 
     "can create files" >> { ce: CommandExecutor =>
@@ -127,6 +127,8 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     Seq.fill(n) { kpg.genKeyPair }
   }
 
+  private def withoutControlCharacters(s: String): String =
+    s.filterNot(c => { c <= '\u001f' || c == '\u001f'})
 
   def readFileBytes(file: Path): Array[Byte] = {
     val out = new ByteArrayOutputStream()
