@@ -18,7 +18,7 @@ libraryDependencies ++= {
     "com.nimbusds"        %   "nimbus-jose-jwt" % "2.22.1",
     "com.github.scopt"    %%  "scopt"           % "3.2.0",
     "com.google.code.findbugs" % "jsr305"       % "3.0.1",
-    "com.github.docker-java" % "docker-java"    % "3.0.0-SNAPSHOT"
+    "com.github.docker-java" % "docker-java"    % "3.0.0"
   )
 }
 
