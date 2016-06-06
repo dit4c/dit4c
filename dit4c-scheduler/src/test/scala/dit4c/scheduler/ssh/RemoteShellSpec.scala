@@ -40,7 +40,7 @@ import org.scalacheck.Arbitrary
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ForEach[CommandExecutor] with ScalaCheck with FileMatchers {
 
-  implicit val params = Parameters(minTestsOk = 100, workers = 10)
+  implicit val params = Parameters(minTestsOk = 20, workers = 5)
 
   val keyPairs: Seq[KeyPair] = generateRsaKeyPairs(5)
   def publicKeys = keyPairs.map(_.getPublic)
