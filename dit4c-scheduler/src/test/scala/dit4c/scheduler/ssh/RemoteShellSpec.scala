@@ -6,9 +6,8 @@ import java.security.PublicKey
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 
-import scala.collection.JavaConversions.asJavaIterable
-import scala.collection.JavaConversions.setAsJavaSet
-import scala.concurrent.duration.DurationInt
+import scala.collection.JavaConversions._
+import scala.concurrent.duration._
 import scala.util.Random
 
 import org.apache.sshd.common.keyprovider.KeyPairProvider
@@ -32,20 +31,18 @@ import java.nio.file.Path
 import org.specs2.matcher.FileMatchers
 import java.io.FileInputStream
 import scala.sys.process.BasicIO
+import org.specs2.ScalaCheck
+import org.scalacheck.Gen
+import java.security.SecureRandom
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
-    with ForEach[CommandExecutor] with FileMatchers {
+    with ForEach[CommandExecutor] with ScalaCheck with FileMatchers {
 
-  val keyPairs: Set[KeyPair] = {
-    val kpg = KeyPairGenerator.getInstance("RSA")
-    kpg.initialize(512)
-    for (i <- 1.to(5)) yield kpg.genKeyPair()
-  }.toSet
+  val keyPairs: Seq[KeyPair] = generateRsaKeyPairs(5)
   def publicKeys = keyPairs.map(_.getPublic)
 
   override def foreach[R: AsResult](f: CommandExecutor => R) = {
-    val kp = keyPairs.head
-    val (server, hostPublicKey) = createSshServer
+    val kp = Random.shuffle(keyPairs).head
     val username = Random.alphanumeric.take(8).mkString
     val ce: CommandExecutor = RemoteShell(server.getHost,
       server.getPort,
@@ -69,21 +66,22 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
       }.awaitFor(1.minute)
     }
 
-    "can create files" >> { ce: CommandExecutor =>
-      val tmpDir = Files.createTempDirectory("remote-shell-test-")
-      val tmpFile = tmpDir.resolve("test.txt").toAbsolutePath
-      val inBytes = "Hello World!\n".getBytes
-      try {
-        Await.ready(ce(
-            Seq("sh", "-c", s"cat - > ${tmpFile}"),
-            new ByteArrayInputStream(inBytes)), 1.minute);
-        { tmpFile.toString must beAFilePath } and
-        { readFileBytes(tmpFile) must_== inBytes }
-      } finally {
-        Files.deleteIfExists(tmpFile)
-        Files.delete(tmpDir)
+    "can create files" >> prop({ bytes: Array[Byte] =>
+      { ce: CommandExecutor =>
+        val tmpDir = Files.createTempDirectory("remote-shell-test-")
+        val tmpFile = tmpDir.resolve("test.txt").toAbsolutePath
+        try {
+          Await.ready(ce(
+              Seq("sh", "-c", s"cat - > ${tmpFile}"),
+              new ByteArrayInputStream(bytes)), 1.minute);
+          { tmpFile.toString must beAFilePath } and
+          { readFileBytes(tmpFile) must_== bytes }
+        } finally {
+          Files.deleteIfExists(tmpFile)
+          Files.delete(tmpDir)
+        }
       }
-    }
+    }).set(minTestsOk = 20)
 
     "exits with non-zero on error" >> { ce: CommandExecutor =>
       ce(Seq("doesnotexist")) must {
@@ -95,13 +93,11 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
 
   }
 
-  def createSshServer: (SshServer, PublicKey) = {
+  val (server, hostPublicKey): (SshServer, PublicKey) = {
     val server = SshServer.setUpDefaultServer()
     server.setHost("localhost")
     val (keyPairProvider, publicKey) = {
-      val kpg = KeyPairGenerator.getInstance("RSA")
-      kpg.initialize(512)
-      val pair = kpg.genKeyPair()
+      val pair = generateRsaKeyPairs(1).head
       (new KeyPairProvider() {
         private val keyType = KeyPairProvider.SSH_RSA
         override val getKeyTypes = asJavaIterable(Seq(keyType))
@@ -121,6 +117,14 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     server.start()
     (server, publicKey)
   }
+
+  def generateRsaKeyPairs(n: Int): Seq[KeyPair] = {
+    val sr = SecureRandom.getInstance("SHA1PRNG")
+    val kpg = KeyPairGenerator.getInstance("RSA")
+    kpg.initialize(512, sr)
+    Seq.fill(n) { kpg.genKeyPair }
+  }
+
 
   def readFileBytes(file: Path): Array[Byte] = {
     val out = new ByteArrayOutputStream()
