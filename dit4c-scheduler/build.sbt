@@ -13,6 +13,7 @@ libraryDependencies ++= {
     "com.jcraft"          %   "jsch"                  % "0.1.53",
     "com.github.scopt"    %%  "scopt"                 % "3.4.0",
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
+    "org.bouncycastle"    %   "bcpkix-jdk15on"        % "1.54",
     "org.specs2"          %%  "specs2-core"           % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",
