@@ -43,10 +43,14 @@ object RemoteShell {
             host,
             RemoteShell.toOpenSshPublicKey(hostPublicKey)),
             null);
+    var lastSession: Option[Session] = None
     ce {
-      Future {
+      if (lastSession.isDefined && lastSession.get.isConnected)
+        Future.successful(lastSession.get)
+      else Future {
         val session = jsch.getSession(username, host, port)
         session.connect()
+        lastSession = Some(session)
         session
       }
     }

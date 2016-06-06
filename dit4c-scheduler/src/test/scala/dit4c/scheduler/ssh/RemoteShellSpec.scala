@@ -34,9 +34,13 @@ import scala.sys.process.BasicIO
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import java.security.SecureRandom
+import org.specs2.scalacheck.Parameters
+import org.scalacheck.Arbitrary
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ForEach[CommandExecutor] with ScalaCheck with FileMatchers {
+
+  implicit val params = Parameters(minTestsOk = 100, workers = 10)
 
   val keyPairs: Seq[KeyPair] = generateRsaKeyPairs(5)
   def publicKeys = keyPairs.map(_.getPublic)
@@ -61,27 +65,25 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     }
 
     "can handle commands with arguments" >> { ce: CommandExecutor =>
-      ce(Seq("echo", "Hello World!")).map(_.trim) must {
-        be_==("Hello World!")
-      }.awaitFor(1.minute)
+      prop({ s: String =>
+        ce(Seq("echo", s)).map(_.trim) must {
+          be_==(s)
+        }.awaitFor(1.minute)
+      }).setGen(Arbitrary.arbString.arbitrary.suchThat(!_.contains("\u0000")))
     }
 
-    "can create files" >> prop({ bytes: Array[Byte] =>
-      { ce: CommandExecutor =>
-        val tmpDir = Files.createTempDirectory("remote-shell-test-")
-        val tmpFile = tmpDir.resolve("test.txt").toAbsolutePath
-        try {
-          Await.ready(ce(
-              Seq("sh", "-c", s"cat - > ${tmpFile}"),
-              new ByteArrayInputStream(bytes)), 1.minute);
-          { tmpFile.toString must beAFilePath } and
-          { readFileBytes(tmpFile) must_== bytes }
-        } finally {
-          Files.deleteIfExists(tmpFile)
-          Files.delete(tmpDir)
-        }
-      }
-    }).set(minTestsOk = 20)
+    "can create files" >> { ce: CommandExecutor =>
+      val tmpDir = Files.createTempDirectory("remote-shell-test-")
+      tmpDir.toFile.deleteOnExit
+      val tmpFile = tmpDir.resolve("test.txt").toAbsolutePath
+      prop({ bytes: Array[Byte] =>
+        Await.ready(ce(
+            Seq("sh", "-c", s"cat - > ${tmpFile}"),
+            new ByteArrayInputStream(bytes)), 1.minute);
+        { tmpFile.toString must beAFilePath } and
+        { readFileBytes(tmpFile) must_== bytes }
+      }).after(Files.deleteIfExists(tmpFile)).set(maxSize = 1024)
+    }
 
     "exits with non-zero on error" >> { ce: CommandExecutor =>
       ce(Seq("doesnotexist")) must {
