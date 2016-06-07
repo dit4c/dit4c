@@ -62,10 +62,10 @@ object RemoteShell {
         val channel: ChannelExec =
           session.openChannel("exec").asInstanceOf[ChannelExec]
         val cmdLine = escapeAndJoin(cmd)
-        channel.setCommand("sh")
+        channel.setCommand("bash")
         channel.setInputStream(
           new SequenceInputStream(
-            new ByteArrayInputStream((cmdLine+"\n").getBytes),
+            new ByteArrayInputStream(("exec "+cmdLine+"\n").getBytes),
             in))
         channel.setOutputStream(out)
         channel.setErrStream(err)
