@@ -19,6 +19,13 @@ import com.jcraft.jsch.Session
 import dit4c.scheduler.runner.CommandExecutor
 import java.io.SequenceInputStream
 import java.io.ByteArrayInputStream
+import java.security.PublicKey
+import akka.util.ByteString
+import java.security.spec.RSAPublicKeySpec
+import java.security.KeyFactory
+import scala.concurrent.Promise
+import com.jcraft.jsch.HostKeyRepository
+import com.jcraft.jsch.JSchException
 
 object RemoteShell {
 
@@ -54,6 +61,35 @@ object RemoteShell {
         session
       }
     }
+  }
+
+
+  def getHostKey(host: String, port: Int): Future[PublicKey] = {
+    val jsch = new JSch
+    val username = Random.alphanumeric.take(8).mkString
+    val p = Promise[PublicKey]()
+    jsch.setHostKeyRepository(new HostKeyRepository {
+      def add(x$1: com.jcraft.jsch.HostKey,x$2: com.jcraft.jsch.UserInfo): Unit = ???
+      def check(x$1: String, key: Array[Byte]): Int = {
+        p.trySuccess(RemoteShell.fromOpenSshPublicKey(key))
+        HostKeyRepository.NOT_INCLUDED
+      }
+      def getHostKey(x$1: String,x$2: String): Array[com.jcraft.jsch.HostKey] = ???
+      def getHostKey(): Array[com.jcraft.jsch.HostKey] = ???
+      def getKnownHostsRepositoryID(): String = ???
+      def remove(x$1: String,x$2: String,x$3: Array[Byte]): Unit = ???
+      def remove(x$1: String,x$2: String): Unit = ???
+    })
+    (new Thread() {
+      override def run {
+        try {
+          jsch.getSession(host, "", port).connect()
+        } catch {
+          case _: JSchException =>
+        }
+      }
+    }).start
+    p.future
   }
 
   protected def ce(sessionProvider: => Future[Session]): CommandExecutor =
@@ -120,6 +156,32 @@ object RemoteShell {
     lengthThenBytes("ssh-rsa".getBytes("us-ascii")) ++
         lengthThenBytes(pub.getPublicExponent.toByteArray) ++
         lengthThenBytes(pub.getModulus.toByteArray)
+  }
+
+  def fromOpenSshPublicKey(bytes: Array[Byte]): PublicKey = {
+    import java.nio.ByteBuffer
+    def readLengthAndSplit(bs: Array[Byte]): (Array[Byte], Array[Byte]) = {
+      val start = Integer.BYTES
+      val length = BigInt(bs.take(Integer.BYTES)).toInt
+      val end = start + length
+      (bs.slice(start, end), bs.drop(end))
+    }
+    def extractType(bs: Array[Byte]): (String, Array[Byte]) = {
+      val (v, remaining) = readLengthAndSplit(bs)
+      (new String(v, "us-ascii"), remaining)
+    }
+    val (algType, keyBytes) = extractType(bytes)
+    algType match {
+      case "ssh-rsa" =>
+        val (publicExponentBytes, remaining) = readLengthAndSplit(keyBytes)
+        val (modulusBytes, _) = readLengthAndSplit(remaining)
+        val factory = KeyFactory.getInstance("RSA")
+        factory.generatePublic(
+          new RSAPublicKeySpec(
+              BigInt(modulusBytes).bigInteger,
+              BigInt(publicExponentBytes).bigInteger))
+      case _ => ???
+    }
   }
 
 
