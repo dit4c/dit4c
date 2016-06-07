@@ -36,11 +36,13 @@ import org.scalacheck.Gen
 import java.security.SecureRandom
 import org.specs2.scalacheck.Parameters
 import org.scalacheck.Arbitrary
+import scala.concurrent.ExecutionContext
+import java.util.concurrent.Executors
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ForEach[CommandExecutor] with ScalaCheck with FileMatchers {
 
-  implicit val params = Parameters(minTestsOk = 20, workers = 5)
+  implicit val params = Parameters(minTestsOk = 1000, workers = 20)
 
   val keyPairs: Seq[KeyPair] = generateRsaKeyPairs(5)
   def publicKeys = keyPairs.map(_.getPublic)
@@ -65,30 +67,52 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     }
 
     "can handle commands with arguments" >> { ce: CommandExecutor =>
-      prop({ s: String =>
-        ce(Seq("echo","-n", s)) must {
-          be_==(withoutControlCharacters(s))
-        }.awaitFor(1.minute)
+      // To do tests parallel, action must happen in the generator
+      case class TestPair(input: String, output: String)
+      implicit val testArb: Arbitrary[TestPair] = Arbitrary {
+        for {
+          input <- Gen.oneOf(Arbitrary.arbString.arbitrary, Gen.alphaStr)
+          output = Await.result(ce(Seq("echo","-n", input)), 1.minute)
+        } yield TestPair(input, output)
+      }
+      // Check the input and output
+      prop({ p: TestPair =>
+        p.output must_==(withoutControlCharacters(p.input))
       })
     }
 
     "can create files" >> { ce: CommandExecutor =>
+      implicit val ec = ExecutionContext.fromExecutorService(
+        Executors.newCachedThreadPool())
       val tmpDir = Files.createTempDirectory("remote-shell-test-")
       tmpDir.toFile.deleteOnExit
-      val tmpFile = tmpDir.resolve("test.txt").toAbsolutePath
-      prop({ bytes: Array[Byte] =>
-        Await.ready(ce(
+      // To do tests parallel, action must happen in the generator
+      case class TestPair(file: Path, content: Array[Byte])
+      implicit val testArb: Arbitrary[TestPair] = Arbitrary {
+        for {
+          bytes <- Arbitrary.arbitrary[Array[Byte]]
+          randomId <- Gen.containerOfN(20, Gen.alphaNumChar).map(_.mkString)
+          tmpFile = tmpDir.resolve("test-"+randomId).toAbsolutePath
+          _ = Await.ready(ce(
             Seq("sh", "-c", s"cat - > ${tmpFile}"),
-            new ByteArrayInputStream(bytes)), 1.minute);
-        { tmpFile.toString must beAFilePath } and
-        { readFileBytes(tmpFile) must_== bytes }
-      }).after(Files.deleteIfExists(tmpFile)).set(maxSize = 1024)
+            new ByteArrayInputStream(bytes)), 1.minute)
+        } yield TestPair(tmpFile, bytes)
+      }
+      // Do the checks
+      prop({ p: TestPair =>
+        try {
+          { p.file.toString must beAFilePath } and
+          { readFileBytes(p.file) must_== p.content }
+        } finally {
+          Files.deleteIfExists(p.file)
+        }
+      }).set(maxSize = 1024)
     }
 
     "exits with non-zero on error" >> { ce: CommandExecutor =>
       ce(Seq("doesnotexist")) must {
         throwAn[Exception].like {
-          case e => e.getMessage must contain("doesnotexist: command not found")
+          case e => e.getMessage must contain("not found")
         }
       }.awaitFor(1.minute)
     }
