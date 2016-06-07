@@ -94,7 +94,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
     "listSystemdUnits" >> {
 
       "initially return empty" >> { runner: RktRunner =>
-        runner.listSystemdUnits must beEmpty[Set[SystemdUnit]].awaitFor(10.seconds)
+        runner.listSystemdUnits must beEmpty[Set[SystemdUnit]].awaitFor(1.minute)
       }
 
       "should show running units with prefix" >> { runner: RktRunner =>
