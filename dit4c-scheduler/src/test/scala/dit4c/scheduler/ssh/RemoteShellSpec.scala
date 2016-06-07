@@ -87,21 +87,22 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
       val tmpDir = Files.createTempDirectory("remote-shell-test-")
       tmpDir.toFile.deleteOnExit
       // To do tests parallel, action must happen in the generator
-      case class TestPair(file: Path, content: Array[Byte])
+      case class TestPair(file: Path, content: Array[Byte], bytesWritten: Int)
       implicit val testArb: Arbitrary[TestPair] = Arbitrary {
         for {
           bytes <- Arbitrary.arbitrary[Array[Byte]]
           randomId <- Gen.containerOfN(20, Gen.alphaNumChar).map(_.mkString)
           tmpFile = tmpDir.resolve("test-"+randomId).toAbsolutePath
-          _ = Await.ready(ce(
-            Seq("sh", "-c", s"cat - > ${tmpFile}"),
-            new ByteArrayInputStream(bytes)), 1.minute)
-        } yield TestPair(tmpFile, bytes)
+          numBytesWritten = Await.result(ce(
+            Seq("sh", "-c", s"cat - > ${tmpFile} && wc -c ${tmpFile} | cut -d' ' -f1"),
+            new ByteArrayInputStream(bytes)).map(_.trim.toInt), 1.minute)
+        } yield TestPair(tmpFile, bytes, numBytesWritten)
       }
       // Do the checks
       prop({ p: TestPair =>
         try {
           { p.file.toString must beAFilePath } and
+          { p.bytesWritten must_== p.content.length } and
           { readFileBytes(p.file) must_== p.content }
         } finally {
           Files.deleteIfExists(p.file)
