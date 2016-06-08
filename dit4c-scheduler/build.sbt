@@ -14,9 +14,11 @@ libraryDependencies ++= {
     "com.github.scopt"    %%  "scopt"                 % "3.4.0",
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
     "org.bouncycastle"    %   "bcpkix-jdk15on"        % "1.54",
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.7.0",
     "org.specs2"          %%  "specs2-core"           % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",
+    "com.typesafe.akka"   %%  "akka-http-testkit"     % akkaV % "test",
     "org.apache.sshd"     %   "apache-sshd"           % "1.2.0" % "test"
       exclude("org.slf4j", "slf4j-jdk14")
   )
