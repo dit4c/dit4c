@@ -1,6 +1,6 @@
 import SharedDependencyVersions._
 
-name  := "dit4c-scheduler"
+name := "dit4c-scheduler"
 
 crossScalaVersions := Nil
 
@@ -28,4 +28,21 @@ scalacOptions ++= Seq("-feature")
 
 packSettings
 
-packMain := Map("dit4c-scheduler" -> "dit4c.scheduler.Boot")
+packMain := Map("dit4c-scheduler" -> "dit4c.scheduler.Main")
+
+// Produce scala object that knows the app version
+sourceGenerators in Compile <+= (sourceManaged in Compile, name, version, cacheDirectory) map { (dir, name, version, cacheDir) =>
+  val cache =
+    FileFunction.cached(cacheDir / "version", inStyle = FilesInfo.hash, outStyle = FilesInfo.hash) { in: Set[File] =>
+      val file = in.toSeq.head
+      val content =
+        s"""|package dit4c.scheduler
+            |object AppMetadataImpl extends utils.AppMetadata {
+            |  override def name = "$name"
+            |  override def version = "$version"
+            |}""".stripMargin
+      IO.write(file, content);
+      Set(file)
+    }
+  cache(Set( dir / "dit4c" / "scheduler" / "AppMetadataImpl.scala" )).toSeq
+}
