@@ -8,5 +8,6 @@ trait Specs2RouteTest extends Specification
     with RouteTest with Specs2TestFrameworkInterface {
 
   val beRedirection = beTrue ^^ { (sc: StatusCode) => sc.isRedirection }
+  val beSuccess = beTrue ^^ { (sc: StatusCode) => sc.isSuccess }
 
 }

@@ -15,6 +15,7 @@ libraryDependencies ++= {
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
     "org.bouncycastle"    %   "bcpkix-jdk15on"        % "1.54",
     "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.7.0",
+    "org.webjars"         %   "swagger-ui"            % "2.1.4",
     "org.specs2"          %%  "specs2-core"           % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",

@@ -17,7 +17,9 @@ class ZoneRoutesSpec extends Specs2RouteTest with JsonMatchers {
       Result.foreach(Seq("/zones", "/zones/")) { path =>
         Get(path) ~> zoneRoutes ~> check {
           Json.prettyPrint(entityAs[JsValue]) must {
-            /("zones").andHave(JsonType.anyMatch)
+            /("zones") /{
+              /("id" -> "default")
+            }
           }
         }
       }
