@@ -9,15 +9,21 @@ import com.github.swagger.akka.HasActorSystem
 import akka.stream.ActorMaterializer
 import scala.reflect.runtime.universe
 import com.github.swagger.akka.model.Info
+import com.github.swagger.akka.model.`package`.License
 
 package object routes extends Directives with PlayJsonSupport {
 
-  def swaggerRoutes(system: ActorSystem, hostAndPort: String) =
-    pathPrefix("swagger") {
+  def apiDocsRoutes(system: ActorSystem, hostAndPort: String) =
+    pathPrefix("api-docs") {
       get {
         getFromResourceDirectory("META-INF/resources/webjars/swagger-ui/2.1.4")
       } ~
-      pathSingleSlash(get(redirect("index.html", StatusCodes.PermanentRedirect)))
+      pathSingleSlash {
+        get {
+          redirect("index.html?url=/api-docs/swagger.json",
+              StatusCodes.PermanentRedirect)
+        }
+      }
     } ~ (new SwaggerDocs(system, hostAndPort)).routes
 
   class SwaggerDocs(system: ActorSystem, hostAndPort: String)
@@ -26,10 +32,11 @@ package object routes extends Directives with PlayJsonSupport {
     override implicit val actorSystem: ActorSystem = system
     override implicit val materializer: ActorMaterializer = ActorMaterializer()
     override val apiTypes = Seq(universe.typeOf[ZoneRoutes])
-    override val host = hostAndPort //the url of your api, not swagger's json endpoint
-    override val basePath = "/"    //the basePath for the API you are exposing
-    override val apiDocsPath = "swagger" //where you want the swagger-json endpoint exposed
-    override val info = Info() //provides license and other description details
+    override val host = hostAndPort
+    override val basePath = "/"
+    override val apiDocsPath = "api-docs"
+    override val info = Info(license = Some(
+        License("MIT", "https://github.com/dit4c/dit4c/blob/master/COPYING")))
 
   }
 
