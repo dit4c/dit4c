@@ -41,7 +41,7 @@ package object utils {
     opt[Int]('p', "port")
       .action { (x, c) => c.copy(port = x) }
       .validate {
-        case n if n >= 0 && n <= 0xFFFF => Right(n)
+        case n if n >= 0 && n <= 0xFFFF => Right(())
         case n => Left("Invalid TCP port specified")
       }
       .text("port to listen on")
