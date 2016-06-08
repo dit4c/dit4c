@@ -38,6 +38,9 @@ import org.specs2.specification.Fixture
 
 import dit4c.scheduler.runner.CommandExecutor
 import dit4c.scheduler.runner.CommandExecutorHelper
+import org.apache.sshd.common.keyprovider.MappedKeyPairProvider
+import java.security.spec.ECGenParameterSpec
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ScalaCheck with FileMatchers {
@@ -133,16 +136,7 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
   val (server, hostPublicKey): (SshServer, PublicKey) = {
     val server = SshServer.setUpDefaultServer()
     server.setHost("localhost")
-    val (keyPairProvider, publicKey) = {
-      val pair = generateRsaKeyPairs(1).head
-      (new KeyPairProvider() {
-        private val keyType = KeyPairProvider.SSH_RSA
-        override val getKeyTypes = asJavaIterable(Seq(keyType))
-        override def loadKey(t: String) =
-          if (t == keyType) pair else null
-        override val loadKeys = asJavaIterable(Seq(pair))
-      }, pair.getPublic)
-    }
+    val (keyPairProvider, publicKey) = generateKeyPairProvider
     server.setKeyPairProvider(keyPairProvider)
     server.setPublickeyAuthenticator(
         new KeySetPublickeyAuthenticator(publicKeys))
@@ -153,6 +147,27 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     })
     server.start()
     (server, publicKey)
+  }
+
+  def generateKeyPairProvider: (KeyPairProvider, PublicKey) = {
+    val sr = SecureRandom.getInstance("SHA1PRNG")
+    // We understand RSA key pairs
+    val rsaPair = {
+      val kpg = KeyPairGenerator.getInstance("RSA")
+      kpg.initialize(2048, sr)
+      kpg.genKeyPair
+    }
+    // We want a pair that we don't understand too
+    val ecdsaPair = {
+      val ecGenSpec = new ECGenParameterSpec("P-256");
+      val kpg = KeyPairGenerator.getInstance("EC", new BouncyCastleProvider())
+      kpg.initialize(ecGenSpec, sr)
+      kpg.genKeyPair
+    }
+    (MappedKeyPairProvider.MAP_TO_KEY_PAIR_PROVIDER.transform(Map(
+      KeyPairProvider.SSH_RSA -> rsaPair,
+      KeyPairProvider.ECDSA_SHA2_NISTP256 -> ecdsaPair
+    )), rsaPair.getPublic)
   }
 
   def generateRsaKeyPairs(n: Int): Seq[KeyPair] = {
