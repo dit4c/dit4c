@@ -18,6 +18,8 @@ package object utils {
     def appName: String
     implicit val system = ActorSystem(appName)
     implicit val materializer = ActorMaterializer()
+
+    sys.addShutdownHook(system.terminate())
   }
 
   trait ActorExecutionContext {

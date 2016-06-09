@@ -10,8 +10,22 @@ import akka.stream.ActorMaterializer
 import scala.reflect.runtime.universe
 import com.github.swagger.akka.model.Info
 import com.github.swagger.akka.model.`package`.License
+import io.swagger.annotations._
+import scala.annotation.meta.field
 
 package object routes extends Directives with PlayJsonSupport {
+  import play.api.libs.json._
+
+  @ApiModel(description = "A list of compute zones")
+  case class ZoneIndex(zones: Set[Zone])
+
+  @ApiModel(description = "A compute zone")
+  case class Zone(
+      @(ApiModelProperty @field)(value = "unique identifier for the zone")
+      val id: String)
+
+  implicit val writesZone = Json.writes[Zone]
+  implicit val writesZoneIndex = Json.writes[ZoneIndex]
 
   def apiDocsRoutes(system: ActorSystem, hostAndPort: String) =
     pathPrefix("api-docs") {
@@ -24,7 +38,17 @@ package object routes extends Directives with PlayJsonSupport {
               StatusCodes.PermanentRedirect)
         }
       }
-    } ~ (new SwaggerDocs(system, hostAndPort)).routes
+    } ~ {
+      import scala.collection.JavaConversions._
+      val swaggerDocs = new SwaggerDocs(system, hostAndPort)
+      val reader = new io.swagger.jaxrs.Reader(swaggerDocs.swaggerConfig, new io.swagger.jaxrs.config.ReaderConfig {
+        def getIgnoredRoutes(): java.util.Collection[String] = List()
+        def isScanAllResources(): Boolean = true
+      })
+      println(reader.read(classOf[ZoneRoutes]).getPaths)
+
+      swaggerDocs
+    }.routes
 
   class SwaggerDocs(system: ActorSystem, hostAndPort: String)
       extends SwaggerHttpService with HasActorSystem {
