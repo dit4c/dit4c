@@ -17,7 +17,6 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
   override def appName = config.name
 
   def handler =
-    apiDocsRoutes(system, "localhost:"+config.port) ~
     (new ZoneRoutes()).routes
 
   def start = {
