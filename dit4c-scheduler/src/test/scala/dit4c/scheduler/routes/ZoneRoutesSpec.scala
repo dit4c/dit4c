@@ -32,6 +32,7 @@ class ZoneRoutesSpec extends Specs2RouteTest
         (status must beSuccess) and
         (Json.prettyPrint(entityAs[JsValue]) must {
           /("id" -> "default")
+          /("type" -> "rkt")
         })
       }
     }
