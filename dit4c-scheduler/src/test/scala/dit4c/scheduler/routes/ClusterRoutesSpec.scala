@@ -6,7 +6,7 @@ import org.specs2.execute.Result
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import org.specs2.matcher.JsonType
-import dit4c.scheduler.service.ZoneAggregateManager
+import dit4c.scheduler.service.ClusterAggregateManager
 import akka.actor.Props
 import org.specs2.ScalaCheck
 import akka.http.scaladsl.model.StatusCodes
@@ -16,29 +16,31 @@ import akka.http.scaladsl.model.Uri
 import org.scalacheck.Gen
 import org.specs2.scalacheck.Parameters
 
-class ZoneRoutesSpec extends Specs2RouteTest
+class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with ScalaCheck with PlayJsonSupport {
 
-  val zoneAggregateManager = system.actorOf(Props[ZoneAggregateManager])
-  val zoneRoutes = (new ZoneRoutes(zoneAggregateManager)).routes
-  val basePath: Uri.Path = Uri.Path / "zones"
+  val clusterAggregateManager = system.actorOf(Props[ClusterAggregateManager])
+  val clusterRoutes = (new ClusterRoutes(clusterAggregateManager)).routes
+  val basePath: Uri.Path = Uri.Path / "clusters"
 
   implicit def path2uri(path: Uri.Path) = Uri(path=path)
 
-  "ZoneRoutes" >> {
+  "ClusterRoutes" >> {
 
-    "get default zone" >> {
-      Get(basePath / "default") ~> zoneRoutes ~> check {
-        (status must beSuccess) and
-        (Json.prettyPrint(entityAs[JsValue]) must {
-          /("id" -> "default")
-          /("type" -> "rkt")
-        })
+    "default cluster" >> {
+
+      "exists" >> {
+        Get(basePath / "default") ~> clusterRoutes ~> check {
+          (status must beSuccess) and
+          (Json.prettyPrint(entityAs[JsValue]) must {
+            /("id" -> "default")
+            /("type" -> "rkt")
+          })
+        }
       }
     }
-
-    "not have any other random zones" >> prop({ id: String =>
-      Get(basePath / id) ~> zoneRoutes ~> check {
+    "not have any other random clusters" >> prop({ id: String =>
+      Get(basePath / id) ~> clusterRoutes ~> check {
         status must be_==(StatusCodes.NotFound)
       }
     }).setGen(Gen.oneOf(

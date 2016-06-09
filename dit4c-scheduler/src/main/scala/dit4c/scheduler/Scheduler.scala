@@ -6,7 +6,7 @@ import dit4c.scheduler.routes._
 import scala.concurrent.Future
 import akka.http.scaladsl.Http.ServerBinding
 import akka.actor.Props
-import dit4c.scheduler.service.ZoneAggregateManager
+import dit4c.scheduler.service.ClusterAggregateManager
 
 object Scheduler {
   def apply(config: SchedulerConfig): Future[ServerBinding] = {
@@ -18,10 +18,10 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
 
   override def appName = config.name
 
-  val zoneAggregateManager = system.actorOf(Props[ZoneAggregateManager])
+  val zoneAggregateManager = system.actorOf(Props[ClusterAggregateManager])
 
   def handler =
-    (new ZoneRoutes(zoneAggregateManager)).routes
+    (new ClusterRoutes(zoneAggregateManager)).routes
 
   def start = {
     Http().bindAndHandle(

@@ -4,29 +4,29 @@ import akka.actor.Props
 import akka.actor.Actor
 import akka.actor.ActorLogging
 
-object ZoneAggregate {
+object ClusterAggregate {
 
-  def props(id: String): Props = Props(new ZoneAggregate(id))
+  def props(id: String): Props = Props(new ClusterAggregate(id))
 
   trait State
   case object Uninitialized extends State
-  case class Zone(id: String, `type`: ZoneType) extends State
+  case class Cluster(id: String, `type`: ClusterType) extends State
 
   trait Command
-  case class Initialize(id: String, `type`: ZoneType) extends Command
+  case class Initialize(id: String, `type`: ClusterType) extends Command
   case object GetState extends Command
 
 }
 
-class ZoneAggregate(aggregateId: String) extends Actor with ActorLogging {
+class ClusterAggregate(aggregateId: String) extends Actor with ActorLogging {
 
-  import ZoneAggregate._
+  import ClusterAggregate._
 
   protected var state: State = Uninitialized
 
   def receive = {
     case Initialize(id, t) =>
-      this.state = Zone(id, t)
+      this.state = Cluster(id, t)
       sender ! state
     case GetState => sender ! state
   }
