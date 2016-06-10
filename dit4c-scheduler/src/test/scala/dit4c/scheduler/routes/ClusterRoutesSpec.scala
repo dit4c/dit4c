@@ -35,9 +35,9 @@ class ClusterRoutesSpec extends Specs2RouteTest
       // We never want an empty string for these checks
       implicit val arbString = Arbitrary(genNonEmptyString)
 
-      "exists" >> prop { (id: String, t: ClusterAggregate.ClusterType) =>
+      "exists" >> prop { id: String =>
         val clusterRoutes = (new ClusterRoutes(TestActorRef(
-            fixedResponseCAM(ClusterAggregate.Cluster(id, t))))).routes
+            fixedResponseCAM(ClusterAggregate.RktCluster(id))))).routes
         Get(basePath / "default") ~> clusterRoutes ~> check {
           (status must beSuccess) and
           (Json.prettyPrint(entityAs[JsValue]) must {

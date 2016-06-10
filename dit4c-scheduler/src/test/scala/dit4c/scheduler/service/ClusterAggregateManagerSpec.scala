@@ -33,10 +33,9 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
         import scala.language.experimental.macros
         val probe = TestProbe()
         probe.send(clusterAggregateManager, GetCluster("default"))
-        probe.expectMsgType[ClusterAggregate.Cluster] must {
-          matchA[ClusterAggregate.Cluster]
+        probe.expectMsgType[ClusterAggregate.RktCluster] must {
+          matchA[ClusterAggregate.RktCluster]
             .id(be_==("default"))
-            .`type`(be(ClusterAggregate.ClusterTypes.Rkt))
         }
       }
     }

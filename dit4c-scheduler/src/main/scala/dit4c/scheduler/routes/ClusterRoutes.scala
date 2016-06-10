@@ -15,8 +15,12 @@ import akka.http.scaladsl.server.PathMatcher
 
 object ClusterRoutes {
   import play.api.libs.json._
+  import play.api.libs.functional.syntax._
 
-  implicit val writesCluster = Json.writes[ClusterAggregate.Cluster]
+  implicit def writesCluster: OWrites[ClusterAggregate.Cluster] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'type).write[String]
+  )(cluster => (cluster.id, cluster.`type`.toString))
 }
 
 class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives

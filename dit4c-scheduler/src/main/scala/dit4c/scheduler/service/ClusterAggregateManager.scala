@@ -39,7 +39,7 @@ class ClusterAggregateManager extends Actor with ActorLogging {
       sender ! ClusterAggregate.Uninitialized
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
-    case ClusterAggregate.Cluster("default", ClusterAggregate.ClusterTypes.Rkt) =>
+    case ClusterAggregate.RktCluster("default") =>
       // Expected from preStart
     case unknownMessage =>
       log.error(s"Unknown message: $unknownMessage")

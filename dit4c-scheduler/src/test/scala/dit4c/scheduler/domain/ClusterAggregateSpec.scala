@@ -61,13 +61,12 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
             import scala.language.experimental.macros
             probe.send(clusterAggregate, GetState)
             probe.expectMsgType[ClusterAggregate.Cluster] must {
-              matchA[ClusterAggregate.Cluster]
-                .id(be_==(id))
-                .`type`(t)
-              }
+              (be_==(id) ^^ { c: ClusterAggregate.Cluster => c.id }) and
+              (be_==(t) ^^ { c: ClusterAggregate.Cluster => c.`type` })
             }
           }
-      ).setGen1(genAggregateId)
+        }
+       ).setGen1(genAggregateId)
     }
 
     "Initialize" >> {
@@ -81,10 +80,8 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
             system.actorOf(ClusterAggregate.props(aggregateId))
           val beExpectedInitializedState: Matcher[AnyRef] = beLike[AnyRef] {
             case state: ClusterAggregate.Cluster =>
-              import scala.language.experimental.macros
-              state must matchA[ClusterAggregate.Cluster]
-                  .id(be_==(id))
-                  .`type`(t)
+              (state.id must_== id) and
+              (state.`type` must_== t)
           }
           // Get returned state after initialization and from GetState
           probe.send(clusterAggregate, Initialize(id, t))
