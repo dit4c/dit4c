@@ -16,8 +16,6 @@ import akka.http.scaladsl.server.PathMatcher
 object ClusterRoutes {
   import play.api.libs.json._
 
-  val validClusterId: Regex = """[a-zA-Z0-9]+""".r.anchored
-
   implicit val writesCluster = Json.writes[ClusterAggregate.Cluster]
 }
 
@@ -33,13 +31,8 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
   def routes = clusterInstanceRoutes
 
   val clusterInstanceRoutes =
-    pathPrefix("clusters" / validClusterId) { id =>
-      clusterRoute(id)
-    } ~
     path("clusters" / Segment) { id =>
-      // Cluster identifier wasn't the format we expected, so obviously not going
-      // to exist.
-      complete(StatusCodes.NotFound)
+      clusterRoute(id)
     }
 
   def clusterRoute(id: String): Route = {

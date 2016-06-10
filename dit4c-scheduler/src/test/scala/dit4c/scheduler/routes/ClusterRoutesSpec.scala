@@ -15,38 +15,62 @@ import org.scalacheck.Arbitrary
 import akka.http.scaladsl.model.Uri
 import org.scalacheck.Gen
 import org.specs2.scalacheck.Parameters
+import akka.testkit.TestActorRef
+import akka.actor.Actor
+import dit4c.scheduler.domain.ClusterAggregate
+import dit4c.scheduler.domain.ClusterType
+import org.scalacheck.ArbitraryLowPriority
+import dit4c.scheduler.domain.ClusterTypes
 
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with ScalaCheck with PlayJsonSupport {
 
-  val clusterAggregateManager = system.actorOf(Props[ClusterAggregateManager])
-  val clusterRoutes = (new ClusterRoutes(clusterAggregateManager)).routes
   val basePath: Uri.Path = Uri.Path / "clusters"
-
   implicit def path2uri(path: Uri.Path) = Uri(path=path)
+
+  implicit val arbClusterType = Arbitrary(Gen.oneOf(ClusterTypes.values.toSeq))
+  val genNonEmptyString: Gen[String] =
+    Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
+      .suchThat(!_.isEmpty)
 
   "ClusterRoutes" >> {
 
-    "default cluster" >> {
+    "get cluster info" >> {
 
-      "exists" >> {
+      // We never want an empty string for these checks
+      implicit val arbString = Arbitrary(genNonEmptyString)
+
+      "exists" >> prop { (id: String, t: ClusterType) =>
+        val clusterRoutes = (new ClusterRoutes(TestActorRef(
+            fixedResponseCAM(ClusterAggregate.Cluster(id, t))))).routes
         Get(basePath / "default") ~> clusterRoutes ~> check {
           (status must beSuccess) and
           (Json.prettyPrint(entityAs[JsValue]) must {
-            /("id" -> "default")
-            /("type" -> "rkt")
+            /("id" -> id)
+            /("type" -> t.toString)
           })
         }
       }
-    }
-    "not have any other random clusters" >> prop({ id: String =>
-      Get(basePath / id) ~> clusterRoutes ~> check {
-        status must be_==(StatusCodes.NotFound)
+
+      "does not exist" >> prop { id: String =>
+        val clusterRoutes = (new ClusterRoutes(TestActorRef(
+            fixedResponseCAM(ClusterAggregate.Uninitialized)))).routes
+        Get(basePath / id) ~> clusterRoutes ~> check {
+          status must be_==(StatusCodes.NotFound)
+        }
       }
-    }).setGen(Gen.oneOf(
-        Gen.alphaStr,
-        Arbitrary.arbString.arbitrary).suchThat(!_.isEmpty))
+
+    }
 
   }
+
+  def fixedResponseCAM(s: ClusterAggregate.State) =
+    new Actor {
+      import ClusterAggregateManager._
+
+      def receive = {
+        case GetCluster(id) => sender ! s
+      }
+    }
 
 }

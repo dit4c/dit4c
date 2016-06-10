@@ -1,8 +1,7 @@
 package dit4c.scheduler.domain
 
-import akka.actor.Props
-import akka.actor.Actor
-import akka.actor.ActorLogging
+import akka.actor._
+import akka.persistence._
 
 object ClusterAggregate {
 
@@ -16,19 +15,39 @@ object ClusterAggregate {
   case class Initialize(id: String, `type`: ClusterType) extends Command
   case object GetState extends Command
 
+  trait Event
+  case class Initialized(id: String, `type`: ClusterType) extends Event
+
+  trait Response
+  case object AlreadyInitialized extends Response
+
 }
 
-class ClusterAggregate(aggregateId: String) extends Actor with ActorLogging {
+class ClusterAggregate(aggregateId: String) extends PersistentActor with ActorLogging {
 
   import ClusterAggregate._
 
+  override def persistenceId = self.path.toString
+
   protected var state: State = Uninitialized
 
-  def receive = {
-    case Initialize(id, t) =>
-      this.state = Cluster(id, t)
-      sender ! state
+  override def receiveCommand: PartialFunction[Any,Unit] = {
+    case Initialize(id, t) if state == Uninitialized =>
+      persist(Initialized(id, t)) { e: Event =>
+        updateState(e)
+        sender ! state
+      }
+    case _: Initialize => sender ! AlreadyInitialized
     case GetState => sender ! state
+  }
+
+  override def receiveRecover: PartialFunction[Any,Unit] = {
+    case e: Event => updateState(e)
+  }
+
+  protected def updateState(e: Event): Unit = e match {
+    case Initialized(id, t) =>
+      this.state = Cluster(id, t)
   }
 
 }

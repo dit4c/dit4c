@@ -5,6 +5,7 @@ import akka.actor.ActorLogging
 import akka.actor.ActorRef
 import dit4c.scheduler.domain._
 import akka.actor.Props
+import scala.util.matching.Regex
 
 object ClusterAggregateManager {
 
@@ -12,6 +13,9 @@ object ClusterAggregateManager {
   case class CreateCluster(id: String, `type`: ClusterType) extends Command
   case class GetCluster(id: String) extends Command
 
+  val validClusterId: Regex = """[a-zA-Z0-9]+""".r.anchored
+  def isValidClusterId(id: String): Boolean =
+    validClusterId.unapplySeq(id).isDefined
 }
 
 class ClusterAggregateManager extends Actor with ActorLogging {
@@ -19,12 +23,18 @@ class ClusterAggregateManager extends Actor with ActorLogging {
   import ClusterAggregateManager._
 
   override def preStart {
-    self ! CreateCluster("default", ClusterTypes.Rkt)
+    self ! "createDefaultCluster"
   }
 
   def receive = {
-    case CreateCluster(id, t) =>
-      processAggregateCommand(aggregateId(id), ClusterAggregate.Initialize(id, t))
+    case "createDefaultCluster" =>
+      val id = "default"
+      val t = ClusterTypes.Rkt
+      processAggregateCommand(aggregateId(id),
+          ClusterAggregate.Initialize(id, t))
+    case GetCluster(id) if !isValidClusterId(id) =>
+      // Invalid IDs will forever be uninitialized clusters
+      sender ! ClusterAggregate.Uninitialized
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
     case ClusterAggregate.Cluster("default", ClusterTypes.Rkt) =>

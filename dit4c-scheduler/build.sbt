@@ -10,6 +10,7 @@ libraryDependencies ++= {
   Seq(
     "ch.qos.logback"      %   "logback-classic"       % "1.1.7",
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,
+    "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
     "com.jcraft"          %   "jsch"                  % "0.1.53",
     "com.github.scopt"    %%  "scopt"                 % "3.4.0",
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
