@@ -11,6 +11,9 @@ import org.scalacheck.Gen
 import dit4c.scheduler.ScalaCheckHelpers
 import akka.testkit.TestProbe
 import org.specs2.matcher.Matcher
+import scala.util.Random
+import org.scalacheck.Arbitrary
+import org.specs2.scalacheck.Parameters
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -19,23 +22,32 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
   import ScalaCheckHelpers._
   import ClusterAggregate._
 
+  implicit val params = Parameters(minTestsOk = 20)
+  implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
+
   "ClusterAggregate" >> {
 
     "GetState" >> {
-      implicit val system = ActorSystem("ClusterAggregateSpec-GetState")
 
-      "initially returns Uninitialized" >> prop({ aggregateId: String =>
-        val probe = TestProbe()
-        val clusterAggregate =
-          system.actorOf(ClusterAggregate.props(aggregateId))
-        probe.send(clusterAggregate, GetState)
-        probe.expectMsgType[ClusterAggregate.State] must {
-          be(ClusterAggregate.Uninitialized)
-        }
-      }).setGen(genAggregateId)
+      "initially returns Uninitialized" >> {
+        // No state change between tests
+        implicit val system =
+          ActorSystem(s"ClusterAggregate-GetState-Uninitialized")
+
+        prop({ aggregateId: String =>
+          val probe = TestProbe()
+          val clusterAggregate =
+            system.actorOf(ClusterAggregate.props(aggregateId))
+          probe.send(clusterAggregate, GetState)
+          probe.expectMsgType[ClusterAggregate.State] must {
+            be(ClusterAggregate.Uninitialized)
+          }
+        }).setGen(genAggregateId)
+      }
 
       "returns state after being initialized" >> prop(
-        (id: String, t: ClusterTypes.Value) => {
+        (id: String, t: ClusterTypes.Value, system: ActorSystem) => {
+          implicit val _ = system
           val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
@@ -59,11 +71,10 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     }
 
     "Initialize" >> {
-      // Need separate system because state persists across tests
-      implicit val system = ActorSystem("ClusterAggregateSpec-Initialize")
 
       "becomes initialized" >> prop(
-        (id: String, t: ClusterTypes.Value) => {
+        (id: String, t: ClusterTypes.Value, system: ActorSystem) => {
+          implicit val _ = system
           val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
@@ -87,8 +98,5 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
       ).setGen1(genAggregateId)
     }
   }
-
-  private def longerThanAkkaTimeout(implicit timeout: Timeout): FiniteDuration =
-    timeout.duration + 100.milliseconds
 
 }
