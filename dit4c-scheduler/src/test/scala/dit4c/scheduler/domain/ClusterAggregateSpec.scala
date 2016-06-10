@@ -94,6 +94,39 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         }
       ).setGen1(genAggregateId)
     }
+
+    "GetRktNodeState" >> {
+
+      "initially returns Uninitialized" >> {
+        // No state change between tests
+        val id = "test"
+        val aggregateId = "cluster-"+id
+        implicit val system =
+          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
+        val clusterAggregate =
+            system.actorOf(ClusterAggregate.props(aggregateId))
+        val probe = TestProbe()
+        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
+        probe.receiveOne(1.second)
+
+        prop({ (rktNodeId: String) =>
+          val probe = TestProbe()
+          probe.send(clusterAggregate, GetRktNodeState(rktNodeId))
+          probe.expectMsgType[RktNode.Data] must {
+            be(RktNode.NoConfig)
+          }
+        }).setGen(Gen.listOfN(8, Gen.numChar).map(_.mkString))
+      }
+
+    }
+
+    "AddRktNode" >> {
+      pending
+    }
+
+    "ConfirmRktNodeKeys" >> {
+      pending
+    }
   }
 
 }
