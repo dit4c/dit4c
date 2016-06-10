@@ -19,6 +19,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",
     "com.typesafe.akka"   %%  "akka-http-testkit"     % akkaV % "test",
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.0" % "test",
     "org.apache.sshd"     %   "apache-sshd"           % "1.2.0" % "test"
       exclude("org.slf4j", "slf4j-jdk14")
   )

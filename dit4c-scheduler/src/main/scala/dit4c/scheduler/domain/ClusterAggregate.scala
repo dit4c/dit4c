@@ -7,8 +7,8 @@ object ClusterAggregate {
 
   type ClusterType = ClusterTypes.Value
   object ClusterTypes extends Enumeration {
-    val Rkt = Value("rkt")
-  }
+  val Rkt = Value("rkt")
+}
 
   def props(id: String): Props = Props(new ClusterAggregate(id))
 

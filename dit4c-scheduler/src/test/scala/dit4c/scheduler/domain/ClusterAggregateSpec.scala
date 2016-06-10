@@ -10,19 +10,19 @@ import akka.actor.ActorSystem
 import org.scalacheck.Gen
 import dit4c.scheduler.ScalaCheckHelpers
 import akka.testkit.TestProbe
+import org.specs2.matcher.Matcher
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
     with ScalaCheck with MatcherMacros {
-
-  implicit val system = ActorSystem("ClusterAggregateSpec")
 
   import ScalaCheckHelpers._
   import ClusterAggregate._
 
   "ClusterAggregate" >> {
 
-    "on GetState" >> {
+    "GetState" >> {
+      implicit val system = ActorSystem("ClusterAggregateSpec-GetState")
 
       "initially returns Uninitialized" >> prop({ aggregateId: String =>
         val probe = TestProbe()
@@ -55,6 +55,35 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
               }
             }
           }
+      ).setGen1(genAggregateId)
+    }
+
+    "Initialize" >> {
+      // Need separate system because state persists across tests
+      implicit val system = ActorSystem("ClusterAggregateSpec-Initialize")
+
+      "becomes initialized" >> prop(
+        (id: String, t: ClusterTypes.Value) => {
+          val aggregateId = s"somePrefix-$id"
+          val probe = TestProbe()
+          val clusterAggregate =
+            system.actorOf(ClusterAggregate.props(aggregateId))
+          val beExpectedInitializedState: Matcher[AnyRef] = beLike[AnyRef] {
+            case state: ClusterAggregate.Cluster =>
+              import scala.language.experimental.macros
+              state must matchA[ClusterAggregate.Cluster]
+                  .id(be_==(id))
+                  .`type`(t)
+          }
+          // Get returned state after initialization and from GetState
+          probe.send(clusterAggregate, Initialize(id, t))
+          val initResponse = probe.expectMsgType[AnyRef]
+          probe.send(clusterAggregate, GetState)
+          val getStateResponse = probe.expectMsgType[AnyRef]
+          // Test both
+          (initResponse must beExpectedInitializedState) and
+          (getStateResponse must beExpectedInitializedState)
+        }
       ).setGen1(genAggregateId)
     }
   }
