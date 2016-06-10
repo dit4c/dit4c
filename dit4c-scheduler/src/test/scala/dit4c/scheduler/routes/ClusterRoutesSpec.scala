@@ -18,20 +18,15 @@ import org.specs2.scalacheck.Parameters
 import akka.testkit.TestActorRef
 import akka.actor.Actor
 import dit4c.scheduler.domain.ClusterAggregate
-import dit4c.scheduler.domain.ClusterType
 import org.scalacheck.ArbitraryLowPriority
-import dit4c.scheduler.domain.ClusterTypes
+import dit4c.scheduler.ScalaCheckHelpers
 
 class ClusterRoutesSpec extends Specs2RouteTest
-    with JsonMatchers with ScalaCheck with PlayJsonSupport {
+    with JsonMatchers with PlayJsonSupport
+    with ScalaCheck with ScalaCheckHelpers {
 
   val basePath: Uri.Path = Uri.Path / "clusters"
   implicit def path2uri(path: Uri.Path) = Uri(path=path)
-
-  implicit val arbClusterType = Arbitrary(Gen.oneOf(ClusterTypes.values.toSeq))
-  val genNonEmptyString: Gen[String] =
-    Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
-      .suchThat(!_.isEmpty)
 
   "ClusterRoutes" >> {
 
@@ -40,7 +35,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       // We never want an empty string for these checks
       implicit val arbString = Arbitrary(genNonEmptyString)
 
-      "exists" >> prop { (id: String, t: ClusterType) =>
+      "exists" >> prop { (id: String, t: ClusterAggregate.ClusterType) =>
         val clusterRoutes = (new ClusterRoutes(TestActorRef(
             fixedResponseCAM(ClusterAggregate.Cluster(id, t))))).routes
         Get(basePath / "default") ~> clusterRoutes ~> check {

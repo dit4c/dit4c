@@ -9,6 +9,8 @@ import scala.util.matching.Regex
 
 object ClusterAggregateManager {
 
+  import ClusterAggregate.ClusterType
+
   sealed trait Command
   case class CreateCluster(id: String, `type`: ClusterType) extends Command
   case class GetCluster(id: String) extends Command
@@ -29,7 +31,7 @@ class ClusterAggregateManager extends Actor with ActorLogging {
   def receive = {
     case "createDefaultCluster" =>
       val id = "default"
-      val t = ClusterTypes.Rkt
+      val t = ClusterAggregate.ClusterTypes.Rkt
       processAggregateCommand(aggregateId(id),
           ClusterAggregate.Initialize(id, t))
     case GetCluster(id) if !isValidClusterId(id) =>
@@ -37,7 +39,7 @@ class ClusterAggregateManager extends Actor with ActorLogging {
       sender ! ClusterAggregate.Uninitialized
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
-    case ClusterAggregate.Cluster("default", ClusterTypes.Rkt) =>
+    case ClusterAggregate.Cluster("default", ClusterAggregate.ClusterTypes.Rkt) =>
       // Expected from preStart
     case unknownMessage =>
       log.error(s"Unknown message: $unknownMessage")

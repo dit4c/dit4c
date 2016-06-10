@@ -5,6 +5,11 @@ import akka.persistence._
 
 object ClusterAggregate {
 
+  type ClusterType = ClusterTypes.Value
+  object ClusterTypes extends Enumeration {
+    val Rkt = Value("rkt")
+  }
+
   def props(id: String): Props = Props(new ClusterAggregate(id))
 
   trait State
@@ -27,7 +32,7 @@ class ClusterAggregate(aggregateId: String) extends PersistentActor with ActorLo
 
   import ClusterAggregate._
 
-  override def persistenceId = self.path.toString
+  override def persistenceId = aggregateId
 
   protected var state: State = Uninitialized
 

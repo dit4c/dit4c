@@ -8,20 +8,19 @@ import scala.concurrent.duration._
 import dit4c.scheduler.domain.ClusterAggregate
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary
-import dit4c.scheduler.domain.ClusterTypes
 import org.specs2.concurrent.ExecutionEnv
 import akka.util.Timeout
+import dit4c.scheduler.ScalaCheckHelpers
+import akka.testkit.TestProbe
 
 class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
-    with ScalaCheck with MatcherMacros {
+    with MatcherMacros
+    with ScalaCheck with ScalaCheckHelpers {
 
+  implicit val system = ActorSystem("ClusterAggregateManagerSpec")
 
-  implicit val system = ActorSystem("ClusterAggregateManagerSpec-system")
-  implicit val timeout = Timeout(10.seconds)
-  import akka.pattern.ask
-
-
+  import ScalaCheckHelpers._
   import ClusterAggregateManager._
 
   val clusterAggregateManager = system.actorOf(Props[ClusterAggregateManager])
@@ -32,24 +31,23 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
 
       "exists" >> {
         import scala.language.experimental.macros
-        (clusterAggregateManager ? GetCluster("default")) must {
-          beLike[Any] {
-            case state: ClusterAggregate.Cluster =>
-              state must matchA[ClusterAggregate.Cluster]
-                .id(be_==("default"))
-                .`type`(be(ClusterTypes.Rkt))
-          }
-        }.awaitFor(longerThanAkkaTimeout)
+        val probe = TestProbe()
+        probe.send(clusterAggregateManager, GetCluster("default"))
+        probe.expectMsgType[ClusterAggregate.Cluster] must {
+          matchA[ClusterAggregate.Cluster]
+            .id(be_==("default"))
+            .`type`(be(ClusterAggregate.ClusterTypes.Rkt))
+        }
       }
     }
+
     "not have any other random clusters" >> prop({ id: String =>
-      import scala.language.experimental.macros
-        (clusterAggregateManager ? GetCluster(id)) must {
-          be_==(ClusterAggregate.Uninitialized)
-        }.awaitFor(longerThanAkkaTimeout)
-    }).setGen(Gen.oneOf(
-        Gen.alphaStr,
-        Arbitrary.arbString.arbitrary).suchThat(!_.isEmpty))
+      val probe = TestProbe()
+      probe.send(clusterAggregateManager, GetCluster(id))
+      probe.expectMsgType[ClusterAggregate.State] must {
+        be_==(ClusterAggregate.Uninitialized)
+      }
+    }).setGen(genNonEmptyString)
   }
 
   private def longerThanAkkaTimeout(implicit timeout: Timeout): FiniteDuration =
