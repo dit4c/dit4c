@@ -8,8 +8,7 @@ import java.security.interfaces.RSAPublicKey
 import java.security.interfaces.RSAPrivateKey
 import akka.persistence.fsm.PersistentFSM.FSMState
 import scala.reflect._
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.security.KeyPairGenerator
 
 object RktNode {
 
@@ -48,7 +47,7 @@ object RktNode {
   case class NodeConfig(
       id: NodeId,
       connectionDetails: ServerConnectionDetails,
-      rktDir: Path,
+      rktDir: String,
       readyToConnect: Boolean) extends Data
 
   trait Command
@@ -69,9 +68,8 @@ object RktNode {
   case class Initialized(
       id: String,
       connectionDetails: ServerConnectionDetails,
-      rktDir: Path) extends DomainEvent
+      rktDir: String) extends DomainEvent
   case object KeysConfirmed extends DomainEvent
-
 
 }
 
@@ -84,13 +82,10 @@ class RktNode(val persistenceId: String)
   when(JustCreated) {
     case Event(GetState, data) =>
       stay replying data
-    case Event(Initialize(id, host, port, username, rktDir), _) =>
-      // TODO: write code to
-      // * Create new client keypair
-      // * Attempt a connection to the server, and retrieve host key
-      val clientKeyPair: ClientKeyPair = ???
-      val serverPublicKey: ServerPublicKey = ???
-      val dir = Paths.get(rktDir)
+    case Event(Initialize(id, host, port, username, dir), _) =>
+      val clientKeyPair: ClientKeyPair = createKeyPair
+      // TODO: Replace this with a real ServerPublicKey
+      val serverPublicKey = ServerPublicKey(clientKeyPair.public)
       val scd = ServerConnectionDetails(
           host, port, username, clientKeyPair, serverPublicKey)
       goto(PendingKeyConfirmation).applying(Initialized(id, scd, dir)).andThen {
@@ -117,7 +112,9 @@ class RktNode(val persistenceId: String)
   }
 
 
-  def applyEvent(domainEvent: DomainEvent, dataBeforeEvent: Data): RktNode.Data = {
+  def applyEvent(
+      domainEvent: DomainEvent,
+      dataBeforeEvent: Data): RktNode.Data = {
     domainEvent match {
       case Initialized(id, connectionDetails, rktDir) =>
         NodeConfig(id, connectionDetails, rktDir, false)
@@ -129,6 +126,16 @@ class RktNode(val persistenceId: String)
     }
   }
 
-  override def domainEventClassTag: ClassTag[DomainEvent] = classTag[DomainEvent]
+  override def domainEventClassTag: ClassTag[DomainEvent] =
+    classTag[DomainEvent]
+
+  private def createKeyPair: ClientKeyPair = {
+    val kpg = KeyPairGenerator.getInstance("RSA")
+    kpg.initialize(2048)
+    val kp = kpg.generateKeyPair
+    ClientKeyPair(
+        kp.getPublic.asInstanceOf[RSAPublicKey],
+        kp.getPrivate.asInstanceOf[RSAPrivateKey])
+  }
 
 }

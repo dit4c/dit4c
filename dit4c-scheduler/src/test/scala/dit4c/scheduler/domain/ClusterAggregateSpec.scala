@@ -14,6 +14,8 @@ import org.specs2.matcher.Matcher
 import scala.util.Random
 import org.scalacheck.Arbitrary
 import org.specs2.scalacheck.Parameters
+import java.security.interfaces.RSAPublicKey
+import java.security.interfaces.RSAPrivateKey
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -98,7 +100,6 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     "GetRktNodeState" >> {
 
       "initially returns Uninitialized" >> {
-        // No state change between tests
         val id = "test"
         val aggregateId = "cluster-"+id
         implicit val system =
@@ -121,11 +122,70 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     }
 
     "AddRktNode" >> {
-      pending
+      "initializes RktNode with config" >> {
+        import scala.language.experimental.macros
+        val id = "test"
+        val aggregateId = "cluster-"+id
+        implicit val system =
+          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
+        val clusterAggregate =
+            system.actorOf(ClusterAggregate.props(aggregateId))
+        val probe = TestProbe()
+        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
+        probe.receiveOne(1.second)
+        probe.send(clusterAggregate, AddRktNode(
+            "localhost", 22, "testuser", "/var/lib/dit4c/rkt"))
+        val config = probe.expectMsgType[RktNode.NodeConfig]
+        probe.send(clusterAggregate, GetState)
+        val clusterState = probe.expectMsgType[ClusterAggregate.RktCluster]
+        (config must {
+          matchA[RktNode.NodeConfig]
+            .id(not(beEmpty[String]))
+            .rktDir(be_==("/var/lib/dit4c/rkt"))
+            .readyToConnect(false)
+            .connectionDetails {
+              matchA[RktNode.ServerConnectionDetails]
+                .host(be_==("localhost"))
+                .port(be_==(22))
+                .username(be_==("testuser"))
+                .clientKey {
+                  matchA[RktNode.ClientKeyPair]
+                    .public(beAnInstanceOf[RSAPublicKey])
+                    .`private`(beAnInstanceOf[RSAPrivateKey])
+                }
+                .serverKey {
+                  matchA[RktNode.ServerPublicKey]
+                    .public(beAnInstanceOf[RSAPublicKey])
+                }
+            }
+        }) and
+        ( clusterState.nodeIds must contain(config.id) ) and
+        ( config.connectionDetails.serverKey.public must not
+            (be_==(config.connectionDetails.clientKey.public))
+              .orPending("Server key lookup not yet implemented")
+        )
+      }
     }
 
     "ConfirmRktNodeKeys" >> {
-      pending
+      "makes RktNode ready to connect" >> {
+        import scala.language.experimental.macros
+        val id = "test"
+        val aggregateId = "cluster-"+id
+        implicit val system =
+          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
+        val clusterAggregate =
+            system.actorOf(ClusterAggregate.props(aggregateId))
+        val probe = TestProbe()
+        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
+        probe.receiveOne(1.second)
+        probe.send(clusterAggregate, AddRktNode(
+            "localhost", 22, "testuser", "/var/lib/dit4c/rkt"))
+        val config = probe.expectMsgType[RktNode.NodeConfig]
+        probe.send(clusterAggregate, ConfirmRktNodeKeys(config.id))
+        val updatedConfig = probe.expectMsgType[RktNode.NodeConfig]
+        ( updatedConfig.readyToConnect must beTrue )
+      }
     }
   }
 
