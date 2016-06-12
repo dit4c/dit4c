@@ -139,7 +139,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
         probe.receiveOne(1.second)
         probe.send(clusterAggregate, AddRktNode(
-            "localhost", 22, "testuser", "/var/lib/dit4c/rkt"))
+            "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
         val config = probe.expectMsgType[RktNode.NodeConfig]
         probe.send(clusterAggregate, GetState)
         val clusterState = probe.expectMsgType[ClusterAggregate.RktCluster]
@@ -150,7 +150,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
             .readyToConnect(false)
             .connectionDetails {
               matchA[RktNode.ServerConnectionDetails]
-                .host(be_==("localhost"))
+                .host(be_==("169.254.42.34"))
                 .port(be_==(22))
                 .username(be_==("testuser"))
                 .clientKey {
@@ -176,12 +176,13 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
         val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId))
+            system.actorOf(ClusterAggregate.props(
+                aggregateId, mockFetchSshHostKey(randomPublicKey)))
         val probe = TestProbe()
         probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
         probe.receiveOne(1.second)
         probe.send(clusterAggregate, AddRktNode(
-            "localhost", 22, "testuser", "/var/lib/dit4c/rkt"))
+            "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
         val config = probe.expectMsgType[RktNode.NodeConfig]
         probe.send(clusterAggregate, ConfirmRktNodeKeys(config.id))
         val updatedConfig = probe.expectMsgType[RktNode.NodeConfig]

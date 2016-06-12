@@ -99,6 +99,7 @@ class RktNode(
       val replyTo = sender
       fetchSshHostKey(init.host, init.port).onSuccess {
         case k =>
+          log.debug(s"${init.host}:${init.port} has host key: $k")
           self ! FinishInitializing(init, ServerPublicKey(k), replyTo)
       }
       stay
