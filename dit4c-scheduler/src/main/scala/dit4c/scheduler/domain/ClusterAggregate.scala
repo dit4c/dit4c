@@ -3,6 +3,9 @@ package dit4c.scheduler.domain
 import akka.actor._
 import akka.persistence._
 import scala.util.Random
+import scala.concurrent.Future
+import java.security.interfaces.RSAPublicKey
+import dit4c.scheduler.ssh.RemoteShell
 
 object ClusterAggregate {
 
@@ -14,7 +17,10 @@ object ClusterAggregate {
     val Rkt = Value("rkt")
   }
 
-  def props(pId: String): Props = Props(classOf[ClusterAggregate], pId)
+  def props(
+      pId: String,
+      fetchSshHostKey: (String, Int) => Future[RSAPublicKey] = RemoteShell.getHostKey): Props =
+        Props(classOf[ClusterAggregate], pId, fetchSshHostKey)
 
   trait State
   case object Uninitialized extends State
@@ -51,7 +57,9 @@ object ClusterAggregate {
 
 }
 
-class ClusterAggregate(val persistenceId: String) extends PersistentActor
+class ClusterAggregate(
+    val persistenceId: String,
+    fetchSshHostKey: (String, Int) => Future[RSAPublicKey]) extends PersistentActor
     with ActorLogging {
 
   import ClusterAggregate._
@@ -121,7 +129,7 @@ class ClusterAggregate(val persistenceId: String) extends PersistentActor
     }
 
     protected def createNodeActor(nodePersistenceId: String): ActorRef = {
-      val node = context.actorOf(RktNode.props(nodePersistenceId))
+      val node = context.actorOf(RktNode.props(nodePersistenceId, fetchSshHostKey))
       context.watch(node)
       node
     }

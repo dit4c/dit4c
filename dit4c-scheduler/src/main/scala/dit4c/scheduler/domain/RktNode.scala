@@ -9,6 +9,9 @@ import java.security.interfaces.RSAPrivateKey
 import akka.persistence.fsm.PersistentFSM.FSMState
 import scala.reflect._
 import java.security.KeyPairGenerator
+import scala.concurrent.Future
+import java.security.PublicKey
+import akka.actor.ActorRef
 
 object RktNode {
 
@@ -19,7 +22,10 @@ object RktNode {
    */
   def newId = Seq.fill(4)(Random.nextInt(255)).map(i => f"$i%x").mkString
 
-  def props(pId: String): Props = Props(classOf[RktNode], pId)
+  def props(
+      pId: String,
+      fetchSshHostKey: (String, Int) => Future[RSAPublicKey]): Props =
+        Props(classOf[RktNode], pId, fetchSshHostKey)
 
   case class ClientKeyPair(public: RSAPublicKey, `private`: RSAPrivateKey)
   case class ServerPublicKey(public: RSAPublicKey)
@@ -57,6 +63,10 @@ object RktNode {
       port: Int,
       username: String,
       rktDir: String) extends Command
+  case class FinishInitializing(
+      init: Initialize,
+      serverPublicKey: ServerPublicKey,
+      replyTo: ActorRef)
   case object GetState extends Command
   case object ConfirmKeys extends Command
 
@@ -73,7 +83,9 @@ object RktNode {
 
 }
 
-class RktNode(val persistenceId: String)
+class RktNode(
+    val persistenceId: String,
+    fetchSshHostKey: (String, Int) => Future[RSAPublicKey])
     extends PersistentFSM[RktNode.State, RktNode.Data, RktNode.DomainEvent] {
   import RktNode._
 
@@ -82,17 +94,25 @@ class RktNode(val persistenceId: String)
   when(JustCreated) {
     case Event(GetState, data) =>
       stay replying data
-    case Event(Initialize(id, host, port, username, dir), _) =>
-      val clientKeyPair: ClientKeyPair = createKeyPair
-      // TODO: Replace this with a real ServerPublicKey
-      val serverPublicKey = ServerPublicKey(clientKeyPair.public)
-      val scd = ServerConnectionDetails(
-          host, port, username, clientKeyPair, serverPublicKey)
-      goto(PendingKeyConfirmation).applying(Initialized(id, scd, dir)).andThen {
-        case data =>
-          context.parent ! ClusterAggregate.RegisterRktNode(id)
-          sender ! data
+    case Event(init: Initialize, _) =>
+      import context.dispatcher
+      val replyTo = sender
+      fetchSshHostKey(init.host, init.port).onSuccess {
+        case k =>
+          self ! FinishInitializing(init, ServerPublicKey(k), replyTo)
       }
+      stay
+    case Event(FinishInitializing(init, serverPublicKey, replyTo), _) =>
+      val clientKeyPair: ClientKeyPair = createKeyPair
+      val scd = ServerConnectionDetails(
+          init.host, init.port, init.username, clientKeyPair, serverPublicKey)
+      goto(PendingKeyConfirmation)
+        .applying(Initialized(init.id, scd, init.rktDir))
+        .andThen {
+          case data =>
+            context.parent ! ClusterAggregate.RegisterRktNode(init.id)
+            replyTo ! data
+        }
   }
 
   when(PendingKeyConfirmation) {

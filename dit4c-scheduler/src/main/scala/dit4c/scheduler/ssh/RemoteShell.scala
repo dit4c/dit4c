@@ -64,14 +64,16 @@ object RemoteShell {
   }
 
 
-  def getHostKey(host: String, port: Int): Future[PublicKey] = {
+  def getHostKey(host: String, port: Int): Future[RSAPublicKey] = {
     val jsch = new JSch
     val username = Random.alphanumeric.take(8).mkString
-    val p = Promise[PublicKey]()
+    val p = Promise[RSAPublicKey]()
     jsch.setHostKeyRepository(new HostKeyRepository {
       def add(x$1: com.jcraft.jsch.HostKey,x$2: com.jcraft.jsch.UserInfo): Unit = ???
       def check(x$1: String, key: Array[Byte]): Int = {
-        p.trySuccess(RemoteShell.fromOpenSshPublicKey(key))
+        RemoteShell.fromOpenSshPublicKey(key) match {
+          case k: RSAPublicKey => p.trySuccess(k)
+        }
         HostKeyRepository.NOT_INCLUDED
       }
       def getHostKey(x$1: String,x$2: String): Array[com.jcraft.jsch.HostKey] = ???

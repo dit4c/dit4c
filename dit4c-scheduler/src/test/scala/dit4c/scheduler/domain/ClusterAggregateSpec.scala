@@ -16,6 +16,9 @@ import org.scalacheck.Arbitrary
 import org.specs2.scalacheck.Parameters
 import java.security.interfaces.RSAPublicKey
 import java.security.interfaces.RSAPrivateKey
+import scala.concurrent.Future
+import java.security.KeyPairGenerator
+import java.security.SecureRandom
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -128,8 +131,10 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         val aggregateId = "cluster-"+id
         implicit val system =
           ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
+        val hostPublicKey = randomPublicKey
         val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId))
+            system.actorOf(ClusterAggregate.props(
+                aggregateId, mockFetchSshHostKey(hostPublicKey)))
         val probe = TestProbe()
         probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
         probe.receiveOne(1.second)
@@ -155,15 +160,11 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
                 }
                 .serverKey {
                   matchA[RktNode.ServerPublicKey]
-                    .public(beAnInstanceOf[RSAPublicKey])
+                    .public(be(hostPublicKey))
                 }
             }
         }) and
-        ( clusterState.nodeIds must contain(config.id) ) and
-        ( config.connectionDetails.serverKey.public must not
-            (be_==(config.connectionDetails.clientKey.public))
-              .orPending("Server key lookup not yet implemented")
-        )
+        ( clusterState.nodeIds must contain(config.id) )
       }
     }
 
@@ -188,5 +189,16 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
       }
     }
   }
+
+  def randomPublicKey: RSAPublicKey = {
+    val sr = SecureRandom.getInstance("SHA1PRNG")
+    val kpg = KeyPairGenerator.getInstance("RSA")
+    kpg.initialize(512, sr)
+    kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
+  }
+
+  def mockFetchSshHostKey(
+      pk: RSAPublicKey)(host: String, port: Int): Future[RSAPublicKey] =
+        Future.successful(pk)
 
 }
