@@ -7,6 +7,13 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 import play.api.libs.json._
+import java.security.interfaces.RSAPrivateKey
+import java.security.interfaces.RSAPublicKey
+import java.security.KeyPairGenerator
+import scala.util.Random
+import pdi.jwt.Jwt
+import pdi.jwt.algorithms.JwtAsymetricAlgorithm
+import pdi.jwt.JwtAlgorithm
 
 class RktRunner(
     val ce: CommandExecutor,
@@ -44,20 +51,25 @@ class RktRunner(
       }
   }
 
-  def start(instanceId: String, image: ImageId): Future[Unit] =
-    if (instanceId.matches("""[a-z0-9\-]+"""))
+  def start(
+      instanceId: String,
+      image: ImageId,
+      callbackUrl: java.net.URL): Future[RSAPublicKey] =
+    if (instanceId.matches("""[a-z0-9\-]+""")) {
       for {
-        manifestFile <- generateManifestFile(instanceId, image)
+        (manifestFile, publicKey) <-
+          generateManifestFile(instanceId, image, callbackUrl)
         systemdRun <- privileged(systemdRunCmd)
         rkt <- rktCmd
         output <- ce(
             systemdRun ++
             Seq(s"--unit=${instanceNamePrefix}-${instanceId}.service") ++
             rkt ++
-            Seq("run", "--no-overlay", s"--pod-manifest=$manifestFile")
+            Seq("run", "--net=default", "--dns=8.8.8.8", "--no-overlay") ++
+            Seq(s"--pod-manifest=$manifestFile")
         )
-      } yield ()
-    else throw new IllegalArgumentException(
+      } yield publicKey
+    } else throw new IllegalArgumentException(
       "Only lower-case alphanumerics & '-' allowed in instance IDs")
 
   def stop(instanceId: String): Future[Unit] =
@@ -121,26 +133,112 @@ class RktRunner(
       }
 
   private def generateManifestFile(
-      instanceId: String, image: ImageId): Future[String] = {
-    val manifest =
-      s"""|{
-          |    "acVersion": "0.8.4",
-          |    "acKind": "PodManifest",
-          |    "apps": [
-          |        {
-          |            "name": "${instanceNamePrefix}-${instanceId}",
-          |            "image": {
-          |                "id": "${image}"
-          |            }
-          |        }
-          |    ]
-          |}""".stripMargin
-    ce(Seq("sh", "-c", Seq(
-        "TMPFILE=$(mktemp --tmpdir manifest-json-XXXXXXXX)",
-        "cat > $TMPFILE",
-        "test -f $TMPFILE",
-        "echo $TMPFILE").mkString(" && ")),
-      new ByteArrayInputStream((manifest+"\n").getBytes)).map(_.trim)
+      instanceId: String,
+      image: ImageId,
+      callbackUrl: java.net.URL): Future[(String, RSAPublicKey)] = {
+    for {
+      curlImageId <- fetch("quay.io/yss44/curl")
+      socatImageId <- fetch("quay.io/ridero/socat")
+      servicePort <- guessServicePort(image)
+      (privateKey, publicKey) = newKeyPair
+      token = jwtToken(instanceId, privateKey)
+      proxyHostIP <- hostIp
+      proxyHostPort = 20000 + Random.nextInt(10000)
+      callbackPayload =
+        Json.asciiStringify(
+          JsString(
+            Json.asciiStringify(
+              Json.obj("ip" -> proxyHostIP, "port" -> proxyHostPort))))
+      manifest =
+        s"""|{
+            |    "acVersion": "0.8.4",
+            |    "acKind": "PodManifest",
+            |    "apps": [
+            |        {
+            |            "name": "${instanceNamePrefix}-${instanceId}",
+            |            "image": {
+            |                "id": "${image}"
+            |            }
+            |        },
+            |        {
+            |            "name": "callback-helper",
+            |            "image": {
+            |                "id": "${curlImageId}"
+            |            },
+            |            "app": {
+            |                "exec": [
+            |                    "curl", "-v",
+            |                    "-X", "PUT",
+            |                    "--retry", "10",
+            |                    "-H", "Authorization: Bearer ${token}",
+            |                    "-H", "Content-Type: application/json",
+            |                    "-d", $callbackPayload,
+            |                    "${callbackUrl.toString}"
+            |                ],
+            |                "group": "99",
+            |                "user": "99"
+            |            },
+            |            "readOnlyRootFS": true
+            |        },
+            |        {
+            |            "name": "pod-proxy",
+            |            "image": {
+            |                "id": "${socatImageId}"
+            |            },
+            |            "app": {
+            |                "exec": [
+            |                    "socat", "-d", "-d", "-d",
+            |                    "TCP-LISTEN:20000,fork,reuseaddr",
+            |                    "TCP:127.0.0.1:${servicePort}"
+            |                ],
+            |                "group": "99",
+            |                "user": "99",
+            |                "ports": [
+            |                    {
+            |                        "name": "pod-proxy-http",
+            |                        "port": 20000,
+            |                        "protocol": "tcp"
+            |                    }
+            |                ]
+            |            },
+            |            "readOnlyRootFS": true
+            |        }
+            |    ],
+            |    "ports": [
+            |        {
+            |            "name": "pod-proxy-http",
+            |            "hostPort": ${proxyHostPort}
+            |        }
+            |    ]
+            |}""".stripMargin
+      output <- ce(Seq("sh", "-c", Seq(
+          "TMPFILE=$(mktemp --tmpdir manifest-json-XXXXXXXX)",
+          "cat > $TMPFILE",
+          "test -f $TMPFILE",
+          "echo $TMPFILE").mkString(" && ")),
+        new ByteArrayInputStream((manifest+"\n").getBytes))
+      filepath = output.trim
+    } yield (filepath, publicKey)
+  }
+
+  private def newKeyPair: (RSAPrivateKey, RSAPublicKey) = {
+    val kpg = KeyPairGenerator.getInstance("RSA")
+    kpg.initialize(2048)
+    val kp = kpg.generateKeyPair
+    (
+      kp.getPrivate.asInstanceOf[RSAPrivateKey],
+      kp.getPublic.asInstanceOf[RSAPublicKey]
+    )
+  }
+
+  private def hostIp: Future[String] =
+    ce(Seq(
+        "sh", "-c",
+        "ip -o -4 addr show | awk -F '[ /]+' '/global/ {print $4}' | head -1"))
+      .map(_.trim)
+
+  private def jwtToken(id: String, key: RSAPrivateKey): String = {
+    Jwt.encode(s"""{"id":"$id"}""", key, JwtAlgorithm.RSASHA512)
   }
 
 }

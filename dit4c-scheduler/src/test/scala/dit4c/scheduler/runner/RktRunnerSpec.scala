@@ -31,9 +31,23 @@ import org.specs2.specification.ForEach
 import org.specs2.execute.AsResult
 import org.specs2.execute.Result
 import org.specs2.ScalaCheck
+import java.net.InetAddress
+import java.net.NetworkInterface
+import akka.http.scaladsl.Http
+import akka.actor.ActorSystem
+import akka.stream.scaladsl.Source
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
+import akka.http.scaladsl.model._
+import java.net.Inet4Address
+import akka.http.scaladsl.model.headers.Authorization
+import pdi.jwt.Jwt
+import org.specs2.matcher.JsonMatchers
+import akka.util.ByteString
 
 class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
-    with BeforeEach with ScalaCheck with ForEach[RktRunner] with MatcherMacros {
+    with BeforeEach with ScalaCheck with ForEach[RktRunner]
+    with JsonMatchers with MatcherMacros {
 
   implicit val executionContext = ExecutionContext.fromExecutorService(
       Executors.newCachedThreadPool())
@@ -310,55 +324,115 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
     "start/stop" >> {
 
       "only accepts lowercase alphanumeric prefixes" >> { runner: RktRunner =>
-        runner.start("NotGood", "sha512-"+Stream.fill(64)("0").mkString) must
+        runner.start(
+            "NotGood",
+            "sha512-"+Stream.fill(64)("0").mkString,
+            new java.net.URL("http://example.test/doesnotexist")) must
           throwAn[IllegalArgumentException]
       }
 
       "should work with image IDs" >> { runner: RktRunner =>
+        var podCallback: Option[HttpRequest] = None
+        val serverBinding = {
+          implicit val system = ActorSystem()
+          implicit val materializer = ActorMaterializer()
+          val serverSource: Source[Http.IncomingConnection, Future[Http.ServerBinding]] =
+            Http().bind(interface = hostIp.getHostAddress, port = 0)
+          Await.result(
+            serverSource.to(Sink.foreach { connection =>
+              connection handleWithSyncHandler {
+                case req: HttpRequest =>
+                  podCallback = Some(req)
+                  HttpResponse(200, entity = "")
+              }
+            }).run,
+            1.minute)
+        }
+        val callbackUrl = new java.net.URL(Uri(
+            "http",
+            Uri.Authority(
+                Uri.Host(serverBinding.localAddress.getAddress),
+                serverBinding.localAddress.getPort),
+            Uri.Path("/")).toString)
         import scala.language.experimental.macros
         // Use a long-running image for this test
         val imageId = Await.result(
-            runner.fetch("quay.io/coreos/etcd"), 1.minute)
-        val instanceId = Random.alphanumeric.take(40).mkString.toLowerCase;
+            runner.fetch("docker://dit4c/gotty"), 1.minute)
+        val instanceId = Random.alphanumeric.take(40).mkString.toLowerCase
         // Start image
-        {
-          runner.start(instanceId, imageId) must {
-            not(throwA[Exception])
-          }.awaitFor(1.minutes)
-        } and {
-          runner.listSystemdUnits must {
-            haveSize[Set[SystemdUnit]](1) and contain(
-              matchA[SystemdUnit]
-                .name(s"${runner.instanceNamePrefix}-${instanceId}")
-            )
-          }.awaitFor(1.minute)
-        } and {
-          Future(Thread.sleep(5000)).flatMap(_ => runner.listRktPods) must {
-            haveSize[Set[RktPod]](1) and contain(
-              matchA[RktPod]
-                .uuid(not(beEmpty[String]))
-                .apps(Set(s"${runner.instanceNamePrefix}-${instanceId}"))
-                .state(be(RktPod.States.Running))
-            )
-          }.awaitFor(1.minutes)
-        } and {
-          runner.stop(instanceId) must {
-            not(throwA[Exception])
-          }.awaitFor(1.minutes)
-        } and {
-          runner.listRktPods must {
-            haveSize[Set[RktPod]](1) and contain(
-              matchA[RktPod]
-                .uuid(not(beEmpty[String]))
-                .apps(Set(s"${runner.instanceNamePrefix}-${instanceId}"))
-                .state(be(RktPod.States.Exited))
-            )
-          }.awaitFor(1.minutes)
+        try {
+          val instancePublicKey = Await.result(
+              runner.start(instanceId, imageId, callbackUrl),
+              5.minutes);
+          {
+            runner.listSystemdUnits must {
+              haveSize[Set[SystemdUnit]](1) and contain(
+                matchA[SystemdUnit]
+                  .name(s"${runner.instanceNamePrefix}-${instanceId}")
+              )
+            }.awaitFor(1.minute)
+          } and {
+            Future(Thread.sleep(5000)).flatMap(_ => runner.listRktPods) must {
+              haveSize[Set[RktPod]](1) and contain(
+                matchA[RktPod]
+                  .uuid(not(beEmpty[String]))
+                  .apps(contain(s"${runner.instanceNamePrefix}-${instanceId}"))
+                  .state(be(RktPod.States.Running))
+              )
+            }.awaitFor(1.minutes)
+          } and {
+            import org.specs2.matcher.JsonType._
+            podCallback must beSome {
+              matchA[HttpRequest]
+                .method(be_==(HttpMethods.PUT))
+                .headers(contain {
+                  beAnInstanceOf[Authorization] and
+                  (startWith("Bearer ") ^^ { h: HttpHeader => h.value }) and
+                  (successfulTry ^^ { h: HttpHeader =>
+                    // Token must decode with public key
+                    Jwt.decodeAll(h.value.split(" ").last, instancePublicKey)
+                  })
+                })
+                .entity(beLike[ResponseEntity] {
+                  case e: HttpEntity.Strict => e must
+                    matchA[HttpEntity.Strict]
+                      .contentType(be_==(ContentTypes.`application/json`))
+                      .data {
+                    { /("ip").andHave(anyMatch) and
+                      /("port").andHave(anyMatch) } ^^ {
+                        bs: ByteString => bs.decodeString("utf8") }
+                  }
+                })
+            }
+          } and {
+            runner.stop(instanceId) must {
+              not(throwA[Exception])
+            }.awaitFor(1.minutes)
+          } and {
+            runner.listRktPods must {
+              haveSize[Set[RktPod]](1) and contain(
+                matchA[RktPod]
+                  .uuid(not(beEmpty[String]))
+                  .apps(contain(s"${runner.instanceNamePrefix}-${instanceId}"))
+                  .state(be(RktPod.States.Exited))
+              )
+            }.awaitFor(1.minutes)
+          }
+        } finally {
+          serverBinding.unbind
         }
       }
 
     }
 
+  }
+
+  lazy val hostIp: InetAddress = {
+    import scala.collection.JavaConversions._
+    NetworkInterface.getNetworkInterfaces.toSeq
+      .find(i => Set("eth0", "em1").contains(i.getName))
+      .flatMap(_.getInetAddresses.toSeq.find(_.isInstanceOf[Inet4Address]))
+      .get
   }
 
   lazy val rktBinaryPath =
