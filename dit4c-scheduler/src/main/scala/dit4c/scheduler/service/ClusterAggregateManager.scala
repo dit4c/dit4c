@@ -14,6 +14,8 @@ object ClusterAggregateManager {
   sealed trait Command
   case class CreateCluster(id: String, `type`: ClusterType) extends Command
   case class GetCluster(id: String) extends Command
+  case class ClusterCommand(
+      clusterId: String, cmd: ClusterAggregate.Command) extends Command
 
   val validClusterId: Regex = """[a-zA-Z0-9]+""".r.anchored
   def isValidClusterId(id: String): Boolean =

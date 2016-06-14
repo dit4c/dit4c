@@ -12,15 +12,51 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.util.matching.Regex
 import akka.http.scaladsl.server.PathMatcher
+import java.security.interfaces.RSAPublicKey
+import dit4c.scheduler.domain.RktNode
+import akka.event.Logging
+import pdi.jwt.JwtBase64
 
 object ClusterRoutes {
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
 
+  implicit def writesRSAPublicKey: Writes[RSAPublicKey] = (
+      (__ \ 'kty).write[String] and
+      (__ \ 'e).write[String] and
+      (__ \ 'n).write[String]
+  )( (k: RSAPublicKey) => (
+      "RSA",
+      JwtBase64.encodeString(k.getPublicExponent.toByteArray),
+      JwtBase64.encodeString(k.getModulus.toByteArray)) )
+
+  implicit def readsAddRktNode: Reads[ClusterAggregate.AddRktNode] = (
+      (__ \ 'host).read[String] and
+      (__ \ 'port).read[Int] and
+      (__ \ 'username).read[String]
+  )((host: String, port: Int, username: String) =>
+    ClusterAggregate.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
+
   implicit def writesCluster: OWrites[ClusterAggregate.Cluster] = (
       (__ \ 'id).write[String] and
       (__ \ 'type).write[String]
   )(cluster => (cluster.id, cluster.`type`.toString))
+
+  implicit def writesNodeConfig: OWrites[RktNode.NodeConfig] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'host).write[String] and
+      (__ \ 'port).write[Int] and
+      (__ \ 'username).write[String] and
+      (__ \ "client-key").write[RSAPublicKey] and
+      (__ \ "host-key").write[RSAPublicKey]
+  )(rktNode => (
+      rktNode.id,
+      rktNode.connectionDetails.host,
+      rktNode.connectionDetails.port,
+      rktNode.connectionDetails.username,
+      rktNode.connectionDetails.clientKey.public,
+      rktNode.connectionDetails.serverKey.public))
+
 }
 
 class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
@@ -35,7 +71,7 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
   def routes = clusterInstanceRoutes
 
   val clusterInstanceRoutes =
-    path("clusters" / Segment) { id =>
+    pathPrefix("clusters" / Segment) { id =>
       clusterRoute(id)
     }
 
@@ -47,7 +83,22 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
           case zone: ClusterAggregate.Cluster => complete(zone)
         }
       }
+    } ~
+    pathPrefix("nodes") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[ClusterAggregate.AddRktNode]) { cmd =>
+            onSuccess(zoneAggregateManager ? ClusterCommand(id, cmd)) {
+              case Uninitialized => complete(StatusCodes.NotFound)
+              case node: RktNode.NodeConfig =>
+                complete((StatusCodes.Created, node))
+            }
+          }
+        }
+      }
     }
   }
+
+  def nodeRoute(clusterId: String, nodeId: String): Route = ???
 
 }

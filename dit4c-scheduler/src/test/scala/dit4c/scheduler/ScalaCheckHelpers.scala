@@ -15,7 +15,7 @@ trait ScalaCheckHelpers {
     Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
       .suchThat(!_.isEmpty)
 
-  val genAggregateId: Gen[String] = Gen.alphaStr.suchThat(!_.isEmpty)
+  val genAggregateId: Gen[String] = Gen.identifier
 
   def genSystem(prefix: String) =
     for {
