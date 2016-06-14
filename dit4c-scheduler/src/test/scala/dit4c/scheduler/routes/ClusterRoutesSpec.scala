@@ -160,13 +160,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
 
   }
 
-  def fixedResponseActor[T](response: T) =
-    new Actor {
-      def receive = {
-        case _ => sender ! response
-      }
-    }
-
   private implicit val arbNodeConfig = Arbitrary(genNodeConfig(false))
 
   private def genNodeConfig(confirmed: Boolean): Gen[RktNode.NodeConfig] =
