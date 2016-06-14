@@ -6,6 +6,7 @@ import scala.util.Random
 import scala.concurrent.Future
 import java.security.interfaces.RSAPublicKey
 import dit4c.scheduler.ssh.RemoteShell
+import java.time.Instant
 
 object ClusterAggregate {
 
@@ -47,10 +48,12 @@ object ClusterAggregate {
   case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends RktClusterCommand
   case class RegisterRktNode(nodeId: RktNodeId) extends RktClusterCommand
 
-  trait Event
-  case class Initialized(cluster: Cluster) extends Event
+  trait Event extends BaseDomainEvent
+  case class Initialized(
+      cluster: Cluster, timestamp: Instant = Instant.now) extends Event
   trait RktEvent extends Event
-  case class RktNodeRegistered(nodeId: String) extends RktEvent
+  case class RktNodeRegistered(
+      nodeId: String, timestamp: Instant = Instant.now) extends RktEvent
 
   trait Response
   case object AlreadyInitialized extends Response
@@ -105,10 +108,10 @@ class ClusterAggregate(
   }
 
   protected def updateState(e: Event): Unit = e match {
-    case Initialized(newState: RktCluster) =>
+    case Initialized(newState: RktCluster, _) =>
       context.become(rktCluster)
       this.state = newState
-    case RktNodeRegistered(nodeId: RktNodeId) =>
+    case RktNodeRegistered(nodeId: RktNodeId, _) =>
       state match {
         case cluster: RktCluster =>
           state = cluster.copy(nodeIds = cluster.nodeIds + nodeId)

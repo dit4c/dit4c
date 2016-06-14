@@ -12,6 +12,7 @@ import java.security.KeyPairGenerator
 import scala.concurrent.Future
 import java.security.PublicKey
 import akka.actor.ActorRef
+import java.time.Instant
 
 object RktNode {
 
@@ -74,12 +75,14 @@ object RktNode {
    * Note that domain events are the only persisted events. All the other FSM
    * "events" could be commands or something else.
    */
-  trait DomainEvent
+  trait DomainEvent extends BaseDomainEvent
   case class Initialized(
       id: String,
       connectionDetails: ServerConnectionDetails,
-      rktDir: String) extends DomainEvent
-  case object KeysConfirmed extends DomainEvent
+      rktDir: String,
+      timestamp: Instant = Instant.now) extends DomainEvent
+  case class KeysConfirmed(
+      timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
@@ -120,7 +123,7 @@ class RktNode(
     case Event(GetState, data) =>
       stay replying data
     case Event(ConfirmKeys, data) =>
-      goto(Active).applying(KeysConfirmed).andThen {
+      goto(Active).applying(KeysConfirmed()).andThen {
         case data =>
           sender ! data
       }
@@ -137,9 +140,9 @@ class RktNode(
       domainEvent: DomainEvent,
       dataBeforeEvent: Data): RktNode.Data = {
     domainEvent match {
-      case Initialized(id, connectionDetails, rktDir) =>
+      case Initialized(id, connectionDetails, rktDir, _) =>
         NodeConfig(id, connectionDetails, rktDir, false)
-      case KeysConfirmed =>
+      case KeysConfirmed(_) =>
         dataBeforeEvent match {
           case c: NodeConfig => c.copy(readyToConnect = true)
           case other => other
