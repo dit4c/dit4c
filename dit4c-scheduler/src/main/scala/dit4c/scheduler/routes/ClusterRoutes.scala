@@ -66,19 +66,17 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
   import akka.pattern.ask
   import ClusterRoutes._
   import ClusterAggregateManager._
-  import ClusterAggregate.{Uninitialized, Cluster}
+  import ClusterAggregate._
 
   def routes = clusterInstanceRoutes
 
   val clusterInstanceRoutes =
-    pathPrefix("clusters" / Segment) { id =>
-      clusterRoute(id)
-    }
+    pathPrefix("clusters" / Segment)(clusterRoute)
 
-  def clusterRoute(id: String): Route = {
+  def clusterRoute(clusterId: String): Route = {
     pathEndOrSingleSlash {
       get {
-        onSuccess(zoneAggregateManager ? GetCluster(id)) {
+        onSuccess(zoneAggregateManager ? GetCluster(clusterId)) {
           case Uninitialized => complete(StatusCodes.NotFound)
           case zone: ClusterAggregate.Cluster => complete(zone)
         }
@@ -88,17 +86,36 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
       pathEndOrSingleSlash {
         post {
           entity(as[ClusterAggregate.AddRktNode]) { cmd =>
-            onSuccess(zoneAggregateManager ? ClusterCommand(id, cmd)) {
+            onSuccess(zoneAggregateManager ? ClusterCommand(clusterId, cmd)) {
               case Uninitialized => complete(StatusCodes.NotFound)
               case node: RktNode.NodeConfig =>
                 complete((StatusCodes.Created, node))
             }
           }
         }
-      }
+      } ~
+      pathPrefix(Segment)(nodeRoute(clusterId))
     }
   }
 
-  def nodeRoute(clusterId: String, nodeId: String): Route = ???
+  def nodeRoute(clusterId: String)(nodeId: String): Route =
+    pathEndOrSingleSlash {
+      get {
+        onSuccess(zoneAggregateManager ?
+            ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case node: RktNode.NodeConfig => complete(node)
+        }
+      }
+    } ~
+    path("confirm-keys") {
+      put {
+        onSuccess(zoneAggregateManager ?
+            ClusterCommand(clusterId, ConfirmRktNodeKeys(nodeId))) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case node: RktNode.NodeConfig => complete(node)
+        }
+      }
+    }
 
 }
