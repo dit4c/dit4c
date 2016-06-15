@@ -7,6 +7,7 @@ import scala.concurrent.duration._
 import java.time.Instant
 import java.security.interfaces.{RSAPublicKey => JavaRSAPublicKey}
 import akka.actor.Props
+import akka.actor.ActorRef
 
 object Instance {
 
@@ -50,7 +51,7 @@ object Instance {
 
   trait Command
   case object GetStatus extends Command
-  case class Initiate(instanceId: Id, image: SourceImage) extends Command
+  case class Initiate(image: SourceImage) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
   case class AssociateSigningKey(key: InstanceSigningKey) extends Command
   case object ConfirmStart extends Command
@@ -60,7 +61,6 @@ object Instance {
 
   trait DomainEvent extends BaseDomainEvent
   case class Initiated(
-      val instanceId: Id,
       val image: SourceImage,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class FetchedImage(
@@ -88,12 +88,11 @@ class Instance(val persistenceId: String)
   startWith(JustCreated, NoData)
 
   when(JustCreated) {
-    case Event(Initiate(id, image @ NamedImage(imageName)), _) =>
+    case Event(Initiate(image @ NamedImage(imageName)), _) =>
       // Ask cluster to fetch image for instance
-      context.parent ! ClusterAggregate.DirectiveFromInstance(
-          id, ClusterAggregate.InstanceDirectives.Fetch(image))
+      context.parent ! ClusterAggregate.InstanceDirectives.Fetch(image)
       // Wait for reply
-      goto(WaitingForImage).applying(Initiated(id, image)).andThen {
+      goto(WaitingForImage).applying(Initiated(image)).andThen {
         case data => sender ! data
       }
   }

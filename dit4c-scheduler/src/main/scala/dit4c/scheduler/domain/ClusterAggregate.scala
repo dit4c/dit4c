@@ -11,6 +11,7 @@ import java.time.Instant
 object ClusterAggregate {
 
   type ClusterId = String
+  type InstanceId = String
   type RktNodeId = String
 
   type ClusterType = ClusterTypes.Value
@@ -28,11 +29,10 @@ object ClusterAggregate {
   trait Cluster extends State {
     def id: String
     def `type`: ClusterType
-    def instanceIds: Set[Instance.Id]
   }
   case class RktCluster(
       id: String,
-      instanceIds: Set[Instance.Id] = Set.empty,
+      instanceNodeMappings: Map[InstanceId, RktNodeId] = Map.empty,
       nodeIds: Set[RktNodeId] = Set.empty) extends Cluster {
     val `type` = ClusterTypes.Rkt
   }
@@ -73,11 +73,14 @@ object ClusterAggregate {
   trait RktEvent extends Event
   case class RktNodeRegistered(
       nodeId: String, timestamp: Instant = Instant.now) extends RktEvent
+  case class InstanceAssignedToNode(
+      instanceId: String, nodeId: String,
+      timestamp: Instant = Instant.now) extends RktEvent
 
   trait Response
   case object AlreadyInitialized extends Response
   case class RktNodeAdded(nodeId: RktNodeId) extends Response
-
+  case class StartingInstance(instanceId: InstanceId) extends Response
 
 }
 
@@ -124,7 +127,7 @@ class ClusterAggregate(
       }
   }
 
-  def processInstanceCommand(instanceId: String, command: RktNode.Command) = {
+  def processInstanceCommand(instanceId: String, command: Instance.Command) = {
     val maybeChild = context.child(PersistenceId.Instance(instanceId))
     maybeChild match {
       case Some(child) =>
@@ -143,7 +146,6 @@ class ClusterAggregate(
   }
 
   object RktClusterBehaviour {
-
     val receive: Receive = commonBehaviour orElse {
       case AddRktNode(host, port, username, rktDir) =>
         val id = RktNode.newId
@@ -161,11 +163,38 @@ class ClusterAggregate(
         }
       case ConfirmRktNodeKeys(id) =>
         processNodeCommand(id, RktNode.ConfirmKeys)
-      case cmd: DirectiveFromInstance =>
-        sender.path
+      case StartInstance(image: Instance.SourceImage) =>
+        val id = Instance.newId
+        // Initiate instance creation
+        processInstanceCommand(id, Instance.Initiate(image))
+        // Immediately reply
+        sender ! StartingInstance(id)
+      case directive: InstanceDirective =>
+        sender.path.name match {
+          case PersistenceId.Instance(id) =>
+            getNodeForInstance(id) match {
+              case Right(nodeId) =>
+                processNodeCommand(nodeId, DirectiveFromInstance(id, directive))
+              case Left(msg) =>
+                sender ! Instance.Error(msg)
+            }
+        }
     }
 
-    def processNodeCommand(nodeId: String, command: RktNode.Command) = {
+    def getNodeForInstance(instanceId: InstanceId): Either[String, RktNodeId] =
+      state match {
+        case c: RktCluster if c.instanceNodeMappings.contains(instanceId) =>
+          Right(c.instanceNodeMappings(instanceId))
+        case c: RktCluster =>
+          Random.shuffle(c.nodeIds).headOption
+            .map { nodeId =>
+              persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
+              nodeId
+            }
+            .toRight("Unable to allocate node for instance")
+      }
+
+    def processNodeCommand(nodeId: String, command: Any) = {
       val maybeChild = context.child(PersistenceId.RktNode(nodeId))
       maybeChild match {
         case Some(child) =>
