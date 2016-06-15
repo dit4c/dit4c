@@ -24,9 +24,8 @@ object RktNode {
   def newId = Seq.fill(4)(Random.nextInt(255)).map(i => f"$i%x").mkString
 
   def props(
-      pId: String,
       fetchSshHostKey: (String, Int) => Future[RSAPublicKey]): Props =
-        Props(classOf[RktNode], pId, fetchSshHostKey)
+        Props(classOf[RktNode], fetchSshHostKey)
 
   case class ClientKeyPair(public: RSAPublicKey, `private`: RSAPrivateKey)
   case class ServerPublicKey(public: RSAPublicKey)
@@ -52,14 +51,12 @@ object RktNode {
   trait Data
   case object NoConfig extends Data
   case class NodeConfig(
-      id: NodeId,
       connectionDetails: ServerConnectionDetails,
       rktDir: String,
       readyToConnect: Boolean) extends Data
 
   trait Command
   case class Initialize(
-      id: NodeId,
       host: String,
       port: Int,
       username: String,
@@ -77,7 +74,6 @@ object RktNode {
    */
   trait DomainEvent extends BaseDomainEvent
   case class Initialized(
-      id: String,
       connectionDetails: ServerConnectionDetails,
       rktDir: String,
       timestamp: Instant = Instant.now) extends DomainEvent
@@ -87,10 +83,11 @@ object RktNode {
 }
 
 class RktNode(
-    val persistenceId: String,
     fetchSshHostKey: (String, Int) => Future[RSAPublicKey])
     extends PersistentFSM[RktNode.State, RktNode.Data, RktNode.DomainEvent] {
   import RktNode._
+
+  lazy val persistenceId = self.path.name
 
   startWith(JustCreated, NoConfig)
 
@@ -111,11 +108,10 @@ class RktNode(
       val scd = ServerConnectionDetails(
           init.host, init.port, init.username, clientKeyPair, serverPublicKey)
       goto(PendingKeyConfirmation)
-        .applying(Initialized(init.id, scd, init.rktDir))
+        .applying(Initialized(scd, init.rktDir))
         .andThen {
           case data =>
-            context.parent ! ClusterAggregate.RegisterRktNode(init.id)
-            replyTo ! data
+            context.parent ! ClusterAggregate.RegisterRktNode(replyTo)
         }
   }
 
@@ -140,8 +136,8 @@ class RktNode(
       domainEvent: DomainEvent,
       dataBeforeEvent: Data): RktNode.Data = {
     domainEvent match {
-      case Initialized(id, connectionDetails, rktDir, _) =>
-        NodeConfig(id, connectionDetails, rktDir, false)
+      case Initialized(connectionDetails, rktDir, _) =>
+        NodeConfig(connectionDetails, rktDir, false)
       case KeysConfirmed(_) =>
         dataBeforeEvent match {
           case c: NodeConfig => c.copy(readyToConnect = true)

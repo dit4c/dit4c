@@ -25,6 +25,7 @@ import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import scala.util.Random
 import pdi.jwt.JwtBase64
+import akka.http.scaladsl.model.headers.Location
 
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with PlayJsonSupport
@@ -76,29 +77,32 @@ class ClusterRoutesSpec extends Specs2RouteTest
     }
 
     "add rkt node" >> prop({
-      (clusterId: String, response: RktNode.NodeConfig) =>
+      (clusterId: String, nodeId: String, nodeConfig: RktNode.NodeConfig) =>
         val path = basePath / clusterId / "nodes"
-        val clientPubKey = response.connectionDetails.clientKey.public
-        val serverPubKey = response.connectionDetails.serverKey.public
+        val clientPubKey = nodeConfig.connectionDetails.clientKey.public
+        val serverPubKey = nodeConfig.connectionDetails.serverKey.public
         val postJson = Json.obj(
-            "host" -> response.connectionDetails.host,
-            "port" -> response.connectionDetails.port,
-            "username" -> response.connectionDetails.username)
+            "host" -> nodeConfig.connectionDetails.host,
+            "port" -> nodeConfig.connectionDetails.port,
+            "username" -> nodeConfig.connectionDetails.username)
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
-          import ClusterAggregate.AddRktNode
+          import ClusterAggregate.{AddRktNode, RktNodeAdded, GetRktNodeState}
           def receive = {
             case ClusterCommand(`clusterId`, _: AddRktNode) =>
-              sender ! response
+              sender ! RktNodeAdded(nodeId)
+            case ClusterCommand(`clusterId`, GetRktNodeState(`nodeId`)) =>
+              sender ! nodeConfig
+            case cmd => println(cmd)
           }
         }
         Post(path, postJson) ~> routes(testActor) ~> check {
           (status must be(StatusCodes.Created)) and
+          (header("Location") must beSome(Location(path / nodeId))) and
           (Json.prettyPrint(entityAs[JsValue]) must {
-            /("id" -> response.id) and
-            /("host" -> response.connectionDetails.host) and
-            /("port" -> response.connectionDetails.port) and
-            /("username" -> response.connectionDetails.username) and
+            /("host" -> nodeConfig.connectionDetails.host) and
+            /("port" -> nodeConfig.connectionDetails.port) and
+            /("username" -> nodeConfig.connectionDetails.username) and
             /("client-key") /("kty" -> "RSA") and
             /("client-key") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
             /("client-key") /("n" -> toBase64url(clientPubKey.getModulus)) and
@@ -108,25 +112,24 @@ class ClusterRoutesSpec extends Specs2RouteTest
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGens(genAggregateId, genNodeConfig(false))
+      .setGens(genAggregateId, Gen.identifier, genNodeConfig(false))
 
     "get rkt node" >> prop({
-      (clusterId: String, response: RktNode.NodeConfig) =>
-        val path = basePath / clusterId / "nodes" / response.id
+      (clusterId: String, nodeId: String, response: RktNode.NodeConfig) =>
+        val path = basePath / clusterId / "nodes" / nodeId
         val clientPubKey = response.connectionDetails.clientKey.public
         val serverPubKey = response.connectionDetails.serverKey.public
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import ClusterAggregate.GetRktNodeState
           def receive = {
-            case ClusterCommand(`clusterId`, GetRktNodeState(response.id)) =>
+            case ClusterCommand(`clusterId`, GetRktNodeState(nodeId)) =>
               sender ! response
           }
         }
         Get(path) ~> routes(testActor) ~> check {
           (status must be(StatusCodes.OK)) and
           (Json.prettyPrint(entityAs[JsValue]) must {
-            /("id" -> response.id) and
             /("host" -> response.connectionDetails.host) and
             /("port" -> response.connectionDetails.port) and
             /("username" -> response.connectionDetails.username) and
@@ -139,16 +142,16 @@ class ClusterRoutesSpec extends Specs2RouteTest
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGens(genAggregateId, genNodeConfig(false))
+      .setGens(genAggregateId, Gen.identifier, genNodeConfig(false))
 
     "confirm keys for rkt node" >> prop({
-      (clusterId: String, response: RktNode.NodeConfig)  =>
-        val path = basePath / clusterId / "nodes" / response.id / "confirm-keys"
+      (clusterId: String, nodeId: String, response: RktNode.NodeConfig)  =>
+        val path = basePath / clusterId / "nodes" / nodeId / "confirm-keys"
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import ClusterAggregate.ConfirmRktNodeKeys
           def receive = {
-            case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(response.id)) =>
+            case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(nodeId)) =>
               sender ! response
           }
         }
@@ -156,7 +159,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
           (status must be(StatusCodes.OK))
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGens(genAggregateId, genNodeConfig(true))
+      .setGens(genAggregateId, Gen.identifier, genNodeConfig(true))
 
   }
 
@@ -164,7 +167,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
 
   private def genNodeConfig(confirmed: Boolean): Gen[RktNode.NodeConfig] =
     for {
-      rktNodeId <- Gen.resultOf((_: Int) => RktNode.newId)
       host <- Gen.identifier // Could be wider, but this will do for now
       port <- Gen.choose(1, 0xFFFF) // Valid TCP port
       username <- Gen.identifier // Could be wider, but this will do for now
@@ -175,7 +177,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
         RktNode.ServerPublicKey(publicKey)
       }
     } yield RktNode.NodeConfig(
-      RktNode.newId,
       RktNode.ServerConnectionDetails(host, port, username, ckp, spk),
       "/var/lib/dit4c-rkt",
       false)

@@ -16,6 +16,8 @@ import java.security.interfaces.RSAPublicKey
 import dit4c.scheduler.domain.RktNode
 import akka.event.Logging
 import pdi.jwt.JwtBase64
+import akka.http.scaladsl.model.headers.Location
+import akka.http.scaladsl.model.Uri
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -43,14 +45,12 @@ object ClusterRoutes {
   )(cluster => (cluster.id, cluster.`type`.toString))
 
   implicit def writesNodeConfig: OWrites[RktNode.NodeConfig] = (
-      (__ \ 'id).write[String] and
       (__ \ 'host).write[String] and
       (__ \ 'port).write[Int] and
       (__ \ 'username).write[String] and
       (__ \ "client-key").write[RSAPublicKey] and
       (__ \ "host-key").write[RSAPublicKey]
   )(rktNode => (
-      rktNode.id,
       rktNode.connectionDetails.host,
       rktNode.connectionDetails.port,
       rktNode.connectionDetails.username,
@@ -88,8 +88,18 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
           entity(as[ClusterAggregate.AddRktNode]) { cmd =>
             onSuccess(zoneAggregateManager ? ClusterCommand(clusterId, cmd)) {
               case Uninitialized => complete(StatusCodes.NotFound)
-              case node: RktNode.NodeConfig =>
-                complete((StatusCodes.Created, node))
+              case ClusterAggregate.RktNodeAdded(nodeId) =>
+                onSuccess(zoneAggregateManager ?
+                    ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
+                  case node: RktNode.NodeConfig =>
+                    extractUri { thisUri =>
+                      val nodeUri = Uri(thisUri.path / nodeId toString)
+                      complete((
+                          StatusCodes.Created,
+                          Location(nodeUri) :: Nil,
+                          node))
+                    }
+                }
             }
           }
         }
