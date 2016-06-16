@@ -130,13 +130,25 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         }
         // Schedule an instance
         val probe = TestProbe()
-        probe.send(manager, StartInstance(
-            NamedImage("docker://dit4c/gotty:latest"), "http://example.test/"))
+        val testImage = NamedImage("docker://dit4c/gotty:latest")
+        val testCallback = "http://example.test/"
+        probe.send(manager, StartInstance(testImage, testCallback))
         val response = probe.expectMsgType[RktClusterManager.StartingInstance]
-        response must {
+        (response must {
           import scala.language.experimental.macros
           matchA[RktClusterManager.StartingInstance]
             .instanceId(not(beEmpty[String]))
+        }) and
+        {
+          probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus =
+            probe.expectMsgType[RktClusterManager.InstanceStatus]
+          instanceStatus.data must beLike {
+            case Instance.StartData(id, providedImage, _, callback) =>
+              ( id must be_==(response.instanceId) ) and
+              ( providedImage must be_==(testImage) ) and
+              ( callback must be_==(testCallback) )
+          }
         }
       }
     }
