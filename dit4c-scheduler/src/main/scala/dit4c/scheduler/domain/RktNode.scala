@@ -24,7 +24,8 @@ object RktNode {
   def newId = Seq.fill(4)(Random.nextInt(255)).map(i => f"$i%x").mkString
 
   def props(
-      fetchSshHostKey: (String, Int) => Future[RSAPublicKey]): Props =
+      rktRunnerFactory: RktClusterManager.RktRunnerFactory,
+      fetchSshHostKey: RktClusterManager.HostKeyChecker): Props =
         Props(classOf[RktNode], fetchSshHostKey)
 
   case class ClientKeyPair(public: RSAPublicKey, `private`: RSAPrivateKey)

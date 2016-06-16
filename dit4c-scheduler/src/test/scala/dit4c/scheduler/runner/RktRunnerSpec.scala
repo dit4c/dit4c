@@ -46,7 +46,7 @@ import org.specs2.matcher.JsonMatchers
 import akka.util.ByteString
 
 class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
-    with BeforeEach with ScalaCheck with ForEach[RktRunner]
+    with BeforeEach with ScalaCheck with ForEach[RktRunnerImpl]
     with JsonMatchers with MatcherMacros {
 
   implicit val executionContext = ExecutionContext.fromExecutorService(
@@ -84,8 +84,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
       1.minute)
   }
 
-  override def foreach[R: AsResult](f: RktRunner => R) = withRktDir { rktDir =>
-    val runner = new RktRunner(commandExecutor, rktDir,
+  override def foreach[R: AsResult](f: RktRunnerImpl => R) = withRktDir { rktDir =>
+    val runner = new RktRunnerImpl(commandExecutor, rktDir,
         "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase)
     AsResult(f(runner))
   }
@@ -97,7 +97,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     "which" >> {
 
-      "fails if no command exists" >> { runner: RktRunner =>
+      "fails if no command exists" >> { runner: RktRunnerImpl =>
         runner.which("doesnotexist") must {
           throwAn[Exception]
         }.awaitFor(1.minute)
@@ -107,11 +107,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     "listSystemdUnits" >> {
 
-      "initially return empty" >> { runner: RktRunner =>
+      "initially return empty" >> { runner: RktRunnerImpl =>
         runner.listSystemdUnits must beEmpty[Set[SystemdUnit]].awaitFor(1.minute)
       }
 
-      "should show running units with prefix" >> { runner: RktRunner =>
+      "should show running units with prefix" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
         val prefix = runner.instanceNamePrefix
         val systemdRunCmd = Seq("sudo", "-n", "--", "systemd-run")
@@ -139,11 +139,11 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     "listRktPods" >> {
 
-      "initially return empty" >> { runner: RktRunner =>
+      "initially return empty" >> { runner: RktRunnerImpl =>
         runner.listRktPods must beEmpty[Set[RktPod]].awaitFor(10.seconds)
       }
 
-      "should show prepared pods" >> { runner: RktRunner =>
+      "should show prepared pods" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
         // Prepared a pod
         Await.ready(
@@ -161,7 +161,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         }.awaitFor(1.minute)
       }
 
-      "should show running pods" >> { runner: RktRunner =>
+      "should show running pods" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
         // Run a pod
         val imageId = Await.result(
@@ -246,7 +246,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         }
       }
 
-      "should show exited pods" >> { runner: RktRunner =>
+      "should show exited pods" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
         // Run a pod
         Await.ready(
@@ -264,7 +264,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         }.awaitFor(1.minute)
       }
 
-      "should list multiple pods" >> { runner: RktRunner =>
+      "should list multiple pods" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
         // Prepared a bunch of pods
         val numOfPods = 10
@@ -289,13 +289,13 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     "fetch" >> {
 
-      "should work with local files" >> { runner: RktRunner =>
+      "should work with local files" >> { runner: RktRunnerImpl =>
         runner.fetch(testImage) must {
           beMatching("sha512-[0-9a-f]{64}".r)
         }.awaitFor(1.minutes)
       }
 
-      "should not work with image IDs" >> { runner: RktRunner =>
+      "should not work with image IDs" >> { runner: RktRunnerImpl =>
         val imageId = Await.result(runner.fetch(testImage), 1.minute)
         runner.fetch(imageId) must {
           throwA[Exception]
@@ -308,7 +308,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
     "guessServicePort" >> {
       "should work for" >> {
         def testImage(imageName: String, expectedPort: Int) =
-          { runner: RktRunner =>
+          { runner: RktRunnerImpl =>
             // Use a long-running image for this test
             val imageId = Await.result(runner.fetch(imageName), 1.minute)
             runner.guessServicePort(imageId) must {
@@ -323,7 +323,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     "start/stop" >> {
 
-      "only accepts lowercase alphanumeric prefixes" >> { runner: RktRunner =>
+      "only accepts lowercase alphanumeric prefixes" >> { runner: RktRunnerImpl =>
         runner.start(
             "NotGood",
             "sha512-"+Stream.fill(64)("0").mkString,
@@ -331,7 +331,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
           throwAn[IllegalArgumentException]
       }
 
-      "should work with image IDs" >> { runner: RktRunner =>
+      "should work with image IDs" >> { runner: RktRunnerImpl =>
         var podCallback: Option[HttpRequest] = None
         val serverBinding = {
           implicit val system = ActorSystem()

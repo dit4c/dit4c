@@ -15,17 +15,27 @@ import pdi.jwt.Jwt
 import pdi.jwt.algorithms.JwtAsymetricAlgorithm
 import pdi.jwt.JwtAlgorithm
 
-class RktRunner(
+trait RktRunner {
+  type ImageId = String
+
+  def fetch(imageName: String): Future[ImageId]
+  def start(
+      instanceId: String,
+      image: ImageId,
+      callbackUrl: java.net.URL): Future[RSAPublicKey]
+  def stop(instanceId: String): Future[Unit]
+
+}
+
+class RktRunnerImpl(
     val ce: CommandExecutor,
     val rktDir: Path,
     val instanceNamePrefix: String = "dit4c-instance-")(
-        implicit ec: ExecutionContext) {
+        implicit ec: ExecutionContext) extends RktRunner {
 
   if (!instanceNamePrefix.matches("""[a-z0-9\-]+"""))
     throw new IllegalArgumentException(
         "Only lower-case alphanumerics & '-' allowed for instance prefix")
-
-  type ImageId = String
 
   def fetch(imageName: String): Future[ImageId] =
     privileged(rktCmd)

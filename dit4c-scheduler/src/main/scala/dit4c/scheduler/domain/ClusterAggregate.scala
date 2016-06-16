@@ -86,7 +86,7 @@ class ClusterAggregate(val persistenceId: String)
     s"${persistenceId}-${t}"
 
   private def managerProps(t: ClusterType) = t match {
-    case ClusterTypes.Rkt => RktClusterManager.props()
+    case ClusterTypes.Rkt => RktClusterManager.props(context.dispatcher)
   }
 
 }

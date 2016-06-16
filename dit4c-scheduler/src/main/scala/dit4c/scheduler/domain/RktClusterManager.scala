@@ -8,15 +8,39 @@ import dit4c.scheduler.ssh.RemoteShell
 import akka.actor.ActorRef
 import java.time.Instant
 import akka.actor.Props
+import dit4c.scheduler.runner.{RktRunner, RktRunnerImpl}
+import java.nio.file.Paths
+import scala.concurrent.ExecutionContext
 
 object RktClusterManager {
   type RktNodeId = String
   type InstanceId = String
 
+  type HostKeyChecker = (String, Int) => Future[RSAPublicKey]
+  type RktRunnerFactory =
+    (RktNode.ServerConnectionDetails, String) => RktRunner
+
+  def props(implicit ec: ExecutionContext): Props = {
+    def rktRunnerFactory(
+        connectionDetails: RktNode.ServerConnectionDetails,
+        rktDir: String) = {
+      new RktRunnerImpl(
+          RemoteShell(
+              connectionDetails.host,
+              connectionDetails.port,
+              connectionDetails.username,
+              connectionDetails.clientKey.`private`,
+              connectionDetails.clientKey.public,
+              connectionDetails.serverKey.public),
+          Paths.get(rktDir))
+    }
+    props(rktRunnerFactory, RemoteShell.getHostKey)
+  }
+
   def props(
-      fetchSshHostKey:
-        (String, Int) => Future[RSAPublicKey] = RemoteShell.getHostKey): Props =
-    Props(classOf[RktClusterManager], fetchSshHostKey)
+      rktRunnerFactory: RktRunnerFactory,
+      hostKeyChecker: HostKeyChecker): Props =
+    Props(classOf[RktClusterManager], rktRunnerFactory, hostKeyChecker)
 
   case class ClusterInfo(
       instanceNodeMappings: Map[InstanceId, RktNodeId] = Map.empty,
@@ -63,7 +87,8 @@ object RktClusterManager {
 }
 
 class RktClusterManager(
-    fetchSshHostKey: (String, Int) => Future[RSAPublicKey])
+    rktRunnerFactory: RktClusterManager.RktRunnerFactory,
+    hostKeyChecker: RktClusterManager.HostKeyChecker)
     extends PersistentActor
     with ClusterManager
     with ActorLogging {
@@ -118,7 +143,7 @@ class RktClusterManager(
 
   protected def createNodeActor(nodeId: String): ActorRef = {
     val node = context.actorOf(
-        RktNode.props(fetchSshHostKey),
+        RktNode.props(rktRunnerFactory, hostKeyChecker),
         RktNodePersistenceId(nodeId))
     context.watch(node)
     node

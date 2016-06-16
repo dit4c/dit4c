@@ -20,6 +20,7 @@ import scala.concurrent.Future
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import akka.actor.Props
+import dit4c.scheduler.runner.RktRunner
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -40,7 +41,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
         prop({ (managerPersistenceId: String, rktNodeId: String) =>
           val manager =
-              system.actorOf(RktClusterManager.props(), managerPersistenceId)
+              system.actorOf(RktClusterManager.props, managerPersistenceId)
           val probe = TestProbe()
           probe.send(manager, GetRktNodeState(rktNodeId))
           probe.expectMsgType[RktNode.Data] must {
@@ -59,7 +60,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val hostPublicKey = randomPublicKey
         val manager =
             system.actorOf(
-                RktClusterManager.props(mockFetchSshHostKey(hostPublicKey)),
+                RktClusterManager.props(mockRktRunnerFactory,
+                    mockFetchSshHostKey(hostPublicKey)),
                 managerPersistenceId)
         val probe = TestProbe()
         probe.send(manager, AddRktNode(
@@ -78,7 +80,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
         val manager =
             system.actorOf(
-                RktClusterManager.props(mockFetchSshHostKey(randomPublicKey)),
+                RktClusterManager.props(mockRktRunnerFactory,
+                    mockFetchSshHostKey(randomPublicKey)),
                 managerPersistenceId)
         val probe = TestProbe()
         probe.send(manager, AddRktNode(
@@ -97,6 +100,15 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     kpg.initialize(512, sr)
     kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
   }
+
+
+  def mockRktRunnerFactory(
+      cd: RktNode.ServerConnectionDetails, dir: String): RktRunner =
+    new RktRunner {
+      def fetch(imageName: String): scala.concurrent.Future[String] = ???
+      def start(instanceId: String,image: String,callbackUrl: java.net.URL): scala.concurrent.Future[java.security.interfaces.RSAPublicKey] = ???
+      def stop(instanceId: String): scala.concurrent.Future[Unit] = ???
+    }
 
   def mockFetchSshHostKey(
       pk: RSAPublicKey)(host: String, port: Int): Future[RSAPublicKey] =
