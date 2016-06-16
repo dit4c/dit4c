@@ -19,6 +19,8 @@ import akka.event.Logging
 import pdi.jwt.JwtBase64
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.Uri
+import play.api.libs.json.Json
+import dit4c.scheduler.domain.Instance
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -39,6 +41,11 @@ object ClusterRoutes {
       (__ \ 'username).read[String]
   )((host: String, port: Int, username: String) =>
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
+
+  implicit def readsStartInstance: Reads[RktClusterManager.StartInstance] = (
+      (__ \ 'image).read[String].map(Instance.NamedImage.apply _) and
+      (__ \ 'callback).read[String]
+  )(RktClusterManager.StartInstance.apply _)
 
   implicit def writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
       (__ \ 'type).write[String]
@@ -79,6 +86,25 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
         onSuccess(clusterAggregateManager ? GetCluster(clusterId)) {
           case Uninitialized => complete(StatusCodes.NotFound)
           case t: ClusterAggregate.ClusterType => complete(t)
+        }
+      }
+    } ~
+    pathPrefix("instances") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[RktClusterManager.StartInstance]) { cmd =>
+            onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
+              case Uninitialized => complete(StatusCodes.NotFound)
+              case RktClusterManager.StartingInstance(instanceId) =>
+                extractUri { thisUri =>
+                  val nodeUri = Uri(thisUri.path / instanceId toString)
+                  complete((
+                      StatusCodes.Accepted,
+                      Location(nodeUri) :: Nil,
+                      Json.obj("id" -> instanceId)))
+                }
+            }
+          }
         }
       }
     } ~

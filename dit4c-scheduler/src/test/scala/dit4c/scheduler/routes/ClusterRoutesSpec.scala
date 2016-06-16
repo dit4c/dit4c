@@ -19,6 +19,7 @@ import akka.testkit.TestActorRef
 import akka.actor.Actor
 import dit4c.scheduler.domain.ClusterAggregate
 import dit4c.scheduler.domain.RktClusterManager
+import dit4c.scheduler.domain.Instance
 import org.scalacheck.ArbitraryLowPriority
 import dit4c.scheduler.ScalaCheckHelpers
 import dit4c.scheduler.domain.RktNode
@@ -161,6 +162,31 @@ class ClusterRoutesSpec extends Specs2RouteTest
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
       .setGens(genAggregateId, Gen.identifier, genNodeConfig(true))
+
+    "start instance" >> prop({
+      (clusterId: String, imageName: String, callbackUrl: Uri, responseId: String) =>
+        val path = basePath / clusterId / "instances"
+        def testActor = new Actor {
+          import ClusterAggregateManager.ClusterCommand
+          import RktClusterManager.{StartInstance, StartingInstance}
+          import Instance.NamedImage
+          val callbackAsString = callbackUrl.toString
+          def receive = {
+            case ClusterCommand(`clusterId`,
+                StartInstance(NamedImage(`imageName`), `callbackAsString`)) =>
+              sender ! StartingInstance(responseId)
+          }
+        }
+        val postJson = Json.obj(
+            "image" -> imageName,
+            "callback" -> callbackUrl.toString)
+        Post(path, postJson) ~> routes(testActor) ~> check {
+          (status must be(StatusCodes.Accepted))
+        }
+    }).noShrink // Most likely shrinking won't help narrow down errors
+      .setGen1(genAggregateId)
+      .setGen2(Gen.identifier)
+      .setGen4(Gen.identifier)
 
   }
 
