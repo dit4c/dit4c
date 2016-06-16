@@ -26,7 +26,7 @@ object RktNode {
   def props(
       rktRunnerFactory: RktClusterManager.RktRunnerFactory,
       fetchSshHostKey: RktClusterManager.HostKeyChecker): Props =
-        Props(classOf[RktNode], fetchSshHostKey)
+        Props(classOf[RktNode], rktRunnerFactory, fetchSshHostKey)
 
   case class ClientKeyPair(public: RSAPublicKey, `private`: RSAPrivateKey)
   case class ServerPublicKey(public: RSAPublicKey)
@@ -58,6 +58,8 @@ object RktNode {
 
   trait Command
   case object GetState extends Command
+  case object RequestInstanceWorker extends Command
+  case object RequireInstanceWorker extends Command
   case class Initialize(
       host: String,
       port: Int,
@@ -68,6 +70,11 @@ object RktNode {
       serverPublicKey: ServerPublicKey,
       replyTo: ActorRef)
   case object ConfirmKeys extends Command
+
+  trait Response
+  trait InstanceWorkerResponse extends Response
+  case class WorkerCreated(worker: ActorRef) extends InstanceWorkerResponse
+  case class UnableToProvideWorker(msg: String) extends InstanceWorkerResponse
 
   /**
    * Note that domain events are the only persisted events. All the other FSM
@@ -84,7 +91,8 @@ object RktNode {
 }
 
 class RktNode(
-    fetchSshHostKey: (String, Int) => Future[RSAPublicKey])
+    createRunner: RktClusterManager.RktRunnerFactory,
+    fetchSshHostKey: RktClusterManager.HostKeyChecker)
     extends PersistentFSM[RktNode.State, RktNode.Data, RktNode.DomainEvent] {
   import RktNode._
 
@@ -127,9 +135,19 @@ class RktNode(
   }
 
   when(Active) {
+    case Event(
+        RequestInstanceWorker | RequireInstanceWorker,
+        NodeConfig(connectionDetails, rktDir, _)) =>
+      val runner = createRunner(connectionDetails, rktDir)
+      val worker = context.actorOf(Props(classOf[RktInstanceWorker], runner))
+      stay replying WorkerCreated(worker)
+  }
+
+  whenUnhandled {
     case Event(GetState, data) =>
       stay replying data
-    // TODO: Actual node functionality
+    case Event(RequestInstanceWorker, _) =>
+      stay replying UnableToProvideWorker("Node is not currently active")
   }
 
 

@@ -15,7 +15,8 @@ object Instance {
   type ImageName = String
   type ImageId = String
 
-  def props(pId: String): Props = Props(classOf[RktNode], pId)
+  def props(worker: ActorRef): Props =
+    Props(classOf[Instance], worker)
 
   sealed trait SourceImage
   case class NamedImage(name: ImageName) extends SourceImage
@@ -40,12 +41,18 @@ object Instance {
 
   sealed trait Data
   case object NoData extends Data
-  trait DataWithId extends Data { def id: Id }
-  case class SomeData(id: Id, image: SourceImage) extends DataWithId
+  case class StartData(
+      instanceId: String,
+      providedImage: SourceImage,
+      resolvedImage: Option[LocalImage],
+      callbackUrl: String) extends Data
 
   trait Command
   case object GetStatus extends Command
-  case class Initiate(image: SourceImage) extends Command
+  case class Initiate(
+      instanceId: String,
+      image: SourceImage,
+      callbackUrl: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
   case class AssociateSigningKey(key: InstanceSigningKey) extends Command
   case object ConfirmStart extends Command
@@ -55,7 +62,9 @@ object Instance {
 
   trait DomainEvent extends BaseDomainEvent
   case class Initiated(
+      val instanceId: String,
       val image: SourceImage,
+      val callbackUrl: String,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class FetchedImage(
       val image: LocalImage,
@@ -75,42 +84,46 @@ object Instance {
 
 }
 
-class Instance(val persistenceId: String, worker: ActorRef)
+class Instance(worker: ActorRef)
     extends PersistentFSM[Instance.State, Instance.Data, Instance.DomainEvent] {
   import Instance._
+
+  lazy val persistenceId = self.path.name
 
   startWith(JustCreated, NoData)
 
   when(JustCreated) {
-    case Event(Initiate(image @ NamedImage(imageName)), _) =>
-      // Ask cluster to fetch image for instance
-      worker ! InstanceWorker.Fetch(image)
-      // Wait for reply
-      goto(WaitingForImage).applying(Initiated(image)).andThen {
-        case data => sender ! data
+    case Event(Initiate(id, image @ NamedImage(imageName), callback), _) =>
+      val domainEvent = Initiated(id, image, callback)
+      goto(WaitingForImage).applying(domainEvent).andThen {
+        case data =>
+          log.info(s"Fetching image: $image")
+          worker ! InstanceWorker.Fetch(image)
       }
   }
 
   when(WaitingForImage) {
-    case Event(ReceiveImage(localImage), data: DataWithId) =>
-      // Ask worker to start instance with image
-      worker ! InstanceWorker.Start(localImage)
+    case Event(ReceiveImage(localImage), StartData(id, _, _, callback)) =>
       goto(Starting).applying(FetchedImage(localImage)).andThen {
-        case data => sender ! data
+        case data =>
+          log.info(s"Starting with: $localImage")
+          worker ! InstanceWorker.Start(id, localImage, callback)
       }
   }
 
   when(Starting) {
     case Event(AssociateSigningKey(key), _) =>
+      log.info(s"Received signing key: $key")
       stay.applying(AssociatedSigningKey(key))
     case Event(ConfirmStart, _) =>
+      log.info(s"Confirmed start")
       goto(Starting).applying(ConfirmedStart())
   }
 
   when(Running) {
-    case Event(Terminate, data: DataWithId) =>
+    case Event(Terminate, StartData(id, _, _, _) ) =>
       // Ask cluster to stop instance
-      worker ! InstanceWorker.Stop
+      worker ! InstanceWorker.Terminate(id)
       goto(Stopping).applying(RequestedTermination())
   }
 
@@ -139,8 +152,14 @@ class Instance(val persistenceId: String, worker: ActorRef)
   def applyEvent(
       domainEvent: DomainEvent,
       currentData: Data): Instance.Data = {
-    domainEvent match {
-      case _: DomainEvent => currentData // TODO: Implement data mutation
+    (domainEvent, currentData) match {
+      case (Initiated(id, image, callback, _), NoData) =>
+        StartData(id, image, None, callback)
+      case (FetchedImage(image, _), data: StartData) =>
+        data.copy(resolvedImage = Some(image))
+      case (e, d) =>
+        stop(PersistentFSM.Failure(s"Unhandled event/state: ($e, $d)"))
+        d
     }
   }
 

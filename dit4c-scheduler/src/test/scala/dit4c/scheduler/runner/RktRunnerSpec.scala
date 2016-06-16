@@ -327,7 +327,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         runner.start(
             "NotGood",
             "sha512-"+Stream.fill(64)("0").mkString,
-            new java.net.URL("http://example.test/doesnotexist")) must
+            "http://example.test/doesnotexist") must
           throwAn[IllegalArgumentException]
       }
 
@@ -348,12 +348,12 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
             }).run,
             1.minute)
         }
-        val callbackUrl = new java.net.URL(Uri(
+        val callbackUrl = Uri(
             "http",
             Uri.Authority(
                 Uri.Host(serverBinding.localAddress.getAddress),
                 serverBinding.localAddress.getPort),
-            Uri.Path("/")).toString)
+            Uri.Path("/")).toString
         import scala.language.experimental.macros
         // Use a long-running image for this test
         val imageId = Await.result(

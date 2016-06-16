@@ -22,7 +22,7 @@ trait RktRunner {
   def start(
       instanceId: String,
       image: ImageId,
-      callbackUrl: java.net.URL): Future[RSAPublicKey]
+      callbackUrl: String): Future[RSAPublicKey]
   def stop(instanceId: String): Future[Unit]
 
 }
@@ -64,7 +64,7 @@ class RktRunnerImpl(
   def start(
       instanceId: String,
       image: ImageId,
-      callbackUrl: java.net.URL): Future[RSAPublicKey] =
+      callbackUrl: String): Future[RSAPublicKey] =
     if (instanceId.matches("""[a-z0-9\-]+""")) {
       for {
         (manifestFile, publicKey) <-
@@ -145,7 +145,7 @@ class RktRunnerImpl(
   private def generateManifestFile(
       instanceId: String,
       image: ImageId,
-      callbackUrl: java.net.URL): Future[(String, RSAPublicKey)] = {
+      callbackUrl: String): Future[(String, RSAPublicKey)] = {
     for {
       curlImageId <- fetch("quay.io/yss44/curl")
       socatImageId <- fetch("quay.io/ridero/socat")
@@ -183,7 +183,7 @@ class RktRunnerImpl(
             |                    "-H", "Authorization: Bearer ${token}",
             |                    "-H", "Content-Type: application/json",
             |                    "-d", $callbackPayload,
-            |                    "${callbackUrl.toString}"
+            |                    "$callbackUrl"
             |                ],
             |                "group": "99",
             |                "user": "99"
