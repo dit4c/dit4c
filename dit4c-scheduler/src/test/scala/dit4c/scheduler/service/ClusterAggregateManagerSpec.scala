@@ -15,7 +15,6 @@ import akka.testkit.TestProbe
 
 class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
-    with MatcherMacros
     with ScalaCheck with ScalaCheckHelpers {
 
   implicit val system = ActorSystem("ClusterAggregateManagerSpec")
@@ -30,12 +29,10 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     "default cluster" >> {
 
       "exists" >> {
-        import scala.language.experimental.macros
         val probe = TestProbe()
         probe.send(clusterAggregateManager, GetCluster("default"))
-        probe.expectMsgType[ClusterAggregate.RktCluster] must {
-          matchA[ClusterAggregate.RktCluster]
-            .id(be_==("default"))
+        probe.expectMsgType[ClusterAggregate.ClusterType] must {
+          be_==(ClusterAggregate.ClusterTypes.Rkt)
         }
       }
     }

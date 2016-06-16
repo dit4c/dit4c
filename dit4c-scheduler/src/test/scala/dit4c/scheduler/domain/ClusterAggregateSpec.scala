@@ -50,7 +50,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         }).setGen(genAggregateId)
       }
 
-      "returns state after being initialized" >> prop(
+      "returns type after being initialized" >> prop(
         (id: String, t: ClusterTypes.Value, system: ActorSystem) => {
           implicit val _ = system
           val aggregateId = s"somePrefix-$id"
@@ -58,16 +58,15 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           val clusterAggregate =
             system.actorOf(ClusterAggregate.props(aggregateId));
           {
-            probe.send(clusterAggregate, Initialize(id, t))
+            probe.send(clusterAggregate, Initialize(t))
             probe.receiveOne(1.second)
             probe.sender must be(clusterAggregate)
           } and
           {
             import scala.language.experimental.macros
             probe.send(clusterAggregate, GetState)
-            probe.expectMsgType[ClusterAggregate.Cluster] must {
-              (be_==(id) ^^ { c: ClusterAggregate.Cluster => c.id }) and
-              (be_==(t) ^^ { c: ClusterAggregate.Cluster => c.`type` })
+            probe.expectMsgType[ClusterAggregate.ClusterType] must {
+              be_==(t)
             }
           }
         }
@@ -83,102 +82,15 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           val clusterAggregate =
             system.actorOf(ClusterAggregate.props(aggregateId))
-          val beExpectedInitializedState: Matcher[AnyRef] = beLike[AnyRef] {
-            case state: ClusterAggregate.Cluster =>
-              (state.id must_== id) and
-              (state.`type` must_== t)
-          }
           // Get returned state after initialization and from GetState
-          probe.send(clusterAggregate, Initialize(id, t))
-          val initResponse = probe.expectMsgType[AnyRef]
+          probe.send(clusterAggregate, Initialize(t))
+          val response = probe.expectMsgType[State]
           probe.send(clusterAggregate, GetState)
-          val getStateResponse = probe.expectMsgType[AnyRef]
-          // Test both
-          (initResponse must beExpectedInitializedState) and
-          (getStateResponse must beExpectedInitializedState)
+          val clusterType = probe.expectMsgType[ClusterType]
+          (response must_== Active) and
+          (clusterType must_== t)
         }
       ).setGen1(genAggregateId)
     }
-
-    "GetRktNodeState" >> {
-
-      "initially returns Uninitialized" >> {
-        val id = "test"
-        val aggregateId = "Cluster-"+id
-        implicit val system =
-          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
-        val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId))
-        val probe = TestProbe()
-        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
-        probe.receiveOne(1.second)
-        prop({ (rktNodeId: String) =>
-          val probe = TestProbe()
-          probe.send(clusterAggregate, GetRktNodeState(rktNodeId))
-          probe.expectMsgType[RktNode.Data] must {
-            be(RktNode.NoConfig)
-          }
-        }).setGen(Gen.listOfN(8, Gen.numChar).map(_.mkString))
-      }
-
-    }
-
-    "AddRktNode" >> {
-      "initializes RktNode with config" >> {
-        import scala.language.experimental.macros
-        val id = "test"
-        val aggregateId = "Cluster-"+id
-        implicit val system =
-          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
-        val hostPublicKey = randomPublicKey
-        val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(
-                aggregateId, mockFetchSshHostKey(hostPublicKey)))
-        val probe = TestProbe()
-        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
-        probe.receiveOne(1.second)
-        probe.send(clusterAggregate, AddRktNode(
-            "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val response = probe.expectMsgType[ClusterAggregate.RktNodeAdded]
-        probe.send(clusterAggregate, GetState)
-        val clusterState = probe.expectMsgType[ClusterAggregate.RktCluster]
-        ( clusterState.nodeIds must contain(response.nodeId) )
-      }
-    }
-
-    "ConfirmRktNodeKeys" >> {
-      "makes RktNode ready to connect" >> {
-        import scala.language.experimental.macros
-        val id = "test"
-        val aggregateId = "Cluster-"+id
-        implicit val system =
-          ActorSystem(s"ClusterAggregate-GetRktNodeState-Uninitialized")
-        val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(
-                aggregateId, mockFetchSshHostKey(randomPublicKey)))
-        val probe = TestProbe()
-        probe.send(clusterAggregate, Initialize(id, ClusterTypes.Rkt))
-        probe.receiveOne(1.second)
-        probe.send(clusterAggregate, AddRktNode(
-            "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val ClusterAggregate.RktNodeAdded(nodeId) =
-          probe.expectMsgType[ClusterAggregate.RktNodeAdded]
-        probe.send(clusterAggregate, ConfirmRktNodeKeys(nodeId))
-        val updatedConfig = probe.expectMsgType[RktNode.NodeConfig]
-        ( updatedConfig.readyToConnect must beTrue )
-      }
-    }
   }
-
-  def randomPublicKey: RSAPublicKey = {
-    val sr = SecureRandom.getInstance("SHA1PRNG")
-    val kpg = KeyPairGenerator.getInstance("RSA")
-    kpg.initialize(512, sr)
-    kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
-  }
-
-  def mockFetchSshHostKey(
-      pk: RSAPublicKey)(host: String, port: Int): Future[RSAPublicKey] =
-        Future.successful(pk)
-
 }

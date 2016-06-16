@@ -18,6 +18,7 @@ import org.specs2.scalacheck.Parameters
 import akka.testkit.TestActorRef
 import akka.actor.Actor
 import dit4c.scheduler.domain.ClusterAggregate
+import dit4c.scheduler.domain.RktClusterManager
 import org.scalacheck.ArbitraryLowPriority
 import dit4c.scheduler.ScalaCheckHelpers
 import dit4c.scheduler.domain.RktNode
@@ -47,9 +48,9 @@ class ClusterRoutesSpec extends Specs2RouteTest
       "exists" >> prop { id: String =>
         def testActor = new Actor {
           import ClusterAggregateManager.GetCluster
-          import ClusterAggregate.RktCluster
+          import ClusterAggregate.ClusterTypes.Rkt
           def receive = {
-            case GetCluster(`id`) => sender ! RktCluster(id)
+            case GetCluster(`id`) => sender ! Rkt
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
@@ -87,7 +88,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
             "username" -> nodeConfig.connectionDetails.username)
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
-          import ClusterAggregate.{AddRktNode, RktNodeAdded, GetRktNodeState}
+          import RktClusterManager.{AddRktNode, RktNodeAdded, GetRktNodeState}
           def receive = {
             case ClusterCommand(`clusterId`, _: AddRktNode) =>
               sender ! RktNodeAdded(nodeId)
@@ -121,7 +122,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
         val serverPubKey = response.connectionDetails.serverKey.public
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
-          import ClusterAggregate.GetRktNodeState
+          import RktClusterManager.GetRktNodeState
           def receive = {
             case ClusterCommand(`clusterId`, GetRktNodeState(nodeId)) =>
               sender ! response
@@ -149,7 +150,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
         val path = basePath / clusterId / "nodes" / nodeId / "confirm-keys"
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
-          import ClusterAggregate.ConfirmRktNodeKeys
+          import RktClusterManager.ConfirmRktNodeKeys
           def receive = {
             case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(nodeId)) =>
               sender ! response

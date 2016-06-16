@@ -15,7 +15,7 @@ object ClusterAggregateManager {
   case class CreateCluster(id: String, `type`: ClusterType) extends Command
   case class GetCluster(id: String) extends Command
   case class ClusterCommand(
-      clusterId: String, cmd: ClusterAggregate.Command) extends Command
+      clusterId: String, cmd: Any) extends Command
 
   val validClusterId: Regex = """[a-zA-Z0-9]+""".r.anchored
   def isValidClusterId(id: String): Boolean =
@@ -35,13 +35,13 @@ class ClusterAggregateManager extends Actor with ActorLogging {
       val id = "default"
       val t = ClusterAggregate.ClusterTypes.Rkt
       processAggregateCommand(aggregateId(id),
-          ClusterAggregate.Initialize(id, t))
+          ClusterAggregate.Initialize(t))
     case GetCluster(id) if !isValidClusterId(id) =>
       // Invalid IDs will forever be uninitialized clusters
       sender ! ClusterAggregate.Uninitialized
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
-    case c: ClusterAggregate.Cluster if c.id == "default" =>
+    case ct: ClusterAggregate.ClusterType if sender.path.name == aggregateId("default") =>
       // Expected from preStart
     case unknownMessage =>
       log.error(s"Unknown message: $unknownMessage")

@@ -56,6 +56,7 @@ object RktNode {
       readyToConnect: Boolean) extends Data
 
   trait Command
+  case object GetState extends Command
   case class Initialize(
       host: String,
       port: Int,
@@ -65,7 +66,6 @@ object RktNode {
       init: Initialize,
       serverPublicKey: ServerPublicKey,
       replyTo: ActorRef)
-  case object GetState extends Command
   case object ConfirmKeys extends Command
 
   /**
@@ -111,7 +111,7 @@ class RktNode(
         .applying(Initialized(scd, init.rktDir))
         .andThen {
           case data =>
-            context.parent ! ClusterAggregate.RegisterRktNode(replyTo)
+            context.parent ! RktClusterManager.RegisterRktNode(replyTo)
         }
   }
 

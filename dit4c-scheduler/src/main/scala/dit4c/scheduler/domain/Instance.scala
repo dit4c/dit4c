@@ -29,13 +29,7 @@ object Instance {
    */
   def newId = Seq.fill(16)(Random.nextInt(255)).map(i => f"$i%x").mkString
 
-  trait State extends PersistentFSM.FSMState {
-    override lazy val identifier: String =
-      this.getClass.getSimpleName
-        .stripSuffix("$")
-        .flatMap(c => if (c.isUpper) s" $c" else c.toString)
-        .trim
-  }
+  trait State extends BasePersistentFSMState
   case object JustCreated extends State
   case object WaitingForImage extends State
   case object Starting extends State
@@ -81,7 +75,7 @@ object Instance {
 
 }
 
-class Instance(val persistenceId: String)
+class Instance(val persistenceId: String, worker: ActorRef)
     extends PersistentFSM[Instance.State, Instance.Data, Instance.DomainEvent] {
   import Instance._
 
@@ -90,7 +84,7 @@ class Instance(val persistenceId: String)
   when(JustCreated) {
     case Event(Initiate(image @ NamedImage(imageName)), _) =>
       // Ask cluster to fetch image for instance
-      context.parent ! ClusterAggregate.InstanceDirectives.Fetch(image)
+      worker ! InstanceWorker.Fetch(image)
       // Wait for reply
       goto(WaitingForImage).applying(Initiated(image)).andThen {
         case data => sender ! data
@@ -99,9 +93,8 @@ class Instance(val persistenceId: String)
 
   when(WaitingForImage) {
     case Event(ReceiveImage(localImage), data: DataWithId) =>
-      // Ask cluster to start instance with image
-      context.parent ! ClusterAggregate.DirectiveFromInstance(
-          data.id, ClusterAggregate.InstanceDirectives.Start(localImage))
+      // Ask worker to start instance with image
+      worker ! InstanceWorker.Start(localImage)
       goto(Starting).applying(FetchedImage(localImage)).andThen {
         case data => sender ! data
       }
@@ -117,8 +110,7 @@ class Instance(val persistenceId: String)
   when(Running) {
     case Event(Terminate, data: DataWithId) =>
       // Ask cluster to stop instance
-      context.parent ! ClusterAggregate.DirectiveFromInstance(
-          data.id, ClusterAggregate.InstanceDirectives.Stop)
+      worker ! InstanceWorker.Stop
       goto(Stopping).applying(RequestedTermination())
   }
 

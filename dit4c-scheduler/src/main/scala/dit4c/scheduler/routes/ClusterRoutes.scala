@@ -3,6 +3,7 @@ package dit4c.scheduler.routes
 import akka.http.scaladsl.server.Directives
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import dit4c.scheduler.service.ClusterAggregateManager
+import dit4c.scheduler.domain.RktClusterManager
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import dit4c.scheduler.domain.ClusterAggregate
@@ -32,17 +33,16 @@ object ClusterRoutes {
       JwtBase64.encodeString(k.getPublicExponent.toByteArray),
       JwtBase64.encodeString(k.getModulus.toByteArray)) )
 
-  implicit def readsAddRktNode: Reads[ClusterAggregate.AddRktNode] = (
+  implicit def readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
       (__ \ 'port).read[Int] and
       (__ \ 'username).read[String]
   )((host: String, port: Int, username: String) =>
-    ClusterAggregate.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
+    RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
-  implicit def writesCluster: OWrites[ClusterAggregate.Cluster] = (
-      (__ \ 'id).write[String] and
+  implicit def writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
       (__ \ 'type).write[String]
-  )(cluster => (cluster.id, cluster.`type`.toString))
+  ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
 
   implicit def writesNodeConfig: OWrites[RktNode.NodeConfig] = (
       (__ \ 'host).write[String] and
@@ -59,7 +59,7 @@ object ClusterRoutes {
 
 }
 
-class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
+class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
     with PlayJsonSupport {
 
   implicit val timeout = Timeout(10.seconds)
@@ -76,21 +76,22 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
   def clusterRoute(clusterId: String): Route = {
     pathEndOrSingleSlash {
       get {
-        onSuccess(zoneAggregateManager ? GetCluster(clusterId)) {
+        onSuccess(clusterAggregateManager ? GetCluster(clusterId)) {
           case Uninitialized => complete(StatusCodes.NotFound)
-          case zone: ClusterAggregate.Cluster => complete(zone)
+          case t: ClusterAggregate.ClusterType => complete(t)
         }
       }
     } ~
     pathPrefix("nodes") {
       pathEndOrSingleSlash {
         post {
-          entity(as[ClusterAggregate.AddRktNode]) { cmd =>
-            onSuccess(zoneAggregateManager ? ClusterCommand(clusterId, cmd)) {
+          entity(as[RktClusterManager.AddRktNode]) { cmd =>
+            onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
               case Uninitialized => complete(StatusCodes.NotFound)
-              case ClusterAggregate.RktNodeAdded(nodeId) =>
-                onSuccess(zoneAggregateManager ?
-                    ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
+              case RktClusterManager.RktNodeAdded(nodeId) =>
+                onSuccess(clusterAggregateManager ?
+                    ClusterCommand(clusterId,
+                        RktClusterManager.GetRktNodeState(nodeId))) {
                   case node: RktNode.NodeConfig =>
                     extractUri { thisUri =>
                       val nodeUri = Uri(thisUri.path / nodeId toString)
@@ -108,10 +109,11 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
     }
   }
 
-  def nodeRoute(clusterId: String)(nodeId: String): Route =
+  def nodeRoute(clusterId: String)(nodeId: String): Route = {
+    import RktClusterManager._
     pathEndOrSingleSlash {
       get {
-        onSuccess(zoneAggregateManager ?
+        onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
           case Uninitialized => complete(StatusCodes.NotFound)
           case node: RktNode.NodeConfig => complete(node)
@@ -120,12 +122,13 @@ class ClusterRoutes(zoneAggregateManager: ActorRef) extends Directives
     } ~
     path("confirm-keys") {
       put {
-        onSuccess(zoneAggregateManager ?
+        onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, ConfirmRktNodeKeys(nodeId))) {
           case Uninitialized => complete(StatusCodes.NotFound)
           case node: RktNode.NodeConfig => complete(node)
         }
       }
     }
+  }
 
 }
