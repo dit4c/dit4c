@@ -40,7 +40,6 @@ object RemoteShell {
       userPublicKey: RSAPublicKey,
       hostPublicKey: RSAPublicKey): CommandExecutor = {
     val jsch = new JSch
-    val username = Random.alphanumeric.take(8).mkString
     jsch.addIdentity("id",
         toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,
         toOpenSshPublicKey(userPublicKey),
