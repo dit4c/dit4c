@@ -4,7 +4,11 @@ name := "dit4c-scheduler"
 
 crossScalaVersions := Nil
 
-scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
+scalacOptions := Seq(
+  "-unchecked",
+  "-deprecation",
+  "-encoding", "utf8",
+  "-Xfatal-warnings")
 
 libraryDependencies ++= {
   Seq(
