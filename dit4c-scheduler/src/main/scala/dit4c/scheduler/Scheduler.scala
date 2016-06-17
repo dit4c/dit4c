@@ -18,10 +18,12 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
 
   override def appName = config.name
 
-  val zoneAggregateManager = system.actorOf(Props[ClusterAggregateManager])
+  val clusterAggregateManager = system.actorOf(
+      Props[ClusterAggregateManager],
+      "cluster-aggregate-manager")
 
   def handler =
-    (new ClusterRoutes(zoneAggregateManager)).routes
+    (new ClusterRoutes(clusterAggregateManager)).routes
 
   def start = {
     Http().bindAndHandle(
