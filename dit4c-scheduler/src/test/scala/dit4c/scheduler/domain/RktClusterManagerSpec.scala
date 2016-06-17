@@ -152,6 +152,67 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         }
       }
     }
+
+    "TerminateInstance" >> {
+      "terminates an instance" >> {
+        val managerPersistenceId = "Cluster-test-rkt"
+        implicit val system =
+          ActorSystem(s"RktClusterManager-TerminateInstance")
+        val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
+        val resolvedPublicKey = randomPublicKey
+        val runnerFactory =
+          (_: RktNode.ServerConnectionDetails, _: String) =>
+            new RktRunner {
+              override def fetch(imageName: String): Future[String] =
+                Future.successful(resolvedImageId)
+              override def start(
+                  instanceId: String,
+                  image: String,
+                  callbackUrl: String): Future[RSAPublicKey] =
+                Future.successful(resolvedPublicKey)
+              override def stop(instanceId: String): Future[Unit] =
+                Future.successful(())
+            }
+
+        val manager =
+            system.actorOf(
+                RktClusterManager.props(runnerFactory,
+                    mockFetchSshHostKey(randomPublicKey)),
+                managerPersistenceId)
+        // Create some nodes
+        val nodeIds = 1.to(3).map { i =>
+          val probe = TestProbe()
+          probe.send(manager, AddRktNode(
+              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          probe.send(manager, ConfirmRktNodeKeys(nodeId))
+          probe.expectMsgType[RktNode.NodeConfig]
+          nodeId
+        }
+        // Schedule an instance
+        val probe = TestProbe()
+        val testImage = NamedImage("docker://dit4c/gotty:latest")
+        val testCallback = "http://example.test/"
+        probe.send(manager, StartInstance(testImage, testCallback))
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        Stream.continually({
+          probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          instanceStatus.state
+        }).filter(_ == Instance.Running).head
+        // Now terminate the instance
+        probe.send(manager, TerminateInstance(response.instanceId))
+        probe.expectMsgType[RktClusterManager.TerminatingInstance.type]
+        // Poll 10 times, 100ms apart to check if we've terminated
+        Stream.fill(10)({
+          Thread.sleep(100)
+          probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          instanceStatus.state
+        }).filter(_ == Instance.Finished).headOption must beSome
+      }
+    }
+
   }
 
   def randomPublicKey: RSAPublicKey = {

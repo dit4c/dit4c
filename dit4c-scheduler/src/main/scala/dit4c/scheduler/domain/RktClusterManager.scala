@@ -71,8 +71,9 @@ object RktClusterManager {
 
   trait Response
   case class StartingInstance(instanceId: InstanceId) extends Response
-  case class RktNodeAdded(nodeId: RktNodeId) extends Response
+  case object TerminatingInstance extends Response
   case object UnknownInstance extends Response
+  case class RktNodeAdded(nodeId: RktNodeId) extends Response
 
 }
 
@@ -84,6 +85,7 @@ class RktClusterManager(
     with ActorLogging {
   import ClusterManager._
   import RktClusterManager._
+  import akka.pattern.{ask, pipe}
 
   lazy val persistenceId = self.path.name
 
@@ -127,17 +129,31 @@ class RktClusterManager(
         case Some(ref) => ref forward Instance.GetStatus
         case None => sender ! UnknownInstance
       }
+    case TerminateInstance(instanceId) =>
+      context.child(InstancePersistenceId(instanceId)) match {
+        case Some(ref) =>
+          implicit val timeout = Timeout(10.seconds)
+          import context.dispatcher
+          (ref ? Instance.Terminate)
+            .collect { case Instance.Ack => TerminatingInstance }
+            .pipeTo(sender)
+        case None => sender ! UnknownInstance
+      }
 
     case RktInstanceScheduler.WorkerFound(nodeId, worker) =>
       operationsAwaitingInstanceWorkers.get(sender).foreach {
         case PendingOperation(requester, StartInstance(image, callbackUrl)) =>
+          implicit val timeout = Timeout(10.seconds)
+          import context.dispatcher
           val instanceId = Instance.newId
           persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
           val instance = context.actorOf(
               Instance.props(worker),
               InstancePersistenceId(instanceId))
-          instance ! Instance.Initiate(instanceId, image, callbackUrl)
-          requester ! StartingInstance(instanceId)
+          // Request start, wait for acknowledgement,
+          (instance ? Instance.Initiate(instanceId, image, callbackUrl))
+            .collect { case Instance.Ack => StartingInstance(instanceId) }
+            .pipeTo(requester)
       }
 
   }

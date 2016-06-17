@@ -64,6 +64,7 @@ object Instance {
   case class StatusReport(
       state: Instance.State,
       data: Instance.Data)
+  case object Ack
 
   trait DomainEvent extends BaseDomainEvent
   case class Initiated(
@@ -100,10 +101,12 @@ class Instance(worker: ActorRef)
   when(JustCreated) {
     case Event(Initiate(id, image @ NamedImage(imageName), callback), _) =>
       val domainEvent = Initiated(id, image, callback)
+      val requester = sender
       goto(WaitingForImage).applying(domainEvent).andThen {
         case data =>
           log.info(s"Fetching image: $image")
           worker ! InstanceWorker.Fetch(image)
+          requester ! Ack
       }
   }
 
@@ -122,14 +125,16 @@ class Instance(worker: ActorRef)
       stay.applying(AssociatedSigningKey(key))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
-      goto(Starting).applying(ConfirmedStart())
+      goto(Running).applying(ConfirmedStart())
   }
 
   when(Running) {
     case Event(Terminate, StartData(id, _, _, _) ) =>
-      // Ask cluster to stop instance
-      worker ! InstanceWorker.Terminate(id)
-      goto(Stopping).applying(RequestedTermination())
+      val requester = sender
+      goto(Stopping).applying(RequestedTermination()).andThen { _ =>
+        worker ! InstanceWorker.Terminate(id)
+        requester ! Ack
+      }
   }
 
   when(Stopping) {
