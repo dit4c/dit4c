@@ -22,6 +22,7 @@ import akka.http.scaladsl.model.Uri
 import play.api.libs.json.Json
 import dit4c.scheduler.domain.Instance
 import java.util.Base64
+import dit4c.scheduler.ssh.RemoteShell
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -31,15 +32,10 @@ object ClusterRoutes {
       (__ \ 'kty).write[String] and
       (__ \ 'e).write[String] and
       (__ \ 'n).write[String]
-  )( (k: RSAPublicKey) => {
-      println(k)
-      println(new String(
-          Base64.getEncoder().encode(
-              dit4c.scheduler.ssh.RemoteShell.toOpenSshPublicKey(k)), "utf8"))
-      (
+  )( (k: RSAPublicKey) => (
       "RSA",
       JwtBase64.encodeString(k.getPublicExponent.toByteArray),
-      JwtBase64.encodeString(k.getModulus.toByteArray)) })
+      JwtBase64.encodeString(k.getModulus.toByteArray)) )
 
   implicit val readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
@@ -132,6 +128,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       entity(as[RktClusterManager.StartInstance]) { cmd =>
         onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
           case Uninitialized => complete(StatusCodes.NotFound)
+          case RktClusterManager.UnableToStartInstance =>
+            complete(StatusCodes.ServiceUnavailable)
           case RktClusterManager.StartingInstance(instanceId) =>
             extractUri { thisUri =>
               val nodeUri = Uri(thisUri.path / instanceId toString)
@@ -179,13 +177,24 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
                 ClusterCommand(clusterId,
                     RktClusterManager.GetRktNodeState(nodeId))) {
               case node: RktNode.NodeConfig =>
-                extractUri { thisUri =>
+                extractUri { thisUri => extractLog { log =>
                   val nodeUri = Uri(thisUri.path / nodeId toString)
+                  val clientPublicKey = new String(
+                      Base64.getEncoder().encode(
+                          RemoteShell.toOpenSshPublicKey(
+                              node.connectionDetails.clientKey.public)),
+                      "utf8")
+                  log.info("Created new node " +
+                      node.connectionDetails.username + "@" +
+                      node.connectionDetails.host + ":" +
+                      node.connectionDetails.port +
+                      " for access with RSA public key: " +
+                      clientPublicKey)
                   complete((
                       StatusCodes.Created,
                       Location(nodeUri) :: Nil,
                       node))
-                }
+                }}
             }
         }
       }

@@ -8,10 +8,9 @@ import akka.actor.ActorLogging
 
 object RktInstanceScheduler {
 
-  sealed trait SchedulerResponse
-  case class WorkerFound(
-      nodeId: String, worker: ActorRef) extends SchedulerResponse
-  case object NoWorkersAvailable extends SchedulerResponse
+  sealed trait Response
+  case class WorkerFound(nodeId: String, worker: ActorRef) extends Response
+  case object NoWorkersAvailable extends Response
 
 }
 

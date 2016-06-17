@@ -71,6 +71,7 @@ object RktClusterManager {
 
   trait Response
   case class StartingInstance(instanceId: InstanceId) extends Response
+  case object UnableToStartInstance extends Response
   case object TerminatingInstance extends Response
   case object UnknownInstance extends Response
   case class RktNodeAdded(nodeId: RktNodeId) extends Response
@@ -140,21 +141,28 @@ class RktClusterManager(
         case None => sender ! UnknownInstance
       }
 
-    case RktInstanceScheduler.WorkerFound(nodeId, worker) =>
+    case msg: RktInstanceScheduler.Response =>
       operationsAwaitingInstanceWorkers.get(sender).foreach {
         case PendingOperation(requester, StartInstance(image, callbackUrl)) =>
-          implicit val timeout = Timeout(10.seconds)
-          import context.dispatcher
-          val instanceId = Instance.newId
-          persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
-          val instance = context.actorOf(
-              Instance.props(worker),
-              InstancePersistenceId(instanceId))
-          // Request start, wait for acknowledgement,
-          (instance ? Instance.Initiate(instanceId, image, callbackUrl))
-            .collect { case Instance.Ack => StartingInstance(instanceId) }
-            .pipeTo(requester)
+          import RktInstanceScheduler._
+          msg match {
+            case WorkerFound(nodeId, worker) =>
+              implicit val timeout = Timeout(10.seconds)
+              import context.dispatcher
+              val instanceId = Instance.newId
+              persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
+              val instance = context.actorOf(
+                  Instance.props(worker),
+                  InstancePersistenceId(instanceId))
+              // Request start, wait for acknowledgement,
+              (instance ? Instance.Initiate(instanceId, image, callbackUrl))
+                .collect { case Instance.Ack => StartingInstance(instanceId) }
+                .pipeTo(requester)
+            case NoWorkersAvailable =>
+              requester ! UnableToStartInstance
+          }
       }
+      operationsAwaitingInstanceWorkers -= sender
 
   }
 

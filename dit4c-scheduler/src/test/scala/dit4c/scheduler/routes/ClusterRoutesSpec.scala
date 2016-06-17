@@ -188,6 +188,30 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen2(Gen.identifier)
       .setGen4(Gen.identifier)
 
+    "unable to start instance" >> prop({
+      (clusterId: String, imageName: String, callbackUrl: Uri) =>
+        val path = basePath / clusterId / "instances"
+        def testActor = new Actor {
+          import ClusterAggregateManager.ClusterCommand
+          import RktClusterManager.{StartInstance, UnableToStartInstance}
+          import Instance.NamedImage
+          val callbackAsString = callbackUrl.toString
+          def receive = {
+            case ClusterCommand(`clusterId`,
+                StartInstance(NamedImage(`imageName`), `callbackAsString`)) =>
+              sender ! UnableToStartInstance
+          }
+        }
+        val postJson = Json.obj(
+            "image" -> imageName,
+            "callback" -> callbackUrl.toString)
+        Post(path, postJson) ~> routes(testActor) ~> check {
+          status must be(StatusCodes.ServiceUnavailable)
+        }
+    }).noShrink // Most likely shrinking won't help narrow down errors
+      .setGen1(genAggregateId)
+      .setGen2(Gen.identifier)
+
    "get instance status" >> prop({
       (clusterId: String, instanceId: String, imageName: String, callbackUrl: Uri) =>
         val path = basePath / clusterId / "instances" / instanceId
