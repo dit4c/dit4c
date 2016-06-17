@@ -63,6 +63,7 @@ object ClusterRoutes {
       case Instance.StartData(id, providedImage, resolvedImage, callbackUrl) =>
         val imageName = providedImage match {
           case Instance.NamedImage(name) => Some(name)
+          case _: Instance.SourceImage => None
         }
         val imageId = resolvedImage.map(_.id)
         (currentState, imageName, imageId, Some(callbackUrl))

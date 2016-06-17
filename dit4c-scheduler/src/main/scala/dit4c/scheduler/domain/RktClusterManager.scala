@@ -124,11 +124,7 @@ class RktClusterManager(
         (instanceSchedulerRef -> PendingOperation(sender,op))
     case GetInstanceStatus(instanceId) =>
       context.child(InstancePersistenceId(instanceId)) match {
-        case Some(ref) =>
-          import akka.pattern.{ask, pipe}
-          import context.dispatcher
-          implicit val timeout = Timeout(1.minute)
-          (ref ? Instance.GetStatus) pipeTo sender
+        case Some(ref) => ref forward Instance.GetStatus
         case None => sender ! UnknownInstance
       }
 
