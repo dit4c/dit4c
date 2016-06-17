@@ -143,7 +143,18 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, GetInstanceStatus(instanceId))) {
           case Uninitialized => complete(StatusCodes.NotFound)
+          case UnknownInstance => complete(StatusCodes.NotFound)
           case status: StatusReport => complete(status)
+        }
+      }
+    } ~
+    path("terminate") {
+      put {
+        onSuccess(clusterAggregateManager ?
+            ClusterCommand(clusterId, TerminateInstance(instanceId))) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case UnknownInstance => complete(StatusCodes.NotFound)
+          case TerminatingInstance => complete(StatusCodes.Accepted)
         }
       }
     }

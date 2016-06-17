@@ -181,7 +181,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
             "image" -> imageName,
             "callback" -> callbackUrl.toString)
         Post(path, postJson) ~> routes(testActor) ~> check {
-          (status must be(StatusCodes.Accepted))
+          status must be(StatusCodes.Accepted)
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
       .setGen1(genAggregateId)
@@ -218,6 +218,24 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen1(genAggregateId)
       .setGen2(Gen.identifier)
       .setGen3(Gen.identifier)
+
+   "terminate instance" >> prop({
+      (clusterId: String, instanceId: String) =>
+        val path = basePath / clusterId / "instances" / instanceId / "terminate"
+        def testActor = new Actor {
+          import ClusterAggregateManager.ClusterCommand
+          import RktClusterManager.{TerminateInstance, TerminatingInstance}
+          def receive = {
+            case ClusterCommand(`clusterId`, TerminateInstance(`instanceId`)) =>
+              sender ! TerminatingInstance
+          }
+        }
+        Put(path) ~> routes(testActor) ~> check {
+          status must be(StatusCodes.Accepted)
+        }
+    }).noShrink // Most likely shrinking won't help narrow down errors
+      .setGen1(genAggregateId)
+      .setGen2(Gen.identifier)
 
   }
 
