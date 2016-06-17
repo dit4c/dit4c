@@ -8,9 +8,10 @@ import akka.actor.ActorLogging
 
 object RktInstanceScheduler {
 
-  trait SchedulerResponse
-  case class WorkerFound(nodeId: String, worker: ActorRef)
-  case object NoWorkersAvailable
+  sealed trait SchedulerResponse
+  case class WorkerFound(
+      nodeId: String, worker: ActorRef) extends SchedulerResponse
+  case object NoWorkersAvailable extends SchedulerResponse
 
 }
 
@@ -43,7 +44,7 @@ class RktInstanceScheduler(
             log.warning(
                 s"Unable to assign instance worker within $completeWithin")
             giveUpAndStop
-          case RktNode.UnableToProvideWorker =>
+          case RktNode.UnableToProvideWorker(msg) =>
             sequentiallyCheckNodes(rest)
         })
         // Query next Node
