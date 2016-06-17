@@ -56,7 +56,7 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
       val username = Random.alphanumeric.take(8).mkString
       val ce: CommandExecutor = RemoteShell(server.getHost,
         server.getPort,
-        username: String,
+        username,
         kp.getPrivate.asInstanceOf[RSAPrivateKey],
         kp.getPublic.asInstanceOf[RSAPublicKey],
         hostPublicKey.asInstanceOf[RSAPublicKey])
@@ -135,7 +135,7 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
 
   val (server, hostPublicKey): (SshServer, PublicKey) = {
     val server = SshServer.setUpDefaultServer()
-    server.setHost("localhost")
+    server.setHost("127.42.7.5") // On loopback, but not localhost
     val (keyPairProvider, publicKey) = generateKeyPairProvider
     server.setKeyPairProvider(keyPairProvider)
     server.setPublickeyAuthenticator(

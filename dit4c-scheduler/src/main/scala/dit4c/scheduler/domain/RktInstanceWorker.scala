@@ -16,8 +16,8 @@ class RktInstanceWorker(runner: RktRunner) extends Actor with InstanceWorker {
       runner.fetch(image.name).andThen {
         case Success(imageId) =>
           instance ! Instance.ReceiveImage(Instance.LocalImage(imageId))
-        case Failure(_) =>
-          instance ! Instance.Error("Unable to fetch image")
+        case Failure(e) =>
+          instance ! error("Unable to fetch image", e)
       }
     case Start(instanceId, Instance.LocalImage(imageId), callbackUrl) =>
       val instance = sender
@@ -25,18 +25,21 @@ class RktInstanceWorker(runner: RktRunner) extends Actor with InstanceWorker {
         case Success(key: RSAPublicKey) =>
           instance ! Instance.AssociateSigningKey(Instance.RSAPublicKey(key))
           instance ! Instance.ConfirmStart
-        case Failure(_) =>
-          instance ! Instance.Error("Unable to start image")
+        case Failure(e) =>
+          instance ! error("Unable to start image", e)
       }
     case Terminate(instanceId) =>
       val instance = sender
       runner.stop(instanceId).andThen {
         case Success(imageId) =>
           instance ! Instance.ConfirmTerminated
-        case Failure(_) =>
-          instance ! Instance.Error("Unable to terminate image")
+        case Failure(e) =>
+          instance ! error("Unable to terminate image", e)
       }
   }
+
+  private def error(msg: String, e: Throwable): Instance.Error =
+    Instance.Error(s"$msg → ${e.getMessage} ${e.getStackTrace.toList}")
 
 
 }

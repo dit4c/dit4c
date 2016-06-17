@@ -65,7 +65,6 @@ object RemoteShell {
 
   def getHostKey(host: String, port: Int): Future[RSAPublicKey] = {
     val jsch = new JSch
-    val username = Random.alphanumeric.take(8).mkString
     val p = Promise[RSAPublicKey]()
     jsch.setHostKeyRepository(new HostKeyRepository {
       def add(x$1: com.jcraft.jsch.HostKey,x$2: com.jcraft.jsch.UserInfo): Unit = ???
@@ -84,7 +83,8 @@ object RemoteShell {
     (new Thread() {
       override def run {
         try {
-          jsch.getSession(host, "", port).connect()
+          val username = ""
+          jsch.getSession(username, host, port).connect()
         } catch {
           case _: JSchException =>
         }
