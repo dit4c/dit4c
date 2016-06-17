@@ -41,7 +41,9 @@ class ClusterAggregateManager extends Actor with ActorLogging {
       sender ! ClusterAggregate.Uninitialized
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
-    case ClusterAggregate.Active if sender.path.name == aggregateId("default") =>
+    case ClusterCommand(id, msg) =>
+      processAggregateCommand(aggregateId(id), msg)
+    case _ if sender.path.name == aggregateId("default") =>
       // Expected from preStart
     case unknownMessage =>
       log.error(s"Unknown message: $unknownMessage")
@@ -49,7 +51,7 @@ class ClusterAggregateManager extends Actor with ActorLogging {
 
   def aggregateId(id: String) = s"Cluster-$id"
 
-  def processAggregateCommand(aggregateId: String, command: ClusterAggregate.Command) = {
+  def processAggregateCommand(aggregateId: String, command: Any) = {
     val maybeChild = context.child(aggregateId)
     maybeChild match {
       case Some(child) =>

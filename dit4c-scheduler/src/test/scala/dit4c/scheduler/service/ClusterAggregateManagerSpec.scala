@@ -35,6 +35,15 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
           be_==(ClusterAggregate.ClusterTypes.Rkt)
         }
       }
+
+      "can receive wrapped messages" >> {
+        val probe = TestProbe()
+        probe.send(clusterAggregateManager,
+            ClusterCommand("default", ClusterAggregate.GetState))
+        probe.expectMsgType[ClusterAggregate.ClusterType] must {
+          be_==(ClusterAggregate.ClusterTypes.Rkt)
+        }
+      }
     }
 
     "not have any other random clusters" >> prop({ id: String =>
