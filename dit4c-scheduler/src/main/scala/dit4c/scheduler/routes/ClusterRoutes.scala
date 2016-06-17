@@ -26,7 +26,7 @@ object ClusterRoutes {
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
 
-  implicit def writesRSAPublicKey: Writes[RSAPublicKey] = (
+  implicit val writesRSAPublicKey: Writes[RSAPublicKey] = (
       (__ \ 'kty).write[String] and
       (__ \ 'e).write[String] and
       (__ \ 'n).write[String]
@@ -35,23 +35,41 @@ object ClusterRoutes {
       JwtBase64.encodeString(k.getPublicExponent.toByteArray),
       JwtBase64.encodeString(k.getModulus.toByteArray)) )
 
-  implicit def readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
+  implicit val readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
       (__ \ 'port).read[Int] and
       (__ \ 'username).read[String]
   )((host: String, port: Int, username: String) =>
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
-  implicit def readsStartInstance: Reads[RktClusterManager.StartInstance] = (
+  implicit val readsStartInstance: Reads[RktClusterManager.StartInstance] = (
       (__ \ 'image).read[String].map(Instance.NamedImage.apply _) and
       (__ \ 'callback).read[String]
   )(RktClusterManager.StartInstance.apply _)
 
-  implicit def writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
+  implicit val writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
 
-  implicit def writesNodeConfig: OWrites[RktNode.NodeConfig] = (
+  implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
+      (__ \ 'state).write[String] and
+      (__ \ 'image \ 'name).write[Option[String]] and
+      (__ \ 'image \ 'id).write[Option[String]] and
+      (__ \ 'callback).write[Option[String]]
+  )( (sr: Instance.StatusReport) => {
+    val currentState = sr.state.identifier
+    sr.data match {
+      case Instance.NoData => (currentState, None, None, None)
+      case Instance.StartData(id, providedImage, resolvedImage, callbackUrl) =>
+        val imageName = providedImage match {
+          case Instance.NamedImage(name) => Some(name)
+        }
+        val imageId = resolvedImage.map(_.id)
+        (currentState, imageName, imageId, Some(callbackUrl))
+    }
+  })
+
+  implicit val writesNodeConfig: OWrites[RktNode.NodeConfig] = (
       (__ \ 'host).write[String] and
       (__ \ 'port).write[Int] and
       (__ \ 'username).write[String] and
@@ -78,9 +96,9 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
   def routes = clusterInstanceRoutes
 
   val clusterInstanceRoutes =
-    pathPrefix("clusters" / Segment)(clusterRoute)
+    pathPrefix("clusters" / Segment)(clusterRoutes)
 
-  def clusterRoute(clusterId: String): Route = {
+  def clusterRoutes(clusterId: String): Route = {
     pathEndOrSingleSlash {
       get {
         onSuccess(clusterAggregateManager ? GetCluster(clusterId)) {
@@ -90,52 +108,69 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       }
     } ~
     pathPrefix("instances") {
-      pathEndOrSingleSlash {
-        post {
-          entity(as[RktClusterManager.StartInstance]) { cmd =>
-            onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
-              case Uninitialized => complete(StatusCodes.NotFound)
-              case RktClusterManager.StartingInstance(instanceId) =>
-                extractUri { thisUri =>
-                  val nodeUri = Uri(thisUri.path / instanceId toString)
-                  complete((
-                      StatusCodes.Accepted,
-                      Location(nodeUri) :: Nil,
-                      Json.obj("id" -> instanceId)))
-                }
-            }
-          }
-        }
-      }
+      pathEndOrSingleSlash(newInstanceRoute(clusterId)) ~
+      pathPrefix(Segment)(instanceRoutes(clusterId))
     } ~
     pathPrefix("nodes") {
-      pathEndOrSingleSlash {
-        post {
-          entity(as[RktClusterManager.AddRktNode]) { cmd =>
-            onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
-              case Uninitialized => complete(StatusCodes.NotFound)
-              case RktClusterManager.RktNodeAdded(nodeId) =>
-                onSuccess(clusterAggregateManager ?
-                    ClusterCommand(clusterId,
-                        RktClusterManager.GetRktNodeState(nodeId))) {
-                  case node: RktNode.NodeConfig =>
-                    extractUri { thisUri =>
-                      val nodeUri = Uri(thisUri.path / nodeId toString)
-                      complete((
-                          StatusCodes.Created,
-                          Location(nodeUri) :: Nil,
-                          node))
-                    }
-                }
-            }
-          }
-        }
-      } ~
-      pathPrefix(Segment)(nodeRoute(clusterId))
+      pathEndOrSingleSlash(newNodeRoute(clusterId)) ~
+      pathPrefix(Segment)(nodeRoutes(clusterId))
     }
   }
 
-  def nodeRoute(clusterId: String)(nodeId: String): Route = {
+  def newInstanceRoute(clusterId: String) =
+    post {
+      entity(as[RktClusterManager.StartInstance]) { cmd =>
+        onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case RktClusterManager.StartingInstance(instanceId) =>
+            extractUri { thisUri =>
+              val nodeUri = Uri(thisUri.path / instanceId toString)
+              complete((
+                  StatusCodes.Accepted,
+                  Location(nodeUri) :: Nil,
+                  Json.obj("id" -> instanceId)))
+            }
+        }
+      }
+    }
+
+  def instanceRoutes(clusterId: String)(instanceId: String): Route = {
+    import RktClusterManager._
+    import Instance._
+    pathEndOrSingleSlash {
+      get {
+        onSuccess(clusterAggregateManager ?
+            ClusterCommand(clusterId, GetInstanceStatus(instanceId))) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case status: StatusReport => complete(status)
+        }
+      }
+    }
+  }
+
+  def newNodeRoute(clusterId: String) =
+    post {
+      entity(as[RktClusterManager.AddRktNode]) { cmd =>
+        onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case RktClusterManager.RktNodeAdded(nodeId) =>
+            onSuccess(clusterAggregateManager ?
+                ClusterCommand(clusterId,
+                    RktClusterManager.GetRktNodeState(nodeId))) {
+              case node: RktNode.NodeConfig =>
+                extractUri { thisUri =>
+                  val nodeUri = Uri(thisUri.path / nodeId toString)
+                  complete((
+                      StatusCodes.Created,
+                      Location(nodeUri) :: Nil,
+                      node))
+                }
+            }
+        }
+      }
+    }
+
+  def nodeRoutes(clusterId: String)(nodeId: String): Route = {
     import RktClusterManager._
     pathEndOrSingleSlash {
       get {

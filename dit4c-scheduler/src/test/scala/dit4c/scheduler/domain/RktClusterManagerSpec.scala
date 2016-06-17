@@ -142,7 +142,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         {
           probe.send(manager, GetInstanceStatus(response.instanceId))
           val instanceStatus =
-            probe.expectMsgType[RktClusterManager.InstanceStatus]
+            probe.expectMsgType[Instance.StatusReport]
           instanceStatus.data must beLike {
             case Instance.StartData(id, providedImage, _, callback) =>
               ( id must be_==(response.instanceId) ) and

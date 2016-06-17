@@ -62,21 +62,6 @@ object RktClusterManager {
   case class GetInstanceStatus(id: Instance.Id) extends Command
   case class TerminateInstance(id: Instance.Id) extends Command
 
-  trait InstanceRelatedCommand extends Command { def instanceId: Instance.Id }
-  case class CommandForInstance(
-      instanceId: Instance.Id,
-      cmd: Instance.Command) extends InstanceRelatedCommand
-  case class DirectiveFromInstance(
-      instanceId: Instance.Id,
-      directive: InstanceDirective) extends InstanceRelatedCommand
-
-  trait InstanceDirective
-  object InstanceDirectives {
-    case class Fetch(image: Instance.NamedImage) extends InstanceDirective
-    case class Start(image: Instance.LocalImage) extends InstanceDirective
-    case object Stop extends InstanceDirective
-  }
-
   trait DomainEvent
   case class RktNodeRegistered(
       nodeId: String, timestamp: Instant = Instant.now) extends DomainEvent
@@ -85,9 +70,8 @@ object RktClusterManager {
       timestamp: Instant = Instant.now) extends DomainEvent
 
   trait Response
-  case class RktNodeAdded(nodeId: RktNodeId) extends Response
   case class StartingInstance(instanceId: InstanceId) extends Response
-  case class InstanceStatus(data: Instance.Data) extends Response
+  case class RktNodeAdded(nodeId: RktNodeId) extends Response
   case object UnknownInstance extends Response
 
 }
@@ -141,14 +125,10 @@ class RktClusterManager(
     case GetInstanceStatus(instanceId) =>
       context.child(InstancePersistenceId(instanceId)) match {
         case Some(ref) =>
-          import akka.pattern.ask
+          import akka.pattern.{ask, pipe}
           import context.dispatcher
           implicit val timeout = Timeout(1.minute)
-          val requester = sender
-          (ref ? Instance.GetStatus).foreach {
-            case data: Instance.Data =>
-              requester ! InstanceStatus(data)
-          }
+          (ref ? Instance.GetStatus) pipeTo sender
         case None => sender ! UnknownInstance
       }
 

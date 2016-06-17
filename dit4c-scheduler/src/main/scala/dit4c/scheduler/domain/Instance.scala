@@ -60,6 +60,11 @@ object Instance {
   case object ConfirmTerminated extends Command
   case class Error(msg: String) extends Command
 
+  trait Response
+  case class StatusReport(
+      state: Instance.State,
+      data: Instance.Data)
+
   trait DomainEvent extends BaseDomainEvent
   case class Initiated(
       val instanceId: String,
@@ -144,7 +149,7 @@ class Instance(worker: ActorRef)
 
   whenUnhandled {
     case Event(GetStatus, data) =>
-      stay replying data
+      stay replying StatusReport(stateName, data)
     case Event(Error(msg), _) =>
       goto(Errored).applying(ErrorOccurred(msg))
   }

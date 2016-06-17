@@ -188,6 +188,37 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen2(Gen.identifier)
       .setGen4(Gen.identifier)
 
+   "get instance status" >> prop({
+      (clusterId: String, instanceId: String, imageName: String, callbackUrl: Uri) =>
+        val path = basePath / clusterId / "instances" / instanceId
+        def testActor = new Actor {
+          import ClusterAggregateManager.ClusterCommand
+          import RktClusterManager.GetInstanceStatus
+          import Instance.{StatusReport, WaitingForImage, StartData, NamedImage}
+          def receive = {
+            case ClusterCommand(`clusterId`, GetInstanceStatus(`instanceId`)) =>
+              sender ! StatusReport(
+                  Instance.WaitingForImage,
+                  StartData(
+                      instanceId,
+                      NamedImage(imageName),
+                      None,
+                      callbackUrl.toString))
+          }
+        }
+        Get(path) ~> routes(testActor) ~> check {
+          (status must be(StatusCodes.OK)) and
+          (Json.prettyPrint(entityAs[JsValue]) must {
+            /("state" -> Instance.WaitingForImage.identifier) and
+            /("image") /("name" -> imageName) and
+            /("callback" -> callbackUrl.toString)
+          })
+        }
+    }).noShrink // Most likely shrinking won't help narrow down errors
+      .setGen1(genAggregateId)
+      .setGen2(Gen.identifier)
+      .setGen3(Gen.identifier)
+
   }
 
   private implicit val arbNodeConfig = Arbitrary(genNodeConfig(false))
