@@ -46,6 +46,7 @@ object Instance {
       providedImage: SourceImage,
       resolvedImage: Option[LocalImage],
       callbackUrl: String) extends Data
+  case class ErrorData(errors: List[String]) extends Data
 
   trait Command
   case object GetStatus extends Command
@@ -167,6 +168,10 @@ class Instance(worker: ActorRef)
         StartData(id, image, None, callback)
       case (FetchedImage(image, _), data: StartData) =>
         data.copy(resolvedImage = Some(image))
+      case (ErrorOccurred(msg, _), errorData: ErrorData) =>
+        errorData.copy(errors = errorData.errors :+ msg)
+      case (ErrorOccurred(msg, _), _) =>
+        ErrorData(List(msg))
       case (e, d) =>
         stop(PersistentFSM.Failure(s"Unhandled event/state: ($e, $d)"))
         d

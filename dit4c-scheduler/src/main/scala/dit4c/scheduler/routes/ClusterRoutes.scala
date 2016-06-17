@@ -21,6 +21,7 @@ import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.Uri
 import play.api.libs.json.Json
 import dit4c.scheduler.domain.Instance
+import java.util.Base64
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -30,10 +31,15 @@ object ClusterRoutes {
       (__ \ 'kty).write[String] and
       (__ \ 'e).write[String] and
       (__ \ 'n).write[String]
-  )( (k: RSAPublicKey) => (
+  )( (k: RSAPublicKey) => {
+      println(k)
+      println(new String(
+          Base64.getEncoder().encode(
+              dit4c.scheduler.ssh.RemoteShell.toOpenSshPublicKey(k)), "utf8"))
+      (
       "RSA",
       JwtBase64.encodeString(k.getPublicExponent.toByteArray),
-      JwtBase64.encodeString(k.getModulus.toByteArray)) )
+      JwtBase64.encodeString(k.getModulus.toByteArray)) })
 
   implicit val readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
@@ -53,20 +59,23 @@ object ClusterRoutes {
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
       (__ \ 'state).write[String] and
-      (__ \ 'image \ 'name).write[Option[String]] and
-      (__ \ 'image \ 'id).write[Option[String]] and
-      (__ \ 'callback).write[Option[String]]
+      (__ \ 'image \ 'name).writeNullable[String] and
+      (__ \ 'image \ 'id).writeNullable[String] and
+      (__ \ 'callback).writeNullable[String] and
+      (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier
     sr.data match {
-      case Instance.NoData => (currentState, None, None, None)
+      case Instance.NoData => (currentState, None, None, None, None)
       case Instance.StartData(id, providedImage, resolvedImage, callbackUrl) =>
         val imageName = providedImage match {
           case Instance.NamedImage(name) => Some(name)
           case _: Instance.SourceImage => None
         }
         val imageId = resolvedImage.map(_.id)
-        (currentState, imageName, imageId, Some(callbackUrl))
+        (currentState, imageName, imageId, Some(callbackUrl), None)
+      case Instance.ErrorData(errors) =>
+        (currentState, None, None, None, Some(errors))
     }
   })
 
@@ -88,7 +97,7 @@ object ClusterRoutes {
 class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
     with PlayJsonSupport {
 
-  implicit val timeout = Timeout(10.seconds)
+  implicit val timeout = Timeout(1.minute)
   import akka.pattern.ask
   import ClusterRoutes._
   import ClusterAggregateManager._
