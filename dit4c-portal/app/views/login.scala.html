@@ -1,0 +1,39 @@
+@(form: Form[controllers.LoginData])
+
+<!DOCTYPE html>
+<html>
+<head>
+<script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
+</script>
+<link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<style is="custom-style" include="iron-flex"></style>
+<style is="custom-style">
+body {
+  background-color: var(--paper-blue-500);
+}
+#login-prompt {
+  padding: 20px;
+  border-radius: 5px;
+  background-color: white;
+}
+</style>
+</head>
+<body class="fullbleed vertical layout">
+
+<div class="layout vertical center center-justified" style="height: 100vh">
+  <div id="login-prompt" class="layout vertical center center-justified">
+	  <div>
+	    <paper-input label="User ID">Some Random User</paper-input>
+	  </div>
+	  <div>
+	    <paper-button>Login</paper-button>
+	  </div>
+  </div>
+</div>
+
+</body>
+</html>

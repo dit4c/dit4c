@@ -1,0 +1,4 @@
+GET     /                           controllers.MainController.index
+POST    /login                      controllers.MainController.login
+GET     /assets/lib/*file           controllers.MainController.webjars(path="/public/lib", file)
+GET     /assets/*file               controllers.Assets.versioned(path="/public", file)
