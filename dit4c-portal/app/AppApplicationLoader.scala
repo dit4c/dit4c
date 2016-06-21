@@ -1,6 +1,7 @@
 import controllers.{Assets, MainController}
 import play.api.ApplicationLoader.Context
 import play.api._
+import play.api.i18n._
 import play.api.routing.Router
 import router.Routes
 import com.softwaremill.macwire._
@@ -17,6 +18,8 @@ class AppComponents(context: Context)
     lazy val prefix = "/"
     wire[Routes]
   }
+  lazy val langs: Langs = wire[DefaultLangs]
+  lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
 }

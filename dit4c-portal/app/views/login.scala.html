@@ -1,11 +1,10 @@
-@(form: Form[controllers.LoginData])
+@(form: Form[controllers.LoginData])(implicit messages: Messages)
 
 <!DOCTYPE html>
 <html>
 <head>
 <script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
 </script>
-<link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
@@ -15,24 +14,37 @@
 body {
   background-color: var(--paper-blue-500);
 }
-#login-prompt {
+#login-form {
   padding: 20px;
   border-radius: 5px;
   background-color: white;
 }
 </style>
+<script>
+function submit(form) {
+	var valid = Polymer.dom(form).querySelectorAll('paper-input').reduce(function(wasValid, n) {
+		return wasValid && n.validate();
+	}, true);
+	if (valid) {
+	  form.submit()
+	}
+}
+</script>
 </head>
 <body class="fullbleed vertical layout">
 
 <div class="layout vertical center center-justified" style="height: 100vh">
-  <div id="login-prompt" class="layout vertical center center-justified">
+  <form class="layout vertical center center-justified" id="login-form" method="post" action="@routes.MainController.login">
 	  <div>
-	    <paper-input label="User ID">Some Random User</paper-input>
+	    <paper-input label="User ID" id="user-id-field" name="user-id" value='@{form.value.map(_.userId).getOrElse("")}'
+	       @if(!form.errors("user-id").isEmpty) { invalid }
+	       auto-validate required
+	       error-message='@{form.errors("user-id").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
 	  </div>
 	  <div>
-	    <paper-button>Login</paper-button>
+	    <paper-button onclick="submit(document.getElementById('login-form'))">Login</paper-button>
 	  </div>
-  </div>
+  </form>
 </div>
 
 </body>

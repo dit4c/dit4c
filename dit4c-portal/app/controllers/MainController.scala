@@ -3,8 +3,11 @@ package controllers
 import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
+import play.api.i18n._
 
-class MainController() extends Controller {
+class MainController(val messagesApi: MessagesApi) extends Controller
+    with I18nSupport {
+
   def index = UserAction { request =>
     request.userId match {
       case Some(userId) =>
