@@ -27,8 +27,16 @@ object Instance {
 
   /**
    * 128-bit identifier as hexadecimal
+   *
+   * Intended to be long enough that it's globally unlikely to have a collision,
+   * but based on time so it can also be sorted.
    */
-  def newId = Seq.fill(16)(Random.nextInt(255)).map(i => f"$i%x").mkString
+  def newId = {
+    val now = Instant.now
+    f"${now.getEpochSecond}%016x".takeRight(10) + // 40-bit epoch seconds
+    f"${now.getNano / 100}%06x" + // 24-bit 100 nanosecond slices
+    f"${Random.nextLong}%016x" // 64-bits of random
+  }
 
   trait State extends BasePersistentFSMState
   case object JustCreated extends State
