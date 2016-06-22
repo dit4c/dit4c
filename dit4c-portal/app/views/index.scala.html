@@ -1,4 +1,4 @@
-@(userId: String, pageTitle: String = "App Instances")
+@(imageNames: Seq[String], pageTitle: String = "App Instances")
 
 <!DOCTYPE html>
 <html>
@@ -34,7 +34,7 @@ app-header {
 .section-heading {
   @@apply(--paper-font-subhead);
 }
-paper-fab {
+#new-instance-open-button {
   position: absolute;
   top: 35px;
   left: 16px;
@@ -100,13 +100,13 @@ function hideNewInstanceDialog() {
       <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
 		    <paper-dropdown-menu label="Image" name="image" required>
 		      <paper-listbox class="dropdown-content">
-		        <paper-item>IPython</paper-item>
-	          <paper-item>RStudio</paper-item>
-	          <paper-item>NLTK</paper-item>
+		        @for(imageName <- imageNames) {
+		        <paper-item>@imageName</paper-item>
+		        }
 		      </paper-listbox>
 		    </paper-dropdown-menu>
-	      <paper-dropdown-menu label="Cluster" placeholder="Default" disabled>
-				  <paper-listbox class="dropdown-content" selected="1">
+	      <paper-dropdown-menu label="Cluster" name="cluster" required>
+				  <paper-listbox class="dropdown-content" selected="0">
 				    <paper-item>Default</paper-item>
 				  </paper-listbox>
 				</paper-dropdown-menu>

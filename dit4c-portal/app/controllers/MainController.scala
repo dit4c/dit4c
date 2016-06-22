@@ -4,6 +4,7 @@ import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.i18n._
+import scala.concurrent.Future
 
 class MainController(val messagesApi: MessagesApi) extends Controller
     with I18nSupport {
@@ -11,10 +12,21 @@ class MainController(val messagesApi: MessagesApi) extends Controller
   def index = UserAction { request =>
     request.userId match {
       case Some(userId) =>
-        Ok(views.html.index(userId))
+        Ok(views.html.index(imageLookup.keys.toList.sorted))
       case None =>
         Ok(views.html.login(loginForm))
     }
+  }
+
+  def newInstance = (UserAction andThen UserRequired).async { implicit request =>
+    newInstanceForm(request.userId.get).bindFromRequest.fold(
+        formWithErrors => {
+          Future.successful(BadRequest(""))
+        },
+        userData => {
+          ???
+        }
+    )
   }
 
   def login = Action { implicit request =>
@@ -59,5 +71,38 @@ class MainController(val messagesApi: MessagesApi) extends Controller
         "user-id" -> nonEmptyText
     )(LoginData.apply)(LoginData.unapply)
   )
+
+  def newInstanceForm(userId: String) = Form(
+    mapping(
+        "image" -> nonEmptyText,
+        "cluster" -> nonEmptyText
+    )(NewInstanceRequest.apply)(NewInstanceRequest.unapply).verifying(r =>
+        imageLookup.contains(r.image) && clusterLookup.contains(r.cluster)
+    )
+  )
+
+  case class NewInstanceRequest(image: String, cluster: String)
+
+  object UserRequired extends ActionFilter[UserRequest] {
+    def filter[A](input: UserRequest[A]) = Future.successful {
+      if (input.userId.isEmpty)
+        Some(Forbidden)
+      else
+        None
+    }
+  }
+
+  private val imageLookup = Map(
+    "IPython"      -> "docker://dit4c/dit4c-container-ipython",
+    "OpenRefine"   -> "docker://dit4c/dit4c-container-openrefine",
+    "NLTK"         -> "docker://dit4c/dit4c-container-nltk",
+    "RStudio"      -> "docker://dit4c/dit4c-container-rstudio"
+  )
+
+  private val clusterLookup = Map(
+    "Default" -> "default"
+  )
+
+
 
 }

@@ -3,6 +3,7 @@ import play.core.PlayVersion.{current => playV}
 name := "dit4c-portal"
 
 libraryDependencies ++= Seq(
+  specs2,
   "com.softwaremill.macwire"  %%  "macros"            % "2.2.3"   % "provided",
   "org.specs2"                %%  "specs2-core"       % "3.6"     % "test",
   "org.specs2"                %%  "specs2-scalacheck" % "3.6"     % "test"
