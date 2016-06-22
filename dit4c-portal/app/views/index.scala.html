@@ -1,12 +1,129 @@
-@()
+@(userId: String, pageTitle: String = "App Instances")
 
 <!DOCTYPE html>
 <html>
 <head>
+<title>DIT4C</title>
 <script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
 </script>
+<link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-form/iron-form.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-icons/iron-icons.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-icons/social-icons.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-image/iron-image.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-fab/paper-fab.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-dropdown-menu/paper-dropdown-menu.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-item/paper-item.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-listbox/paper-listbox.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/app-layout/app-layout.html")">
+<style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning"></style>
+<style is="custom-style">
+app-header {
+  height: 64px;
+  color: white;
+  background-color: var(--paper-blue-500);
+}
+#page-title {
+  @@apply(--paper-font-headline);
+}
+.section-heading {
+  @@apply(--paper-font-subhead);
+}
+paper-fab {
+  position: absolute;
+  top: 35px;
+  left: 16px;
+  z-index: 100;
+}
+.card-container {
+  min-height: 300px;
+}
+#content-wrapper {
+  overflow: hidden;
+}
+#main-content {
+  background-color: var(--paper-grey-100);
+  padding: 48px;
+  height: 100%;
+  width: 100%;
+}
+#new-instance-dialog {
+  height: 100%;
+  width: 100%;
+  padding: 48px;
+}
+#new-instance-close-button {
+  position: fixed;
+  right: 48px;
+}
+paper-dropdown-menu {
+  width: 200px;
+  margin-right: 20px;
+}
+#new-instance-form paper-button:not([disabled]) {
+  background: var(--paper-light-blue-500);
+  color: white;
+}
+</style>
+<script type="text/javascript">
+function showNewInstanceDialog() {
+  document.getElementById("new-instance-dialog").style.display = "";
+  document.getElementById("new-instance-open-button").style.display = "none";
+}
+function hideNewInstanceDialog() {
+  document.getElementById("new-instance-dialog").style.display = "none";
+  document.getElementById("new-instance-open-button").style.display = "";
+}
+</script>
 </head>
-<body>
-
+<body class="fullbleed">
+<app-header-layout>
+  <app-header condenses fixed>
+    <app-toolbar class="layout container horizontal justified">
+      <div></div>
+      <div id="page-title">@pageTitle</div>
+      <div></div>
+	  </app-toolbar>
+    <paper-fab icon="add" id="new-instance-open-button" title="New Instance" onclick="showNewInstanceDialog()"></paper-fab>
+	</app-header>
+	<div id="content-wrapper">
+    <div id="new-instance-dialog" class="layout vertical" style="display: none">
+      <paper-icon-button icon="close" id="new-instance-close-button"
+        title="close form"
+        onclick="hideNewInstanceDialog()"></paper-icon-button>
+      <div class="section-heading">New Instance</div>
+      <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
+		    <paper-dropdown-menu label="Image" name="image" required>
+		      <paper-listbox class="dropdown-content">
+		        <paper-item>IPython</paper-item>
+	          <paper-item>RStudio</paper-item>
+	          <paper-item>NLTK</paper-item>
+		      </paper-listbox>
+		    </paper-dropdown-menu>
+	      <paper-dropdown-menu label="Cluster" placeholder="Default" disabled>
+				  <paper-listbox class="dropdown-content" selected="1">
+				    <paper-item>Default</paper-item>
+				  </paper-listbox>
+				</paper-dropdown-menu>
+				<paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
+			</form>
+    </div>
+	  <div id="main-content" class="layout vertical">
+	    
+	    <div class="section-heading">Running Instances</div>
+	    <div class="card-container">
+	    
+	    </div>
+	    <div class="section-heading">Finished Instances</div>
+	    <div class="card-container">
+	    </div>
+	  </div>
+  </div>
+</app-header-layout>
 </body>
 </html>

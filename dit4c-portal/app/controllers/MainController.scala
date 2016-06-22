@@ -11,7 +11,7 @@ class MainController(val messagesApi: MessagesApi) extends Controller
   def index = UserAction { request =>
     request.userId match {
       case Some(userId) =>
-        Ok(views.html.index())
+        Ok(views.html.index(userId))
       case None =>
         Ok(views.html.login(loginForm))
     }
@@ -37,12 +37,20 @@ class MainController(val messagesApi: MessagesApi) extends Controller
   private val fudgeFileLocation: String => String = {
     case s if s.startsWith("polymer") =>
       "github-com-Polymer-"+s
+    case s if s.startsWith("promise-polyfill") =>
+      "github-com-PolymerLabs-"+s
+    case s if s.startsWith("app-") =>
+      "github-com-PolymerElements-"+s
     case s if s.startsWith("font-") =>
       "github-com-PolymerElements-"+s
     case s if s.startsWith("iron-") =>
       "github-com-PolymerElements-"+s
+    case s if s.startsWith("neon-") =>
+      "github-com-PolymerElements-"+s
     case s if s.startsWith("paper-") =>
       "github-com-PolymerElements-"+s
+    case s if s.startsWith("web-animations-js") =>
+      "github-com-web-animations-"+s
     case s => s
   }
 
