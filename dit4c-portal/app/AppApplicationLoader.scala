@@ -5,9 +5,17 @@ import play.api.i18n._
 import play.api.routing.Router
 import router.Routes
 import com.softwaremill.macwire._
+import com.softwaremill.tagging._
+import akka.actor.ActorSystem
+import services.InstanceAggregateManager
+import services.ClusterAggregateManager
+import akka.actor.Props
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
+    LoggerConfigurator(context.environment.classLoader).foreach {
+      _.configure(context.environment)
+    }
     (new AppComponents(context)).application
   }
 }
@@ -20,6 +28,14 @@ class AppComponents(context: Context)
   }
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
+  val clusterAggregateManager = actorSystem.actorOf(
+      Props(classOf[ClusterAggregateManager]))
+      .taggedWith[ClusterAggregateManager]
+  val instanceAggregateManager = actorSystem.actorOf(
+      Props(classOf[InstanceAggregateManager], clusterAggregateManager))
+      .taggedWith[InstanceAggregateManager]
+  Logger.debug("Test error")
+  actorSystem.log.error("Test from actor system")
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
 }

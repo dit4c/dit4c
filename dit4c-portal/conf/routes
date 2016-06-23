@@ -1,5 +1,6 @@
 GET     /                           controllers.MainController.index
 POST    /login                      controllers.MainController.login
 POST    /instances/                 controllers.MainController.newInstance
+PUT     /instances/                 controllers.MainController.instanceRegistration
 GET     /assets/lib/*file           controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file)

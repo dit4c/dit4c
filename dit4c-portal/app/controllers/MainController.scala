@@ -4,10 +4,23 @@ import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.i18n._
+import com.softwaremill.tagging._
 import scala.concurrent.Future
+import scala.concurrent.duration._
+import akka.pattern.ask
+import akka.actor.ActorRef
+import services.InstanceAggregateManager
+import domain.InstanceAggregate
+import akka.util.Timeout
+import scala.concurrent.ExecutionContext
 
-class MainController(val messagesApi: MessagesApi) extends Controller
+class MainController(
+    val messagesApi: MessagesApi,
+    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager)
+    extends Controller
     with I18nSupport {
+
+  import play.api.libs.concurrent.Execution.Implicits._
 
   def index = UserAction { request =>
     request.userId match {
@@ -24,7 +37,14 @@ class MainController(val messagesApi: MessagesApi) extends Controller
           Future.successful(BadRequest(""))
         },
         userData => {
-          ???
+          implicit val timeout = Timeout(1.minute)
+          (instanceAggregateManager ? InstanceAggregateManager.StartInstance(
+              clusterLookup(userData.cluster),
+              imageLookup(userData.image),
+              routes.MainController.instanceRegistration.absoluteURL())).map {
+            case InstanceAggregate.RemoteStatus(state) =>
+              Ok(state)
+          }
         }
     )
   }
@@ -42,6 +62,10 @@ class MainController(val messagesApi: MessagesApi) extends Controller
     )
   }
 
+  def instanceRegistration = Action(parse.json) { implicit request =>
+    println(request)
+    ???
+  }
 
   def webjars(path: String, file: String) =
     Assets.versioned(path, fudgeFileLocation(file))

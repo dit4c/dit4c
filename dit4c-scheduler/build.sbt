@@ -12,7 +12,7 @@ scalacOptions := Seq(
 
 libraryDependencies ++= {
   Seq(
-    "ch.qos.logback"      %   "logback-classic"       % "1.1.7",
+    "ch.qos.logback"      %   "logback-classic"       % logbackV,
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,
     "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
     "com.jcraft"          %   "jsch"                  % "0.1.53",

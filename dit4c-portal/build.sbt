@@ -1,12 +1,19 @@
+import SharedDependencyVersions._
 import play.core.PlayVersion.{current => playV}
 
 name := "dit4c-portal"
 
 libraryDependencies ++= Seq(
+  "com.softwaremill.macwire"  %%  "macros"  % macwireV    % "provided",
+  "com.softwaremill.macwire"  %%  "util"    % macwireV,
+  "de.heikoseeberger"         %%  "akka-http-play-json"   % "1.7.0",
+  "com.typesafe.akka"         %%  "akka-http-core"        % akkaV,
+  "com.typesafe.akka"         %%  "akka-persistence"      % akkaV,
+  "org.iq80.leveldb"          %   "leveldb"               % "0.7",
+  "org.fusesource.leveldbjni" %   "leveldbjni-all"        % "1.8",
   specs2,
-  "com.softwaremill.macwire"  %%  "macros"            % "2.2.3"   % "provided",
-  "org.specs2"                %%  "specs2-core"       % "3.6"     % "test",
-  "org.specs2"                %%  "specs2-scalacheck" % "3.6"     % "test"
+  "org.specs2"                %%  "specs2-core"       % specs2V % "test",
+  "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test"
 )
 
 // Bower WebJars
@@ -45,3 +52,6 @@ libraryDependencies ++= {
 scalacOptions ++= Seq("-feature")
 
 routesGenerator := InjectedRoutesGenerator
+
+// Speed up resolution times
+updateOptions := updateOptions.value.withCachedResolution(true)
