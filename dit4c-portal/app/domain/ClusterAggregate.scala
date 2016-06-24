@@ -17,11 +17,14 @@ object ClusterAggregate {
   sealed trait Command
   case class StartInstance(image: String, callback: Uri) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
+  case class TerminateInstance(instanceId: String) extends Command
 
   sealed trait Response
-  case class InstanceStarted(clusterId: String, instanceId: String) extends Response
   case class InstanceStatus(httpResponse: HttpResponse) extends Response
+  case class InstanceStarted(clusterId: String, instanceId: String) extends Response
   case object UnableToStartInstance extends Response
+  case class InstanceTerminating(instanceId: String) extends Response
+  case object UnableToTerminateInstance extends Response
 
 
 }
@@ -42,6 +45,8 @@ class ClusterAggregate(
       startInstance(image, callback) pipeTo sender
     case GetInstanceStatus(instanceId) =>
       getInstanceStatus(instanceId) pipeTo sender
+    case TerminateInstance(instanceId) =>
+      terminateInstance(instanceId) pipeTo sender
   }
 
   def startInstance(image: String, callback: Uri): Future[Response] = {
@@ -66,6 +71,22 @@ class ClusterAggregate(
       case e: Throwable =>
         log.error("Unable to start instance: "+e.getMessage)
         UnableToStartInstance
+    }
+  }
+
+  def terminateInstance(instanceId: String): Future[Response] = {
+    val path = baseUri.withPath(baseUri.path / "instances" / instanceId / "terminate")
+    val request = HttpRequest(
+        method = HttpMethods.PUT,
+        uri = path)
+    http.singleRequest(request).collect {
+      case HttpResponse(StatusCodes.Accepted, headers, _, _) =>
+        log.info("Request accepted")
+        InstanceTerminating(instanceId)
+    }.recover {
+      case e: Throwable =>
+        log.error("Unable to terminate instance: "+e.getMessage)
+        UnableToTerminateInstance
     }
   }
 

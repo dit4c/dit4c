@@ -12,6 +12,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/iron-icons/social-icons.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-image/iron-image.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-card/paper-card.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-fab/paper-fab.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-dropdown-menu/paper-dropdown-menu.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
@@ -31,17 +32,11 @@ app-header {
 #page-title {
   @@apply(--paper-font-headline);
 }
-.section-heading {
-  @@apply(--paper-font-subhead);
-}
 #new-instance-open-button {
   position: absolute;
   top: 35px;
   left: 16px;
   z-index: 100;
-}
-.card-container {
-  min-height: 300px;
 }
 #content-wrapper {
   overflow: hidden;
@@ -50,7 +45,6 @@ app-header {
   background-color: var(--paper-grey-100);
   padding: 48px;
   height: 100%;
-  width: 100%;
 }
 #new-instance-dialog {
   height: 100%;
@@ -69,6 +63,9 @@ paper-dropdown-menu {
   background: var(--paper-light-blue-500);
   color: white;
 }
+.section-heading {
+  @@apply(--paper-font-subhead);
+}
 </style>
 <script type="text/javascript">
 function showNewInstanceDialog() {
@@ -80,6 +77,99 @@ function hideNewInstanceDialog() {
   document.getElementById("new-instance-open-button").style.display = "";
 }
 </script>
+<dom-module id="instances-container">
+  <style>
+	.section-heading {
+	  @@apply(--paper-font-subhead);
+	}	
+	.card-container {
+	  min-height: 300px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+	}
+	paper-card {
+	  margin-right: 10px;
+	  margin-bottom: 10px;
+  }
+	.instance-id {
+	  @@apply(--paper-font-body2);
+	}
+	.instance-state {
+	  @@apply(--paper-font-body1);
+	}
+  </style>
+  <template>
+    <iron-ajax
+      auto
+      id="ajax-get-instances"
+      url="@routes.MainController.getInstances"
+      handle-as="json"
+      last-response="{{instancesResponse}}"
+      debounce-duration="300"></iron-ajax>
+    <div class="layout vertical" style="width: 100%">
+	    <div class="section-heading">Running Instances</div>
+	    <div class="card-container">
+	      <template id="running-instances" is="dom-repeat" items="[[instancesResponse.instances]]" filter="isRunning" observe="state">
+	        <paper-card>
+	          <div class="card-content">
+	            <div class="instance-id">{{item.id}}</div>
+	            <div class="instance-state">{{item.state}}</div>
+	          </div>
+	          <div class="card-actions">
+              <iron-request id="xhr-{{item.id}}"></iron-request>
+	            <div class="layout horizontal end-justified">
+	              <paper-icon-button icon="close"
+	                title="terminate instance"
+	                onclick="{{terminate(item.id)}}"></paper-icon-button>
+	            </div>
+	          </div>
+	        </paper-card>
+	      </template>
+	    </div>
+	    <div class="section-heading">Previous Instances</div>
+	    <div class="card-container">
+	      <template is="dom-repeat" items="[[instancesResponse.instances]]" filter="isPrevious" observe="state">
+	        <paper-card>
+	          <div class="card-content">
+	            <div class="instance-id">{{item.id}}</div>
+	            <div class="instance-state">{{item.state}}</div>
+	          </div>
+	        </paper-card>
+	      </template>
+	    </div>
+    </div>
+  </template>
+  <script>
+  Polymer({
+    is: "instances-container",
+    isPrevious: function(item) {
+      return item.state == "Stopping" || item.state == "Finished";
+    },
+    isRunning: function(item) {
+      return !this.isPrevious(item);
+    },
+    ready: function() {
+      this.polling();
+    },
+    polling: function() {
+      this.refresh();
+    	this.async(this.polling, 10000);
+    },  
+    refresh: function() {
+    	document.getElementById('ajax-get-instances').generateRequest();
+    },
+    terminate: function(instanceId) {
+      var xhr = Polymer.dom(this.root).querySelector('#xhr-'+instanceId);
+      var refresh = this.refresh;
+      return function() {
+        xhr.send({
+	        url: "@routes.MainController.getInstances()"+instanceId+"/terminate",
+	        method: "PUT"
+	      }).then(refresh);
+      };
+    }
+  });   
+  </script>
 </head>
 <body class="fullbleed">
 <app-header-layout>
@@ -112,18 +202,20 @@ function hideNewInstanceDialog() {
 				</paper-dropdown-menu>
 				<paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
 			</form>
+			<script>
+			document.getElementById("new-instance-form").addEventListener('iron-form-response', function(event) {
+			  console.log(event);
+			  document.getElementById('instances').refresh()
+			});
+			</script>
     </div>
-	  <div id="main-content" class="layout vertical">
-	    
-	    <div class="section-heading">Running Instances</div>
-	    <div class="card-container">
-	    
-	    </div>
-	    <div class="section-heading">Finished Instances</div>
-	    <div class="card-container">
-	    </div>
+	  <div id="main-content">
+      <instances-container id="instances"></instances-container>
 	  </div>
   </div>
 </app-header-layout>
+<script type="text/javascript">
+
+</script>
 </body>
 </html>

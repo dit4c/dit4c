@@ -7,8 +7,7 @@ import router.Routes
 import com.softwaremill.macwire._
 import com.softwaremill.tagging._
 import akka.actor.ActorSystem
-import services.InstanceAggregateManager
-import services.ClusterAggregateManager
+import services._
 import akka.actor.Props
 
 class AppApplicationLoader extends ApplicationLoader {
@@ -34,8 +33,9 @@ class AppComponents(context: Context)
   val instanceAggregateManager = actorSystem.actorOf(
       Props(classOf[InstanceAggregateManager], clusterAggregateManager))
       .taggedWith[InstanceAggregateManager]
-  Logger.debug("Test error")
-  actorSystem.log.error("Test from actor system")
+  val userAggregateManager = actorSystem.actorOf(
+      Props(classOf[UserAggregateManager], instanceAggregateManager))
+      .taggedWith[UserAggregateManager]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
 }

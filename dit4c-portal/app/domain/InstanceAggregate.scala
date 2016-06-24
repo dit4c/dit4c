@@ -31,6 +31,7 @@ object InstanceAggregate {
 
   sealed trait Command
   case object GetStatus extends Command
+  case object Terminate extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
 
   sealed trait Response
@@ -85,6 +86,12 @@ class InstanceAggregate(
               }
         }
       futureResponse pipeTo sender
+      stay
+    case Event(Terminate, InstanceData(clusterId)) =>
+      implicit val timeout = Timeout(1.minute)
+      (clusterAggregateManager ? ClusterAggregateManager.ClusterEnvelope(
+        clusterId, ClusterAggregate.TerminateInstance(instanceId)))
+        .pipeTo(sender)
       stay
   }
 

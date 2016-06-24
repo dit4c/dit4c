@@ -9,18 +9,24 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.actor.ActorRef
-import services.InstanceAggregateManager
-import domain.InstanceAggregate
+import services._
+import domain._
 import akka.util.Timeout
 import scala.concurrent.ExecutionContext
+import akka.http.scaladsl.model.StatusCodes.ServerError
 
 class MainController(
     val messagesApi: MessagesApi,
-    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager)
+    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
+    val userAggregateManager: ActorRef @@ UserAggregateManager)
     extends Controller
     with I18nSupport {
 
   import play.api.libs.concurrent.Execution.Implicits._
+  import play.api.libs.json._
+  import play.api.libs.functional.syntax._
+
+  val log = play.Logger.underlying
 
   def index = UserAction { request =>
     request.userId match {
@@ -31,6 +37,29 @@ class MainController(
     }
   }
 
+  def getInstances = (UserAction andThen UserRequired).async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.GetAllInstanceIds)).flatMap {
+      case UserAggregate.UserInstances(instanceIds) =>
+        val idSeq = instanceIds.toSeq
+        Future.sequence(idSeq.map { instanceId =>
+          (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(instanceId, InstanceAggregate.GetStatus))
+            .collect { case msg: InstanceAggregate.RemoteStatus => msg }
+        }).map { instances =>
+          val instancesResponse = InstancesResponse(
+            idSeq.zip(instances).map {
+              case (id, remoteState) =>
+                InstanceResponse(id, remoteState.state)
+            })
+          Ok(Json.toJson(instancesResponse))
+        }.recover {
+          case e =>
+            log.error("Get instances failed", e)
+            InternalServerError
+        }
+    }
+  }
+
   def newInstance = (UserAction andThen UserRequired).async { implicit request =>
     newInstanceForm(request.userId.get).bindFromRequest.fold(
         formWithErrors => {
@@ -38,15 +67,25 @@ class MainController(
         },
         userData => {
           implicit val timeout = Timeout(1.minute)
-          (instanceAggregateManager ? InstanceAggregateManager.StartInstance(
+          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.StartInstance(
               clusterLookup(userData.cluster),
               imageLookup(userData.image),
-              routes.MainController.instanceRegistration.absoluteURL())).map {
-            case InstanceAggregate.RemoteStatus(state) =>
-              Ok(state)
+              routes.MainController.instanceRegistration.absoluteURL()))).map {
+            case InstanceAggregateManager.InstanceStarted(id) =>
+              Ok(id)
           }
         }
     )
+  }
+
+  def terminateInstance(instanceId: String) = (UserAction andThen UserRequired).async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.TerminateInstance(instanceId))).map {
+      case ClusterAggregate.InstanceTerminating(id) =>
+        Ok(id)
+      case UserAggregate.InstanceNotOwnedByUser =>
+        Forbidden
+    }
   }
 
   def login = Action { implicit request =>
@@ -106,6 +145,8 @@ class MainController(
   )
 
   case class NewInstanceRequest(image: String, cluster: String)
+  case class InstancesResponse(instances: Seq[InstanceResponse])
+  case class InstanceResponse(id: String, state: String)
 
   object UserRequired extends ActionFilter[UserRequest] {
     def filter[A](input: UserRequest[A]) = Future.successful {
@@ -127,6 +168,14 @@ class MainController(
     "Default" -> "default"
   )
 
+  implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'state).write[String]
+    )(unlift(InstanceResponse.unapply))
+
+  implicit private val writesInstancesResponse: Writes[InstancesResponse] = (
+      (__ \ 'instances).write[Seq[InstanceResponse]]
+    ).contramap({ case InstancesResponse(instances) => instances })
 
 
 }

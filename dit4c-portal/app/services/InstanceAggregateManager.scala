@@ -17,6 +17,9 @@ object InstanceAggregateManager {
       clusterId: String, image: String, callback: Uri) extends Command
   case class InstanceEnvelope(instanceId: String, msg: Any) extends Command
 
+  sealed trait Response
+  case class InstanceStarted(instanceId: String) extends Response
+
 }
 
 class InstanceAggregateManager(
@@ -35,9 +38,9 @@ class InstanceAggregateManager(
       (clusterAggregateManager ? ClusterEnvelope(clusterId,
           ClusterAggregate.StartInstance(image, callback))).flatMap {
         case ClusterAggregate.InstanceStarted(clusterId, instanceId) =>
-          (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).flatMap {
+          (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
             case InstanceAggregate.Ack =>
-              instanceRef(instanceId) ? InstanceAggregate.GetStatus
+              InstanceStarted(instanceId)
           } pipeTo requester
       }
     case InstanceEnvelope(instanceId, msg) =>
