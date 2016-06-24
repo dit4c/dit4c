@@ -1,5 +1,6 @@
 GET     /                                   controllers.MainController.index
 POST    /login                              controllers.MainController.login
+POST    /logout                             controllers.MainController.logout
 GET     /instances/                         controllers.MainController.getInstances
 POST    /instances/                         controllers.MainController.newInstance
 PUT     /instances/:instanceId/terminate    controllers.MainController.terminateInstance(instanceId)

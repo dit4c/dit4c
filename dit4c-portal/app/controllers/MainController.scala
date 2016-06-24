@@ -44,12 +44,15 @@ class MainController(
         val idSeq = instanceIds.toSeq
         Future.sequence(idSeq.map { instanceId =>
           (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(instanceId, InstanceAggregate.GetStatus))
-            .collect { case msg: InstanceAggregate.RemoteStatus => msg }
+            .collect { case msg: InstanceAggregate.RemoteStatus => Some(msg) }
+            .recover { case _ => None }
         }).map { instances =>
           val instancesResponse = InstancesResponse(
             idSeq.zip(instances).map {
-              case (id, remoteState) =>
+              case (id, Some(remoteState)) =>
                 InstanceResponse(id, remoteState.state)
+              case (id, None) =>
+                InstanceResponse(id, "Unknown")
             })
           Ok(Json.toJson(instancesResponse))
         }.recover {
@@ -99,6 +102,10 @@ class MainController(
           .withSession("user-id" -> userData.userId)
       }
     )
+  }
+
+  def logout = Action { implicit request =>
+    Redirect(routes.MainController.index).withSession()
   }
 
   def instanceRegistration = Action(parse.json) { implicit request =>

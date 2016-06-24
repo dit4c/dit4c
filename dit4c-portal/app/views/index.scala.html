@@ -22,8 +22,11 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/app-layout/app-layout.html")">
-<style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning"></style>
+<style is="custom-style" include="iron-flex iron-flex-reverse iron-flex-alignment iron-positioning"></style>
 <style is="custom-style">
+body {
+  background-color: var(--paper-grey-100);
+}
 app-header {
   height: 64px;
   color: white;
@@ -42,18 +45,13 @@ app-header {
   overflow: hidden;
 }
 #main-content {
-  background-color: var(--paper-grey-100);
   padding: 48px;
   height: 100%;
 }
 #new-instance-dialog {
+  background-color: white;
   height: 100%;
-  width: 100%;
   padding: 48px;
-}
-#new-instance-close-button {
-  position: fixed;
-  right: 48px;
 }
 paper-dropdown-menu {
   width: 200px;
@@ -83,7 +81,7 @@ function hideNewInstanceDialog() {
 	  @@apply(--paper-font-subhead);
 	}	
 	.card-container {
-	  min-height: 300px;
+	  min-height: 200px;
     padding-top: 20px;
     padding-bottom: 20px;
 	}
@@ -115,13 +113,11 @@ function hideNewInstanceDialog() {
 	            <div class="instance-id">{{item.id}}</div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
-	          <div class="card-actions">
+	          <div class="card-actions layout horizontal-reverse">
               <iron-request id="xhr-{{item.id}}"></iron-request>
-	            <div class="layout horizontal end-justified">
-	              <paper-icon-button icon="close"
-	                title="terminate instance"
-	                onclick="{{terminate(item.id)}}"></paper-icon-button>
-	            </div>
+              <paper-icon-button icon="close"
+	              title="terminate instance"
+	              onclick="{{terminate(item.id)}}"></paper-icon-button>
 	          </div>
 	        </paper-card>
 	      </template>
@@ -143,10 +139,12 @@ function hideNewInstanceDialog() {
   Polymer({
     is: "instances-container",
     isPrevious: function(item) {
-      return item.state == "Stopping" || item.state == "Finished";
+      return !this.isRunning(item);
     },
     isRunning: function(item) {
-      return !this.isPrevious(item);
+      return item.state == "Waiting For Image" || 
+        item.state == "Starting" ||
+        item.state == "Running";
     },
     ready: function() {
       this.polling();
@@ -177,16 +175,24 @@ function hideNewInstanceDialog() {
     <app-toolbar class="layout container horizontal justified">
       <div></div>
       <div id="page-title">@pageTitle</div>
-      <div></div>
+      <div>
+        <form id="logout" method="post" action="@routes.MainController.logout">
+          <paper-button onclick="document.getElementById('logout').submit()">
+            Logout
+          </paper-button>
+        </form>
+      </div>
 	  </app-toolbar>
     <paper-fab icon="add" id="new-instance-open-button" title="New Instance" onclick="showNewInstanceDialog()"></paper-fab>
 	</app-header>
 	<div id="content-wrapper">
     <div id="new-instance-dialog" class="layout vertical" style="display: none">
-      <paper-icon-button icon="close" id="new-instance-close-button"
-        title="close form"
-        onclick="hideNewInstanceDialog()"></paper-icon-button>
-      <div class="section-heading">New Instance</div>
+      <div class="layout horizontal baseline justified">
+        <div class="section-heading flex">New Instance</div>
+        <paper-icon-button icon="close" id="new-instance-close-button"
+          title="close form"
+          onclick="hideNewInstanceDialog()"></paper-icon-button>
+      </div>
       <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
 		    <paper-dropdown-menu label="Image" name="image" required>
 		      <paper-listbox class="dropdown-content">
