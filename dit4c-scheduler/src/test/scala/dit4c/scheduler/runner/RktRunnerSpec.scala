@@ -458,6 +458,9 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
       f(rktDir)
     } finally {
       Await.ready({
+        commandExecutor(rktCmd(rktDir) ++ Seq("gc", "--grace-period=0s"))
+      }, 1.minute)
+      Await.ready({
         commandExecutor(sudoCmd("rm", "-rf", rktDir.toString))
       }, 1.minute)
     }
