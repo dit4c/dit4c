@@ -110,7 +110,8 @@ class MainController(
 
   def instanceRegistration = Action(parse.json) { implicit request =>
     println(request)
-    ???
+    println(request.body)
+    Ok("")
   }
 
   def webjars(path: String, file: String) =
@@ -165,6 +166,7 @@ class MainController(
   }
 
   private val imageLookup = Map(
+    "gotty"        -> "docker://dit4c/gotty",
     "IPython"      -> "docker://dit4c/dit4c-container-ipython",
     "OpenRefine"   -> "docker://dit4c/dit4c-container-openrefine",
     "NLTK"         -> "docker://dit4c/dit4c-container-nltk",
