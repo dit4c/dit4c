@@ -22,6 +22,7 @@ import java.security.SecureRandom
 import akka.actor.Props
 import dit4c.scheduler.runner.RktRunner
 import dit4c.scheduler.domain.Instance.NamedImage
+import akka.actor.Terminated
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -97,7 +98,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       "starts an instance" >> {
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system =
-          ActorSystem(s"RktClusterManager-StartInstance")
+          ActorSystem(s"RktClusterManager-StartInstance-start")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
         val resolvedPublicKey = randomPublicKey
         val runnerFactory =
@@ -141,6 +142,69 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         }) and
         {
           probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus =
+            probe.expectMsgType[Instance.StatusReport]
+          instanceStatus.data must beLike {
+            case Instance.StartData(id, providedImage, _, callback) =>
+              ( id must be_==(response.instanceId) ) and
+              ( providedImage must be_==(testImage) ) and
+              ( callback must be_==(testCallback) )
+          }
+        }
+      }
+
+      "instance exists after system restart" >> {
+        val managerPersistenceId = "Cluster-test-rkt"
+        implicit val system =
+          ActorSystem(s"RktClusterManager-StartInstance-restart")
+        val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
+        val resolvedPublicKey = randomPublicKey
+        val runnerFactory =
+          (_: RktNode.ServerConnectionDetails, _: String) =>
+            new RktRunner {
+              override def fetch(imageName: String): Future[String] =
+                Future.successful(resolvedImageId)
+              override def start(
+                  instanceId: String,
+                  image: String,
+                  callbackUrl: String): Future[RSAPublicKey] =
+                Future.successful(resolvedPublicKey)
+              override def stop(instanceId: String): Future[Unit] = ???
+            }
+
+        def createManager =
+            system.actorOf(
+                RktClusterManager.props(runnerFactory,
+                    mockFetchSshHostKey(randomPublicKey)),
+                managerPersistenceId)
+        val manager = createManager
+        // Create some nodes
+        val nodeIds = 1.to(3).map { i =>
+          val probe = TestProbe()
+          probe.send(manager, AddRktNode(
+              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          probe.send(manager, ConfirmRktNodeKeys(nodeId))
+          probe.expectMsgType[RktNode.NodeConfig]
+          nodeId
+        }
+        // Schedule an instance
+        val probe = TestProbe()
+        val testImage = NamedImage("docker://dit4c/gotty:latest")
+        val testCallback = "http://example.test/"
+        probe.send(manager, StartInstance(testImage, testCallback))
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        (response must {
+          import scala.language.experimental.macros
+          matchA[RktClusterManager.StartingInstance]
+            .instanceId(not(beEmpty[String]))
+        }) and
+        {
+          probe.watch(manager)
+          probe.send(manager, Shutdown)
+          probe.expectMsgType[Terminated]
+          val newManager = createManager
+          probe.send(newManager, GetInstanceStatus(response.instanceId))
           val instanceStatus =
             probe.expectMsgType[Instance.StatusReport]
           instanceStatus.data must beLike {

@@ -49,6 +49,7 @@ object RktClusterManager {
       nodeIds: Set[RktNodeId] = Set.empty)
 
   trait Command extends ClusterManager.Command
+  case object Shutdown extends Command
   case class AddRktNode(
       host: String,
       port: Int,
@@ -116,19 +117,32 @@ class RktClusterManager(
 
     case ConfirmRktNodeKeys(id) =>
       processNodeCommand(id, RktNode.ConfirmKeys)
-
+    case Shutdown =>
+      context.stop(self)
     case op: StartInstance =>
       log.info("Requesting instance worker from nodes")
       val instanceSchedulerRef =
         context.actorOf(Props(classOf[RktInstanceScheduler],
           state.nodeIds.map(id => (id, getNodeActor(id))).toMap,
-          1.minute))
+          1.minute,
+          false))
       operationsAwaitingInstanceWorkers +=
         (instanceSchedulerRef -> PendingOperation(sender,op))
-    case GetInstanceStatus(instanceId) =>
+    case op @ GetInstanceStatus(instanceId) =>
       context.child(InstancePersistenceId(instanceId)) match {
         case Some(ref) => ref forward Instance.GetStatus
-        case None => sender ! UnknownInstance
+        case None =>
+          if (state.instanceNodeMappings.contains(instanceId)) {
+            val instanceSchedulerRef =
+            context.actorOf(Props(classOf[RktInstanceScheduler],
+              state.instanceNodeMappings.get(instanceId).map(id => (id, getNodeActor(id))).toMap,
+              1.minute,
+              true))
+            operationsAwaitingInstanceWorkers +=
+              (instanceSchedulerRef -> PendingOperation(sender,op))
+          } else {
+            sender ! UnknownInstance
+          }
       }
     case TerminateInstance(instanceId) =>
       context.child(InstancePersistenceId(instanceId)) match {
@@ -161,6 +175,19 @@ class RktClusterManager(
             case NoWorkersAvailable =>
               requester ! UnableToStartInstance
           }
+        case PendingOperation(requester, GetInstanceStatus(instanceId)) =>
+          import RktInstanceScheduler._
+          msg match {
+            case WorkerFound(nodeId, worker) =>
+              implicit val timeout = Timeout(10.seconds)
+              import context.dispatcher
+              val instance = context.actorOf(
+                  Instance.props(worker),
+                  InstancePersistenceId(instanceId))
+              instance.tell(Instance.GetStatus, requester)
+            case NoWorkersAvailable =>
+              requester ! UnknownInstance
+          }
       }
       operationsAwaitingInstanceWorkers -= sender
 
@@ -174,6 +201,8 @@ class RktClusterManager(
     case RktNodeRegistered(nodeId, _) =>
       state = state.copy(nodeIds = state.nodeIds + nodeId)
     case InstanceAssignedToNode(instanceId, nodeId, _) =>
+      state = state.copy(instanceNodeMappings = 
+        state.instanceNodeMappings + (instanceId -> nodeId))
 
   }
 
