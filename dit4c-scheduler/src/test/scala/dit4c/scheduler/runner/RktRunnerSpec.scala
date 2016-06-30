@@ -398,9 +398,9 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                     matchA[HttpEntity.Strict]
                       .contentType(be_==(ContentTypes.`application/json`))
                       .data {
-                    { /("ip").andHave(anyMatch) and
-                      /("port").andHave(anyMatch) } ^^ {
-                        bs: ByteString => bs.decodeString("utf8") }
+                        {
+                          /("uri" -> "http://[0-9\\.]+:[0-9]+".r.anchored)
+                        } ^^ { bs: ByteString => bs.decodeString("utf8") }
                   }
                 })
             }
@@ -430,7 +430,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
   lazy val hostIp: InetAddress = {
     import scala.collection.JavaConversions._
     NetworkInterface.getNetworkInterfaces.toSeq
-      .find(i => Set("eth0", "em1").contains(i.getName))
+      .sortBy(_.getName)
+      .find(i => i.getName.matches("(eth[0-9]|em[0-9]|wl.+)"))
       .flatMap(_.getInetAddresses.toSeq.find(_.isInstanceOf[Inet4Address]))
       .get
   }

@@ -14,6 +14,7 @@ import scala.util.Random
 import pdi.jwt.Jwt
 import pdi.jwt.algorithms.JwtAsymetricAlgorithm
 import pdi.jwt.JwtAlgorithm
+import akka.http.scaladsl.model.Uri
 
 trait RktRunner {
   type ImageId = String
@@ -158,7 +159,12 @@ class RktRunnerImpl(
         Json.asciiStringify(
           JsString(
             Json.asciiStringify(
-              Json.obj("ip" -> proxyHostIP, "port" -> proxyHostPort))))
+              Json.obj(
+                  "uri" -> Uri(
+                      scheme="http",
+                      authority=Uri.Authority(
+                          Uri.Host(proxyHostIP),
+                          proxyHostPort)).toString))))
       manifest =
         s"""|{
             |    "acVersion": "0.8.4",
@@ -244,8 +250,11 @@ class RktRunnerImpl(
   private def hostIp: Future[String] =
     ce(Seq(
         "sh", "-c",
-        "ip -o -4 addr show | awk -F '[ /]+' '/global/ {print $4}' | head -1"))
-      .map(_.trim)
+        "/sbin/ip route get 8.8.8.8"))
+      .collect {
+        case s if s.startsWith("8.8.8.8") =>
+          s.lines.next.split(" ").last
+      }
 
   private def jwtToken(id: String, key: RSAPrivateKey): String = {
     Jwt.encode(s"""{"id":"$id"}""", key, JwtAlgorithm.RSASHA512)
