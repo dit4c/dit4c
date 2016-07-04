@@ -165,6 +165,12 @@ class RktRunnerImpl(
                       authority=Uri.Authority(
                           Uri.Host(proxyHostIP),
                           proxyHostPort)).toString))))
+      callbackCmd = JsString(Seq(
+          "curl -v -X PUT --retry 10",
+          s"""-H "Authorization: Bearer ${token}"""",
+          """-H "Content-Type: application/json"""",
+          s"-d $callbackPayload",
+          callbackUrl).mkString(" "))
       manifest =
         s"""|{
             |    "acVersion": "0.8.4",
@@ -183,14 +189,7 @@ class RktRunnerImpl(
             |            },
             |            "app": {
             |                "exec": [
-            |                    "watch", "-n", "60",
-            |                    "curl", "-v",
-            |                    "-X", "PUT",
-            |                    "--retry", "10",
-            |                    "-H", "Authorization: Bearer ${token}",
-            |                    "-H", "Content-Type: application/json",
-            |                    "-d", $callbackPayload,
-            |                    "$callbackUrl"
+            |                    "watch", "-n", "60", $callbackCmd
             |                ],
             |                "group": "99",
             |                "user": "99"
@@ -251,7 +250,7 @@ class RktRunnerImpl(
   private def hostIp: Future[String] =
     ce(Seq(
         "sh", "-c",
-        "/sbin/ip route get 8.8.8.8"))
+        "ip route get 8.8.8.8"))
       .collect {
         case s if s.startsWith("8.8.8.8") =>
           s.lines.next.split(" ").last
