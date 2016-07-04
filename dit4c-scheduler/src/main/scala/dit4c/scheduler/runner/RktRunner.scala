@@ -183,6 +183,7 @@ class RktRunnerImpl(
             |            },
             |            "app": {
             |                "exec": [
+            |                    "watch", "-n", "60",
             |                    "curl", "-v",
             |                    "-X", "PUT",
             |                    "--retry", "10",
