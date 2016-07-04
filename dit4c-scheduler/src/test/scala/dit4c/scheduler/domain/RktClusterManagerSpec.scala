@@ -145,7 +145,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val instanceStatus =
             probe.expectMsgType[Instance.StatusReport]
           instanceStatus.data must beLike {
-            case Instance.StartData(id, providedImage, _, callback) =>
+            case Instance.StartData(id, providedImage, _, callback, _) =>
               ( id must be_==(response.instanceId) ) and
               ( providedImage must be_==(testImage) ) and
               ( callback must be_==(testCallback) )
@@ -208,10 +208,11 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val instanceStatus =
             probe.expectMsgType[Instance.StatusReport]
           instanceStatus.data must beLike {
-            case Instance.StartData(id, providedImage, _, callback) =>
+            case Instance.StartData(id, providedImage, _, callback, key) =>
               ( id must be_==(response.instanceId) ) and
               ( providedImage must be_==(testImage) ) and
-              ( callback must be_==(testCallback) )
+              ( callback must be_==(testCallback) ) and
+              ( key must beSome[Instance.InstanceSigningKey] )
           }
         }
       }

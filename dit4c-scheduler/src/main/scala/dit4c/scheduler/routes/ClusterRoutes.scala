@@ -53,25 +53,31 @@ object ClusterRoutes {
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
 
+  implicit val writesInstanceSigningKey: Writes[Instance.InstanceSigningKey] =
+    Writes {
+      case Instance.RSAPublicKey(key) => Json.toJson(key)
+    }
+
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
       (__ \ 'state).write[String] and
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
       (__ \ 'callback).writeNullable[String] and
+      (__ \ 'key).writeNullable[Instance.InstanceSigningKey] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier
     sr.data match {
-      case Instance.NoData => (currentState, None, None, None, None)
-      case Instance.StartData(id, providedImage, resolvedImage, callbackUrl) =>
+      case Instance.NoData => (currentState, None, None, None, None, None)
+      case Instance.StartData(id, providedImage, resolvedImage, callbackUrl, instanceKey) =>
         val imageName = providedImage match {
           case Instance.NamedImage(name) => Some(name)
           case _: Instance.SourceImage => None
         }
         val imageId = resolvedImage.map(_.id)
-        (currentState, imageName, imageId, Some(callbackUrl), None)
+        (currentState, imageName, imageId, Some(callbackUrl), instanceKey, None)
       case Instance.ErrorData(errors) =>
-        (currentState, None, None, None, Some(errors))
+        (currentState, None, None, None, None, Some(errors))
     }
   })
 

@@ -213,7 +213,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen2(Gen.identifier)
 
    "get instance status" >> prop({
-      (clusterId: String, instanceId: String, imageName: String, callbackUrl: Uri) =>
+      (clusterId: String, instanceId: String, imageName: String, callbackUrl: Uri, signingKey: RSAPublicKey) =>
         val path = basePath / clusterId / "instances" / instanceId
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
@@ -227,7 +227,8 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       instanceId,
                       NamedImage(imageName),
                       None,
-                      callbackUrl.toString))
+                      callbackUrl.toString,
+                      Some(Instance.RSAPublicKey(signingKey))))
           }
         }
         Get(path) ~> routes(testActor) ~> check {
@@ -235,7 +236,8 @@ class ClusterRoutesSpec extends Specs2RouteTest
           (Json.prettyPrint(entityAs[JsValue]) must {
             /("state" -> Instance.WaitingForImage.identifier) and
             /("image") /("name" -> imageName) and
-            /("callback" -> callbackUrl.toString)
+            /("callback" -> callbackUrl.toString) and
+            /("key") /("kty" -> "RSA")
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
@@ -262,6 +264,8 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen2(Gen.identifier)
 
   }
+
+  private implicit val arbPublicKey = Arbitrary(Gen.resultOf(randomPublicKey _))
 
   private implicit val arbNodeConfig = Arbitrary(genNodeConfig(false))
 

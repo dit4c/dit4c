@@ -53,7 +53,8 @@ object Instance {
       instanceId: String,
       providedImage: SourceImage,
       resolvedImage: Option[LocalImage],
-      callbackUrl: String) extends Data
+      callbackUrl: String,
+      signingKey: Option[InstanceSigningKey]) extends Data
   case class ErrorData(errors: List[String]) extends Data
 
   trait Command
@@ -120,7 +121,7 @@ class Instance(worker: ActorRef)
   }
 
   when(WaitingForImage) {
-    case Event(ReceiveImage(localImage), StartData(id, _, _, callback)) =>
+    case Event(ReceiveImage(localImage), StartData(id, _, _, callback, _)) =>
       goto(Starting).applying(FetchedImage(localImage)).andThen {
         case data =>
           log.info(s"Starting with: $localImage")
@@ -138,7 +139,7 @@ class Instance(worker: ActorRef)
   }
 
   when(Running) {
-    case Event(Terminate, StartData(id, _, _, _) ) =>
+    case Event(Terminate, StartData(id, _, _, _, _) ) =>
       val requester = sender
       goto(Stopping).applying(RequestedTermination()).andThen { _ =>
         worker ! InstanceWorker.Terminate(id)
@@ -173,9 +174,11 @@ class Instance(worker: ActorRef)
       currentData: Data): Instance.Data = {
     (domainEvent, currentData) match {
       case (Initiated(id, image, callback, _), NoData) =>
-        StartData(id, image, None, callback)
+        StartData(id, image, None, callback, None)
       case (FetchedImage(image, _), data: StartData) =>
         data.copy(resolvedImage = Some(image))
+      case (AssociatedSigningKey(key, _), data: StartData) =>
+        data.copy(signingKey = Some(key))
       case (ErrorOccurred(msg, _), errorData: ErrorData) =>
         errorData.copy(errors = errorData.errors :+ msg)
       case (ErrorOccurred(msg, _), _) =>
