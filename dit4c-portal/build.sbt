@@ -11,6 +11,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"         %%  "akka-persistence"      % akkaV,
   "org.iq80.leveldb"          %   "leveldb"               % "0.7",
   "org.fusesource.leveldbjni" %   "leveldbjni-all"        % "1.8",
+  "com.pauldijou"             %%  "jwt-play-json"         % "0.7.1",
   specs2,
   "org.specs2"                %%  "specs2-core"       % specs2V % "test",
   "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test"

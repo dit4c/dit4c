@@ -1,13 +1,14 @@
 package services
 
 import akka.actor._
+import pdi.jwt._
+import scala.util._
 import com.softwaremill.tagging._
 import akka.http.scaladsl.model.Uri
 import akka.util.Timeout
 import scala.concurrent.duration._
 import domain.InstanceAggregate
 import domain.InstanceAggregate.RecordInstanceStart
-import sun.security.jca.GetInstance
 import akka.event.LoggingReceive
 
 object InstanceAggregateManager {
@@ -15,6 +16,7 @@ object InstanceAggregateManager {
   sealed trait Command
   case class StartInstance(
       clusterId: String, image: String, callback: Uri) extends Command
+  case class VerifyJwt(token: String) extends Command
   case class InstanceEnvelope(instanceId: String, msg: Any) extends Command
 
   sealed trait Response
@@ -36,12 +38,21 @@ class InstanceAggregateManager(
       implicit val timeout = Timeout(1.minute)
       val requester = sender
       (clusterAggregateManager ? ClusterEnvelope(clusterId,
-          ClusterAggregate.StartInstance(image, callback))).flatMap {
+          ClusterAggregate.StartInstance(image, callback))).foreach {
         case ClusterAggregate.InstanceStarted(clusterId, instanceId) =>
           (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
             case InstanceAggregate.Ack =>
               InstanceStarted(instanceId)
           } pipeTo requester
+        case msg @ ClusterAggregate.UnableToStartInstance =>
+          requester ! msg
+      }
+    case VerifyJwt(token) =>
+      resolveJwtInstance(token) match {
+        case Right(ref) =>
+          ref forward InstanceAggregate.VerifyJwt(token)
+        case Left(errorMsg) =>
+          sender ! InstanceAggregate.InvalidJwt(errorMsg)
       }
     case InstanceEnvelope(instanceId, msg) =>
       instanceRef(instanceId) forward msg
@@ -61,5 +72,18 @@ class InstanceAggregateManager(
   private def aggregateProps(instanceId: String): Props =
     Props(classOf[InstanceAggregate], instanceId, clusterAggregateManager)
 
-
+  private def resolveJwtInstance(token: String): Either[String, ActorRef] =
+    JwtJson.decode(token, JwtOptions(signature=false))
+        .toOption.toRight("Unable to decode token")
+        .right.flatMap { claim =>
+          val issuerPrefix = "instance/"
+          claim.issuer match {
+            case Some(id) if id.startsWith(issuerPrefix) =>
+              Right(instanceRef(id.stripPrefix(issuerPrefix)))
+            case Some(id) =>
+              Left("Invalid issuer format")
+            case None =>
+              Left("No issuer defined")
+          }
+        }
 }

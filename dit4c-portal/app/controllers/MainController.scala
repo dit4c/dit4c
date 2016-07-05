@@ -8,12 +8,13 @@ import com.softwaremill.tagging._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
-import akka.actor.ActorRef
+import akka.actor._
 import services._
 import domain._
 import akka.util.Timeout
 import scala.concurrent.ExecutionContext
 import akka.http.scaladsl.model.StatusCodes.ServerError
+import akka.http.scaladsl.model.Uri
 
 class MainController(
     val messagesApi: MessagesApi,
@@ -50,9 +51,11 @@ class MainController(
           val instancesResponse = InstancesResponse(
             idSeq.zip(instances).map {
               case (id, Some(remoteState)) =>
-                InstanceResponse(id, remoteState.state)
+                val url: Option[String] =
+                  remoteState.uri.map(Uri(_).withPath(Uri.Path./).toString)
+                InstanceResponse(id, remoteState.state, url)
               case (id, None) =>
-                InstanceResponse(id, "Unknown")
+                InstanceResponse(id, "Unknown", None)
             })
           Ok(Json.toJson(instancesResponse))
         }.recover {
@@ -76,6 +79,8 @@ class MainController(
               routes.MainController.instanceRegistration.absoluteURL()))).map {
             case InstanceAggregateManager.InstanceStarted(id) =>
               Ok(id)
+            case ClusterAggregate.UnableToStartInstance =>
+              ServiceUnavailable
           }
         }
     )
@@ -108,10 +113,34 @@ class MainController(
     Redirect(routes.MainController.index).withSession()
   }
 
-  def instanceRegistration = Action(parse.json) { implicit request =>
-    println(request)
-    println(request.body)
-    Ok("")
+  def instanceRegistration = Action.async(parse.json) { implicit request =>
+    import InstanceAggregateManager.{InstanceEnvelope, VerifyJwt}
+    implicit val timeout = Timeout(1.minute)
+    val authHeaderRegex = "^Bearer (.*)$".r
+    request.headers.get("Authorization")
+      .collect { case authHeaderRegex(token) => token }
+      .map { token =>
+        (instanceAggregateManager ? VerifyJwt(token)).flatMap {
+          case InstanceAggregate.ValidJwt(instanceId) =>
+            log.debug(s"Valid JWT for $instanceId")
+            log.debug(Json.prettyPrint(request.body))
+            Json.fromJson[InstanceRegistrationRequest](request.body).asOpt match {
+              case Some(InstanceRegistrationRequest(uri)) =>
+                (instanceAggregateManager ? InstanceEnvelope(instanceId, InstanceAggregate.AssociateUri(uri))).map { _ =>
+                  Ok("")
+                }.recover {
+                  case e => InternalServerError(e.getMessage)
+                }
+              case None =>
+                Future.successful(BadRequest("No valid uri"))
+            }
+          case InstanceAggregate.InvalidJwt(msg) =>
+            println(s"Invalid JWT: $msg")
+            println(request.body)
+            Future.successful(BadRequest(msg))
+        }
+      }
+      .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
   }
 
   def webjars(path: String, file: String) =
@@ -153,8 +182,9 @@ class MainController(
   )
 
   case class NewInstanceRequest(image: String, cluster: String)
+  case class InstanceRegistrationRequest(uri: String)
   case class InstancesResponse(instances: Seq[InstanceResponse])
-  case class InstanceResponse(id: String, state: String)
+  case class InstanceResponse(id: String, state: String, url: Option[String])
 
   object UserRequired extends ActionFilter[UserRequest] {
     def filter[A](input: UserRequest[A]) = Future.successful {
@@ -177,9 +207,13 @@ class MainController(
     "Default" -> "default"
   )
 
+  implicit private val readsInstanceRegistration: Reads[InstanceRegistrationRequest] =
+    (__ \ 'uri).read[String].map(InstanceRegistrationRequest(_))
+
   implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
       (__ \ 'id).write[String] and
-      (__ \ 'state).write[String]
+      (__ \ 'state).write[String] and
+      (__ \ 'url).writeNullable[String]
     )(unlift(InstanceResponse.unapply))
 
   implicit private val writesInstancesResponse: Writes[InstancesResponse] = (

@@ -110,7 +110,12 @@ function hideNewInstanceDialog() {
 	      <template id="running-instances" is="dom-repeat" items="[[instancesResponse.instances]]" filter="isRunning" observe="state">
 	        <paper-card>
 	          <div class="card-content">
-	            <div class="instance-id">{{item.id}}</div>
+	            <div class="instance-id">
+	              <template is="dom-if" if="{{item.url}}">
+	                <a href="{{item.url}}">{{item.id}}</a>
+	              </template>
+	              <template is="dom-if" if="{{!item.url}}">{{item.id}}</template>
+	            </div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
 	          <div class="card-actions layout horizontal-reverse">

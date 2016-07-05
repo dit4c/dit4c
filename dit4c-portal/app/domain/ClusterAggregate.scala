@@ -67,6 +67,9 @@ class ClusterAggregate(
         log.info("Request accepted")
         val location = Uri(headers.find(_.lowercaseName == "location").get.value)
         InstanceStarted(clusterId, location.path.last.toString)
+      case HttpResponse(StatusCodes.ServiceUnavailable, headers, entity, _) =>
+        log.error("Unable to start instance: Service Unavailable")
+        UnableToStartInstance
     }.recover {
       case e: Throwable =>
         log.error("Unable to start instance: "+e.getMessage)

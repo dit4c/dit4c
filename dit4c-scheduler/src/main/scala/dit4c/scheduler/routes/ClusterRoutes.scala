@@ -23,19 +23,25 @@ import play.api.libs.json.Json
 import dit4c.scheduler.domain.Instance
 import java.util.Base64
 import dit4c.scheduler.ssh.RemoteShell
+import java.math.BigInteger
 
 object ClusterRoutes {
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
 
+  implicit val writesBigInteger: Writes[BigInteger] =
+    Writes { bi: BigInteger =>
+      JsString(JwtBase64.encodeString(bi.toByteArray))
+    }
+
   implicit val writesRSAPublicKey: Writes[RSAPublicKey] = (
       (__ \ 'kty).write[String] and
-      (__ \ 'e).write[String] and
-      (__ \ 'n).write[String]
+      (__ \ 'e).write[BigInteger] and
+      (__ \ 'n).write[BigInteger]
   )( (k: RSAPublicKey) => (
       "RSA",
-      JwtBase64.encodeString(k.getPublicExponent.toByteArray),
-      JwtBase64.encodeString(k.getModulus.toByteArray)) )
+      k.getPublicExponent,
+      k.getModulus) )
 
   implicit val readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
