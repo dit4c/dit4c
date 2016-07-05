@@ -51,10 +51,10 @@ before_install:
     ls -laR $BASE/nginx && \
     export PATH=$BASE/nginx/sbin:$PATH
   - |
-    RKT_VERSION=v1.7.0 &&
+    RKT_VERSION=v1.9.1 &&
     docker build -t rkt-systemd - <<< "
     FROM fedora/systemd-systemd
-    RUN dnf install -y tar which sudo && \
+    RUN dnf update -y && dnf install -y --allowerasing tar which sudo iproute && \
       cd /opt && \
       curl -sL https://github.com/coreos/rkt/releases/download/$RKT_VERSION/rkt-$RKT_VERSION.tar.gz | tar xz && \
       mv rkt-$RKT_VERSION rkt && \
