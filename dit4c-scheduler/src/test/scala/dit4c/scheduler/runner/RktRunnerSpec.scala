@@ -41,7 +41,7 @@ import akka.stream.scaladsl.Sink
 import akka.http.scaladsl.model._
 import java.net.Inet4Address
 import akka.http.scaladsl.model.headers.Authorization
-import pdi.jwt.Jwt
+import pdi.jwt._
 import org.specs2.matcher.JsonMatchers
 import akka.util.ByteString
 
@@ -388,9 +388,13 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                 .headers(contain {
                   beAnInstanceOf[Authorization] and
                   (startWith("Bearer ") ^^ { h: HttpHeader => h.value }) and
-                  (successfulTry ^^ { h: HttpHeader =>
+                  (successfulTry.withValue { claim: JwtClaim =>
+                    claim must
+                      matchA[JwtClaim]
+                        .issuer(be_==(Some(s"instance/$instanceId")))
+                  } ^^ { h: HttpHeader =>
                     // Token must decode with public key
-                    Jwt.decodeAll(h.value.split(" ").last, instancePublicKey)
+                    JwtJson.decode(h.value.split(" ").last, instancePublicKey)
                   })
                 })
                 .entity(beLike[ResponseEntity] {

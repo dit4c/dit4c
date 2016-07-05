@@ -257,7 +257,7 @@ class RktRunnerImpl(
       }
 
   private def jwtToken(id: String, key: RSAPrivateKey): String = {
-    Jwt.encode(s"""{"id":"$id"}""", key, JwtAlgorithm.RSASHA512)
+    Jwt.encode(s"""{"iss":"instance/$id"}""", key, JwtAlgorithm.RSASHA512)
   }
 
 }
