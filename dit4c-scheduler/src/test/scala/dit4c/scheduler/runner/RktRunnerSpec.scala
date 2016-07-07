@@ -495,12 +495,24 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
       // Travis CI will stall unless input is provided via <#(in) instead of
       // ProcessIO. It probably has something to do with subtle differences
       // in the way input is read from the stream.
-      val process = Process(actualCmd).#<(in).run(processIO(out, err))
+      val process = Process(
+          actualCmd,
+          None,
+          "PATH" -> Seq(rktExecutable.getParent, sys.env("PATH")).mkString(":")
+        ).#<(in).run(processIO(out, err))
       // We could use a future, but this is a simpler way to wait for exitValue
       // on its own thread.
       val pExitValue = Promise[Int]()
       spawn(pExitValue.complete(Try(process.exitValue)))
       pExitValue.future
+    }
+
+    private lazy val rktExecutable = {
+      val dirPath = Paths.get(getClass.getClassLoader.getResource("rkt").toURI)
+      val f = dirPath.resolve("rkt").toFile
+      // SBT doesn't preserve the executable permission when copying
+      f.setExecutable(true)
+      f
     }
 
     private def spawn(block: => Unit): Unit =

@@ -56,3 +56,30 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, name, version, cacheD
     }
   cache(Set( dir / "dit4c" / "scheduler" / "AppMetadataImpl.scala" )).toSeq
 }
+
+// Download rkt for testing
+resourceGenerators in Test <+=
+  (resourceManaged in Test, name, version, streams) map { (dir, n, v, s) =>
+    import scala.sys.process._
+    val rktVersion = "1.9.1"
+    val rktDir = dir / "rkt"
+    val rktExecutable = rktDir / "rkt"
+    s.log.debug(s"Checking for rkt $rktVersion tarball")
+    if (!rktDir.isDirectory || !(rktExecutable).isFile) {
+      IO.withTemporaryDirectory { tmpDir =>
+        val rktTarballUrl = new java.net.URL(
+          s"https://github.com/coreos/rkt/releases/download/v${rktVersion}/rkt-v${rktVersion}.tar.gz")
+        val rktTarball = tmpDir / s"rkt-v${rktVersion}.tar.gz"
+        s.log.info(s"Downloading rkt $rktVersion")
+        IO.download(rktTarballUrl, rktTarball)
+        val sbtLogger = ProcessLogger(s.log.info(_), s.log.warn(_))
+        Process(
+          Seq("tar", "xzf", rktTarball.getAbsolutePath),
+          cwd=Some(tmpDir)).!<(sbtLogger)
+        IO.delete(rktDir)
+        IO.copyDirectory(tmpDir / s"rkt-v${rktVersion}", rktDir)
+        IO.delete(tmpDir)
+      }
+    }
+    IO.listFiles(rktDir).toSeq
+  }
