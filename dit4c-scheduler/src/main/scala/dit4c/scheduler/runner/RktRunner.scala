@@ -149,27 +149,17 @@ class RktRunnerImpl(
       callbackUrl: String): Future[(String, RSAPublicKey)] = {
     for {
       curlImageId <- fetch("quay.io/yss44/curl")
-      socatImageId <- fetch("quay.io/ridero/socat")
+      ngrokImageId <- fetch("docker://wernight/ngrok")
       servicePort <- guessServicePort(image)
       (privateKey, publicKey) = newKeyPair
       token = jwtToken(instanceId, privateKey)
-      proxyHostIP <- hostIp
-      proxyHostPort = 20000 + Random.nextInt(10000)
-      callbackPayload =
-        Json.asciiStringify(
-          JsString(
-            Json.asciiStringify(
-              Json.obj(
-                  "uri" -> Uri(
-                      scheme="http",
-                      authority=Uri.Authority(
-                          Uri.Host(proxyHostIP),
-                          proxyHostPort)).toString))))
       callbackCmd = JsString(Seq(
+          """NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -oE "https://.*.io")""",
+          "&&",
           "curl -v -X PUT --retry 10",
           s"""-H "Authorization: Bearer ${token}"""",
           """-H "Content-Type: application/json"""",
-          s"-d $callbackPayload",
+          """-d "{\"uri\":\"$NGROK_URL\"}"""",
           callbackUrl).mkString(" "))
       manifest =
         s"""|{
@@ -199,31 +189,17 @@ class RktRunnerImpl(
             |        {
             |            "name": "pod-proxy",
             |            "image": {
-            |                "id": "${socatImageId}"
+            |                "id": "${ngrokImageId}"
             |            },
             |            "app": {
             |                "exec": [
-            |                    "socat", "-d", "-d", "-d",
-            |                    "TCP-LISTEN:20000,fork,reuseaddr",
-            |                    "TCP:127.0.0.1:${servicePort}"
+            |                    "/bin/ngrok", "http", "-bind-tls=true",
+            |                    "127.0.0.1:$servicePort"
             |                ],
             |                "group": "99",
-            |                "user": "99",
-            |                "ports": [
-            |                    {
-            |                        "name": "pod-proxy-http",
-            |                        "port": 20000,
-            |                        "protocol": "tcp"
-            |                    }
-            |                ]
+            |                "user": "99"
             |            },
             |            "readOnlyRootFS": true
-            |        }
-            |    ],
-            |    "ports": [
-            |        {
-            |            "name": "pod-proxy-http",
-            |            "hostPort": ${proxyHostPort}
             |        }
             |    ]
             |}""".stripMargin
