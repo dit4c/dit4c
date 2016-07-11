@@ -50,7 +50,19 @@ libraryDependencies ++= {
   )
 } 
 
-scalacOptions ++= Seq("-feature")
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-feature",
+  "-unchecked",
+  "-Xfatal-warnings",
+//  "-Xlint",
+  "-Ywarn-dead-code",
+  "-Ywarn-inaccessible",
+  "-Ywarn-nullary-override",
+  "-Ywarn-numeric-widen",
+//  "-Ywarn-unused-import",
+  "-Xfuture"
+)
 
 routesGenerator := InjectedRoutesGenerator
 
