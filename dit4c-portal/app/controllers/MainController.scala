@@ -15,11 +15,17 @@ import akka.util.Timeout
 import scala.concurrent.ExecutionContext
 import akka.http.scaladsl.model.StatusCodes.ServerError
 import akka.http.scaladsl.model.Uri
+import com.mohiva.play.silhouette.api.LoginInfo
+import com.mohiva.play.silhouette.api.Silhouette
+import utils.auth.DefaultEnv
+import com.mohiva.play.silhouette.api.LoginEvent
 
 class MainController(
     val messagesApi: MessagesApi,
     val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
-    val userAggregateManager: ActorRef @@ UserAggregateManager)
+    val userAggregateManager: ActorRef @@ UserAggregateManager,
+    val silhouette: Silhouette[DefaultEnv],
+    val identityService: IdentityService)
     extends Controller
     with I18nSupport {
 
@@ -29,18 +35,18 @@ class MainController(
 
   val log = play.Logger.underlying
 
-  def index = UserAction { request =>
-    request.userId match {
-      case Some(userId) =>
+  def index = silhouette.UserAwareAction { request =>
+    request.identity match {
+      case Some(IdentityService.User(_, _)) =>
         Ok(views.html.index(imageLookup.keys.toList.sorted))
       case None =>
-        Ok(views.html.login(loginForm))
+        Ok(views.html.login(Some(loginForm)))
     }
   }
 
-  def getInstances = (UserAction andThen UserRequired).async { implicit request =>
+  def getInstances = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.GetAllInstanceIds)).flatMap {
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetAllInstanceIds)).flatMap {
       case UserAggregate.UserInstances(instanceIds) =>
         val idSeq = instanceIds.toSeq
         Future.sequence(idSeq.map { instanceId =>
@@ -96,15 +102,27 @@ class MainController(
     }
   }
 
-  def login = Action { implicit request =>
+  def login = silhouette.UnsecuredAction.async { implicit request =>
     loginForm.bindFromRequest.fold(
-      formWithErrors => {
+      formWithErrors => Future.successful {
         // binding failure, you retrieve the form containing errors:
-        BadRequest(views.html.login(formWithErrors))
+        BadRequest(views.html.login(Some(formWithErrors)))
       },
       userData => {
-        Redirect(routes.MainController.index)
-          .withSession("user-id" -> userData.userId)
+        val loginInfo = LoginInfo("dummy", userData.identity)
+        identityService.retrieve(loginInfo).flatMap {
+          case Some(user) =>
+            val result = Redirect(routes.MainController.index)
+            silhouette.env.authenticatorService.create(loginInfo).flatMap { authenticator =>
+              silhouette.env.eventBus.publish(LoginEvent(user, request))
+              log.info(s"Logged in as $user")
+              silhouette.env.authenticatorService.init(authenticator).flatMap { v =>
+                silhouette.env.authenticatorService.embed(v, result)
+              }
+            }
+          case None =>
+            ??? // Shouldn't currently be possible
+        }
       }
     )
   }
@@ -168,7 +186,7 @@ class MainController(
 
   val loginForm = Form(
     mapping(
-        "user-id" -> nonEmptyText
+        "identity" -> nonEmptyText
     )(LoginData.apply)(LoginData.unapply)
   )
 

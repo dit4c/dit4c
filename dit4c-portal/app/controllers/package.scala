@@ -12,5 +12,5 @@ package object controllers {
     }
   }
 
-  case class LoginData(userId: String)
+  case class LoginData(identity: String)
 }

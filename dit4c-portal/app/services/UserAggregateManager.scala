@@ -14,7 +14,11 @@ import domain.UserAggregate
 object UserAggregateManager {
 
   sealed trait Command
-  case class UserEnvelope(userId: String, msg: Any) extends Command
+  case object CreateNewUser extends Command
+  case class UserEnvelope(userId: UserAggregate.Id, msg: Any) extends Command
+
+  sealed trait Response
+  case class CreatedUser(userId: UserAggregate.Id) extends Command
 
 }
 
@@ -28,6 +32,8 @@ class UserAggregateManager(
   import context.dispatcher
 
   val receive: Receive = LoggingReceive {
+    case CreateNewUser =>
+      sender ! CreatedUser(newUserId)
     case UserEnvelope(userId, msg) =>
       userRef(userId) forward msg
   }
@@ -40,6 +46,8 @@ class UserAggregateManager(
       agg
     }
   }
+
+  private def newUserId: String = f"${BigInt.apply(128, scala.util.Random)}%032x"
 
   private def aggregateId(userId: String) = s"User-$userId"
 

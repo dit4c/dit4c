@@ -19,6 +19,8 @@ import services.{InstanceAggregateManager => IAM}
 
 object UserAggregate {
 
+  type Id = String
+
   case class Data(instances: SortedSet[String] = SortedSet.empty)
 
   sealed trait Command
@@ -42,7 +44,7 @@ object UserAggregate {
 }
 
 class UserAggregate(
-    userId: String,
+    userId: UserAggregate.Id,
     instanceAggregateManager: ActorRef @@ InstanceAggregateManager) extends PersistentActor with ActorLogging {
   import UserAggregate._
   import play.api.libs.json._

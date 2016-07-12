@@ -1,4 +1,4 @@
-@(form: Form[controllers.LoginData])(implicit messages: Messages)
+@(dummyIdForm: Option[Form[controllers.LoginData]])(implicit messages: Messages)
 
 <!DOCTYPE html>
 <html>
@@ -34,17 +34,19 @@ function submit(form) {
 <body class="fullbleed vertical layout">
 
 <div class="layout vertical center center-justified" style="height: 100vh">
+  @for(form <- dummyIdForm) {
   <form class="layout vertical center center-justified" id="login-form" method="post" action="@routes.MainController.login">
 	  <div>
-	    <paper-input label="User ID" id="user-id-field" name="user-id" value='@{form.value.map(_.userId).getOrElse("")}'
-	       @if(!form.errors("user-id").isEmpty) { invalid }
+	    <paper-input label="User Identity" id="identity-field" name="identity" value='@{form.value.map(_.identity).getOrElse("")}'
+	       @if(!form.errors("identity").isEmpty) { invalid }
 	       auto-validate required
-	       error-message='@{form.errors("user-id").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
+	       error-message='@{form.errors("identity").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
 	  </div>
 	  <div>
 	    <paper-button onclick="submit(document.getElementById('login-form'))">Login</paper-button>
 	  </div>
   </form>
+  }
 </div>
 
 </body>
