@@ -19,6 +19,7 @@ import com.mohiva.play.silhouette.api.LoginInfo
 import pdi.jwt.exceptions.JwtException
 import com.mohiva.play.silhouette.api.Logger
 import scala.util._
+import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
 
 object RapidAAFProvider {
 
@@ -30,13 +31,12 @@ object RapidAAFProvider {
 
 class RapidAAFProvider(
     val httpLayer: HTTPLayer,
-    val settings: RapidAAFProvider.Settings) extends SocialProvider with Logger {
+    val settings: RapidAAFProvider.Settings) extends SocialProvider with CommonSocialProfileBuilder with Logger {
   val id = "rapidaaf"
   private val attributesClaim = "https://aaf.edu.au/attributes"
 
   type A = RapidAAFProvider.AAFInfo
   type Content = JsValue
-  type Profile = CommonSocialProfile
   type Self = RapidAAFProvider
   type Settings = RapidAAFProvider.Settings
 

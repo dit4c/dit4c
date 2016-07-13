@@ -41,6 +41,7 @@ import com.mohiva.play.silhouette.crypto.JcaCookieSigner
 import com.mohiva.play.silhouette.crypto.JcaCookieSignerSettings
 import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
 import scala.util.Try
+import utils.auth.providers.RapidAAFProvider
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -91,6 +92,10 @@ class AppComponents(context: Context)
       Try {
         val settings = configuration.underlying.as[OAuth2Settings]("silhouette.github")
         new GitHubProvider(httpLayer, stateProvider, settings)
+      },
+      Try {
+        val settings = configuration.underlying.as[RapidAAFProvider.Settings]("silhouette.rapidaaf")
+        new RapidAAFProvider(httpLayer, settings)
       }
     ).map(_.toOption).flatten
   lazy val socialProviderRegistry = wire[SocialProviderRegistry]
