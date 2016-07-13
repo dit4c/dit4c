@@ -1,4 +1,4 @@
-@(dummyIdForm: Option[Form[controllers.LoginData]])(implicit messages: Messages)
+@(dummyIdForm: Option[Form[controllers.LoginData]], socialProviders: com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry )(implicit messages: Messages)
 
 <!DOCTYPE html>
 <html>
@@ -14,10 +14,11 @@
 body {
   background-color: var(--paper-blue-500);
 }
-#login-form {
+#login-form, #social-providers {
   padding: 20px;
   border-radius: 5px;
   background-color: white;
+  margin-bottom: 20px;
 }
 </style>
 <script>
@@ -46,6 +47,15 @@ function submit(form) {
 	    <paper-button onclick="submit(document.getElementById('login-form'))">Login</paper-button>
 	  </div>
   </form>
+  }
+  @if(socialProviders.providers.nonEmpty) {
+    <div id="social-providers">
+      <div>
+      @for(p <- socialProviders.providers) {
+        <a href="@routes.MainController.authenticate(p.id)" class="provider @p.id">@Messages(p.id)</a>
+      }
+      </div>
+    </div>
   }
 </div>
 

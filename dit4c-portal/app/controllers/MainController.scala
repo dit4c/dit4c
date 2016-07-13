@@ -19,13 +19,18 @@ import com.mohiva.play.silhouette.api.LoginInfo
 import com.mohiva.play.silhouette.api.Silhouette
 import utils.auth.DefaultEnv
 import com.mohiva.play.silhouette.api.LoginEvent
+import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
+import com.mohiva.play.silhouette.impl.providers.SocialProvider
+import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
+import com.mohiva.play.silhouette.api.exceptions.ProviderException
 
 class MainController(
     val messagesApi: MessagesApi,
     val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
     val userAggregateManager: ActorRef @@ UserAggregateManager,
     val silhouette: Silhouette[DefaultEnv],
-    val identityService: IdentityService)
+    val identityService: IdentityService,
+    val socialProviders: SocialProviderRegistry)
     extends Controller
     with I18nSupport {
 
@@ -40,7 +45,7 @@ class MainController(
       case Some(IdentityService.User(_, _)) =>
         Ok(views.html.index(imageLookup.keys.toList.sorted))
       case None =>
-        Ok(views.html.login(Some(loginForm)))
+        Ok(views.html.login(Some(loginForm), socialProviders))
     }
   }
 
@@ -106,7 +111,7 @@ class MainController(
     loginForm.bindFromRequest.fold(
       formWithErrors => Future.successful {
         // binding failure, you retrieve the form containing errors:
-        BadRequest(views.html.login(Some(formWithErrors)))
+        BadRequest(views.html.login(Some(formWithErrors), socialProviders))
       },
       userData => {
         val loginInfo = LoginInfo("dummy", userData.identity)
@@ -129,6 +134,31 @@ class MainController(
 
   def logout = Action { implicit request =>
     Redirect(routes.MainController.index).withSession()
+  }
+
+  def authenticate(provider: String) = Action.async { implicit request =>
+    (socialProviders.get[SocialProvider](provider) match {
+      case Some(p: SocialProvider with CommonSocialProfileBuilder) =>
+        p.authenticate().flatMap {
+          case Left(result) => Future.successful(result)
+          case Right(authInfo) => for {
+            profile <- p.retrieveProfile(authInfo)
+            user <- identityService.retrieve(profile.loginInfo).map(_.get)
+            authenticator <- silhouette.env.authenticatorService.create(profile.loginInfo)
+            value <- silhouette.env.authenticatorService.init(authenticator)
+            result <- silhouette.env.authenticatorService.embed(value, Redirect(routes.MainController.index()))
+          } yield {
+            log.info(s"Logged in as $user")
+            silhouette.env.eventBus.publish(LoginEvent(user, request))
+            result
+          }
+        }
+      case _ => Future.failed(new ProviderException(s"Cannot authenticate with unexpected social provider $provider"))
+    }).recover {
+      case e: ProviderException =>
+        log.error("Unexpected provider error", e)
+        Redirect(routes.MainController.index())
+    }
   }
 
   def instanceRegistration = Action.async(parse.json) { implicit request =>
