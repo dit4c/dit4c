@@ -23,7 +23,7 @@ import scala.util._
 object RapidAAFProvider {
 
   case class AAFInfo(attributes: Map[String, String]) extends AuthInfo
-  case class Settings(url: String, key: String)
+  case class Settings(url: String, secret: String)
 
 }
 
@@ -67,7 +67,7 @@ class RapidAAFProvider(
   implicit class RapidAAFRequest[B](request: ExtractableRequest[B]) {
     def jwtClaim: Option[JwtClaim] =
       request.extractString("assertion", Some(Seq(RequestPart.FormUrlEncodedBody)))
-        .map(token => JwtJson.decode(token, settings.key, JwtAlgorithm.allHmac))
+        .map(token => JwtJson.decode(token, settings.secret, JwtAlgorithm.allHmac))
         .flatMap {
           case Success(v) => Some(v)
           case Failure(e) =>

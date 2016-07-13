@@ -58,10 +58,10 @@ class RapidAAFAuthProviderSpec(implicit ee: ExecutionEnv)
       }.await
     }
 
-    "produce AuthInfo from a properly formatted request" >> prop({ (id: String, key: String, alg: JwtAlgorithm) =>
+    "produce AuthInfo from a properly formatted request" >> prop({ (id: String, secret: String, alg: JwtAlgorithm) =>
         val authProvider = new RapidAAFProvider(
             httpLayer,
-            RapidAAFProvider.Settings("http://example.test/login", key))
+            RapidAAFProvider.Settings("http://example.test/login", secret))
         val content =
           s"""|{
               |  "iss": "https://rapid.aaf.edu.au",
@@ -81,7 +81,7 @@ class RapidAAFAuthProviderSpec(implicit ee: ExecutionEnv)
               |    "edupersonscopedaffiliation": "staff@fictional.edu.au"
               |  }
               |}""".stripMargin
-        val serializedToken: String = JwtJson.encode(content, key, alg)
+        val serializedToken: String = JwtJson.encode(content, secret, alg)
         val request = FakeRequest("POST", "/authenticate/rapidaaf")
           .withFormUrlEncodedBody("assertion" -> serializedToken)
         authProvider.authenticate()(request) must beRight[RapidAAFProvider.AAFInfo]({
@@ -102,10 +102,10 @@ class RapidAAFAuthProviderSpec(implicit ee: ExecutionEnv)
         .setGen2(signingKeys)
         .noShrink
 
-    "retrieve SocialProfile from AuthInfo" >> prop({ (id: String, key: String) =>
+    "retrieve SocialProfile from AuthInfo" >> prop({ (id: String, secret: String) =>
         val authProvider = new RapidAAFProvider(
             httpLayer,
-            RapidAAFProvider.Settings("http://example.test/login", key))
+            RapidAAFProvider.Settings("http://example.test/login", secret))
         val authInfo = RapidAAFProvider.AAFInfo(Map(
           "cn" -> "Tom Atkins",
           "mail" -> "t.atkins@fictional.edu.au",
