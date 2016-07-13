@@ -23,8 +23,11 @@ import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
 import com.mohiva.play.silhouette.impl.providers.SocialProvider
 import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
 import com.mohiva.play.silhouette.api.exceptions.ProviderException
+import play.api.Environment
+import play.api.Mode
 
 class MainController(
+    val environment: Environment,
     val messagesApi: MessagesApi,
     val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
     val userAggregateManager: ActorRef @@ UserAggregateManager,
@@ -45,7 +48,7 @@ class MainController(
       case Some(IdentityService.User(_, _)) =>
         Ok(views.html.index(imageLookup.keys.toList.sorted))
       case None =>
-        Ok(views.html.login(Some(loginForm), socialProviders))
+        Ok(views.html.login(noneIfProd(loginForm), socialProviders))
     }
   }
 
@@ -111,7 +114,7 @@ class MainController(
     loginForm.bindFromRequest.fold(
       formWithErrors => Future.successful {
         // binding failure, you retrieve the form containing errors:
-        BadRequest(views.html.login(Some(formWithErrors), socialProviders))
+        BadRequest(views.html.login(noneIfProd(formWithErrors), socialProviders))
       },
       userData => {
         val loginInfo = LoginInfo("dummy", userData.identity)
@@ -268,5 +271,9 @@ class MainController(
       (__ \ 'instances).write[Seq[InstanceResponse]]
     ).contramap({ case InstancesResponse(instances) => instances })
 
+  private def noneIfProd[A](v: A): Option[A] = environment.mode match {
+    case Mode.Prod => None
+    case _ => Some(v)
+  }
 
 }
