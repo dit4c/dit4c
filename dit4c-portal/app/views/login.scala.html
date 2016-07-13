@@ -14,11 +14,26 @@
 body {
   background-color: var(--paper-blue-500);
 }
-#login-form, #social-providers {
+#login-methods, #dummy-login-form {
   padding: 20px;
   border-radius: 5px;
   background-color: white;
   margin-bottom: 20px;
+}
+#dummy-login-form {
+  background-color: var(--paper-grey-100);
+}
+h1 {
+  @@apply(--paper-font-title);
+}
+paper-button.provider {
+  width: 100%;
+  color: white;
+  background-color: var(--paper-blue-400);
+}
+#social-providers a {
+  width: 100%;
+  text-decoration: initial;
 }
 </style>
 <script>
@@ -35,8 +50,10 @@ function submit(form) {
 <body class="fullbleed vertical layout">
 
 <div class="layout vertical center center-justified" style="height: 100vh">
+  <div id="login-methods">
+    <h1>@Messages("login.with")</h1>
   @for(form <- dummyIdForm) {
-  <form class="layout vertical center center-justified" id="login-form" method="post" action="@routes.MainController.login">
+  <form class="layout vertical center center-justified" id="dummy-login-form" method="post" action="@routes.MainController.login">
 	  <div>
 	    <paper-input label="User Identity" id="identity-field" name="identity" value='@{form.value.map(_.identity).getOrElse("")}'
 	       @if(!form.errors("identity").isEmpty) { invalid }
@@ -44,19 +61,20 @@ function submit(form) {
 	       error-message='@{form.errors("identity").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
 	  </div>
 	  <div>
-	    <paper-button onclick="submit(document.getElementById('login-form'))">Login</paper-button>
+	    <paper-button onclick="submit(document.getElementById('dummy-login-form'))">Login</paper-button>
 	  </div>
   </form>
   }
   @if(socialProviders.providers.nonEmpty) {
-    <div id="social-providers">
-      <div>
+    <div id="social-providers" class="layout vertical center">
       @for(p <- socialProviders.providers) {
-        <a href="@routes.MainController.authenticate(p.id)" class="provider @p.id">@Messages(p.id)</a>
+        <a href="@routes.MainController.authenticate(p.id)" tab-index="-1">
+          <paper-button class="provider">@Messages(p.id)</paper-button>
+        </a>
       }
-      </div>
     </div>
   }
+  </div>
 </div>
 
 </body>
