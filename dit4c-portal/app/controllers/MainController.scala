@@ -80,14 +80,14 @@ class MainController(
     }
   }
 
-  def newInstance = (UserAction andThen UserRequired).async { implicit request =>
-    newInstanceForm(request.userId.get).bindFromRequest.fold(
+  def newInstance = silhouette.SecuredAction.async { implicit request =>
+    newInstanceForm(request.identity.id).bindFromRequest.fold(
         formWithErrors => {
           Future.successful(BadRequest(""))
         },
         userData => {
           implicit val timeout = Timeout(1.minute)
-          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.StartInstance(
+          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.StartInstance(
               clusterLookup(userData.cluster),
               imageLookup(userData.image),
               routes.MainController.instanceRegistration.absoluteURL()))).map {
