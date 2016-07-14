@@ -100,9 +100,9 @@ class MainController(
     )
   }
 
-  def terminateInstance(instanceId: String) = (UserAction andThen UserRequired).async { implicit request =>
+  def terminateInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.userId.get, UserAggregate.TerminateInstance(instanceId))).map {
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.TerminateInstance(instanceId))).map {
       case ClusterAggregate.InstanceTerminating(id) =>
         Ok(id)
       case UserAggregate.InstanceNotOwnedByUser =>
@@ -237,15 +237,6 @@ class MainController(
   case class InstancesResponse(instances: Seq[InstanceResponse])
   case class InstanceResponse(id: String, state: String, url: Option[String])
 
-  object UserRequired extends ActionFilter[UserRequest] {
-    def filter[A](input: UserRequest[A]) = Future.successful {
-      if (input.userId.isEmpty)
-        Some(Forbidden)
-      else
-        None
-    }
-  }
-
   private val imageLookup = Map(
     "gotty"        -> "docker://dit4c/gotty",
     "IPython"      -> "docker://dit4c/dit4c-container-ipython",
@@ -277,3 +268,5 @@ class MainController(
   }
 
 }
+
+case class LoginData(identity: String)
