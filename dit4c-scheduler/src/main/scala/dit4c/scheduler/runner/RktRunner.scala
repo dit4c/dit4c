@@ -193,7 +193,7 @@ class RktRunnerImpl(
             |            },
             |            "app": {
             |                "exec": [
-            |                    "/bin/ngrok", "http", "-bind-tls=true",
+            |                    "/bin/ngrok", "http", "-bind-tls=true", "-region=au",
             |                    "127.0.0.1:$servicePort"
             |                ],
             |                "group": "99",
