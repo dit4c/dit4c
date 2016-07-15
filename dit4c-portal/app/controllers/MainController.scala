@@ -238,7 +238,7 @@ class MainController(
   case class InstanceResponse(id: String, state: String, url: Option[String])
 
   private val imageLookup = Map(
-    "gotty"        -> "docker://dit4c/gotty",
+    "Base (Alpine)" -> "docker://dit4c/dit4c-container-base:alpine",
     "IPython"      -> "docker://dit4c/dit4c-container-ipython",
     "OpenRefine"   -> "docker://dit4c/dit4c-container-openrefine",
     "NLTK"         -> "docker://dit4c/dit4c-container-nltk",
