@@ -13,7 +13,8 @@ object ClusterAggregate {
     val Rkt = Value("rkt")
   }
 
-  def props(pId: String): Props = Props(classOf[ClusterAggregate], pId)
+  def props(pId: String, defaultConfigProvider: DefaultConfigProvider): Props =
+    Props(classOf[ClusterAggregate], pId, defaultConfigProvider)
 
   trait State extends BasePersistentFSMState
   case object Uninitialized extends State
@@ -39,7 +40,7 @@ object ClusterAggregate {
 
 }
 
-class ClusterAggregate(val persistenceId: String)
+class ClusterAggregate(val persistenceId: String, defaultConfigProvider: DefaultConfigProvider)
     extends PersistentFSM[ClusterAggregate.State, ClusterAggregate.Data, ClusterAggregate.DomainEvent]
     with ActorLogging {
   import ClusterAggregate._
@@ -86,7 +87,7 @@ class ClusterAggregate(val persistenceId: String)
     s"${persistenceId}-${t}"
 
   private def managerProps(t: ClusterType) = t match {
-    case ClusterTypes.Rkt => RktClusterManager.props(context.dispatcher)
+    case ClusterTypes.Rkt => RktClusterManager.props(defaultConfigProvider.rktRunnerConfig)(context.dispatcher)
   }
 
 }

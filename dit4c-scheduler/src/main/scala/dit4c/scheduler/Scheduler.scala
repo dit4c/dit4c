@@ -7,6 +7,9 @@ import scala.concurrent.Future
 import akka.http.scaladsl.Http.ServerBinding
 import akka.actor.Props
 import dit4c.scheduler.service.ClusterAggregateManager
+import dit4c.scheduler.domain.DefaultConfigProvider
+import dit4c.scheduler.runner.RktRunner
+import java.nio.file.Paths
 
 object Scheduler {
   def apply(config: SchedulerConfig): Future[ServerBinding] = {
@@ -18,8 +21,8 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
 
   override def appName = config.name
 
-  val clusterAggregateManager = system.actorOf(
-      Props[ClusterAggregateManager],
+  lazy val clusterAggregateManager = system.actorOf(
+      Props(classOf[ClusterAggregateManager], defaultConfigProvider),
       "cluster-aggregate-manager")
 
   def handler =
@@ -31,5 +34,9 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
         "localhost", config.port)
   }
 
+  private val defaultConfigProvider: DefaultConfigProvider = new DefaultConfigProvider {
+    override def rktRunnerConfig =
+      RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+  }
 
 }

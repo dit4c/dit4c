@@ -12,6 +12,9 @@ import org.specs2.concurrent.ExecutionEnv
 import akka.util.Timeout
 import dit4c.scheduler.ScalaCheckHelpers
 import akka.testkit.TestProbe
+import dit4c.scheduler.domain.DefaultConfigProvider
+import dit4c.scheduler.runner.RktRunner
+import java.nio.file.Paths
 
 class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -22,7 +25,11 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
   import ScalaCheckHelpers._
   import ClusterAggregateManager._
 
-  val clusterAggregateManager = system.actorOf(Props[ClusterAggregateManager])
+  val defaultConfigProvider = new DefaultConfigProvider {
+    override def rktRunnerConfig =
+      RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+  }
+  val clusterAggregateManager = system.actorOf(Props(classOf[ClusterAggregateManager], defaultConfigProvider))
 
   "ClusterAggregateManager" >> {
 

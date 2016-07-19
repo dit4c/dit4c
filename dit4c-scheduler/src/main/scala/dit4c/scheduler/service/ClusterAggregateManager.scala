@@ -22,7 +22,7 @@ object ClusterAggregateManager {
     validClusterId.unapplySeq(id).isDefined
 }
 
-class ClusterAggregateManager extends Actor with ActorLogging {
+class ClusterAggregateManager(defaultConfigProvider: DefaultConfigProvider) extends Actor with ActorLogging {
 
   import ClusterAggregateManager._
 
@@ -66,7 +66,7 @@ class ClusterAggregateManager extends Actor with ActorLogging {
   }
 
   def aggregateProps(aggregateId: String): Props = {
-    ClusterAggregate.props(aggregateId)
+    ClusterAggregate.props(aggregateId, defaultConfigProvider)
   }
 
   protected def createClusterAggregate(aggregateId: String): ActorRef = {

@@ -15,6 +15,14 @@ import pdi.jwt.Jwt
 import pdi.jwt.algorithms.JwtAsymetricAlgorithm
 import pdi.jwt.JwtAlgorithm
 import akka.http.scaladsl.model.Uri
+import dit4c.scheduler.utils.KeyHelpers._
+import java.nio.file.Paths
+
+object RktRunner {
+  case class Config(
+      rktDir: Path,
+      instanceNamePrefix: String)
+}
 
 trait RktRunner {
   type ImageId = String
@@ -23,18 +31,17 @@ trait RktRunner {
   def start(
       instanceId: String,
       image: ImageId,
-      callbackUrl: String): Future[RSAPublicKey]
+      portalUri: String): Future[RSAPublicKey]
   def stop(instanceId: String): Future[Unit]
 
 }
 
 class RktRunnerImpl(
     val ce: CommandExecutor,
-    val rktDir: Path,
-    val instanceNamePrefix: String = "dit4c-instance-")(
+    val config: RktRunner.Config)(
         implicit ec: ExecutionContext) extends RktRunner {
 
-  if (!instanceNamePrefix.matches("""[a-z0-9\-]+"""))
+  if (!config.instanceNamePrefix.matches("""[a-z0-9\-]+"""))
     throw new IllegalArgumentException(
         "Only lower-case alphanumerics & '-' allowed for instance prefix")
 
@@ -65,16 +72,16 @@ class RktRunnerImpl(
   def start(
       instanceId: String,
       image: ImageId,
-      callbackUrl: String): Future[RSAPublicKey] =
+      portalUri: String): Future[RSAPublicKey] =
     if (instanceId.matches("""[a-z0-9\-]+""")) {
       for {
         (manifestFile, publicKey) <-
-          generateManifestFile(instanceId, image, callbackUrl)
+          generateManifestFile(instanceId, image, portalUri)
         systemdRun <- privileged(systemdRunCmd)
         rkt <- rktCmd
         output <- ce(
             systemdRun ++
-            Seq(s"--unit=${instanceNamePrefix}-${instanceId}.service") ++
+            Seq(s"--unit=${config.instanceNamePrefix}-${instanceId}.service") ++
             rkt ++
             Seq("run", "--net=default", "--dns=8.8.8.8", "--no-overlay") ++
             Seq(s"--pod-manifest=$manifestFile")
@@ -88,13 +95,13 @@ class RktRunnerImpl(
       .flatMap { systemctl =>
         ce(
           systemctl :+ "stop" :+
-          s"${instanceNamePrefix}-${instanceId}.service")
+          s"${config.instanceNamePrefix}-${instanceId}.service")
       }
       .map { _ => () }
 
   protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
     systemctlCmd
-      .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"$instanceNamePrefix*") }
+      .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"${config.instanceNamePrefix}*") }
       .map(_.trim)
       .map { output =>
         output.lines.map { line =>
@@ -119,14 +126,14 @@ class RktRunnerImpl(
                 line.dropWhile(_.isWhitespace).takeWhile(!_.isWhitespace)
               m.init :+ m.last.copy(apps = m.last.apps + appName)
             case line =>
-              var parts = line.split("""(\t|\s\s+)""").toList
+              var parts = line.split("""(\t+|\s\s+)""").toList
               val (uuid :: appName :: _ :: _ :: state :: _) = parts
               m :+ RktPod(uuid, Set(appName), RktPod.States.fromString(state))
           }
         }.toSet
       }
 
-  private def rktCmd = which("rkt").map(_ :+ s"--dir=$rktDir")
+  private def rktCmd = which("rkt").map(_ :+ s"--dir=${config.rktDir}")
 
   private def systemdRunCmd = which("systemd-run")
 
@@ -146,71 +153,80 @@ class RktRunnerImpl(
   private def generateManifestFile(
       instanceId: String,
       image: ImageId,
-      callbackUrl: String): Future[(String, RSAPublicKey)] = {
+      portalUri: String): Future[(String, RSAPublicKey)] = {
     for {
-      curlImageId <- fetch("quay.io/yss44/curl")
-      ngrokImageId <- fetch("docker://wernight/ngrok")
+      socatImageId <- fetch("quay.io/ridero/socat")
+      listenerImageId <- fetch("https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.5/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
       servicePort <- guessServicePort(image)
       (privateKey, publicKey) = newKeyPair
-      token = jwtToken(instanceId, privateKey)
-      callbackCmd = JsString(Seq(
-          """NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -oE "https://.*.io")""",
-          "&&",
-          "curl -v -X PUT --retry 10",
-          s"""-H "Authorization: Bearer ${token}"""",
-          """-H "Content-Type: application/json"""",
-          """-d "{\"uri\":\"$NGROK_URL\"}"""",
-          callbackUrl).mkString(" "))
-      manifest =
-        s"""|{
-            |    "acVersion": "0.8.4",
-            |    "acKind": "PodManifest",
-            |    "apps": [
-            |        {
-            |            "name": "${instanceNamePrefix}-${instanceId}",
-            |            "image": {
-            |                "id": "${image}"
-            |            }
-            |        },
-            |        {
-            |            "name": "callback-helper",
-            |            "image": {
-            |                "id": "${curlImageId}"
-            |            },
-            |            "app": {
-            |                "exec": [
-            |                    "watch", "-n", "60", $callbackCmd
-            |                ],
-            |                "group": "99",
-            |                "user": "99"
-            |            },
-            |            "readOnlyRootFS": true
-            |        },
-            |        {
-            |            "name": "pod-proxy",
-            |            "image": {
-            |                "id": "${ngrokImageId}"
-            |            },
-            |            "app": {
-            |                "exec": [
-            |                    "/bin/ngrok", "http", "-bind-tls=true", "-region=au",
-            |                    "127.0.0.1:$servicePort"
-            |                ],
-            |                "group": "99",
-            |                "user": "99"
-            |            },
-            |            "readOnlyRootFS": true
-            |        }
-            |    ]
-            |}""".stripMargin
-      output <- ce(Seq("sh", "-c", Seq(
-          "TMPFILE=$(mktemp --tmpdir manifest-json-XXXXXXXX)",
-          "cat > $TMPFILE",
-          "test -f $TMPFILE",
-          "echo $TMPFILE").mkString(" && ")),
-        new ByteArrayInputStream((manifest+"\n").getBytes))
+      instanceKeyInternalPath = "/dit4c/pki/instance-key.pem"
+      vfm <- tempVolumeFileManager(s"instance-$instanceId")
+      configMountJson = Json.obj(
+          "volume" -> "dit4c-instance-config",
+          "path" -> "/dit4c")
+      configVolumeJson = Json.obj(
+          "name" -> "dit4c-instance-config",
+          "kind" -> "host",
+          "readOnly" -> true,
+          "source" -> vfm.baseDir)
+      helperEnvVars = Map[String, String](
+          "DIT4C_INSTANCE_PRIVATE_KEY" -> instanceKeyInternalPath,
+          "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
+          "DIT4C_INSTANCE_JWT_KID" -> privateKey.pkcs1.der.digest("SHA-256").base64,
+          "DIT4C_INSTANCE_HELPER_AUTH_HOST" -> "127.68.73.84",
+          "DIT4C_INSTANCE_HELPER_AUTH_PORT" -> "5267",
+          "DIT4C_INSTANCE_HTTP_PORT" -> servicePort.toString,
+          "DIT4C_INSTANCE_URI_UPDATE_URL" -> Uri(portalUri).withPath(Uri.Path("/instances/")).toString)
+      _ <- vfm.writeFile("env.sh",
+          (helperEnvVars.map({case (k, v) => s"$k=$v"}).toSeq.sorted.mkString("\n")+"\n").getBytes)
+      _ <- vfm.writeFile("pki/instance-key.pem", privateKey.pkcs1.pem.getBytes)
+      manifest = Json.obj(
+        "acVersion" -> "0.8.4",
+        "acKind" -> "PodManifest",
+        "apps" -> Json.arr(
+          Json.obj(
+            "name" -> s"${config.instanceNamePrefix}-${instanceId}",
+            "image" -> Json.obj(
+              "id" -> image)),
+          Json.obj(
+            "name" -> "helper-listener",
+            "image" -> Json.obj(
+              "id" -> listenerImageId),
+            "mounts" -> Json.arr(configMountJson)),
+          Json.obj(
+            "name" -> "helper-auth",
+            "image" -> Json.obj(
+              "id" -> socatImageId),
+            "app" -> Json.obj(
+              "exec" -> Json.arr(
+                "sh", "-c",
+                "set -aex && source /dit4c/env.sh && socat -d TCP-LISTEN:$DIT4C_INSTANCE_HELPER_AUTH_PORT,bind=$DIT4C_INSTANCE_HELPER_AUTH_HOST,fork,reuseaddr TCP:127.0.0.1:$DIT4C_INSTANCE_HTTP_PORT"),
+              "group" -> "99",
+              "user" -> "99"),
+            "mounts" -> Json.arr(configMountJson),
+            "readOnlyRootFS" -> true)),
+        "volumes" -> Json.arr(configVolumeJson))
+      output <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
+        vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
       filepath = output.trim
     } yield (filepath, publicKey)
+  }
+
+  private def tempVolumeFileManager(dirPrefix: String): Future[VolumeFileManager] =
+    ce(Seq("sh", "-c", Seq(
+            s"DIR=$$(mktemp -d --tmpdir $dirPrefix-XXXX)",
+            "chmod o=rx $DIR",
+            "echo $DIR").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+
+  private class VolumeFileManager(val baseDir: String) {
+    def writeFile(filename: String, content: Array[Byte]): Future[String] = {
+      val f = Paths.get(baseDir).resolve(filename.stripPrefix("/"))
+      ce(Seq("sh", "-c", Seq(
+            s"mkdir -p $$(dirname $f)",
+            s"cat > $f",
+            s"test -f $f",
+            s"echo $f").mkString(" && ")), new ByteArrayInputStream(content))
+    }
   }
 
   private def newKeyPair: (RSAPrivateKey, RSAPublicKey) = {
@@ -235,5 +251,9 @@ class RktRunnerImpl(
   private def jwtToken(id: String, key: RSAPrivateKey): String = {
     Jwt.encode(s"""{"iss":"instance/$id"}""", key, JwtAlgorithm.RSASHA512)
   }
+
+  private def rktEnv(pairs: (String, String)*): JsArray = JsArray(
+    pairs.map { case (k: String, v: String) => Json.obj("name" -> k, "value" -> v) })
+
 
 }

@@ -85,8 +85,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
   }
 
   override def foreach[R: AsResult](f: RktRunnerImpl => R) = withRktDir { rktDir =>
-    val runner = new RktRunnerImpl(commandExecutor, rktDir,
-        "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase)
+    val runner = new RktRunnerImpl(commandExecutor, RktRunner.Config(
+        rktDir, "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase))
     AsResult(f(runner))
   }
 
@@ -113,7 +113,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
       "should show running units with prefix" >> { runner: RktRunnerImpl =>
         import scala.language.experimental.macros
-        val prefix = runner.instanceNamePrefix
+        val prefix = runner.config.instanceNamePrefix
         val systemdRunCmd = Seq("sudo", "-n", "--", "systemd-run")
         val instanceId = Random.alphanumeric.take(40).mkString
         // Prepared a unit
@@ -148,7 +148,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         // Prepared a pod
         Await.ready(
           commandExecutor(
-              rktCmd(runner.rktDir) ++
+              rktCmd(runner.config.rktDir) ++
               Seq("prepare", "--insecure-options=image", "--no-overlay", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
@@ -166,7 +166,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         // Run a pod
         val imageId = Await.result(
             commandExecutor(
-              rktCmd(runner.rktDir) ++
+              rktCmd(runner.config.rktDir) ++
               Seq("fetch", "--insecure-options=image", testImage)),
             1.minute).trim
         val runOutput = new ByteArrayOutputStream()
@@ -221,7 +221,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
           .map(_.trim)
           .flatMap { manifestFile =>
             commandExecutor(
-              rktCmd(runner.rktDir) ++
+              rktCmd(runner.config.rktDir) ++
               Seq("run", "--interactive", "--no-overlay", "--net=none", s"--pod-manifest=$manifestFile"),
               toProc,
               runOutput,
@@ -251,7 +251,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         // Run a pod
         Await.ready(
           commandExecutor(
-              rktCmd(runner.rktDir) ++
+              rktCmd(runner.config.rktDir) ++
               Seq("run", "--insecure-options=image", "--no-overlay", "--net=none", testImage, "--exec", "/bin/true")),
           1.minute)
         // Check listing
@@ -271,7 +271,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         1.to(numOfPods).foreach { _ =>
           Await.ready(
             commandExecutor(
-                rktCmd(runner.rktDir) ++
+                rktCmd(runner.config.rktDir) ++
                 Seq("prepare", "--insecure-options=image", "--no-overlay", testImage, "--exec", "/bin/true")),
             1.minute)
         }
@@ -357,7 +357,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         import scala.language.experimental.macros
         // Use a long-running image for this test
         val imageId = Await.result(
-            runner.fetch("docker://dit4c/gotty"), 1.minute)
+            runner.fetch("docker://dit4c/https-redirect"), 1.minute)
         val instanceId = Random.alphanumeric.take(40).mkString.toLowerCase
         // Start image
         try {
@@ -368,7 +368,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
             runner.listSystemdUnits must {
               haveSize[Set[SystemdUnit]](1) and contain(
                 matchA[SystemdUnit]
-                  .name(s"${runner.instanceNamePrefix}-${instanceId}")
+                  .name(s"${runner.config.instanceNamePrefix}-${instanceId}")
               )
             }.awaitFor(1.minute)
           } and {
@@ -376,7 +376,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
               haveSize[Set[RktPod]](1) and contain(
                 matchA[RktPod]
                   .uuid(not(beEmpty[String]))
-                  .apps(contain(s"${runner.instanceNamePrefix}-${instanceId}"))
+                  .apps(contain(s"${runner.config.instanceNamePrefix}-${instanceId}"))
                   .state(be(RktPod.States.Running))
               )
             }.awaitFor(1.minutes)
@@ -391,21 +391,21 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                   (successfulTry.withValue { claim: JwtClaim =>
                     claim must
                       matchA[JwtClaim]
-                        .issuer(be_==(Some(s"instance/$instanceId")))
+                        .issuer(be_==(Some(s"instance-$instanceId")))
+                        .content(contain("kid"))
                   } ^^ { h: HttpHeader =>
+                    val encodedJwt = h.value.split(" ").last
                     // Token must decode with public key
-                    JwtJson.decode(h.value.split(" ").last, instancePublicKey)
+                    JwtJson.decode(encodedJwt, instancePublicKey)
                   })
                 })
                 .entity(beLike[ResponseEntity] {
                   case e: HttpEntity.Strict => e must
                     matchA[HttpEntity.Strict]
-                      .contentType(be_==(ContentTypes.`application/json`))
-                      .data {
-                        {
-                          /("uri" -> "http://[0-9\\.]+:[0-9]+".r.anchored)
-                        } ^^ { bs: ByteString => bs.decodeString("utf8") }
-                  }
+                      .contentType(be_==(ContentTypes.`text/plain(UTF-8)`))
+                      .data(
+                        { beMatching("https?://[a-z0-9\\.]+".r.anchored) } ^^
+                        { bs: ByteString => bs.decodeString("utf8") })
                 })
             }
           } and {
@@ -417,7 +417,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
               haveSize[Set[RktPod]](1) and contain(
                 matchA[RktPod]
                   .uuid(not(beEmpty[String]))
-                  .apps(contain(s"${runner.instanceNamePrefix}-${instanceId}"))
+                  .apps(contain(s"${runner.config.instanceNamePrefix}-${instanceId}"))
                   .state(be(RktPod.States.Exited))
               )
             }.awaitFor(1.minutes)

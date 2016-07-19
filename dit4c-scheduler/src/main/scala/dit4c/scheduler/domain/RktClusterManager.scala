@@ -22,7 +22,7 @@ object RktClusterManager {
   type RktRunnerFactory =
     (RktNode.ServerConnectionDetails, String) => RktRunner
 
-  def props(implicit ec: ExecutionContext): Props = {
+  def props(config: RktRunner.Config)(implicit ec: ExecutionContext): Props = {
     def rktRunnerFactory(
         connectionDetails: RktNode.ServerConnectionDetails,
         rktDir: String) = {
@@ -34,7 +34,7 @@ object RktClusterManager {
               connectionDetails.clientKey.`private`,
               connectionDetails.clientKey.public,
               connectionDetails.serverKey.public),
-          Paths.get(rktDir))
+          config)
     }
     props(rktRunnerFactory, RemoteShell.getHostKey)
   }
@@ -201,7 +201,7 @@ class RktClusterManager(
     case RktNodeRegistered(nodeId, _) =>
       state = state.copy(nodeIds = state.nodeIds + nodeId)
     case InstanceAssignedToNode(instanceId, nodeId, _) =>
-      state = state.copy(instanceNodeMappings = 
+      state = state.copy(instanceNodeMappings =
         state.instanceNodeMappings + (instanceId -> nodeId))
 
   }

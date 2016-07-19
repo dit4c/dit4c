@@ -23,6 +23,7 @@ import akka.actor.Props
 import dit4c.scheduler.runner.RktRunner
 import dit4c.scheduler.domain.Instance.NamedImage
 import akka.actor.Terminated
+import java.nio.file.Paths
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -33,6 +34,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
 
   implicit val params = Parameters(minTestsOk = 20)
   implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
+  implicit val rktRunnerConfig =
+    RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
 
   "ClusterAggregate" >> {
 
@@ -43,7 +46,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           ActorSystem("RktClusterManager-GetRktNodeState-Uninitialized")
         prop({ (managerPersistenceId: String, rktNodeId: String) =>
           val manager =
-              system.actorOf(RktClusterManager.props, managerPersistenceId)
+              system.actorOf(RktClusterManager.props(rktRunnerConfig), managerPersistenceId)
           val probe = TestProbe()
           probe.send(manager, GetRktNodeState(rktNodeId))
           probe.expectMsgType[RktNode.Data] must {

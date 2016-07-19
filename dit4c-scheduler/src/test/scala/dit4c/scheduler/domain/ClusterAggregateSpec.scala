@@ -19,6 +19,8 @@ import java.security.interfaces.RSAPrivateKey
 import scala.concurrent.Future
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
+import dit4c.scheduler.runner.RktRunner
+import java.nio.file.Paths
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -29,6 +31,10 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
 
   implicit val params = Parameters(minTestsOk = 20)
   implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
+  val defaultConfigProvider = new DefaultConfigProvider {
+    override def rktRunnerConfig =
+      RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+  }
 
   "ClusterAggregate" >> {
 
@@ -42,7 +48,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         prop({ aggregateId: String =>
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId))
+            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider))
           probe.send(clusterAggregate, GetState)
           probe.expectMsgType[ClusterAggregate.State] must {
             be(ClusterAggregate.Uninitialized)
@@ -56,7 +62,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId));
+            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider));
           {
             probe.send(clusterAggregate, Initialize(t))
             probe.receiveOne(1.second)
@@ -81,7 +87,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId))
+            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider))
           // Get returned state after initialization and from GetState
           probe.send(clusterAggregate, Initialize(t))
           val response = probe.expectMsgType[State]
