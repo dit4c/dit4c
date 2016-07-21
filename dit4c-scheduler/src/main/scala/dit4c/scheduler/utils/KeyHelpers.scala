@@ -5,6 +5,8 @@ import java.util.Base64
 import java.security.KeyPairGenerator
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import java.security.MessageDigest
+import java.security.PublicKey
+import java.security.PrivateKey
 
 object KeyHelpers {
 
@@ -54,26 +56,40 @@ object KeyHelpers {
         .+("\n")                           // Append final newline
   }
 
-  class SshPublicKey(val raw: Array[Byte]) {
-    def ssh2: PemEncodable = {
-      def bytes = raw
-      new PemEncodable {
-        def raw = bytes
-        def pemName = "SSH2 PUBLIC KEY"
-      }
-    }
-
+  class SshPublicKey(val raw: Array[Byte], opensshKeyType: String) extends PemEncodable {
+    def pemName = "SSH2 PUBLIC KEY"
+    def authorizedKeys = s"${opensshKeyType} ${raw.base64}"
     def fingerprint(alg: String): String = {
       val digest = MessageDigest.getInstance(alg).digest(raw)
       alg.toUpperCase match {
-        case "MD5" => raw.digest("MD5").map(_.toHexString).mkString(":")
-        case alg => s"${alg}:${raw.digest(alg).base64}"
+        case "MD5" => raw.digest("MD5").map(b => f"${b}%02x").mkString(":")
+        case alg => s"${alg.replace("-","")}:${raw.digest(alg).base64}"
       }
     }
-
   }
 
-  implicit class PrivateKeyHelper(key: RSAPrivateKey) {
+  implicit class PublicKeyHelper(key: PublicKey) {
+    def pkcs8: DerEncoded with PemEncodable = new DerEncoded with PemEncodable {
+      def raw = key.getEncoded
+      override def pemName = "PUBLIC KEY"
+    }
+  }
+
+  implicit class RSAPublicKeyHelper(key: RSAPublicKey) extends PublicKeyHelper(key) {
+    def ssh = {
+      import java.nio.ByteBuffer
+      // As per RFC4251, string/mpint are represented by uint32 length then bytes
+      def lengthThenBytes(bs: Array[Byte]): Array[Byte] =
+        ByteBuffer.allocate(4).putInt(bs.length).array() ++ bs
+      val bytes =
+        lengthThenBytes("ssh-rsa".getBytes("us-ascii")) ++
+        lengthThenBytes(key.getPublicExponent.toByteArray) ++
+        lengthThenBytes(key.getModulus.toByteArray)
+      new SshPublicKey(bytes, "ssh-rsa")
+    }
+  }
+
+  implicit class PrivateKeyHelper(key: PrivateKey) {
     def pkcs8: DerEncoded with PemEncodable = new DerEncoded with PemEncodable {
       def raw = key.getEncoded
       override def pemName = "PRIVATE KEY"

@@ -28,6 +28,7 @@ import java.security.interfaces.RSAPublicKey
 import scala.util.Random
 import pdi.jwt.JwtBase64
 import akka.http.scaladsl.model.headers.Location
+import dit4c.scheduler.utils.KeyHelpers._
 
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with PlayJsonSupport
@@ -105,12 +106,20 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("host" -> nodeConfig.connectionDetails.host) and
             /("port" -> nodeConfig.connectionDetails.port) and
             /("username" -> nodeConfig.connectionDetails.username) and
-            /("client-key") /("kty" -> "RSA") and
-            /("client-key") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
-            /("client-key") /("n" -> toBase64url(clientPubKey.getModulus)) and
-            /("host-key") /("kty" -> "RSA") and
-            /("host-key") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
-            /("host-key") /("n" -> toBase64url(serverPubKey.getModulus))
+            /("client-key") /("jwk") /("kty" -> "RSA") and
+            /("client-key") /("jwk") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
+            /("client-key") /("jwk") /("n" -> toBase64url(clientPubKey.getModulus)) and
+            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("MD5")) and
+            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("SHA-256")) and
+            /("client-key") /("ssh") /("openssh" -> clientPubKey.ssh.authorizedKeys) and
+            /("client-key") /("ssh") /("ssh2" -> clientPubKey.ssh.pem) and
+            /("host-key") /("jwk") /("kty" -> "RSA") and
+            /("host-key") /("jwk") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
+            /("host-key") /("jwk") /("n" -> toBase64url(serverPubKey.getModulus)) and
+            /("host-key") /("ssh") /("fingerprints") /(serverPubKey.ssh.fingerprint("MD5")) and
+            /("host-key") /("ssh") /("fingerprints") /(serverPubKey.ssh.fingerprint("SHA-256")) and
+            /("host-key") /("ssh") /("openssh" -> serverPubKey.ssh.authorizedKeys) and
+            /("host-key") /("ssh") /("ssh2" -> serverPubKey.ssh.pem)
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
@@ -135,12 +144,20 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("host" -> response.connectionDetails.host) and
             /("port" -> response.connectionDetails.port) and
             /("username" -> response.connectionDetails.username) and
-            /("client-key") /("kty" -> "RSA") and
-            /("client-key") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
-            /("client-key") /("n" -> toBase64url(clientPubKey.getModulus)) and
-            /("host-key") /("kty" -> "RSA") and
-            /("host-key") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
-            /("host-key") /("n" -> toBase64url(serverPubKey.getModulus))
+            /("client-key") /("jwk") /("kty" -> "RSA") and
+            /("client-key") /("jwk") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
+            /("client-key") /("jwk") /("n" -> toBase64url(clientPubKey.getModulus)) and
+            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("MD5")) and
+            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("SHA-256")) and
+            /("client-key") /("ssh") /("openssh" -> clientPubKey.ssh.authorizedKeys) and
+            /("client-key") /("ssh") /("ssh2" -> clientPubKey.ssh.pem) and
+            /("host-key") /("jwk") /("kty" -> "RSA") and
+            /("host-key") /("jwk") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
+            /("host-key") /("jwk") /("n" -> toBase64url(serverPubKey.getModulus)) and
+            /("host-key") /("ssh") /("fingerprints") /(serverPubKey.ssh.fingerprint("MD5")) and
+            /("host-key") /("ssh") /("fingerprints") /(serverPubKey.ssh.fingerprint("SHA-256")) and
+            /("host-key") /("ssh") /("openssh" -> serverPubKey.ssh.authorizedKeys) and
+            /("host-key") /("ssh") /("ssh2" -> serverPubKey.ssh.pem)
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors
@@ -237,7 +254,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("state" -> Instance.WaitingForImage.identifier) and
             /("image") /("name" -> imageName) and
             /("callback" -> callbackUrl.toString) and
-            /("key") /("kty" -> "RSA")
+            /("key") /("jwk") /("kty" -> "RSA")
           })
         }
     }).noShrink // Most likely shrinking won't help narrow down errors

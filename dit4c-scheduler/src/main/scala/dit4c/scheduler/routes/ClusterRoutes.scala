@@ -24,6 +24,7 @@ import dit4c.scheduler.domain.Instance
 import java.util.Base64
 import dit4c.scheduler.ssh.RemoteShell
 import java.math.BigInteger
+import dit4c.scheduler.utils.KeyHelpers._
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -35,13 +36,19 @@ object ClusterRoutes {
     }
 
   implicit val writesRSAPublicKey: Writes[RSAPublicKey] = (
-      (__ \ 'kty).write[String] and
-      (__ \ 'e).write[BigInteger] and
-      (__ \ 'n).write[BigInteger]
+      (__ \ 'jwk \ 'kty).write[String] and
+      (__ \ 'jwk \ 'e).write[BigInteger] and
+      (__ \ 'jwk \ 'n).write[BigInteger] and
+      (__ \ 'ssh \ 'fingerprints).write[Seq[String]] and
+      (__ \ 'ssh \ 'openssh).write[String] and
+      (__ \ 'ssh \ 'ssh2).write[String]
   )( (k: RSAPublicKey) => (
       "RSA",
       k.getPublicExponent,
-      k.getModulus) )
+      k.getModulus,
+      Seq("MD5", "SHA-256").map(k.ssh.fingerprint),
+      k.ssh.authorizedKeys,
+      k.ssh.pem) )
 
   implicit val readsAddRktNode: Reads[RktClusterManager.AddRktNode] = (
       (__ \ 'host).read[String] and
@@ -191,11 +198,7 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
               case node: RktNode.NodeConfig =>
                 extractUri { thisUri => extractLog { log =>
                   val nodeUri = Uri(thisUri.path / nodeId toString)
-                  val clientPublicKey = new String(
-                      Base64.getEncoder().encode(
-                          RemoteShell.toOpenSshPublicKey(
-                              node.connectionDetails.clientKey.public)),
-                      "utf8")
+                  val clientPublicKey = node.connectionDetails.clientKey.public.ssh.authorizedKeys
                   log.info("Created new node " +
                       node.connectionDetails.username + "@" +
                       node.connectionDetails.host + ":" +

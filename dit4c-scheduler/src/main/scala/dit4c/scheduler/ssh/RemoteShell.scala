@@ -39,16 +39,15 @@ object RemoteShell {
       userPrivateKey: RSAPrivateKey,
       userPublicKey: RSAPublicKey,
       hostPublicKey: RSAPublicKey): CommandExecutor = {
+    import dit4c.scheduler.utils.KeyHelpers._
     val jsch = new JSch
     jsch.addIdentity("id",
         toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,
-        toOpenSshPublicKey(userPublicKey),
+        userPublicKey.ssh.raw,
         null)
     jsch.getHostKeyRepository.add(
-        new HostKey(
-            host,
-            RemoteShell.toOpenSshPublicKey(hostPublicKey)),
-            null);
+        new HostKey(host, hostPublicKey.ssh.raw),
+        null);
     var lastSession: Option[Session] = None
     ce {
       if (lastSession.isDefined && lastSession.get.isConnected)
@@ -147,16 +146,6 @@ object RemoteShell {
     pemWriter.close
     writer.close
     writer.toString
-  }
-
-  def toOpenSshPublicKey(pub: RSAPublicKey): Array[Byte] = {
-    import java.nio.ByteBuffer
-    // As per RFC4251, string/mpint are represented by uint32 length then bytes
-    def lengthThenBytes(bs: Array[Byte]): Array[Byte] =
-      ByteBuffer.allocate(4).putInt(bs.length).array() ++ bs
-    lengthThenBytes("ssh-rsa".getBytes("us-ascii")) ++
-        lengthThenBytes(pub.getPublicExponent.toByteArray) ++
-        lengthThenBytes(pub.getModulus.toByteArray)
   }
 
   def fromOpenSshPublicKey(bytes: Array[Byte]): PublicKey = {
