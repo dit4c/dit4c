@@ -63,7 +63,7 @@ object KeyHelpers {
       val digest = MessageDigest.getInstance(alg).digest(raw)
       alg.toUpperCase match {
         case "MD5" => raw.digest("MD5").map(b => f"${b}%02x").mkString(":")
-        case alg => s"${alg.replace("-","")}:${raw.digest(alg).base64}"
+        case alg => s"${alg.replace("-","")}:${raw.digest(alg).base64.stripSuffix("=")}"
       }
     }
   }
