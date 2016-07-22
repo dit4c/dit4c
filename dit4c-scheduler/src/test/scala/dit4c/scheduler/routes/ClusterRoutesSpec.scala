@@ -254,6 +254,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("state" -> Instance.WaitingForImage.identifier) and
             /("image") /("name" -> imageName) and
             /("portal" -> portalUri.toString) and
+            /("key") /("jwk") /("kid" -> instanceId) and
             /("key") /("jwk") /("kty" -> "RSA")
           })
         }

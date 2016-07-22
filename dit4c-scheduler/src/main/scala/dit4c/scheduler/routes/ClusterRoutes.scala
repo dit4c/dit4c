@@ -94,6 +94,15 @@ object ClusterRoutes {
     }
   })
 
+  case class StatusReportWithId(id: String, sr: Instance.StatusReport)
+
+  implicit val writesInstanceStatusReportWithId: OWrites[StatusReportWithId] =
+    OWrites { obj =>
+      writesInstanceStatusReport.writes(obj.sr).deepMerge {
+        (__ \ 'key \ 'jwk \ 'kid).write[String].writes(obj.id)
+      }
+    }
+
   implicit val writesNodeConfig: OWrites[RktNode.NodeConfig] = (
       (__ \ 'host).write[String] and
       (__ \ 'port).write[Int] and
@@ -106,7 +115,6 @@ object ClusterRoutes {
       rktNode.connectionDetails.username,
       rktNode.connectionDetails.clientKey.public,
       rktNode.connectionDetails.serverKey.public))
-
 }
 
 class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
@@ -170,7 +178,7 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
             ClusterCommand(clusterId, GetInstanceStatus(instanceId))) {
           case Uninitialized => complete(StatusCodes.NotFound)
           case UnknownInstance => complete(StatusCodes.NotFound)
-          case status: StatusReport => complete(status)
+          case status: StatusReport => complete(StatusReportWithId(instanceId, status))
         }
       }
     } ~
