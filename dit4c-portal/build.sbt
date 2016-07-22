@@ -54,7 +54,10 @@ libraryDependencies ++= {
   )
 }
 
-resolvers += "Atlassian Releases" at "https://maven.atlassian.com/public/"
+resolvers ++= Seq(
+  "Atlassian Releases" at "https://maven.atlassian.com/public/",
+  Resolver.jcenterRepo
+)
 
 scalacOptions ++= Seq(
   "-deprecation",
