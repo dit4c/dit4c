@@ -21,7 +21,8 @@ import java.nio.file.Paths
 object RktRunner {
   case class Config(
       rktDir: Path,
-      instanceNamePrefix: String)
+      instanceNamePrefix: String,
+      listenerImage: String)
 }
 
 trait RktRunner {
@@ -156,7 +157,7 @@ class RktRunnerImpl(
       portalUri: String): Future[(String, RSAPublicKey)] = {
     for {
       socatImageId <- fetch("quay.io/ridero/socat")
-      listenerImageId <- fetch("https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.5/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
+      listenerImageId <- fetch(config.listenerImage)
       servicePort <- guessServicePort(image)
       (privateKey, publicKey) = newKeyPair
       instanceKeyInternalPath = "/dit4c/pki/instance-key.pem"

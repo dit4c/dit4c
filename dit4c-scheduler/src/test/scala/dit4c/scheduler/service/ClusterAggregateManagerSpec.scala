@@ -27,7 +27,10 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
 
   val defaultConfigProvider = new DefaultConfigProvider {
     override def rktRunnerConfig =
-      RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+      RktRunner.Config(
+          Paths.get("/var/lib/dit4c-rkt"),
+          "dit4c-instance-",
+          "" /* Not used */)
   }
   val clusterAggregateManager = system.actorOf(Props(classOf[ClusterAggregateManager], defaultConfigProvider))
 

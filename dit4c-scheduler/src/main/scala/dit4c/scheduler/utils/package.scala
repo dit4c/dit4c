@@ -29,7 +29,8 @@ package object utils {
 
   case class SchedulerConfig(
       val name: String,
-      val port: Int = 8080)
+      val port: Int = 8080,
+      val listenerImage: String = "https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.5/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
 
   class SchedulerConfigParser(app: AppMetadata)
       extends OptionParser[SchedulerConfig](app.name) {
@@ -47,6 +48,10 @@ package object utils {
         case n => Left("Invalid TCP port specified")
       }
       .text("port to listen on")
+
+    opt[String]("listener-image")
+      .action { (x, c) => c.copy(listenerImage = x) }
+      .text("image to use as pod listener")
   }
 
 }

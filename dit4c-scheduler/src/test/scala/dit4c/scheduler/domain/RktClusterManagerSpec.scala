@@ -35,7 +35,10 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
   implicit val params = Parameters(minTestsOk = 20)
   implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
   implicit val rktRunnerConfig =
-    RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+    RktRunner.Config(
+        Paths.get("/var/lib/dit4c-rkt"),
+        "dit4c-instance-",
+          "" /* Not used */)
 
   "ClusterAggregate" >> {
 

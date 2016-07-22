@@ -36,7 +36,10 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
 
   private val defaultConfigProvider: DefaultConfigProvider = new DefaultConfigProvider {
     override def rktRunnerConfig =
-      RktRunner.Config(Paths.get("/var/lib/dit4c-rkt"), "dit4c-instance-")
+      RktRunner.Config(
+          Paths.get("/var/lib/dit4c-rkt"),
+          "dit4c-instance-",
+          config.listenerImage)
   }
 
 }
