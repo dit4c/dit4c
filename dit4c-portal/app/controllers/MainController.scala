@@ -90,7 +90,7 @@ class MainController(
           (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.StartInstance(
               clusterLookup(userData.cluster),
               imageLookup(userData.image),
-              routes.MainController.instanceRegistration.absoluteURL()))).map {
+              routes.MainController.index.absoluteURL.stripSuffix("/")))).map {
             case InstanceAggregateManager.InstanceStarted(id) =>
               Ok(id)
             case ClusterAggregate.UnableToStartInstance =>
@@ -164,7 +164,7 @@ class MainController(
     }
   }
 
-  def instanceRegistration = Action.async(parse.json) { implicit request =>
+  def instanceRegistration = Action.async { implicit request =>
     import InstanceAggregateManager.{InstanceEnvelope, VerifyJwt}
     implicit val timeout = Timeout(1.minute)
     val authHeaderRegex = "^Bearer (.*)$".r
@@ -174,9 +174,8 @@ class MainController(
         (instanceAggregateManager ? VerifyJwt(token)).flatMap {
           case InstanceAggregate.ValidJwt(instanceId) =>
             log.debug(s"Valid JWT for $instanceId")
-            log.debug(Json.prettyPrint(request.body))
-            Json.fromJson[InstanceRegistrationRequest](request.body).asOpt match {
-              case Some(InstanceRegistrationRequest(uri)) =>
+            request.body.asText match {
+              case Some(uri) =>
                 (instanceAggregateManager ? InstanceEnvelope(instanceId, InstanceAggregate.AssociateUri(uri))).map { _ =>
                   Ok("")
                 }.recover {
@@ -186,8 +185,7 @@ class MainController(
                 Future.successful(BadRequest("No valid uri"))
             }
           case InstanceAggregate.InvalidJwt(msg) =>
-            println(s"Invalid JWT: $msg")
-            println(request.body)
+            log.warn(s"Invalid JWT: $msg\n${request.body}")
             Future.successful(BadRequest(msg))
         }
       }

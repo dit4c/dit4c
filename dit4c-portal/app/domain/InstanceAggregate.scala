@@ -184,7 +184,7 @@ class InstanceAggregate(
 
   private implicit val readsRemoteStatus: Reads[RemoteStatusInfo] = (
       (__ \ 'state).read[String] and
-      (__ \ 'key).readNullable[PublicKey] and
+      (__ \ 'key \ 'jwk).readNullable[PublicKey] and
       (__ \ 'errors).readNullable[Seq[String]].map(_.getOrElse(Seq.empty))
   )(RemoteStatusInfo.apply _)
 

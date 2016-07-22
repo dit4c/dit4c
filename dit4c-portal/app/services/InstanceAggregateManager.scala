@@ -76,7 +76,7 @@ class InstanceAggregateManager(
     JwtJson.decode(token, JwtOptions(signature=false))
         .toOption.toRight("Unable to decode token")
         .right.flatMap { claim =>
-          val issuerPrefix = "instance/"
+          val issuerPrefix = "instance-"
           claim.issuer match {
             case Some(id) if id.startsWith(issuerPrefix) =>
               Right(instanceRef(id.stripPrefix(issuerPrefix)))
