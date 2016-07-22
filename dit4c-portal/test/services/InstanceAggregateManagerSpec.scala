@@ -7,7 +7,6 @@ class InstanceAggregateManagerSpec(implicit ee: ExecutionEnv)
     extends Specification {
 
   "InstanceAggregateManager" >> {
-
     pending
   }
 

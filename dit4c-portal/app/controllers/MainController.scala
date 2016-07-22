@@ -33,6 +33,7 @@ class MainController(
     val userAggregateManager: ActorRef @@ UserAggregateManager,
     val silhouette: Silhouette[DefaultEnv],
     val identityService: IdentityService,
+    val oauthDataHandler: InstanceOAuthDataHandler,
     val socialProviders: SocialProviderRegistry)
     extends Controller
     with I18nSupport {

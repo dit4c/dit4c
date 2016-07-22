@@ -13,12 +13,17 @@ import scala.concurrent.ExecutionContext
 
 object IdentityService {
   case class User(id: String, loginInfo: LoginInfo) extends SilhouetteIdentity
+
+  def toIdentityKey(loginInfo: LoginInfo): IdentityAggregate.Key = loginInfo match {
+    case LoginInfo(providerId, providerKey) => providerId + ":" + providerKey
+  }
+
 }
 
 class IdentityService(
     val identityAggregateManager: ActorRef @@ IdentityAggregateManager)(implicit ec: ExecutionContext)
     extends SilhouetteIdentityService[IdentityService.User] {
-  import IdentityService.User
+  import IdentityService._
   import akka.pattern.ask
 
   implicit val timeout = Timeout(1.minute)
@@ -28,9 +33,4 @@ class IdentityService(
         toIdentityKey(loginInfo), IdentityAggregate.GetUser)).collect {
     case IdentityAggregate.UserFound(id) => Some(User(id, loginInfo))
   }
-
-  private def toIdentityKey(loginInfo: LoginInfo): IdentityAggregate.Key = loginInfo match {
-    case LoginInfo(providerId, providerKey) => providerId + ":" + providerKey
-  }
-
 }

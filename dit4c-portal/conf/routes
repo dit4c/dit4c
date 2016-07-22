@@ -1,6 +1,8 @@
 GET     /                                   controllers.MainController.index
 POST    /login                              controllers.MainController.login
 POST    /logout                             controllers.MainController.logout
+GET     /login/oauth/authorize              controllers.OAuthServerController.authorize(client_id: String, redirect_uri: String)
+POST    /login/oauth/access_token           controllers.OAuthServerController.accessToken
 GET     /authenticate/:provider             controllers.MainController.authenticate(provider)
 POST    /authenticate/:provider             controllers.MainController.authenticate(provider)
 GET     /instances/                         controllers.MainController.getInstances

@@ -42,6 +42,9 @@ import com.mohiva.play.silhouette.crypto.JcaCookieSignerSettings
 import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
 import scala.util.Try
 import utils.auth.providers.RapidAAFProvider
+import services.InstanceOAuthDataHandler
+import utils.oauth.AuthorizationCodeGenerator
+import controllers.OAuthServerController
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -110,6 +113,10 @@ class AppComponents(context: Context)
   lazy val userAwareActionModule = wire[DefaultUserAwareRequestHandler]
   lazy val userAwareAction: UserAwareAction = wire[DefaultUserAwareAction]
   lazy val silhouette: Silhouette[DefaultEnv] = wire[SilhouetteProvider[DefaultEnv]]
+  lazy val authorizationCodeGenerator: AuthorizationCodeGenerator =
+    new AuthorizationCodeGenerator(configuration.underlying.as[String]("play.crypto.secret"))
+  lazy val instanceOAuthDataHandler: InstanceOAuthDataHandler = wire[InstanceOAuthDataHandler]
+  lazy val oauthServerController = wire[OAuthServerController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
 }
