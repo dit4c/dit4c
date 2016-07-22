@@ -15,10 +15,12 @@ libraryDependencies ++= Seq(
   "com.mohiva"                %%  "play-silhouette"       % "4.0.0-RC1",
   "com.mohiva"                %%  "play-silhouette-crypto-jca" % "4.0.0-RC1",
   "com.iheart"                %%  "ficus"                 % "1.2.3",
+  "com.nulab-inc"             %%  "play2-oauth2-provider" % "0.17.2",
   ws,
   specs2,
   "org.specs2"                %%  "specs2-core"       % specs2V % "test",
-  "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test"
+  "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test",
+  "com.typesafe.akka"         %%  "akka-testkit"      % akkaV
 )
 
 // Bower WebJars
