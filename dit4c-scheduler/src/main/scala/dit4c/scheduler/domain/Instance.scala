@@ -53,7 +53,7 @@ object Instance {
       instanceId: String,
       providedImage: SourceImage,
       resolvedImage: Option[LocalImage],
-      callbackUrl: String,
+      portalUri: String,
       signingKey: Option[InstanceSigningKey]) extends Data
   case class ErrorData(errors: List[String]) extends Data
 
@@ -62,7 +62,7 @@ object Instance {
   case class Initiate(
       instanceId: String,
       image: SourceImage,
-      callbackUrl: String) extends Command
+      portalUri: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
   case class AssociateSigningKey(key: InstanceSigningKey) extends Command
   case object ConfirmStart extends Command
@@ -80,7 +80,7 @@ object Instance {
   case class Initiated(
       val instanceId: String,
       val image: SourceImage,
-      val callbackUrl: String,
+      val portalUri: String,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class FetchedImage(
       val image: LocalImage,
@@ -173,8 +173,8 @@ class Instance(worker: ActorRef)
       domainEvent: DomainEvent,
       currentData: Data): Instance.Data = {
     (domainEvent, currentData) match {
-      case (Initiated(id, image, callback, _), NoData) =>
-        StartData(id, image, None, callback, None)
+      case (Initiated(id, image, portalUri, _), NoData) =>
+        StartData(id, image, None, portalUri, None)
       case (FetchedImage(image, _), data: StartData) =>
         data.copy(resolvedImage = Some(image))
       case (AssociatedSigningKey(key, _), data: StartData) =>

@@ -59,7 +59,7 @@ object ClusterRoutes {
 
   implicit val readsStartInstance: Reads[RktClusterManager.StartInstance] = (
       (__ \ 'image).read[String].map(Instance.NamedImage.apply _) and
-      (__ \ 'callback).read[String]
+      (__ \ 'portal).read[String]
   )(RktClusterManager.StartInstance.apply _)
 
   implicit val writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
@@ -75,7 +75,7 @@ object ClusterRoutes {
       (__ \ 'state).write[String] and
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
-      (__ \ 'callback).writeNullable[String] and
+      (__ \ 'portal).writeNullable[String] and
       (__ \ 'key).writeNullable[Instance.InstanceSigningKey] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {

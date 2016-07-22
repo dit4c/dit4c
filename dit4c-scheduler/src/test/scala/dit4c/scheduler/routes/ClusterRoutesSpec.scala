@@ -181,22 +181,22 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGens(genAggregateId, Gen.identifier, genNodeConfig(true))
 
     "start instance" >> prop({
-      (clusterId: String, imageName: String, callbackUrl: Uri, responseId: String) =>
+      (clusterId: String, imageName: String, portalUri: Uri, responseId: String) =>
         val path = basePath / clusterId / "instances"
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import RktClusterManager.{StartInstance, StartingInstance}
           import Instance.NamedImage
-          val callbackAsString = callbackUrl.toString
+          val portalAsString = portalUri.toString
           def receive = {
             case ClusterCommand(`clusterId`,
-                StartInstance(NamedImage(`imageName`), `callbackAsString`)) =>
+                StartInstance(NamedImage(`imageName`), `portalAsString`)) =>
               sender ! StartingInstance(responseId)
           }
         }
         val postJson = Json.obj(
             "image" -> imageName,
-            "callback" -> callbackUrl.toString)
+            "portal" -> portalUri.toString)
         Post(path, postJson) ~> routes(testActor) ~> check {
           status must be(StatusCodes.Accepted)
         }
@@ -206,13 +206,13 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen4(Gen.identifier)
 
     "unable to start instance" >> prop({
-      (clusterId: String, imageName: String, callbackUrl: Uri) =>
+      (clusterId: String, imageName: String, portalUri: Uri) =>
         val path = basePath / clusterId / "instances"
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import RktClusterManager.{StartInstance, UnableToStartInstance}
           import Instance.NamedImage
-          val callbackAsString = callbackUrl.toString
+          val callbackAsString = portalUri.toString
           def receive = {
             case ClusterCommand(`clusterId`,
                 StartInstance(NamedImage(`imageName`), `callbackAsString`)) =>
@@ -221,7 +221,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
         }
         val postJson = Json.obj(
             "image" -> imageName,
-            "callback" -> callbackUrl.toString)
+            "portal" -> portalUri.toString)
         Post(path, postJson) ~> routes(testActor) ~> check {
           status must be(StatusCodes.ServiceUnavailable)
         }
@@ -230,7 +230,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen2(Gen.identifier)
 
    "get instance status" >> prop({
-      (clusterId: String, instanceId: String, imageName: String, callbackUrl: Uri, signingKey: RSAPublicKey) =>
+      (clusterId: String, instanceId: String, imageName: String, portalUri: Uri, signingKey: RSAPublicKey) =>
         val path = basePath / clusterId / "instances" / instanceId
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
@@ -244,7 +244,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       instanceId,
                       NamedImage(imageName),
                       None,
-                      callbackUrl.toString,
+                      portalUri.toString,
                       Some(Instance.RSAPublicKey(signingKey))))
           }
         }
@@ -253,7 +253,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
           (Json.prettyPrint(entityAs[JsValue]) must {
             /("state" -> Instance.WaitingForImage.identifier) and
             /("image") /("name" -> imageName) and
-            /("callback" -> callbackUrl.toString) and
+            /("portal" -> portalUri.toString) and
             /("key") /("jwk") /("kty" -> "RSA")
           })
         }

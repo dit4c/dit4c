@@ -15,7 +15,7 @@ object ClusterAggregate {
       Uri("http://localhost:8080/clusters/default"))
 
   sealed trait Command
-  case class StartInstance(image: String, callback: Uri) extends Command
+  case class StartInstance(image: String, portal: Uri) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class TerminateInstance(instanceId: String) extends Command
 
@@ -49,11 +49,11 @@ class ClusterAggregate(
       terminateInstance(instanceId) pipeTo sender
   }
 
-  def startInstance(image: String, callback: Uri): Future[Response] = {
+  def startInstance(image: String, portal: Uri): Future[Response] = {
     val path = baseUri.withPath(baseUri.path / "instances")
     val reqJson = Json.obj(
         "image" -> image,
-        "callback" -> callback.toString
+        "portal" -> portal.toString
     )
     val request = HttpRequest(
         method = HttpMethods.POST,

@@ -15,7 +15,7 @@ object InstanceAggregateManager {
 
   sealed trait Command
   case class StartInstance(
-      clusterId: String, image: String, callback: Uri) extends Command
+      clusterId: String, image: String, portal: Uri) extends Command
   case class VerifyJwt(token: String) extends Command
   case class InstanceEnvelope(instanceId: String, msg: Any) extends Command
 
@@ -34,11 +34,11 @@ class InstanceAggregateManager(
   import context.dispatcher
 
   val receive: Receive = LoggingReceive {
-    case StartInstance(clusterId, image, callback) =>
+    case StartInstance(clusterId, image, portal) =>
       implicit val timeout = Timeout(1.minute)
       val requester = sender
       (clusterAggregateManager ? ClusterEnvelope(clusterId,
-          ClusterAggregate.StartInstance(image, callback))).foreach {
+          ClusterAggregate.StartInstance(image, portal))).foreach {
         case ClusterAggregate.InstanceStarted(clusterId, instanceId) =>
           (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
             case InstanceAggregate.Ack =>

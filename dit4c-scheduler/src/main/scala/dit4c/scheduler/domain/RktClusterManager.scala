@@ -59,7 +59,7 @@ object RktClusterManager {
   case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends Command
   case class RegisterRktNode(requester: ActorRef) extends Command
   case class StartInstance(
-      image: Instance.SourceImage, callbackUrl: String) extends Command
+      image: Instance.SourceImage, portalUri: String) extends Command
   case class GetInstanceStatus(id: Instance.Id) extends Command
   case class TerminateInstance(id: Instance.Id) extends Command
 
@@ -157,7 +157,7 @@ class RktClusterManager(
 
     case msg: RktInstanceScheduler.Response =>
       operationsAwaitingInstanceWorkers.get(sender).foreach {
-        case PendingOperation(requester, StartInstance(image, callbackUrl)) =>
+        case PendingOperation(requester, StartInstance(image, portalUri)) =>
           import RktInstanceScheduler._
           msg match {
             case WorkerFound(nodeId, worker) =>
@@ -169,7 +169,7 @@ class RktClusterManager(
                   Instance.props(worker),
                   InstancePersistenceId(instanceId))
               // Request start, wait for acknowledgement,
-              (instance ? Instance.Initiate(instanceId, image, callbackUrl))
+              (instance ? Instance.Initiate(instanceId, image, portalUri))
                 .collect { case Instance.Ack => StartingInstance(instanceId) }
                 .pipeTo(requester)
             case NoWorkersAvailable =>
