@@ -52,7 +52,9 @@ libraryDependencies ++= {
       exclude(__, "github-com-polymerelements-iron-media-query")
       exclude(__, "github-com-polymerelements-iron-scroll-target-behavior")
   )
-} 
+}
+
+resolvers += "Atlassian Releases" at "https://maven.atlassian.com/public/"
 
 scalacOptions ++= Seq(
   "-deprecation",
