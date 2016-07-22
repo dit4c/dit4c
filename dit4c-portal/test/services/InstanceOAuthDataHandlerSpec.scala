@@ -104,6 +104,18 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
 
     }
 
+    "findUser" >> {
+
+      // Not needed for Authorization Code Grant, so...
+      "always returns None" >> {
+        val probe = TestProbe()(ActorSystem("dh-fu-always"))
+        val iam: ActorRef @@ InstanceAggregateManager = probe.ref.taggedWith[InstanceAggregateManager]
+        val dh = new InstanceOAuthDataHandler(iam)
+        dh.findUser(new AuthorizationRequest(Map.empty, Map.empty)) must beNone.await
+      }
+
+    }
+
   }
 
 }
