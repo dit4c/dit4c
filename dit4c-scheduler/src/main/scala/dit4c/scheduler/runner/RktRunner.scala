@@ -173,7 +173,7 @@ class RktRunnerImpl(
       helperEnvVars = Map[String, String](
           "DIT4C_INSTANCE_PRIVATE_KEY" -> instanceKeyInternalPath,
           "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
-          "DIT4C_INSTANCE_JWT_KID" -> privateKey.pkcs1.der.digest("SHA-256").base64,
+          "DIT4C_INSTANCE_JWT_KID" -> instanceId,
           "DIT4C_INSTANCE_HELPER_AUTH_HOST" -> "127.68.73.84",
           "DIT4C_INSTANCE_HELPER_AUTH_PORT" -> "5267",
           "DIT4C_INSTANCE_HTTP_PORT" -> servicePort.toString,

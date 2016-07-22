@@ -394,7 +394,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                     claim must
                       matchA[JwtClaim]
                         .issuer(be_==(Some(s"instance-$instanceId")))
-                        .content(contain("kid"))
+                        .content(/("kid" -> instanceId))
                   } ^^ { h: HttpHeader =>
                     val encodedJwt = h.value.split(" ").last
                     // Token must decode with public key
