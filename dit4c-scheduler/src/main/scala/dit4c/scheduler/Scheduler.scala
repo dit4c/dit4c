@@ -39,6 +39,7 @@ protected class Scheduler(config: SchedulerConfig) extends utils.ActorModule {
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance-",
+          config.authImage,
           config.listenerImage)
   }
 

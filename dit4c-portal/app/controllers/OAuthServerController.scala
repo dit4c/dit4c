@@ -1,40 +1,31 @@
 package controllers
 
-import play.api.mvc._
-import play.api.data._
-import play.api.data.Forms._
-import play.api.i18n._
-import com.softwaremill.tagging._
-import scala.concurrent.Future
+import scala.concurrent._
 import scala.concurrent.duration._
-import akka.pattern.ask
-import akka.actor._
-import services._
-import domain._
-import akka.util.Timeout
-import scala.concurrent.ExecutionContext
-import akka.http.scaladsl.model.StatusCodes.ServerError
-import akka.http.scaladsl.model.Uri
-import com.mohiva.play.silhouette.api.LoginInfo
+
 import com.mohiva.play.silhouette.api.Silhouette
-import utils.auth.DefaultEnv
-import com.mohiva.play.silhouette.api.LoginEvent
-import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
-import com.mohiva.play.silhouette.impl.providers.SocialProvider
-import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
-import com.mohiva.play.silhouette.api.exceptions.ProviderException
-import play.api.Environment
-import play.api.Mode
+import com.softwaremill.tagging._
+
+import akka.actor.ActorRef
+import play.api.mvc.Controller
 import scalaoauth2.provider._
+import services._
+import utils.auth.DefaultEnv
+import services.UserAggregateManager.UserEnvelope
+import domain.UserAggregate.{ GetAllInstanceIds, UserInstances }
+import akka.util.Timeout
 
 class OAuthServerController(
     val silhouette: Silhouette[DefaultEnv],
+    val userAggregateManager: ActorRef @@ UserAggregateManager,
     val oauthDataHandler: InstanceOAuthDataHandler)(implicit ec: ExecutionContext)
     extends Controller
     with OAuth2Provider {
 
-  val log = play.Logger.underlying
+  import akka.pattern.ask
+  implicit val timeout = Timeout(30.seconds)
 
+  val log = play.Logger.underlying
 
   override val tokenEndpoint = new TokenEndpoint {
     override val handlers = Map(
@@ -44,12 +35,18 @@ class OAuthServerController(
 
   def authorize(clientId: String, redirectUri: String) = silhouette.UserAwareAction.async { request =>
     request.identity match {
-      case Some(user: IdentityService.User) =>
-        val authInfo = AuthInfo.apply(user, Some(clientId), None, Some(redirectUri))
-        for {
-          code <- oauthDataHandler.createAuthCode(authInfo)
-        } yield {
-          Redirect(redirectUri, Map("code" -> Seq(code)), FOUND)
+      case Some(user: IdentityService.User) if clientId.startsWith("instance-")=>
+        val instanceId = clientId.stripPrefix("instance-")
+        checkUserOwnsInstance(user.id, instanceId).flatMap {
+          case true =>
+            val authInfo = AuthInfo.apply(user, Some(clientId), None, Some(redirectUri))
+            oauthDataHandler.createAuthCode(authInfo).map { code =>
+              Redirect(redirectUri, Map("code" -> Seq(code)), FOUND)
+            }
+          case false =>
+            Future.successful {
+              Forbidden("You attempted to access an instance you do not own")
+            }
         }
       case None =>
         Future.successful {
@@ -61,5 +58,11 @@ class OAuthServerController(
   def accessToken = silhouette.UnsecuredAction.async { implicit request =>
     issueAccessToken(oauthDataHandler)
   }
+
+  private def checkUserOwnsInstance(userId: String, instanceId: String): Future[Boolean] =
+    (userAggregateManager ? UserEnvelope(userId, GetAllInstanceIds)).collect {
+      case UserInstances(instanceIds) =>
+        instanceIds.contains(instanceId)
+    }
 
 }

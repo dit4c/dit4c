@@ -22,6 +22,7 @@ object RktRunner {
   case class Config(
       rktDir: Path,
       instanceNamePrefix: String,
+      authImage: String,
       listenerImage: String)
 }
 
@@ -156,7 +157,7 @@ class RktRunnerImpl(
       image: ImageId,
       portalUri: String): Future[(String, RSAPublicKey)] = {
     for {
-      socatImageId <- fetch("quay.io/ridero/socat")
+      authImageId <- fetch(config.authImage)
       listenerImageId <- fetch(config.listenerImage)
       servicePort <- guessServicePort(image)
       (privateKey, publicKey) = newKeyPair
@@ -177,7 +178,10 @@ class RktRunnerImpl(
           "DIT4C_INSTANCE_HELPER_AUTH_HOST" -> "127.68.73.84",
           "DIT4C_INSTANCE_HELPER_AUTH_PORT" -> "5267",
           "DIT4C_INSTANCE_HTTP_PORT" -> servicePort.toString,
-          "DIT4C_INSTANCE_URI_UPDATE_URL" -> Uri(portalUri).withPath(Uri.Path("/instances/")).toString)
+          "DIT4C_INSTANCE_URI_UPDATE_URL" -> Uri(portalUri).withPath(Uri.Path("/instances/")).toString,
+          "DIT4C_INSTANCE_OAUTH_AUTHORIZE_URL" -> Uri(portalUri).withPath(Uri.Path("/login/oauth/authorize")).toString,
+          "DIT4C_INSTANCE_OAUTH_ACCESS_TOKEN_URL" -> Uri(portalUri).withPath(Uri.Path("/login/oauth/access_token")).toString
+      )
       _ <- vfm.writeFile("env.sh",
           (helperEnvVars.map({case (k, v) => s"$k=$v"}).toSeq.sorted.mkString("\n")+"\n").getBytes)
       _ <- vfm.writeFile("pki/instance-key.pem", privateKey.pkcs1.pem.getBytes)
@@ -197,15 +201,9 @@ class RktRunnerImpl(
           Json.obj(
             "name" -> "helper-auth",
             "image" -> Json.obj(
-              "id" -> socatImageId),
-            "app" -> Json.obj(
-              "exec" -> Json.arr(
-                "sh", "-c",
-                "set -aex && source /dit4c/env.sh && socat -d TCP-LISTEN:$DIT4C_INSTANCE_HELPER_AUTH_PORT,bind=$DIT4C_INSTANCE_HELPER_AUTH_HOST,fork,reuseaddr TCP:127.0.0.1:$DIT4C_INSTANCE_HTTP_PORT"),
-              "group" -> "99",
-              "user" -> "99"),
-            "mounts" -> Json.arr(configMountJson),
-            "readOnlyRootFS" -> true)),
+              "id" -> authImageId),
+            "mounts" -> Json.arr(configMountJson))
+        ),
         "volumes" -> Json.arr(configVolumeJson))
       output <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
         vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
