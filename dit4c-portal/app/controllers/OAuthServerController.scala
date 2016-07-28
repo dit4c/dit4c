@@ -51,6 +51,7 @@ class OAuthServerController(
       case None =>
         Future.successful {
           Redirect(routes.MainController.index)
+            .withSession("redirect_uri" -> redirectUri)
         }
     }
   }

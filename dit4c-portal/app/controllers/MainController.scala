@@ -121,7 +121,7 @@ class MainController(
         val loginInfo = LoginInfo("dummy", userData.identity)
         identityService.retrieve(loginInfo).flatMap {
           case Some(user) =>
-            val result = Redirect(routes.MainController.index)
+            val result = redirectAfterLogin(request)
             silhouette.env.authenticatorService.create(loginInfo).flatMap { authenticator =>
               silhouette.env.eventBus.publish(LoginEvent(user, request))
               log.info(s"Logged in as $user")
@@ -150,7 +150,7 @@ class MainController(
             user <- identityService.retrieve(profile.loginInfo).map(_.get)
             authenticator <- silhouette.env.authenticatorService.create(profile.loginInfo)
             value <- silhouette.env.authenticatorService.init(authenticator)
-            result <- silhouette.env.authenticatorService.embed(value, Redirect(routes.MainController.index()))
+            result <- silhouette.env.authenticatorService.embed(value, redirectAfterLogin(request))
           } yield {
             log.info(s"Logged in as $user")
             silhouette.env.eventBus.publish(LoginEvent(user, request))
@@ -265,6 +265,12 @@ class MainController(
     case Mode.Prod => None
     case _ => Some(v)
   }
+
+  private def redirectAfterLogin[A](request: Request[A]): Result =
+    request.session.get("redirect_uri") match {
+      case Some(uri) => Redirect(uri).withSession(request.session - "redirect_uri")
+      case None => Redirect(routes.MainController.index)
+    }
 
 }
 
