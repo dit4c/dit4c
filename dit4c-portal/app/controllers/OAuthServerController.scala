@@ -14,6 +14,8 @@ import utils.auth.DefaultEnv
 import services.UserAggregateManager.UserEnvelope
 import domain.UserAggregate.{ GetAllInstanceIds, UserInstances }
 import akka.util.Timeout
+import akka.http.scaladsl.model.Uri
+import play.api.mvc.Request
 
 class OAuthServerController(
     val silhouette: Silhouette[DefaultEnv],
@@ -39,7 +41,7 @@ class OAuthServerController(
         val instanceId = clientId.stripPrefix("instance-")
         checkUserOwnsInstance(user.id, instanceId).flatMap {
           case true =>
-            val authInfo = AuthInfo.apply(user, Some(clientId), None, Some(redirectUri))
+            val authInfo = AuthInfo.apply(user, Some(clientId), None, Some(sanitizeRedirectUri(redirectUri)))
             oauthDataHandler.createAuthCode(authInfo).map { code =>
               Redirect(redirectUri, Map("code" -> Seq(code)), FOUND)
             }
@@ -56,8 +58,17 @@ class OAuthServerController(
     }
   }
 
-  def accessToken = silhouette.UnsecuredAction.async { implicit request =>
-    issueAccessToken(oauthDataHandler)
+  def accessToken = silhouette.UnsecuredAction.async { request =>
+    // Use modified request with simplified redirect_uri
+    // (the client should not need to know this is being done)
+    val modifiedRequest = Request(
+      request.copy(queryString =
+        request.queryString.map({
+          case (k, vs) if k == "redirect_uri" => (k, vs.map(sanitizeRedirectUri))
+          case p => p
+        }).toMap), request.body)
+    // Issue access token against modified request
+    issueAccessToken(oauthDataHandler)(modifiedRequest, ec)
   }
 
   private def checkUserOwnsInstance(userId: String, instanceId: String): Future[Boolean] =
@@ -65,5 +76,10 @@ class OAuthServerController(
       case UserInstances(instanceIds) =>
         instanceIds.contains(instanceId)
     }
+
+  /**
+   * Strip query off <code>redirect_uri</code> to avoid complex "redirect_uri_mismatch" behavior
+   */
+  private def sanitizeRedirectUri(uri: String): String = Uri(uri).copy(rawQueryString=None).toString
 
 }
