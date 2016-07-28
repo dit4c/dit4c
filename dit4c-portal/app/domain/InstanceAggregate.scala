@@ -166,14 +166,14 @@ class InstanceAggregate(
     import play.api.libs.json.Reads.JsObjectReads
     import java.security.KeyFactory
     import java.security.spec.RSAPublicKeySpec
-    val keyTypeSelector: Reads[String] = (__ \ 'kty).read[String]
+    val keyTypeSelector: Reads[String] = (__ \ 'jwk \ 'kty).read[String]
     def keyType(obj: JsObject): Option[String] =
       Json.fromJson(obj)(keyTypeSelector).asOpt
     JsObjectReads.flatMap {
       case obj if keyType(obj) == Some("RSA") =>
         (
-          (__ \ 'e).read[BigInteger] and
-          (__ \ 'n).read[BigInteger]
+          (__ \ 'jwk \ 'e).read[BigInteger] and
+          (__ \ 'jwk \ 'n).read[BigInteger]
         ) { (publicExponent: BigInteger, modulus: BigInteger) =>
           val spec = new RSAPublicKeySpec(modulus, publicExponent)
           val factory = KeyFactory.getInstance("RSA")
@@ -184,7 +184,7 @@ class InstanceAggregate(
 
   private implicit val readsRemoteStatus: Reads[RemoteStatusInfo] = (
       (__ \ 'state).read[String] and
-      (__ \ 'key \ 'jwk).readNullable[PublicKey] and
+      (__ \ 'key).readNullable[PublicKey] and
       (__ \ 'errors).readNullable[Seq[String]].map(_.getOrElse(Seq.empty))
   )(RemoteStatusInfo.apply _)
 

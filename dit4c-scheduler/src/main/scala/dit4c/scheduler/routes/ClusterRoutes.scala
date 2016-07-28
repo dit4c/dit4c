@@ -99,7 +99,11 @@ object ClusterRoutes {
   implicit val writesInstanceStatusReportWithId: OWrites[StatusReportWithId] =
     OWrites { obj =>
       writesInstanceStatusReport.writes(obj.sr).deepMerge {
-        (__ \ 'key \ 'jwk \ 'kid).write[String].writes(obj.id)
+        obj.sr.data match {
+          case d: Instance.StartData if d.signingKey.isDefined =>
+            (__ \ 'key \ 'jwk \ 'kid).write[String].writes( obj.id)
+          case _ => Json.obj()
+        }
       }
     }
 
