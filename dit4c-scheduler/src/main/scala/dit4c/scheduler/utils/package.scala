@@ -30,7 +30,7 @@ package object utils {
   case class SchedulerConfig(
       val name: String,
       val port: Int = 8080,
-      val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.2/dit4c-helper-auth-portal.linux.amd64.aci",
+      val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.3/dit4c-helper-auth-portal.linux.amd64.aci",
       val listenerImage: String = "https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.6/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
 
   class SchedulerConfigParser(app: AppMetadata)
@@ -49,6 +49,10 @@ package object utils {
         case n => Left("Invalid TCP port specified")
       }
       .text("port to listen on")
+
+    opt[String]("auth-image")
+      .action { (x, c) => c.copy(listenerImage = x) }
+      .text("image to use for pod auth instead of the default")
 
     opt[String]("listener-image")
       .action { (x, c) => c.copy(listenerImage = x) }
