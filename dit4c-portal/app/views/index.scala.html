@@ -93,6 +93,7 @@ function hideNewInstanceDialog() {
   paper-card paper-progress {
     width: 100%;
     --paper-progress-active-color: var(--paper-light-blue-500);
+    --paper-progress-secondary-color: var(--paper-light-blue-300);
   }
 	.instance-id {
 	  @@apply(--paper-font-body2);
@@ -123,12 +124,10 @@ function hideNewInstanceDialog() {
 	            </div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
-            <template is="dom-if" if="{{isTransitioning(item)}}">
-              <paper-progress indeterminate></paper-progress>
-            </template>
-            <template is="dom-if" if="{{!isTransitioning(item)}}">
-              <paper-progress value="100"></paper-progress>
-            </template>
+            <paper-progress
+              value="100"
+              indeterminate="{{isTransitioning(item)}}"
+              secondary-progress="{{stateProgress(item)}}"></paper-progress>
 	          <div class="card-actions layout horizontal-reverse">
               <iron-request id="xhr-{{item.id}}"></iron-request>
               <paper-icon-button icon="close"
@@ -146,12 +145,10 @@ function hideNewInstanceDialog() {
 	            <div class="instance-id">{{item.id}}</div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
-            <template is="dom-if" if="{{isTransitioning(item)}}">
-              <paper-progress indeterminate></paper-progress>
-            </template>
-            <template is="dom-if" if="{{!isTransitioning(item)}}">
-              <paper-progress value="0"></paper-progress>
-            </template>
+            <paper-progress
+              value="0"
+              indeterminate="{{isTransitioning(item)}}"
+              secondary-progress="{{stateProgress(item)}}"></paper-progress>
 	        </paper-card>
 	      </template>
 	    </div>
@@ -164,14 +161,36 @@ function hideNewInstanceDialog() {
       return !this.isRunning(item);
     },
     isRunning: function(item) {
-      return item.state == "Waiting For Image" || 
-        item.state == "Starting" ||
-        item.state == "Running";
+    	switch (item.state) {
+    	  case "Waiting For Image": 
+    	  case "Starting":
+    	  case "Started":
+    	  case "Available":
+    		  return true;
+    		default:
+    			return false;
+    	} 	
     },
     isTransitioning: function(item) {
-      return item.state == "Waiting For Image" || 
-        item.state == "Starting" ||
-        item.state == "Stopping";
+    	switch (item.state) {
+        case "Waiting For Image": 
+        case "Starting":
+        case "Started":
+        case "Stopping":
+          return true;
+        default:
+          return false;
+      }
+    },
+    stateProgress: function(item) {
+      switch (item.state) {
+        case "Waiting For Image":   return  25;
+        case "Starting":            return  50;
+        case "Started":             return  75;
+        case "Available":           return 100;
+        case "Stopping":            return 100;
+        default:                    return   0;
+      }
     },
     ready: function() {
       this.polling();

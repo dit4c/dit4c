@@ -68,7 +68,7 @@ class MainController(
               case (id, Some(remoteState)) =>
                 val url: Option[String] =
                   remoteState.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(id, remoteState.state, url)
+                InstanceResponse(id, effectiveState(remoteState.state, url), url)
               case (id, None) =>
                 InstanceResponse(id, "Unknown", None)
             })
@@ -271,6 +271,12 @@ class MainController(
       case Some(uri) => Redirect(uri).withSession(request.session - "redirect_uri")
       case None => Redirect(routes.MainController.index)
     }
+
+  private def effectiveState(state: String, url: Option[String]) = state match {
+    case "Running" if url.isDefined  => "Available"
+    case "Running" if url.isEmpty    => "Started"
+    case _ => state
+  }
 
 }
 
