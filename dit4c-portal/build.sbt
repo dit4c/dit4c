@@ -36,6 +36,7 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-iron-image"                   % "1.0.4",
     __ %  "github-com-PolymerElements-iron-media-query"             % "1.0.7",
     __ %  "github-com-PolymerElements-iron-overlay-behavior"        % "1.8.0",
+    __ %  "github-com-PolymerElements-iron-range-behavior"          % "1.0.6",
     __ %  "github-com-PolymerElements-iron-resizable-behavior"      % "1.0.3",
     __ %  "github-com-PolymerElements-iron-scroll-target-behavior"  % "1.0.6",
     __ %  "github-com-PolymerElements-neon-animation"               % "1.2.3"
@@ -49,6 +50,8 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-paper-item"                   % "1.2.1",
     __ %  "github-com-PolymerElements-paper-listbox"                % "1.1.2",
     __ %  "github-com-PolymerElements-paper-menu-button"            % "1.1.1",
+    __ %  "github-com-PolymerElements-paper-progress"               % "1.0.9"
+      exclude(__, "github-com-polymerelements-iron-range-behavior"),
     __ %  "github-com-PolymerElements-paper-ripple"                 % "1.0.5",
     __ %  "github-com-PolymerElements-app-layout"                   % "0.9.1"
       exclude(__, "github-com-polymerelements-iron-media-query")

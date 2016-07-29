@@ -13,6 +13,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/iron-image/iron-image.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-card/paper-card.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-progress/paper-progress.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-fab/paper-fab.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-dropdown-menu/paper-dropdown-menu.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
@@ -89,6 +90,10 @@ function hideNewInstanceDialog() {
 	  margin-right: 10px;
 	  margin-bottom: 10px;
   }
+  paper-card paper-progress {
+    width: 100%;
+    --paper-progress-active-color: var(--paper-light-blue-500);
+  }
 	.instance-id {
 	  @@apply(--paper-font-body2);
 	}
@@ -118,6 +123,12 @@ function hideNewInstanceDialog() {
 	            </div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
+            <template is="dom-if" if="{{isTransitioning(item)}}">
+              <paper-progress indeterminate></paper-progress>
+            </template>
+            <template is="dom-if" if="{{!isTransitioning(item)}}">
+              <paper-progress value="100"></paper-progress>
+            </template>
 	          <div class="card-actions layout horizontal-reverse">
               <iron-request id="xhr-{{item.id}}"></iron-request>
               <paper-icon-button icon="close"
@@ -135,6 +146,12 @@ function hideNewInstanceDialog() {
 	            <div class="instance-id">{{item.id}}</div>
 	            <div class="instance-state">{{item.state}}</div>
 	          </div>
+            <template is="dom-if" if="{{isTransitioning(item)}}">
+              <paper-progress indeterminate></paper-progress>
+            </template>
+            <template is="dom-if" if="{{!isTransitioning(item)}}">
+              <paper-progress value="0"></paper-progress>
+            </template>
 	        </paper-card>
 	      </template>
 	    </div>
@@ -150,6 +167,11 @@ function hideNewInstanceDialog() {
       return item.state == "Waiting For Image" || 
         item.state == "Starting" ||
         item.state == "Running";
+    },
+    isTransitioning: function(item) {
+      return item.state == "Waiting For Image" || 
+        item.state == "Starting" ||
+        item.state == "Stopping";
     },
     ready: function() {
       this.polling();
