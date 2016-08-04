@@ -21,6 +21,7 @@ import java.security.PublicKey
 import java.math.BigInteger
 import java.security.interfaces.RSAPublicKey
 import java.time.Instant
+import play.api.libs.json.JsObject
 
 object InstanceAggregate {
 
@@ -38,6 +39,7 @@ object InstanceAggregate {
 
   sealed trait Command
   case object GetStatus extends Command
+  case object GetJwk extends Command
   case class VerifyJwt(token: String) extends Command
   case object Terminate extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
@@ -49,6 +51,9 @@ object InstanceAggregate {
   case object DoesNotExist extends StatusResponse
   case class RemoteStatus(
       state: String, uri: Option[String]) extends StatusResponse
+  sealed trait GetJwkResponse extends Response
+  case class InstanceJwk(jwk: JsObject) extends GetJwkResponse
+  case object NoJwkExists extends GetJwkResponse
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
@@ -79,6 +84,8 @@ class InstanceAggregate(
   when(Uninitialized) {
     case Event(GetStatus, _) =>
       stay replying DoesNotExist
+    case Event(GetJwk, _) =>
+      stay replying NoJwkExists
     case Event(RecordInstanceStart(clusterId), _) =>
       val requester = sender
       goto(Started).applying(StartedInstance(clusterId)).andThen { _ =>
@@ -97,6 +104,14 @@ class InstanceAggregate(
             RemoteStatus(state, maybeUri)
         }
       futureResponse pipeTo sender
+      stay
+    case Event(GetJwk, InstanceData(clusterId, _)) =>
+      implicit val timeout = Timeout(1.minute)
+      log.debug(s"Fetching remote JWK ($instanceId)")
+      getJwkFromCluster(clusterId).map {
+        case Some(jwk) => InstanceJwk(jwk)
+        case None => NoJwkExists
+      } pipeTo sender
       stay
     case Event(VerifyJwt(token), InstanceData(clusterId, _)) =>
       implicit val timeout = Timeout(1.minute)
@@ -199,5 +214,19 @@ class InstanceAggregate(
         case HttpResponse(StatusCodes.NotFound, _, _, _) =>
           throw new Exception("Not found on server")
     }
+
+  private def getJwkFromCluster(
+    clusterId: String
+    )(implicit timeout: akka.util.Timeout): Future[Option[JsObject]] =
+  (clusterAggregateManager ? ClusterAggregateManager.ClusterEnvelope(
+    clusterId, ClusterAggregate.GetInstanceStatus(instanceId))).flatMap {
+      case ClusterAggregate.InstanceStatus(
+          HttpResponse(StatusCodes.OK, headers, entity, _)) =>
+        Unmarshal(entity).to[JsObject].map { response =>
+          response.transform((__ \ 'key \ 'jwk).json.pick[JsObject]).asOpt
+        }
+      case HttpResponse(StatusCodes.NotFound, _, _, _) =>
+        Future.successful(None)
+  }
 
 }

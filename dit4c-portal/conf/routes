@@ -11,3 +11,8 @@ PUT     /instances/:instanceId/terminate    controllers.MainController.terminate
 PUT     /instances/                         controllers.MainController.instanceRegistration
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
+
+# As documented at:
+# https://github.com/coreos/jwtproxy/blob/master/jwt/keyserver/keyregistry/README.md
+GET     /services/:service/keys             controllers.KeyServerController.serviceKeys(service)
+GET     /services/:service/keys/:kid        controllers.KeyServerController.serviceKey(service, kid)

@@ -1,4 +1,3 @@
-import controllers.{Assets, MainController}
 import play.api.ApplicationLoader.Context
 import play.api._
 import play.api.i18n._
@@ -44,7 +43,7 @@ import scala.util.Try
 import utils.auth.providers.RapidAAFProvider
 import services.InstanceOAuthDataHandler
 import utils.oauth.AuthorizationCodeGenerator
-import controllers.OAuthServerController
+import controllers._
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -116,6 +115,8 @@ class AppComponents(context: Context)
   lazy val authorizationCodeGenerator: AuthorizationCodeGenerator =
     new AuthorizationCodeGenerator(configuration.underlying.as[String]("play.crypto.secret"))
   lazy val instanceOAuthDataHandler: InstanceOAuthDataHandler = wire[InstanceOAuthDataHandler]
+  // Controllers
+  lazy val keyServerController = wire[KeyServerController]
   lazy val oauthServerController = wire[OAuthServerController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
