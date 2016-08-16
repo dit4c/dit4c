@@ -76,31 +76,65 @@ function hideNewInstanceDialog() {
   document.getElementById("new-instance-open-button").style.display = "";
 }
 </script>
+<dom-module id="instance-terminate-button">
+  <template>
+    <iron-ajax id="xhr"
+      method="PUT"
+      url="{{url}}"
+      on-response="handleResponse"></iron-ajax>
+    <paper-icon-button icon="close"
+      title="terminate instance"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-terminate-button",
+    properties: {
+      instanceId: String,
+      url: {
+        type: String,
+        computed: 'terminateUrl(instanceId)'
+      }
+    },
+    listeners: {
+      'click': 'terminate',
+    },
+    terminateUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/terminate';
+    },
+    handleResponse: function() {
+      this.fire('terminated', {"instanceId": this.instanceId});
+    },
+    terminate: function() {
+      this.$.xhr.generateRequest();
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="instances-container">
   <style>
-	.section-heading {
-	  @@apply(--paper-font-subhead);
-	}	
-	.card-container {
-	  min-height: 200px;
+  .section-heading {
+    @@apply(--paper-font-subhead);
+  }  
+  .card-container {
+    min-height: 200px;
     padding-top: 20px;
     padding-bottom: 20px;
-	}
-	paper-card {
-	  margin-right: 10px;
-	  margin-bottom: 10px;
+  }
+  paper-card {
+    margin-right: 10px;
+    margin-bottom: 10px;
   }
   paper-card paper-progress {
     width: 100%;
     --paper-progress-active-color: var(--paper-light-blue-500);
     --paper-progress-secondary-color: var(--paper-light-blue-300);
   }
-	.instance-id {
-	  @@apply(--paper-font-body2);
-	}
-	.instance-state {
-	  @@apply(--paper-font-body1);
-	}
+  .instance-id {
+    @@apply(--paper-font-body2);
+  }
+  .instance-state {
+    @@apply(--paper-font-body1);
+  }
   </style>
   <template>
     <iron-ajax
@@ -111,68 +145,68 @@ function hideNewInstanceDialog() {
       last-response="{{instancesResponse}}"
       debounce-duration="300"></iron-ajax>
     <div class="layout vertical" style="width: 100%">
-	    <div class="section-heading">Running Instances</div>
-	    <div class="card-container">
-	      <template id="running-instances" is="dom-repeat" items="[[instancesResponse.instances]]" filter="isRunning" observe="state">
-	        <paper-card>
-	          <div class="card-content">
-	            <div class="instance-id">
-	              <template is="dom-if" if="{{item.url}}">
-	                <a href="{{item.url}}">{{item.id}}</a>
-	              </template>
-	              <template is="dom-if" if="{{!item.url}}">{{item.id}}</template>
-	            </div>
-	            <div class="instance-state">{{item.state}}</div>
-	          </div>
+      <div class="section-heading">Running Instances</div>
+      <div class="card-container">
+        <template id="running-instances" is="dom-repeat" items="[[instancesResponse.instances]]" filter="isRunning" observe="state">
+          <paper-card>
+            <div class="card-content">
+              <div class="instance-id">
+                <template is="dom-if" if="{{item.url}}">
+                  <a href="{{item.url}}">{{item.id}}</a>
+                </template>
+                <template is="dom-if" if="{{!item.url}}">{{item.id}}</template>
+              </div>
+              <div class="instance-state">{{item.state}}</div>
+            </div>
             <paper-progress
               value="100"
               indeterminate="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
-	          <div class="card-actions layout horizontal-reverse">
-              <iron-request id="xhr-{{item.id}}"></iron-request>
-              <paper-icon-button icon="close"
-	              title="terminate instance"
-	              onclick="{{terminate(item.id)}}"></paper-icon-button>
-	          </div>
-	        </paper-card>
-	      </template>
-	    </div>
-	    <div class="section-heading">Previous Instances</div>
-	    <div class="card-container">
-	      <template is="dom-repeat" items="[[instancesResponse.instances]]" filter="isPrevious" observe="state">
-	        <paper-card>
-	          <div class="card-content">
-	            <div class="instance-id">{{item.id}}</div>
-	            <div class="instance-state">{{item.state}}</div>
-	          </div>
+            <div class="card-actions layout horizontal-reverse">
+              <instance-terminate-button instance-id="{{item.id}}"></instance-terminate-button>
+            </div>
+          </paper-card>
+        </template>
+      </div>
+      <div class="section-heading">Previous Instances</div>
+      <div class="card-container">
+        <template is="dom-repeat" items="[[instancesResponse.instances]]" filter="isPrevious" observe="state">
+          <paper-card>
+            <div class="card-content">
+              <div class="instance-id">{{item.id}}</div>
+              <div class="instance-state">{{item.state}}</div>
+            </div>
             <paper-progress
               value="0"
               indeterminate="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
-	        </paper-card>
-	      </template>
-	    </div>
+          </paper-card>
+        </template>
+      </div>
     </div>
   </template>
   <script>
   Polymer({
     is: "instances-container",
+    listeners: {
+      'terminated': 'refresh',
+    },
     isPrevious: function(item) {
       return !this.isRunning(item);
     },
     isRunning: function(item) {
-    	switch (item.state) {
-    	  case "Waiting For Image": 
-    	  case "Starting":
-    	  case "Started":
-    	  case "Available":
-    		  return true;
-    		default:
-    			return false;
-    	} 	
+      switch (item.state) {
+        case "Waiting For Image": 
+        case "Starting":
+        case "Started":
+        case "Available":
+          return true;
+        default:
+          return false;
+      }   
     },
     isTransitioning: function(item) {
-    	switch (item.state) {
+      switch (item.state) {
         case "Waiting For Image": 
         case "Starting":
         case "Started":
@@ -197,22 +231,12 @@ function hideNewInstanceDialog() {
     },
     polling: function() {
       this.refresh();
-    	this.async(this.polling, 10000);
-    },  
-    refresh: function() {
-    	document.getElementById('ajax-get-instances').generateRequest();
+      this.async(this.polling, 10000);
     },
-    terminate: function(instanceId) {
-      var xhr = Polymer.dom(this.root).querySelector('#xhr-'+instanceId);
-      var refresh = this.refresh;
-      return function() {
-        xhr.send({
-	        url: "@routes.MainController.getInstances()"+instanceId+"/terminate",
-	        method: "PUT"
-	      }).then(refresh);
-      };
+    refresh: function() {
+      document.getElementById('ajax-get-instances').generateRequest();
     }
-  });   
+  });
   </script>
 </head>
 <body class="fullbleed">
@@ -228,10 +252,10 @@ function hideNewInstanceDialog() {
           </paper-button>
         </form>
       </div>
-	  </app-toolbar>
+    </app-toolbar>
     <paper-fab icon="add" id="new-instance-open-button" title="New Instance" onclick="showNewInstanceDialog()"></paper-fab>
-	</app-header>
-	<div id="content-wrapper">
+  </app-header>
+  <div id="content-wrapper">
     <div id="new-instance-dialog" class="layout vertical" style="display: none">
       <div class="layout horizontal baseline justified">
         <div class="section-heading flex">New Instance</div>
@@ -240,30 +264,30 @@ function hideNewInstanceDialog() {
           onclick="hideNewInstanceDialog()"></paper-icon-button>
       </div>
       <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
-		    <paper-dropdown-menu label="Image" name="image" required>
-		      <paper-listbox class="dropdown-content">
-		        @for(imageName <- imageNames) {
-		        <paper-item>@imageName</paper-item>
-		        }
-		      </paper-listbox>
-		    </paper-dropdown-menu>
-	      <paper-dropdown-menu label="Cluster" name="cluster" required>
-				  <paper-listbox class="dropdown-content" selected="0">
-				    <paper-item>Default</paper-item>
-				  </paper-listbox>
-				</paper-dropdown-menu>
-				<paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
-			</form>
-			<script>
-			document.getElementById("new-instance-form").addEventListener('iron-form-response', function(event) {
-			  console.log(event);
-			  document.getElementById('instances').refresh()
-			});
-			</script>
+        <paper-dropdown-menu label="Image" name="image" required>
+          <paper-listbox class="dropdown-content">
+            @for(imageName <- imageNames) {
+            <paper-item>@imageName</paper-item>
+            }
+          </paper-listbox>
+        </paper-dropdown-menu>
+        <paper-dropdown-menu label="Cluster" name="cluster" required>
+          <paper-listbox class="dropdown-content" selected="0">
+            <paper-item>Default</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+        <paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
+      </form>
+      <script>
+      document.getElementById("new-instance-form").addEventListener('iron-form-response', function(event) {
+        console.log(event);
+        document.getElementById('instances').refresh()
+      });
+      </script>
     </div>
-	  <div id="main-content">
+    <div id="main-content">
       <instances-container id="instances"></instances-container>
-	  </div>
+    </div>
   </div>
 </app-header-layout>
 <script type="text/javascript">
