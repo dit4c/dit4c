@@ -85,7 +85,7 @@ class RktRunnerImpl(
             systemdRun ++
             Seq(s"--unit=${config.instanceNamePrefix}-${instanceId}.service") ++
             rkt ++
-            Seq("run", "--net=default", "--dns=8.8.8.8", "--no-overlay") ++
+            Seq("run", "--net=default", "--dns=8.8.8.8") ++
             Seq(s"--pod-manifest=$manifestFile")
         )
       } yield publicKey
