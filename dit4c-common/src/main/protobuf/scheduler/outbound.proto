@@ -1,0 +1,25 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+
+package dit4c.protobuf.scheduler;
+
+message AllocatedInstanceKey {
+  string instanceId = 1;
+  message RSAPublicKey {
+    bytes publicExponent = 1;
+    bytes modulus = 2;
+  }
+}
+
+message InstanceStateUpdate {
+  string instanceId = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  enum InstanceState {
+    CREATED = 0;
+    PRESTART = 1;
+    STARTED = 2;
+    EXITED = 3;
+    SAVING = 4;
+  }
+  InstanceState state = 3;
+}

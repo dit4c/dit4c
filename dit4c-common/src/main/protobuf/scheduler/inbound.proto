@@ -1,0 +1,16 @@
+syntax = "proto3";
+package dit4c.protobuf.scheduler;
+
+message StartInstance {
+  string instanceId = 1;
+  string imageUrl = 2;
+}
+
+message DiscardInstance {
+  string instanceId = 1;
+}
+
+message SaveInstance {
+  string instanceId = 1;
+  string imageUrl = 2;
+}
