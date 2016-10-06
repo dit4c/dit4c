@@ -14,3 +14,11 @@ message SaveInstance {
   string instanceId = 1;
   string imageUrl = 2;
 }
+
+message InboundMessage {
+  oneof payload {
+    StartInstance startInstance = 1;
+    DiscardInstance discardInstance = 2;
+    SaveInstance saveInstance = 3;
+  }
+}

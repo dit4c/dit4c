@@ -30,6 +30,7 @@ package object utils {
   case class SchedulerConfig(
       val name: String,
       val port: Int = 8080,
+      val portalUri: String = "https://localhost:9000",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",
       val listenerImage: String = "https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.6/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
 
@@ -49,6 +50,10 @@ package object utils {
         case n => Left("Invalid TCP port specified")
       }
       .text("port to listen on")
+
+    opt[String]("portal-uri")
+      .action { (x, c) => c.copy(portalUri = x) }
+      .text("portal to connect to")
 
     opt[String]("auth-image")
       .action { (x, c) => c.copy(listenerImage = x) }

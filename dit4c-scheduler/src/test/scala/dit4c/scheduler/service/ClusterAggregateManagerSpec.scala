@@ -30,6 +30,7 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance-",
+          "" /* Not used */,
           "" /* Not used */)
   }
   val clusterAggregateManager = system.actorOf(Props(classOf[ClusterAggregateManager], defaultConfigProvider))

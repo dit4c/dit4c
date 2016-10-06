@@ -38,6 +38,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     RktRunner.Config(
         Paths.get("/var/lib/dit4c-rkt"),
         "dit4c-instance-",
+          "" /* Not used */,
           "" /* Not used */)
 
   "ClusterAggregate" >> {

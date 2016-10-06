@@ -22,4 +22,5 @@ message InstanceStateUpdate {
     SAVING = 4;
   }
   InstanceState state = 3;
+  string additionalInfo = 4;
 }

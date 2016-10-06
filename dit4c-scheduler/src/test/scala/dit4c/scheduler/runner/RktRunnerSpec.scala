@@ -85,10 +85,12 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
   }
 
   override def foreach[R: AsResult](f: RktRunnerImpl => R) = withRktDir { rktDir =>
+    val defaultSchedulerConfig = dit4c.scheduler.utils.SchedulerConfig("")
     val runner = new RktRunnerImpl(commandExecutor, RktRunner.Config(
         rktDir,
         "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase,
-        dit4c.scheduler.utils.SchedulerConfig("").listenerImage))
+        defaultSchedulerConfig.authImage,
+        defaultSchedulerConfig.listenerImage))
     AsResult(f(runner))
   }
 
