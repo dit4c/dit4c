@@ -61,7 +61,7 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, name, version, cacheD
 resourceGenerators in Test <+=
   (resourceManaged in Test, name, version, streams) map { (dir, n, v, s) =>
     import scala.sys.process._
-    val rktVersion = "1.11.0"
+    val rktVersion = "1.16.0"
     val rktDir = dir / "rkt"
     val rktExecutable = rktDir / "rkt"
     s.log.debug(s"Checking for rkt $rktVersion tarball")
