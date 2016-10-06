@@ -16,6 +16,7 @@ import akka.stream.Materializer
 import scala.concurrent.duration.FiniteDuration
 import akka.http.scaladsl.HttpsConnectionContext
 import javax.net.ssl.SSLContext
+import akka.stream.EagerClose
 
 object AkkaHttpExtras {
 
@@ -108,7 +109,7 @@ object AkkaHttpExtras {
       }
       val tlsStage = httpsContext match {
         case Some(hctx) =>
-          TLS(hctx.sslContext, hctx.firstSession, Client,
+          TLS(hctx.sslContext, hctx.firstSession, Client, EagerClose,
               hostInfo = Some(host -> effectivePort))
         case None => TLSPlacebo()
       }
