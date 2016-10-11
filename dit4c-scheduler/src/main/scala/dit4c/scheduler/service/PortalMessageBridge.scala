@@ -81,9 +81,13 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
-      // TODO: Fix to include instanceId
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, Instance.NamedImage(imageUrl), portalUri))
+    case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
+      import dit4c.scheduler.domain._
+      import dit4c.scheduler.service._
+      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+          RktClusterManager.TerminateInstance(instanceId))
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)

@@ -18,6 +18,7 @@ import scala.util.Random
 import scala.concurrent.Promise
 import akka.util.ByteString
 import akka.http.scaladsl.model.Uri
+import org.specs2.scalacheck.Parameters
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -25,6 +26,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
   implicit val system = ActorSystem("PortalMessageBridgeSpec")
   implicit val materializer = ActorMaterializer()
+  implicit val params = Parameters(minTestsOk = 5)
 
   import ScalaCheckHelpers._
 
@@ -53,19 +55,37 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
     "incoming message handling" >> {
 
-      "StartInstance" >> prop({ (msgId: String, instanceId: String, imageUrl: Uri) =>
+      "StartInstance" >> prop({ (msgId: String, instanceId: String, clusterId: String, imageUrl: Uri) =>
         import dit4c.protobuf.scheduler.{inbound => pb}
         import dit4c.scheduler.service.{ClusterAggregateManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
         val msg = pb.InboundMessage(randomMsgId,
             pb.InboundMessage.Payload.StartInstance(
-                pb.StartInstance(randomInstanceId, "default", imageUrl.toString)))
+                pb.StartInstance(randomInstanceId, clusterId, imageUrl.toString)))
         newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
           wsProbe.sendMessage(ByteString(msg.toByteArray))
           parentProbe.expectMsgPF(5.seconds) {
-            case cam.ClusterCommand("default", command) => // success
+            case cam.ClusterCommand(clusterId, cmd: ram.StartInstance) =>
+              // success
+              done
           }
-          done
+        }
+      })
+
+      "DiscardInstance" >> prop({ (msgId: String, instanceId: String, clusterId: String) =>
+        import dit4c.protobuf.scheduler.{inbound => pb}
+        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.domain.{RktClusterManager => ram}
+        val msg = pb.InboundMessage(randomMsgId,
+            pb.InboundMessage.Payload.DiscardInstance(
+                pb.DiscardInstance(randomInstanceId, clusterId)))
+        newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
+          wsProbe.sendMessage(ByteString(msg.toByteArray))
+          parentProbe.expectMsgPF(5.seconds) {
+            case cam.ClusterCommand(clusterId, ram.TerminateInstance(instanceId)) =>
+              // Success
+              done
+          }
         }
       })
 
