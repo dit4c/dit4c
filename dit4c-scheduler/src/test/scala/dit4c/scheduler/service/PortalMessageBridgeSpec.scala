@@ -15,6 +15,7 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
+import scala.concurrent.Promise
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -28,31 +29,48 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
   "PortalMessageBridgeSpec" >> {
 
     "connects to a websocket server" >> {
-      newWithProbes { (wsProbe: WSProbe, camProbe: TestProbe) =>
+      newWithProbes { (wsProbe: WSProbe, _: TestProbe, _: ActorRef) =>
         wsProbe.sendMessage("Hello")
+        done
+      }
+    }
+
+    "terminates on server complete" >> {
+      newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
+        parentProbe.watch(msgBridge)
+        wsProbe.sendMessage("Hello")
+        wsProbe.sendCompletion()
+        parentProbe.expectMsgPF(5.seconds) {
+          case t: Terminated if t.actor == msgBridge => // Expected
+        }
         done
       }
     }
   }
 
-  def newWithProbes[A](f: (WSProbe, TestProbe) => A): A = {
-    val camProbe = TestProbe()
+  def newWithProbes[A](f: (WSProbe, TestProbe, ActorRef) => A): A = {
+    val parentProbe = TestProbe()
     val wsProbe = WSProbe()
+    val closePromise = Promise[Unit]()
     val route = Route.seal {
+      // Source which never emits an element, and terminates on closePromise success
+      val closeSource = Source.maybe[Message]
+        .mapMaterializedValue { p => closePromise.future.foreach { _ => p.success(None) } }
       import akka.http.scaladsl.server.Directives._
       logRequest("websocket-server") {
         path("ws") {
-          handleWebSocketMessages(wsProbe.flow)
+          handleWebSocketMessages(wsProbe.flow.merge(closeSource, true))
         }
       }
     }
     val binding = Await.result(Http().bindAndHandle(Route.handlerFlow(route), "localhost", 0), 2.seconds)
     try {
-      val msgBridge = system.actorOf(Props(classOf[PortalMessageBridge],
-        s"ws://localhost:${binding.localAddress.getPort}/ws", camProbe.ref),
-        "portal-message-bridge-"+Random.alphanumeric.take(10).mkString)
-      f(wsProbe, camProbe)
+      val msgBridgeRef = parentProbe.childActorOf(Props(classOf[PortalMessageBridge],
+        s"ws://localhost:${binding.localAddress.getPort}/ws"),
+        "portal-message-bridge")
+      f(wsProbe, parentProbe, msgBridgeRef)
     } finally {
+      closePromise.success(()) // Close websocket server-side if still open
       binding.unbind
     }
   }

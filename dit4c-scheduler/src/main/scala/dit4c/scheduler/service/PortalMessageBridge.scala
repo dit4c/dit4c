@@ -37,7 +37,10 @@ object PortalMessageBridge {
         val addPrefix = "Text from portal: ".concat _
         msg.textStream.runForeach(addPrefix.andThen(log.info))
       case BridgeClosed =>
-        context.stop(self)
+        log.debug("portal message bridge closed - sending to parent")
+        context.parent ! BridgeClosed
+      case msg =>
+        throw new Exception(s"Unknown message: $msg")
     }
 
     def sendToParent[M](msg: M) { context.parent ! msg }
@@ -47,13 +50,18 @@ object PortalMessageBridge {
   }
 }
 
-class PortalMessageBridge(websocketUrl: String, clusterAggregateManager: ActorRef) extends Actor with ActorLogging {
+class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging {
 
   implicit val materializer = ActorMaterializer()
   var outboundSource: Source[Message, ActorRef] = null
   var inboundSink: Sink[Message, NotUsed] = null
   var inbound: ActorRef = null
   var outbound: ActorRef = null
+
+  // Everything is so closely linked that a child failure means we should shut everything down
+  override val supervisorStrategy = AllForOneStrategy() {
+    case _ => SupervisorStrategy.Escalate
+  }
 
   override def preStart {
     inbound = context.watch(context.actorOf(Props[PortalMessageBridge.UnmarshallingActor], "unmarshaller"))
@@ -65,12 +73,18 @@ class PortalMessageBridge(websocketUrl: String, clusterAggregateManager: ActorRe
         WebSocketRequest.fromTargetUri(websocketUrl),
         Flow.fromSinkAndSourceMat(
             inboundSink, outboundSource)(outboundActorRefExtractor))._2
+    context.watch(outbound)
   }
 
   val receive: Receive = {
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, imageUrl) =>
       // Do something
-
+    case PortalMessageBridge.BridgeClosed =>
+      log.info(s"bridge closed → terminating outbound actor")
+      outbound ! akka.actor.Status.Success(NotUsed)
+    case Terminated(ref) if ref == outbound =>
+      log.info(s"shutting down after outbound actor terminated")
+      context.stop(self)
   }
 
 }
