@@ -24,3 +24,11 @@ message InstanceStateUpdate {
   InstanceState state = 3;
   string additionalInfo = 4;
 }
+
+message OutboundMessage {
+  string messageId = 1;
+  oneof payload {
+    InstanceStateUpdate instanceStateUpdate = 2;
+    AllocatedInstanceKey allocatedInstanceKey = 3;
+  }
+}

@@ -59,7 +59,7 @@ object RktClusterManager {
   case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends Command
   case class RegisterRktNode(requester: ActorRef) extends Command
   case class StartInstance(
-      image: Instance.SourceImage, portalUri: String) extends Command
+      instanceId: String, image: Instance.SourceImage, portalUri: String) extends Command
   case class GetInstanceStatus(id: Instance.Id) extends Command
   case class TerminateInstance(id: Instance.Id) extends Command
 
@@ -157,13 +157,12 @@ class RktClusterManager(
 
     case msg: RktInstanceScheduler.Response =>
       operationsAwaitingInstanceWorkers.get(sender).foreach {
-        case PendingOperation(requester, StartInstance(image, portalUri)) =>
+        case PendingOperation(requester, StartInstance(instanceId, image, portalUri)) =>
           import RktInstanceScheduler._
           msg match {
             case WorkerFound(nodeId, worker) =>
               implicit val timeout = Timeout(10.seconds)
               import context.dispatcher
-              val instanceId = Instance.newId
               persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
               val instance = context.actorOf(
                   Instance.props(worker),

@@ -140,7 +140,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
-        probe.send(manager, StartInstance(testImage, testCallback))
+        probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
         val response = probe.expectMsgType[RktClusterManager.StartingInstance]
         (response must {
           import scala.language.experimental.macros
@@ -199,7 +199,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
-        probe.send(manager, StartInstance(testImage, testCallback))
+        probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
         val response = probe.expectMsgType[RktClusterManager.StartingInstance]
         (response must {
           import scala.language.experimental.macros
@@ -265,7 +265,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
-        probe.send(manager, StartInstance(testImage, testCallback))
+        probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
         val response = probe.expectMsgType[RktClusterManager.StartingInstance]
         Stream.continually({
           probe.send(manager, GetInstanceStatus(response.instanceId))
@@ -309,5 +309,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
   def mockFetchSshHostKey(
       pk: RSAPublicKey)(host: String, port: Int): Future[RSAPublicKey] =
         Future.successful(pk)
+
+  def randomInstanceId = Random.alphanumeric.take(20).mkString
 
 }

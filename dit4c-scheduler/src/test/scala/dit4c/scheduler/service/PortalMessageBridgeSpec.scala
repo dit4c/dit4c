@@ -16,6 +16,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 import scala.concurrent.Promise
+import akka.util.ByteString
+import akka.http.scaladsl.model.Uri
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -28,25 +30,51 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
   "PortalMessageBridgeSpec" >> {
 
-    "connects to a websocket server" >> {
-      newWithProbes { (wsProbe: WSProbe, _: TestProbe, _: ActorRef) =>
-        wsProbe.sendMessage("Hello")
-        done
+    "connection behaviour" >> {
+
+      "connects to a websocket server" >> {
+        newWithProbes { (wsProbe: WSProbe, _: TestProbe, _: ActorRef) =>
+          wsProbe.sendMessage("Hello")
+          done
+        }
       }
+
+      "terminates on server complete" >> {
+        newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
+          parentProbe.watch(msgBridge)
+          wsProbe.sendMessage("Hello")
+          wsProbe.sendCompletion()
+          parentProbe.expectTerminated(msgBridge)
+          done
+        }
+      }
+
     }
 
-    "terminates on server complete" >> {
-      newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
-        parentProbe.watch(msgBridge)
-        wsProbe.sendMessage("Hello")
-        wsProbe.sendCompletion()
-        parentProbe.expectMsgPF(5.seconds) {
-          case t: Terminated if t.actor == msgBridge => // Expected
+    "incoming message handling" >> {
+
+      "StartInstance" >> prop({ (msgId: String, instanceId: String, imageUrl: Uri) =>
+        import dit4c.protobuf.scheduler.{inbound => pb}
+        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.domain.{RktClusterManager => ram}
+        val msg = pb.InboundMessage(randomMsgId,
+            pb.InboundMessage.Payload.StartInstance(
+                pb.StartInstance(randomInstanceId, "default", imageUrl.toString)))
+        newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
+          wsProbe.sendMessage(ByteString(msg.toByteArray))
+          parentProbe.expectMsgPF(5.seconds) {
+            case cam.ClusterCommand("default", command) => // success
+          }
+          done
         }
-        done
-      }
+      })
+
     }
+
   }
+
+  def randomMsgId = Random.alphanumeric.take(20).mkString
+  def randomInstanceId = Random.alphanumeric.take(20).mkString
 
   def newWithProbes[A](f: (WSProbe, TestProbe, ActorRef) => A): A = {
     val parentProbe = TestProbe()

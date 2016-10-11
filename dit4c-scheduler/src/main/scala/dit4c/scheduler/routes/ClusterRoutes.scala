@@ -57,11 +57,6 @@ object ClusterRoutes {
   )((host: String, port: Int, username: String) =>
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
-  implicit val readsStartInstance: Reads[RktClusterManager.StartInstance] = (
-      (__ \ 'image).read[String].map(Instance.NamedImage.apply _) and
-      (__ \ 'portal).read[String]
-  )(RktClusterManager.StartInstance.apply _)
-
   implicit val writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
@@ -145,7 +140,6 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       }
     } ~
     pathPrefix("instances") {
-      pathEndOrSingleSlash(newInstanceRoute(clusterId)) ~
       pathPrefix(Segment)(instanceRoutes(clusterId))
     } ~
     pathPrefix("nodes") {
@@ -153,25 +147,6 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       pathPrefix(Segment)(nodeRoutes(clusterId))
     }
   }
-
-  def newInstanceRoute(clusterId: String) =
-    post {
-      entity(as[RktClusterManager.StartInstance]) { cmd =>
-        onSuccess(clusterAggregateManager ? ClusterCommand(clusterId, cmd)) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case RktClusterManager.UnableToStartInstance =>
-            complete(StatusCodes.ServiceUnavailable)
-          case RktClusterManager.StartingInstance(instanceId) =>
-            extractUri { thisUri =>
-              val nodeUri = Uri(thisUri.path / instanceId toString)
-              complete((
-                  StatusCodes.Accepted,
-                  Location(nodeUri) :: Nil,
-                  Json.obj("id" -> instanceId)))
-            }
-        }
-      }
-    }
 
   def instanceRoutes(clusterId: String)(instanceId: String): Route = {
     import RktClusterManager._
@@ -183,16 +158,6 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
           case Uninitialized => complete(StatusCodes.NotFound)
           case UnknownInstance => complete(StatusCodes.NotFound)
           case status: StatusReport => complete(StatusReportWithId(instanceId, status))
-        }
-      }
-    } ~
-    path("terminate") {
-      put {
-        onSuccess(clusterAggregateManager ?
-            ClusterCommand(clusterId, TerminateInstance(instanceId))) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case UnknownInstance => complete(StatusCodes.NotFound)
-          case TerminatingInstance => complete(StatusCodes.Accepted)
         }
       }
     }

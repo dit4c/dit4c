@@ -13,6 +13,7 @@ import akka.util.ByteString
 import scala.concurrent.Future
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.event.LoggingReceive
+import akka.http.scaladsl.model.Uri
 
 object PortalMessageBridge {
   case object BridgeClosed
@@ -77,14 +78,27 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
   }
 
   val receive: Receive = {
-    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, imageUrl) =>
-      // Do something
+    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl) =>
+      import dit4c.scheduler.domain._
+      import dit4c.scheduler.service._
+      // TODO: Fix to include instanceId
+      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+          RktClusterManager.StartInstance(instanceId, Instance.NamedImage(imageUrl), portalUri))
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)
     case Terminated(ref) if ref == outbound =>
       log.info(s"shutting down after outbound actor terminated")
       context.stop(self)
+  }
+
+  protected lazy val portalUri: String = {
+    val scheme = Uri(websocketUrl).scheme match {
+      case "ws" => "http"
+      case "wss" => "https"
+      case other => other
+    }
+    Uri(websocketUrl).copy(scheme = scheme, path = Uri.Path.Empty, rawQueryString = None, fragment = None).toString
   }
 
 }

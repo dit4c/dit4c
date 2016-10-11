@@ -180,55 +180,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
     }).noShrink // Most likely shrinking won't help narrow down errors
       .setGens(genAggregateId, Gen.identifier, genNodeConfig(true))
 
-    "start instance" >> prop({
-      (clusterId: String, imageName: String, portalUri: Uri, responseId: String) =>
-        val path = basePath / clusterId / "instances"
-        def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
-          import RktClusterManager.{StartInstance, StartingInstance}
-          import Instance.NamedImage
-          val portalAsString = portalUri.toString
-          def receive = {
-            case ClusterCommand(`clusterId`,
-                StartInstance(NamedImage(`imageName`), `portalAsString`)) =>
-              sender ! StartingInstance(responseId)
-          }
-        }
-        val postJson = Json.obj(
-            "image" -> imageName,
-            "portal" -> portalUri.toString)
-        Post(path, postJson) ~> routes(testActor) ~> check {
-          status must be(StatusCodes.Accepted)
-        }
-    }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGen1(genAggregateId)
-      .setGen2(Gen.identifier)
-      .setGen4(Gen.identifier)
-
-    "unable to start instance" >> prop({
-      (clusterId: String, imageName: String, portalUri: Uri) =>
-        val path = basePath / clusterId / "instances"
-        def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
-          import RktClusterManager.{StartInstance, UnableToStartInstance}
-          import Instance.NamedImage
-          val callbackAsString = portalUri.toString
-          def receive = {
-            case ClusterCommand(`clusterId`,
-                StartInstance(NamedImage(`imageName`), `callbackAsString`)) =>
-              sender ! UnableToStartInstance
-          }
-        }
-        val postJson = Json.obj(
-            "image" -> imageName,
-            "portal" -> portalUri.toString)
-        Post(path, postJson) ~> routes(testActor) ~> check {
-          status must be(StatusCodes.ServiceUnavailable)
-        }
-    }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGen1(genAggregateId)
-      .setGen2(Gen.identifier)
-
    "get instance status" >> prop({
       (clusterId: String, instanceId: String, imageName: String, portalUri: Uri, signingKey: RSAPublicKey) =>
         val path = basePath / clusterId / "instances" / instanceId
@@ -262,24 +213,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGen1(genAggregateId)
       .setGen2(Gen.identifier)
       .setGen3(Gen.identifier)
-
-   "terminate instance" >> prop({
-      (clusterId: String, instanceId: String) =>
-        val path = basePath / clusterId / "instances" / instanceId / "terminate"
-        def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
-          import RktClusterManager.{TerminateInstance, TerminatingInstance}
-          def receive = {
-            case ClusterCommand(`clusterId`, TerminateInstance(`instanceId`)) =>
-              sender ! TerminatingInstance
-          }
-        }
-        Put(path) ~> routes(testActor) ~> check {
-          status must be(StatusCodes.Accepted)
-        }
-    }).noShrink // Most likely shrinking won't help narrow down errors
-      .setGen1(genAggregateId)
-      .setGen2(Gen.identifier)
 
   }
 

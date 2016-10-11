@@ -3,22 +3,26 @@ package dit4c.protobuf.scheduler;
 
 message StartInstance {
   string instanceId = 1;
-  string imageUrl = 2;
+  string clusterId = 2;
+  string imageUrl = 3;
 }
 
 message DiscardInstance {
   string instanceId = 1;
+  string clusterId = 2;
 }
 
 message SaveInstance {
   string instanceId = 1;
-  string imageUrl = 2;
+  string clusterId = 2;
+  string imageUrl = 3;
 }
 
 message InboundMessage {
+  string messageId = 1;
   oneof payload {
-    StartInstance startInstance = 1;
-    DiscardInstance discardInstance = 2;
-    SaveInstance saveInstance = 3;
+    StartInstance startInstance = 2;
+    DiscardInstance discardInstance = 3;
+    SaveInstance saveInstance = 4;
   }
 }
