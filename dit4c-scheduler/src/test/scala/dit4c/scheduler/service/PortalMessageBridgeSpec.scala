@@ -99,19 +99,37 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         import dit4c.protobuf.scheduler.{outbound => pb}
         import dit4c.scheduler.service.{ClusterAggregateManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
-        val msg = Instance.StatusReport(Instance.WaitingForImage, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString), None, portalUri.toString, None))
+        val dummyLocalImageId = "sha512-"+Stream.fill(64)("0").mkString
+        val msgs: List[Instance.StatusReport] =
+          Instance.StatusReport(Instance.WaitingForImage, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString), None, portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Starting, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Running, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Stopping, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Finished, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Errored, Instance.ErrorData(
+            instanceId, List("A bunch", "of errors", "occurred"))) ::
+          Nil
         newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
-          parentProbe.send(msgBridge, msg)
-          wsProbe.expectMessage() match {
-            case wsMsg =>
+          msgs must contain(beLike[Instance.StatusReport] {
+            case msg =>
+              parentProbe.send(msgBridge, msg)
+              val wsMsg = wsProbe.expectMessage()
               val om = OutboundMessage.parseFrom(wsMsg.asBinaryMessage.getStrictData.toArray)
               (om.messageId must {
                 haveLength[String](32) and
                 beMatching("[0-9a-f]+")
               }) and
               (om.payload.instanceStateUpdate.isDefined must beTrue)
-          }
+          }).foreach
         }
       })
     }

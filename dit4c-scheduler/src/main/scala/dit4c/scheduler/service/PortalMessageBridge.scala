@@ -109,6 +109,13 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
         pb.InstanceStateUpdate.apply(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
+    case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
+        pb.InstanceStateUpdate.apply(data.instanceId, Some(pbTimestamp(Instant.now)),
+            pb.InstanceStateUpdate.InstanceState.ERRORED, data.errors.mkString("\n\n"))
+      ))
+      outbound ! toBinaryMessage(msg.toByteArray)
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)

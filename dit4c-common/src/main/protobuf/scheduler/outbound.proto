@@ -20,6 +20,7 @@ message InstanceStateUpdate {
     STARTED = 2;
     EXITED = 3;
     SAVING = 4;
+    ERRORED = 99;
   }
   InstanceState state = 3;
   string additionalInfo = 4;
