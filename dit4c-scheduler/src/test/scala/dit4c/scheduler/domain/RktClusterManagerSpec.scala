@@ -218,8 +218,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
             case Instance.StartData(id, providedImage, _, callback, key) =>
               ( id must be_==(response.instanceId) ) and
               ( providedImage must be_==(testImage) ) and
-              ( callback must be_==(testCallback) ) and
-              ( key must beSome[Instance.InstanceSigningKey] )
+              ( callback must be_==(testCallback) )
           }
         }
       }
