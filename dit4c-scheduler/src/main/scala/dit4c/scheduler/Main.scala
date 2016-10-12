@@ -16,9 +16,7 @@ object Main extends App {
   (new SchedulerConfigParser(appMetadata))
     .parse(args)
     .map { config =>
-      Scheduler(config).foreach { sb =>
-        println(s"Listening on ${sb.localAddress}")
-      }
+      Scheduler(config)
     } getOrElse {
       // arguments are bad, error message will have been displayed
     }
