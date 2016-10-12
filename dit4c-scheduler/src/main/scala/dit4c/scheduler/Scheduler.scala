@@ -68,7 +68,14 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
   }
 
   override def receive = {
-    case _ => // TODO: Implement
+    case msg if sender == context.child("cluster-aggregate-manager") =>
+      context.child("pmb-supervisor").foreach { child =>
+        child.forward(msg)
+      }
+    case msg if sender == context.child("pmb-supervisor") =>
+      context.child("cluster-aggregate-manager").foreach { child =>
+        child.forward(msg)
+      }
   }
 
   override def postStop = {
@@ -77,7 +84,6 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     }
     super.postStop()
   }
-
 
   private val defaultConfigProvider: DefaultConfigProvider = new DefaultConfigProvider {
     override def rktRunnerConfig =
