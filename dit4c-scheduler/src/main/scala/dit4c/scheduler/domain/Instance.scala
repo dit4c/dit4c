@@ -42,7 +42,7 @@ object Instance {
       resolvedImage: Option[LocalImage],
       portalUri: String,
       signingKey: Option[InstanceSigningKey]) extends Data
-  case class ErrorData(errors: List[String]) extends Data
+  case class ErrorData(instanceId: String, errors: List[String]) extends Data
 
   trait Command
   case object GetStatus extends Command
@@ -168,8 +168,8 @@ class Instance(worker: ActorRef)
         data.copy(signingKey = Some(key))
       case (ErrorOccurred(msg, _), errorData: ErrorData) =>
         errorData.copy(errors = errorData.errors :+ msg)
-      case (ErrorOccurred(msg, _), _) =>
-        ErrorData(List(msg))
+      case (ErrorOccurred(msg, _), data: StartData) =>
+        ErrorData(data.instanceId, List(msg))
       case (e, d) =>
         stop(PersistentFSM.Failure(s"Unhandled event/state: ($e, $d)"))
         d
