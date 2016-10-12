@@ -17,6 +17,9 @@ import akka.actor.ActorLogging
 import akka.stream.ActorMaterializer
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import dit4c.scheduler.service.PortalMessageBridge
+import akka.pattern.BackoffSupervisor
+import akka.pattern.Backoff
 
 object Scheduler {
 
@@ -50,10 +53,18 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
         Props(classOf[ClusterAggregateManager], defaultConfigProvider),
         "cluster-aggregate-manager")
     val httpHandler = (new ClusterRoutes(clusterAggregateManager)).routes
-    Http()(context.system).bindAndHandle(httpHandler, "localhost", config.port).foreach { sb =>
+    Http(context.system).bindAndHandle(httpHandler, "localhost", config.port).foreach { sb =>
       serverBinding = Some(sb)
       log.info(s"Listening on ${sb.localAddress}")
     }
+    val pmbSupervisor = context.actorOf(BackoffSupervisor.props(
+        Backoff.onStop(
+          Props(classOf[PortalMessageBridge], config.portalUri),
+          childName = "portal-message-bridge",
+          minBackoff = 500.milliseconds,
+          maxBackoff = 15.seconds,
+          randomFactor = 0.1)
+      ),"pmb-supervisor")
   }
 
   override def receive = {

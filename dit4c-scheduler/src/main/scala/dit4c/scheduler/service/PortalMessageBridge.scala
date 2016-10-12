@@ -43,6 +43,9 @@ object PortalMessageBridge {
       case BridgeClosed =>
         log.debug("portal message bridge closed - sending to parent")
         context.parent ! BridgeClosed
+      case akka.actor.Status.Failure(e) =>
+        log.error(s"portal message bridge connection failed: $e")
+        context.parent ! BridgeClosed
       case msg =>
         throw new Exception(s"Unknown message: $msg")
     }
