@@ -19,6 +19,8 @@ import scala.concurrent.Promise
 import akka.util.ByteString
 import akka.http.scaladsl.model.Uri
 import org.specs2.scalacheck.Parameters
+import dit4c.scheduler.domain.Instance
+import dit4c.protobuf.scheduler.outbound.OutboundMessage
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -89,6 +91,29 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         }
       })
 
+    }
+
+    "outgoing message handling" >> {
+
+      "InstanceStateUpdate" >> prop({ (msgId: String, instanceId: String, imageUrl: Uri, portalUri: Uri) =>
+        import dit4c.protobuf.scheduler.{outbound => pb}
+        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.domain.{RktClusterManager => ram}
+        val msg = Instance.StatusReport(Instance.WaitingForImage, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString), None, portalUri.toString, None))
+        newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
+          parentProbe.send(msgBridge, msg)
+          wsProbe.expectMessage() match {
+            case wsMsg =>
+              val om = OutboundMessage.parseFrom(wsMsg.asBinaryMessage.getStrictData.toArray)
+              (om.messageId must {
+                haveLength[String](32) and
+                beMatching("[0-9a-f]+")
+              }) and
+              (om.payload.instanceStateUpdate.isDefined must beTrue)
+          }
+        }
+      })
     }
 
   }

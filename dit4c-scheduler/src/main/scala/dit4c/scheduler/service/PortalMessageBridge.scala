@@ -14,6 +14,9 @@ import scala.concurrent.Future
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.event.LoggingReceive
 import akka.http.scaladsl.model.Uri
+import dit4c.scheduler.domain.Instance
+import java.time.Instant
+import scala.util.Random
 
 object PortalMessageBridge {
   case object BridgeClosed
@@ -78,6 +81,7 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
   }
 
   val receive: Receive = {
+    // Inbound
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
@@ -88,6 +92,20 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.TerminateInstance(instanceId))
+    // Outbound
+    case Instance.StatusReport(state, data: Instance.StartData) =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      val pbState = state match {
+        case Instance.WaitingForImage => pb.InstanceStateUpdate.InstanceState.CREATED
+        case Instance.Starting => pb.InstanceStateUpdate.InstanceState.PRESTART
+        case Instance.Running => pb.InstanceStateUpdate.InstanceState.STARTED
+        case Instance.Stopping => pb.InstanceStateUpdate.InstanceState.STARTED
+        case Instance.Finished => pb.InstanceStateUpdate.InstanceState.EXITED
+      }
+      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
+        pb.InstanceStateUpdate.apply(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
+      ))
+      outbound ! toBinaryMessage(msg.toByteArray)
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)
@@ -95,6 +113,24 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       log.info(s"shutting down after outbound actor terminated")
       context.stop(self)
   }
+
+  /**
+   * 128-bit identifier as hexadecimal
+   *
+   * Intended to be long enough that it's globally unlikely to have a collision,
+   * but based on time so it can also be sorted.
+   */
+  protected def newMsgId = {
+    val now = Instant.now
+    f"${now.getEpochSecond}%016x".takeRight(10) + // 40-bit epoch seconds
+    f"${now.getNano / 100}%06x" + // 24-bit 100 nanosecond slices
+    f"${Random.nextLong}%016x" // 64-bits of random
+  }
+
+  protected def toBinaryMessage(bs: Array[Byte]): BinaryMessage = BinaryMessage(ByteString(bs))
+
+  protected def pbTimestamp(t: Instant): com.google.protobuf.timestamp.Timestamp =
+    com.google.protobuf.timestamp.Timestamp(t.getEpochSecond, t.getNano)
 
   protected lazy val portalUri: String = {
     val scheme = Uri(websocketUrl).scheme match {
