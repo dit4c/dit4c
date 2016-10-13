@@ -44,6 +44,8 @@ import utils.auth.providers.RapidAAFProvider
 import services.InstanceOAuthDataHandler
 import utils.oauth.AuthorizationCodeGenerator
 import controllers._
+import utils.admin.SshRepl
+import ammonite.util.Bind
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -64,16 +66,20 @@ class AppComponents(context: Context)
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
   val clusterAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.ClusterAggregateManager]))
+      Props(classOf[services.ClusterAggregateManager]),
+      "cluster-aggregate-manager")
       .taggedWith[services.ClusterAggregateManager]
   val instanceAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.InstanceAggregateManager], clusterAggregateManager))
+      Props(classOf[services.InstanceAggregateManager], clusterAggregateManager),
+      "instance-aggregate-manager")
       .taggedWith[services.InstanceAggregateManager]
   val userAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.UserAggregateManager], instanceAggregateManager))
+      Props(classOf[services.UserAggregateManager], instanceAggregateManager),
+      "user-aggregate-manager")
       .taggedWith[services.UserAggregateManager]
   val identityAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.IdentityAggregateManager], userAggregateManager))
+      Props(classOf[services.IdentityAggregateManager], userAggregateManager),
+      "identity-aggregate-manager")
       .taggedWith[services.IdentityAggregateManager]
   lazy val identityService: services.IdentityService = wire[services.IdentityService]
   lazy val sessionAuthenticatorSettings = SessionAuthenticatorSettings()
@@ -120,4 +126,9 @@ class AppComponents(context: Context)
   lazy val oauthServerController = wire[OAuthServerController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
+  // SSH admin server
+  lazy val sshReplBindings: Seq[Bind[_]] =
+    Bind("app", application) ::
+    Nil
+  val sshRepl = wire[SshRepl]
 }

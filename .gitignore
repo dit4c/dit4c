@@ -28,3 +28,4 @@ activator-*.sbt
 /dit4c-scheduler/rkt-test-image.aci
 /dit4c-scheduler/manifest-*.json
 /*/.tmpBin
+/dit4c-portal/ssh-host.key
