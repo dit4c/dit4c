@@ -130,5 +130,6 @@ class AppComponents(context: Context)
   lazy val sshReplBindings: Seq[Bind[_]] =
     Bind("app", application) ::
     Nil
+  lazy val classloader = application.classloader
   val sshRepl = wire[SshRepl]
 }
