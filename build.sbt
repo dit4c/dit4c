@@ -1,7 +1,3 @@
-import com.typesafe.sbt.web._
-import sbtrelease._
-import ReleaseStateTransformations._
-
 name := "dit4c"
 
 // Overriding publishArtifactsAction, so unnecessary for actual operation
@@ -30,12 +26,4 @@ lazy val portal = (project in file("dit4c-portal")).dependsOn(common).enablePlug
 
 lazy val scheduler = (project in file("dit4c-scheduler")).dependsOn(common)
 
-// Release settings
-
-releaseSettings
-
 crossScalaVersions := Nil
-
-buildOptions in docker in ThisBuild := BuildOptions(
-  pullBaseImage = BuildOptions.Pull.Always
-)
