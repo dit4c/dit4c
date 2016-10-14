@@ -137,7 +137,4 @@ class AppComponents(context: Context)
     Nil
   lazy val classloader = application.classloader
   val sshRepl = wire[SshRepl]
-  // Self-join cluster of 1
-  val clusterNode = Cluster(actorSystem)
-  clusterNode.join(clusterNode.selfAddress)
 }

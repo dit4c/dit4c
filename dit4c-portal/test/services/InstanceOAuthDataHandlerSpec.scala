@@ -24,6 +24,7 @@ import domain.IdentityAggregate
 import testing.ScalaCheckHelpers
 import org.scalacheck.Arbitrary
 import scala.concurrent.Await
+import com.typesafe.config.ConfigFactory
 
 class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
     extends Specification with ScalaCheck with ScalaCheckHelpers {
@@ -37,7 +38,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
     "validateClient" >> {
 
       "true if instance with valid JWT secret" >> prop({ (instanceId: String) =>
-        val probe = TestProbe()(ActorSystem("dh-vc-instance"))
+        val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -57,7 +58,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       })
 
       "false if instance JWT verification fails" >> prop({ (instanceId: String) =>
-        val probe = TestProbe()(ActorSystem("dh-vc-instance"))
+        val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -77,7 +78,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       }).setGen(Gen.identifier)
 
       "false if client_id doesn't match JWT" >> prop({ (instanceId: String) =>
-        val probe = TestProbe()(ActorSystem("dh-vc-instance"))
+        val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -98,7 +99,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       }).setGen(Gen.identifier)
 
       "always false without credentials" >> {
-        val probe = TestProbe()(ActorSystem("dh-vc-nocreds"))
+        val probe = TestProbe()(actorSystem("dh-vc-nocreds"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -107,7 +108,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       }
 
       "always false if not an instance" >> {
-        val probe = TestProbe()(ActorSystem("dh-vc-notinstance"))
+        val probe = TestProbe()(actorSystem("dh-vc-notinstance"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -123,7 +124,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
     "findAuthInfoByCode" >> {
 
       "extracts info from code and then resolves user identity" >> prop({ (instanceId: String, info: AuthInfo[IdentityService.User]) =>
-        val probe = TestProbe()(ActorSystem("dh-vc-instance"))
+        val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
             probe.ref.taggedWith[InstanceAggregateManager],
             new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
@@ -148,7 +149,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
 
       // Not needed for Authorization Code Grant, so...
       "not implemented - always returns None" >> {
-        val probe = TestProbe()(ActorSystem("dh-fu-always"))
+        val probe = TestProbe()(actorSystem("dh-fu-always"))
         val dh = stubbedDataHandler(probe)
         dh.findUser(new AuthorizationRequest(Map.empty, Map.empty)) must beNone.await
       }
@@ -161,5 +162,13 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
     new InstanceOAuthDataHandler(acg,
         probe.ref.taggedWith[InstanceAggregateManager],
         new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+
+  def actorSystem(name: String) = ActorSystem(name, ConfigFactory.load(actorSystemConfig))
+
+  private lazy val actorSystemConfig = ConfigFactory.parseString("""
+    |akka.actor.provider = "local"
+    |akka.remote = {}
+    |akka.cluster = {}
+    |""".stripMargin)
 
 }

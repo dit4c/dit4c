@@ -15,7 +15,7 @@
   <logger name="akka.stream.impl" level="INFO" />
   <logger name="akka.event.slf4j" level="WARN" />
 
-  <root level="INFO">
+  <root level="WARN">
     <appender-ref ref="ASYNCSTDOUT" />
   </root>
   
