@@ -12,6 +12,9 @@ PUT     /instances/                         controllers.MainController.instanceR
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
 
+# Websocket messaging
+GET     /messaging/scheduler/:id            controllers.MessagingController.schedulerSocket(id)
+
 # As documented at:
 # https://github.com/coreos/jwtproxy/blob/master/jwt/keyserver/keyregistry/README.md
 GET     /services/:service/keys             controllers.KeyServerController.serviceKeys(service)

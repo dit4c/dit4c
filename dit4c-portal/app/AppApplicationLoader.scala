@@ -46,6 +46,8 @@ import utils.oauth.AuthorizationCodeGenerator
 import controllers._
 import utils.admin.SshRepl
 import ammonite.util.Bind
+import services.SchedulerSharder
+import akka.cluster.Cluster
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -65,6 +67,8 @@ class AppComponents(context: Context)
   }
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
+  val schedulerAggregateManager = SchedulerSharder()(actorSystem)
+      .taggedWith[services.SchedulerSharder.type]
   val clusterAggregateManager = actorSystem.actorOf(
       Props(classOf[services.ClusterAggregateManager]),
       "cluster-aggregate-manager")
@@ -124,6 +128,7 @@ class AppComponents(context: Context)
   // Controllers
   lazy val keyServerController = wire[KeyServerController]
   lazy val oauthServerController = wire[OAuthServerController]
+  lazy val messagingController = wire[MessagingController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
   // SSH admin server
@@ -132,4 +137,7 @@ class AppComponents(context: Context)
     Nil
   lazy val classloader = application.classloader
   val sshRepl = wire[SshRepl]
+  // Self-join cluster of 1
+  val clusterNode = Cluster(actorSystem)
+  clusterNode.join(clusterNode.selfAddress)
 }
