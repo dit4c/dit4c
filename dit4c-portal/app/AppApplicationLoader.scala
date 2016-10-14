@@ -61,6 +61,7 @@ class AppApplicationLoader extends ApplicationLoader {
 class AppComponents(context: Context)
     extends BuiltInComponentsFromContext(context) with AhcWSComponents {
   implicit lazy val executionContext = materializer.executionContext
+  implicit val system = actorSystem
   lazy val router: Router = {
     lazy val prefix = "/"
     wire[Routes]

@@ -10,6 +10,7 @@ import akka.stream.Materializer
 import domain.SchedulerAggregate._
 import java.time.Instant
 import pdi.jwt.JwtJson
+import akka.actor.ActorRef
 
 object SchedulerAggregate {
 
@@ -26,6 +27,8 @@ object SchedulerAggregate {
   sealed trait Command
   case object Create extends Command
   case class VerifyJwt(token: String) extends Command
+  case class RegisterSocket(socketActor: ActorRef) extends Command
+  case class DeregisterSocket(socketActor: ActorRef) extends Command
 
   sealed trait Response
   case object Ack extends Response
@@ -46,6 +49,8 @@ class SchedulerAggregate()
 
   lazy val schedulerId = self.path.name
   override lazy val persistenceId: String = "Scheduler-" + self.path.name
+
+  var schedulerSocket: Option[ActorRef] = None
 
   startWith(Uninitialized, NoData)
 
@@ -69,6 +74,18 @@ class SchedulerAggregate()
         }
         .fold[VerifyJwtResponse](InvalidJwt(_), _ => ValidJwt)
       stay replying response
+    case Event(RegisterSocket(ref), _) =>
+      schedulerSocket = Some(ref)
+      log.info(s"Registered socket: ${ref.path.toString}")
+      stay
+    case Event(DeregisterSocket(ref), _) =>
+      if (Some(ref) == schedulerSocket) {
+        schedulerSocket = None
+        log.info(s"Deregistered socket: ${ref.path.toString}")
+      } else {
+        log.debug(s"Ignored deregister: ${ref.path.toString}")
+      }
+      stay
   }
 
   override def applyEvent(
