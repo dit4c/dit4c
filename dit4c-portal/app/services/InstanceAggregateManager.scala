@@ -25,10 +25,9 @@ object InstanceAggregateManager {
 }
 
 class InstanceAggregateManager(
-    val clusterAggregateManager: ActorRef @@ ClusterAggregateManager)
+    val clusterAggregateManager: ActorRef @@ ClusterSharder.type)
     extends Actor with ActorLogging {
   import InstanceAggregateManager._
-  import services.ClusterAggregateManager.ClusterEnvelope
   import domain.ClusterAggregate
   import akka.pattern.{ask, pipe}
   import context.dispatcher
@@ -37,15 +36,13 @@ class InstanceAggregateManager(
     case StartInstance(clusterId, image, portal) =>
       implicit val timeout = Timeout(1.minute)
       val requester = sender
-      (clusterAggregateManager ? ClusterEnvelope(clusterId,
+      (clusterAggregateManager ? ClusterSharder.Envelope(clusterId,
           ClusterAggregate.StartInstance(image, portal))).foreach {
-        case ClusterAggregate.InstanceStarted(clusterId, instanceId) =>
+        case ClusterAggregate.AllocatedInstanceId(clusterId, instanceId) =>
           (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
             case InstanceAggregate.Ack =>
               InstanceStarted(instanceId)
           } pipeTo requester
-        case msg @ ClusterAggregate.UnableToStartInstance =>
-          requester ! msg
       }
     case VerifyJwt(token) =>
       resolveJwtInstance(token) match {

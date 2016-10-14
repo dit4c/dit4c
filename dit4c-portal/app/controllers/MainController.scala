@@ -94,8 +94,6 @@ class MainController(
               routes.MainController.index.absoluteURL.stripSuffix("/")))).map {
             case InstanceAggregateManager.InstanceStarted(id) =>
               Ok(id)
-            case ClusterAggregate.UnableToStartInstance =>
-              ServiceUnavailable
           }
         }
     )
@@ -104,8 +102,8 @@ class MainController(
   def terminateInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
     (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.TerminateInstance(instanceId))).map {
-      case ClusterAggregate.InstanceTerminating(id) =>
-        Ok(id)
+      case InstanceAggregate.Ack =>
+        Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
         Forbidden
     }

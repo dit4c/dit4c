@@ -18,11 +18,17 @@ message SaveInstance {
   string imageUrl = 3;
 }
 
+message RequestInstanceStateUpdate {
+  string instanceId = 1;
+  string clusterId = 2;
+}
+
 message InboundMessage {
   string messageId = 1;
   oneof payload {
     StartInstance startInstance = 2;
     DiscardInstance discardInstance = 3;
     SaveInstance saveInstance = 4;
+    RequestInstanceStateUpdate requestInstanceStateUpdate = 5;
   }
 }

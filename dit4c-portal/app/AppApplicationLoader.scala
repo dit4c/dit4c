@@ -46,7 +46,7 @@ import utils.oauth.AuthorizationCodeGenerator
 import controllers._
 import utils.admin.SshRepl
 import ammonite.util.Bind
-import services.SchedulerSharder
+import services._
 import akka.cluster.Cluster
 
 class AppApplicationLoader extends ApplicationLoader {
@@ -68,12 +68,10 @@ class AppComponents(context: Context)
   }
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
-  val schedulerAggregateManager = SchedulerSharder()(actorSystem)
+  val schedulerSharder = SchedulerSharder()(actorSystem)
       .taggedWith[services.SchedulerSharder.type]
-  val clusterAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.ClusterAggregateManager]),
-      "cluster-aggregate-manager")
-      .taggedWith[services.ClusterAggregateManager]
+  val clusterAggregateManager = ClusterSharder(schedulerSharder)(actorSystem)
+      .taggedWith[services.ClusterSharder.type]
   val instanceAggregateManager = actorSystem.actorOf(
       Props(classOf[services.InstanceAggregateManager], clusterAggregateManager),
       "instance-aggregate-manager")

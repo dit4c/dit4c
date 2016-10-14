@@ -29,12 +29,16 @@ object SchedulerAggregate {
   case class VerifyJwt(token: String) extends Command
   case class RegisterSocket(socketActor: ActorRef) extends Command
   case class DeregisterSocket(socketActor: ActorRef) extends Command
+  case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
 
   sealed trait Response
   case object Ack extends Response
   sealed trait VerifyJwtResponse extends Response
   case object ValidJwt extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
+  sealed trait SendSchedulerMessageResponse extends Response
+  case object MessageSent extends Response
+  case object UnableToSendMessage extends Response
 
   sealed trait DomainEvent extends BaseDomainEvent
   case class Created(timestamp: Instant = Instant.now) extends DomainEvent
@@ -86,6 +90,15 @@ class SchedulerAggregate()
         log.debug(s"Ignored deregister: ${ref.path.toString}")
       }
       stay
+    case Event(SendSchedulerMessage(msg), _) =>
+      val response = schedulerSocket match {
+        case Some(ref) =>
+          ref ! msg
+          MessageSent
+        case None =>
+          UnableToSendMessage
+      }
+      stay replying response
   }
 
   override def applyEvent(

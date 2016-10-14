@@ -1,107 +1,141 @@
 package domain
 
 import akka.actor._
+import com.softwaremill.tagging._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import scala.concurrent.Future
 import akka.util.ByteString
 import akka.stream.ActorMaterializer
 import akka.stream.Materializer
+import services.SchedulerSharder
+import akka.persistence.fsm._
+import ClusterAggregate._
+import java.time.Instant
+import scala.reflect._
+import scala.util.Random
 
 object ClusterAggregate {
 
-  val defaultClusterProps = Props(classOf[ClusterAggregate],
-      "default",
-      Uri("http://localhost:8080/clusters/default"))
+  sealed trait State extends PersistentFSM.FSMState {
+    override def identifier = this.getClass.getSimpleName.stripSuffix("$")
+  }
+  case object Uninitialized extends State
+  case object Active extends State
+
+  sealed trait Data
+  case object NoData extends Data
+  case class ClusterInfo(schedulerId: String) extends Data
 
   sealed trait Command
+  case class Create(schedulerId: String) extends Command
   case class StartInstance(image: String, portal: Uri) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class TerminateInstance(instanceId: String) extends Command
 
   sealed trait Response
-  case class InstanceStatus(httpResponse: HttpResponse) extends Response
-  case class InstanceStarted(clusterId: String, instanceId: String) extends Response
-  case object UnableToStartInstance extends Response
-  case class InstanceTerminating(instanceId: String) extends Response
-  case object UnableToTerminateInstance extends Response
+  case object Ack extends Response
+  case class AllocatedInstanceId(clusterId: String, instanceId: String) extends Response
 
+  sealed trait DomainEvent extends BaseDomainEvent
+  case class Created(schedulerId: String, timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
-class ClusterAggregate(
-    clusterId: String, baseUri: Uri) extends Actor with ActorLogging {
+class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
+    extends PersistentFSM[State, Data, DomainEvent]
+    with LoggingPersistentFSM[State, Data, DomainEvent]
+    with ActorLogging {
   import ClusterAggregate._
   import play.api.libs.json._
   import akka.pattern.pipe
 
+  lazy val clusterId = self.path.name
+  override lazy val persistenceId: String = "Scheduler-" + self.path.name
+
   implicit val m: Materializer = ActorMaterializer()
   import context.dispatcher
 
-  val http = Http(context.system)
+    startWith(Uninitialized, NoData)
 
-  val receive: Receive = {
-    case StartInstance(image, callback) =>
-      startInstance(image, callback) pipeTo sender
-    case GetInstanceStatus(instanceId) =>
-      getInstanceStatus(instanceId) pipeTo sender
-    case TerminateInstance(instanceId) =>
-      terminateInstance(instanceId) pipeTo sender
+  when(Uninitialized) {
+    case Event(Create(schedulerId), _) =>
+      val requester = sender
+      goto(Active).applying(Created(schedulerId)).andThen { _ =>
+        requester ! Ack
+      }
   }
 
-  def startInstance(image: String, portal: Uri): Future[Response] = {
-    val path = baseUri.withPath(baseUri.path / "instances")
-    val reqJson = Json.obj(
-        "image" -> image,
-        "portal" -> portal.toString
-    )
-    val request = HttpRequest(
-        method = HttpMethods.POST,
-        uri = path,
-        entity = HttpEntity.Strict(
-            ContentTypes.`application/json`,
-            ByteString.fromString(Json.prettyPrint(reqJson))))
+  when(Active) {
+    case Event(StartInstance(image, callback), ClusterInfo(schedulerId)) =>
+      var instanceId = timePrefix+randomId(16)
+      schedulerSharder forward SchedulerMessage(schedulerId).startInstance(instanceId, image, callback)
+      stay replying AllocatedInstanceId(clusterId, instanceId)
+    case Event(GetInstanceStatus(instanceId), ClusterInfo(schedulerId)) =>
+      schedulerSharder forward SchedulerMessage(schedulerId).getInstanceStatus(instanceId)
+      stay
+    case Event(TerminateInstance(instanceId), ClusterInfo(schedulerId)) =>
+      schedulerSharder forward SchedulerMessage(schedulerId).terminateInstance(instanceId)
+      stay
+  }
 
-    http.singleRequest(request).collect {
-      case HttpResponse(StatusCodes.Accepted, headers, _, _) =>
-        log.info("Request accepted")
-        val location = Uri(headers.find(_.lowercaseName == "location").get.value)
-        InstanceStarted(clusterId, location.path.last.toString)
-      case HttpResponse(StatusCodes.ServiceUnavailable, headers, entity, _) =>
-        log.error("Unable to start instance: Service Unavailable")
-        UnableToStartInstance
-    }.recover {
-      case e: Throwable =>
-        log.error("Unable to start instance: "+e.getMessage)
-        UnableToStartInstance
+  override def applyEvent(
+      domainEvent: DomainEvent,
+      currentData: Data): Data = (domainEvent, currentData) match {
+    case (Created(schedulerId, _), _) =>
+      ClusterInfo(schedulerId)
+    case p =>
+      throw new Exception(s"Unknown state/data combination: $p")
+  }
+
+  override def domainEventClassTag: ClassTag[DomainEvent] =
+    classTag[DomainEvent]
+
+  case class SchedulerMessage(schedulerId: String) {
+
+
+    def startInstance(instanceId: String, image: String, portal: Uri): SchedulerSharder.Envelope = wrapForScheduler {
+      import dit4c.protobuf.scheduler.inbound._
+      InboundMessage(randomMsgId, InboundMessage.Payload.StartInstance(
+        StartInstance(instanceId, image, portal.toString)
+      ))
     }
-  }
 
-  def terminateInstance(instanceId: String): Future[Response] = {
-    val path = baseUri.withPath(baseUri.path / "instances" / instanceId / "terminate")
-    val request = HttpRequest(
-        method = HttpMethods.PUT,
-        uri = path)
-    http.singleRequest(request).collect {
-      case HttpResponse(StatusCodes.Accepted, headers, _, _) =>
-        log.info("Request accepted")
-        InstanceTerminating(instanceId)
-    }.recover {
-      case e: Throwable =>
-        log.error("Unable to terminate instance: "+e.getMessage)
-        UnableToTerminateInstance
+    def terminateInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
+      import dit4c.protobuf.scheduler.inbound._
+      InboundMessage(randomMsgId, InboundMessage.Payload.DiscardInstance(
+        DiscardInstance(instanceId, clusterId)
+      ))
     }
+
+    def getInstanceStatus(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
+      import dit4c.protobuf.scheduler.inbound._
+      InboundMessage(randomMsgId, InboundMessage.Payload.RequestInstanceStateUpdate(
+        RequestInstanceStateUpdate(instanceId, clusterId)
+      ))
+    }
+
+    private def wrapForScheduler(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) =
+      SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.SendSchedulerMessage(msg))
+
+    private def randomMsgId = timePrefix + randomId(16)
+
   }
 
-  def getInstanceStatus(instanceId: String): Future[Response] = {
-    val path = baseUri.withPath(baseUri.path / "instances" / instanceId)
-    val request = HttpRequest(method = HttpMethods.GET, uri = path)
-    http.singleRequest(request).map(InstanceStatus(_))
+  /**
+   * Prefix based on time for easy sorting
+   */
+  protected def timePrefix = {
+    val now = Instant.now
+    f"${now.getEpochSecond}%016x".takeRight(10) + // 40-bit epoch seconds
+    f"${now.getNano / 100}%06x"// 24-bit 100 nanosecond slices
   }
 
-
-  implicit class UriPathHelper(path: Uri.Path) {
-    def last = path.reverse.head
+  private lazy val randomId: (Int) => String = {
+    val base32 = (Range.inclusive('a','z').map(_.toChar) ++ Range.inclusive(2,7).map(_.toString.charAt(0)))
+    (length: Int) =>
+      Stream.continually(Random.nextInt(33)).map(base32).take(length).mkString
   }
+
 
 }
