@@ -20,6 +20,8 @@ import scala.concurrent.duration._
 import dit4c.scheduler.service.PortalMessageBridge
 import akka.pattern.BackoffSupervisor
 import akka.pattern.Backoff
+import akka.event.LoggingReceive
+import dit4c.scheduler.domain.Instance
 
 object Scheduler {
 
@@ -65,17 +67,25 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
           maxBackoff = 15.seconds,
           randomFactor = 0.1)
       ),"pmb-supervisor")
+    // TODO: remove need for this kludge
+    context.system.eventStream.subscribe(self, classOf[Instance.StatusReport])
   }
 
-  override def receive = {
-    case msg if sender == context.child("cluster-aggregate-manager") =>
+  override def receive = LoggingReceive {
+    case msg if Some(sender) == context.child("cluster-aggregate-manager") =>
       context.child("pmb-supervisor").foreach { child =>
         child.forward(msg)
       }
-    case msg if sender == context.child("pmb-supervisor") =>
+    case msg if Some(sender) == context.child("pmb-supervisor") =>
       context.child("cluster-aggregate-manager").foreach { child =>
         child.forward(msg)
       }
+    case msg: Instance.StatusReport => // TODO: remove need for this kludge
+      context.child("pmb-supervisor").foreach { child =>
+        child.forward(msg)
+      }
+    case unknown =>
+      log.warning(s"Unknown message from $sender: $unknown")
   }
 
   override def postStop = {

@@ -14,8 +14,7 @@ import akka.event.LoggingReceive
 object InstanceAggregateManager {
 
   sealed trait Command
-  case class StartInstance(
-      clusterId: String, image: String, portal: Uri) extends Command
+  case class StartInstance(clusterId: String, image: String) extends Command
   case class VerifyJwt(token: String) extends Command
   case class InstanceEnvelope(instanceId: String, msg: Any) extends Command
 
@@ -33,11 +32,11 @@ class InstanceAggregateManager(
   import context.dispatcher
 
   val receive: Receive = LoggingReceive {
-    case StartInstance(clusterId, image, portal) =>
+    case StartInstance(clusterId, image) =>
       implicit val timeout = Timeout(1.minute)
       val requester = sender
       (clusterAggregateManager ? ClusterSharder.Envelope(clusterId,
-          ClusterAggregate.StartInstance(image, portal))).foreach {
+          ClusterAggregate.StartInstance(image))).foreach {
         case ClusterAggregate.AllocatedInstanceId(clusterId, instanceId) =>
           (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
             case InstanceAggregate.Ack =>
@@ -56,18 +55,16 @@ class InstanceAggregateManager(
   }
 
   def instanceRef(instanceId: String) = {
-    context.child(aggregateId(instanceId)).getOrElse {
+    context.child(instanceId).getOrElse {
       val agg = context.actorOf(
-          aggregateProps(instanceId), aggregateId(instanceId))
+          aggregateProps(instanceId), instanceId)
       context.watch(agg)
       agg
     }
   }
 
-  private def aggregateId(instanceId: String) = s"Instance-$instanceId"
-
   private def aggregateProps(instanceId: String): Props =
-    Props(classOf[InstanceAggregate], instanceId, clusterAggregateManager)
+    Props(classOf[InstanceAggregate], clusterAggregateManager)
 
   private def resolveJwtInstance(token: String): Either[String, ActorRef] =
     JwtJson.decode(token, JwtOptions(signature=false))

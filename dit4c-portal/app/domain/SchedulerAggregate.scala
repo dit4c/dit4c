@@ -11,6 +11,8 @@ import domain.SchedulerAggregate._
 import java.time.Instant
 import pdi.jwt.JwtJson
 import akka.actor.ActorRef
+import dit4c.protobuf.scheduler.outbound.AllocatedInstanceKey
+import java.security.spec.RSAPublicKeySpec
 
 object SchedulerAggregate {
 
@@ -29,6 +31,7 @@ object SchedulerAggregate {
   case class VerifyJwt(token: String) extends Command
   case class RegisterSocket(socketActor: ActorRef) extends Command
   case class DeregisterSocket(socketActor: ActorRef) extends Command
+  case class ReceiveSchedulerMessage(msg: dit4c.protobuf.scheduler.outbound.OutboundMessage) extends Command
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
 
   sealed trait Response
@@ -80,6 +83,7 @@ class SchedulerAggregate()
       stay replying response
     case Event(RegisterSocket(ref), _) =>
       schedulerSocket = Some(ref)
+      log.info(sender.toString)
       log.info(s"Registered socket: ${ref.path.toString}")
       stay
     case Event(DeregisterSocket(ref), _) =>
@@ -90,15 +94,34 @@ class SchedulerAggregate()
         log.debug(s"Ignored deregister: ${ref.path.toString}")
       }
       stay
+    case Event(ReceiveSchedulerMessage(msg), _) =>
+      import dit4c.protobuf.scheduler.outbound.OutboundMessage.Payload
+      import services.InstanceAggregateManager.InstanceEnvelope
+      import domain.InstanceAggregate.AssociateRsaPublicKey
+      msg.payload match {
+        case Payload.Empty => // Do nothing
+        case Payload.InstanceStateUpdate(msg) =>
+          val envelope = InstanceEnvelope(msg.instanceId, msg)
+          context.system.eventStream.publish(envelope)
+        case Payload.AllocatedInstanceKey(msg) =>
+          for {
+            key <- msg.rsaPublickey
+            modulus = BigInt(key.modulus.toByteArray)
+            publicExponent = BigInt(key.publicExponent.toByteArray)
+            envelope = InstanceEnvelope(msg.instanceId, AssociateRsaPublicKey(publicExponent, modulus))
+          } yield {
+            context.system.eventStream.publish(envelope)
+          }
+      }
+      stay
     case Event(SendSchedulerMessage(msg), _) =>
-      val response = schedulerSocket match {
+      schedulerSocket match {
         case Some(ref) =>
           ref ! msg
-          MessageSent
         case None =>
-          UnableToSendMessage
+          log.warning(s"Unable to send: $msg")
       }
-      stay replying response
+      stay
   }
 
   override def applyEvent(

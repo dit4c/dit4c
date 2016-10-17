@@ -22,8 +22,18 @@ import java.math.BigInteger
 import java.security.interfaces.RSAPublicKey
 import java.time.Instant
 import play.api.libs.json.JsObject
+import java.security.spec.RSAPublicKeySpec
+import java.security.KeyFactory
+import scala.util.Random
+import dit4c.protobuf.scheduler.outbound.InstanceStateUpdate
 
 object InstanceAggregate {
+
+  type JwtValidator = String => Either[String, Unit]
+
+  trait PublicJwk extends JwtValidator {
+    def toJson: JsObject
+  }
 
   sealed trait State extends PersistentFSM.FSMState {
     override def identifier = this.getClass.getSimpleName.stripSuffix("$")
@@ -35,6 +45,7 @@ object InstanceAggregate {
   case object NoData extends Data
   case class InstanceData(
       clusterId: String,
+      jwk: Option[PublicJwk] = None,
       uri: Option[String] = None) extends Data
 
   sealed trait Command
@@ -44,6 +55,8 @@ object InstanceAggregate {
   case object Terminate extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
   case class AssociateUri(uri: String) extends Command
+  case class AssociateRsaPublicKey(publicExponent: BigInt, modulus: BigInt) extends Command
+  case class ReceiveInstanceStateUpdate(state: String) extends Command
 
   sealed trait Response
   case object Ack extends Response
@@ -61,12 +74,13 @@ object InstanceAggregate {
   sealed trait DomainEvent extends BaseDomainEvent
   case class StartedInstance(
       clusterId: String, timestamp: Instant = Instant.now) extends DomainEvent
+  case class AssociatedRsaPublicKey(
+      publicExponent: BigInt, modulus: BigInt, timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedUri(
       uri: String, timestamp: Instant = Instant.now) extends DomainEvent
 }
 
 class InstanceAggregate(
-    instanceId: String,
     clusterAggregateManager: ActorRef @@ ClusterSharder.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
@@ -77,7 +91,8 @@ class InstanceAggregate(
   import play.api.libs.functional.syntax._
   implicit val m: Materializer = ActorMaterializer()
 
-  override lazy val persistenceId: String = self.path.name
+  lazy val instanceId: String = self.path.name
+  override lazy val persistenceId: String = "Instance-"+self.path.name
 
   startWith(Uninitialized, NoData)
 
@@ -94,25 +109,43 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(clusterId, maybeUri)) =>
-      log.error("Not implemented yet!!!")
+    case Event(GetStatus, InstanceData(clusterId, _, _)) =>
+      // Start actor listening
+      context.actorOf(
+          Props(classOf[GetStatusRequestActor], sender),
+          "get-status-request-"+Random.alphanumeric.take(10).mkString)
+      // Forward request to cluster
+      context.system.eventStream.publish(
+          ClusterSharder.Envelope(clusterId, ClusterAggregate.GetInstanceStatus(instanceId)))
       stay
-    case Event(GetJwk, InstanceData(clusterId, _)) =>
-      log.error("Not implemented yet!!!")
+    case Event(InstanceStateUpdate(instanceId, timestamp, state, additionalInfo), InstanceData(clusterId, _, uri)) =>
+      // Tell any listening actors
+      context.actorSelection("get-status-request-*") ! RemoteStatus(state.toString, uri)
       stay
-    case Event(VerifyJwt(token), InstanceData(clusterId, _)) =>
-      log.error("Not implemented yet!!!")
-      stay
-    case Event(AssociateUri(newUri), InstanceData(_, Some(currentUri))) if currentUri == newUri =>
+    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _)) =>
+      stay replying InstanceJwk(jwk.toJson)
+    case Event(GetJwk, InstanceData(clusterId, None, _)) =>
+      stay replying NoJwkExists
+    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _)) =>
+      stay replying {
+        jwk(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
+      }
+    case Event(VerifyJwt(token), InstanceData(clusterId, None, _)) =>
+      stay replying InvalidJwt("No JWK is associated with this instance")
+    case Event(AssociateRsaPublicKey(e, n), InstanceData(_, _, _)) =>
+      val requester = sender
+      stay applying AssociatedRsaPublicKey(e, n) andThen { _ =>
+        requester ! Ack
+      }
+    case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri))) if currentUri == newUri =>
       // Same as current - no need to update
-      sender ! Ack
-      stay
-    case Event(AssociateUri(uri), InstanceData(_, _)) =>
+      stay replying Ack
+    case Event(AssociateUri(uri), InstanceData(_, _, _)) =>
       val requester = sender
       stay applying AssociatedUri(uri) andThen { _ =>
         requester ! Ack
       }
-    case Event(Terminate, InstanceData(clusterId, _)) =>
+    case Event(Terminate, InstanceData(clusterId, _, _)) =>
       implicit val timeout = Timeout(1.minute)
       (clusterAggregateManager ? ClusterSharder.Envelope(
         clusterId, ClusterAggregate.TerminateInstance(instanceId)))
@@ -124,6 +157,8 @@ class InstanceAggregate(
       domainEvent: DomainEvent,
       currentData: Data): Data = (domainEvent, currentData) match {
     case (StartedInstance(clusterId, _), _) => InstanceData(clusterId)
+    case (AssociatedRsaPublicKey(e, n, _), data: InstanceData) =>
+      data.copy(jwk = Some(RsaJwk(e, n)))
     case (AssociatedUri(uri, _), data: InstanceData) =>
       data.copy(uri = Some(uri))
     case p =>
@@ -133,8 +168,34 @@ class InstanceAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
-  private case class RemoteStatusInfo(
-      state: String,
-      key: Option[PublicKey],
-      errors: Seq[String])
+  case class RsaJwk(publicExponent: BigInt, modulus: BigInt) extends PublicJwk {
+    val key: PublicKey =
+      KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus.bigInteger, publicExponent.bigInteger))
+
+    override def apply(token: String) =
+      JwtJson.decode(token, key)
+        .toOption.toRight("Failed to verify JWT with key")
+        .right.flatMap { claim =>
+          if (claim.isValid) Right(())
+          else Left("Claim is not valid at this time")
+        }
+
+    override def toJson =
+      Json.obj(
+          "kty" -> "RSA",
+          "e" -> base64Url(publicExponent),
+          "n" -> base64Url(modulus))
+
+    protected def base64Url(bi: BigInt): String =
+      JwtBase64.encodeString(bi.toByteArray)
+  }
+
+}
+
+class GetStatusRequestActor(requester: ActorRef) extends Actor {
+  override def receive = {
+    case msg =>
+      requester.tell(msg, context.parent)
+      context.stop(self)
+  }
 }

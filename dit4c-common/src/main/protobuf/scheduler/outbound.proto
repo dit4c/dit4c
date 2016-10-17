@@ -9,6 +9,7 @@ message AllocatedInstanceKey {
     bytes publicExponent = 1;
     bytes modulus = 2;
   }
+  RSAPublicKey rsaPublickey = 2;
 }
 
 message InstanceStateUpdate {
@@ -20,6 +21,7 @@ message InstanceStateUpdate {
     STARTED = 2;
     EXITED = 3;
     SAVING = 4;
+    UNKNOWN = 98;
     ERRORED = 99;
   }
   InstanceState state = 3;

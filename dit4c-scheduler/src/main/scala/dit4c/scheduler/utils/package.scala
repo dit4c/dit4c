@@ -30,7 +30,7 @@ package object utils {
   case class SchedulerConfig(
       val name: String,
       val port: Int = 8080,
-      val portalUri: String = "ws://localhost:9000",
+      val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",
       val listenerImage: String = "https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.6/dit4c-helper-listener-ngrok2-au.linux.amd64.aci")
 

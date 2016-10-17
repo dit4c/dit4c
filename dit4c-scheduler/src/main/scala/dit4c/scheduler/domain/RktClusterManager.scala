@@ -74,7 +74,7 @@ object RktClusterManager {
   case class StartingInstance(instanceId: InstanceId) extends Response
   case object UnableToStartInstance extends Response
   case object TerminatingInstance extends Response
-  case object UnknownInstance extends Response
+  case class UnknownInstance(instanceId: InstanceId) extends Response
   case class RktNodeAdded(nodeId: RktNodeId) extends Response
 
 }
@@ -141,7 +141,7 @@ class RktClusterManager(
             operationsAwaitingInstanceWorkers +=
               (instanceSchedulerRef -> PendingOperation(sender,op))
           } else {
-            sender ! UnknownInstance
+            sender ! UnknownInstance(instanceId)
           }
       }
     case TerminateInstance(instanceId) =>
@@ -152,7 +152,7 @@ class RktClusterManager(
           (ref ? Instance.Terminate)
             .collect { case Instance.Ack => TerminatingInstance }
             .pipeTo(sender)
-        case None => sender ! UnknownInstance
+        case None => sender ! UnknownInstance(instanceId)
       }
 
     case msg: RktInstanceScheduler.Response =>
@@ -185,7 +185,7 @@ class RktClusterManager(
                   InstancePersistenceId(instanceId))
               instance.tell(Instance.GetStatus, requester)
             case NoWorkersAvailable =>
-              requester ! UnknownInstance
+              requester ! UnknownInstance(instanceId)
           }
       }
       operationsAwaitingInstanceWorkers -= sender

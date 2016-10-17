@@ -100,13 +100,18 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
     extends Actor
     with ActorLogging {
 
+  var keepAlive: Option[Cancellable] = None
+
   override def preStart = {
-    implicit val ec = context.dispatcher
+    import context.dispatcher
+    keepAlive = Some(
+        context.system.scheduler.schedule(1.second, 20.seconds, self, Instant.now.toString))
     in ! SchedulerGatewayActor.Up(self)
   }
 
   override def postStop = {
     log.info("stopped")
+    keepAlive.foreach(_.cancel)
     in ! SchedulerGatewayActor.Done
     super.postStop
   }
@@ -116,12 +121,18 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
     case msg: TextMessage =>
       log.info(s"Text from scheduler: $msg")
     case msg: BinaryMessage =>
-      log.info(s"Binary msg of ${msg.data.length} bytes from scheduler")
-      // TODO: Implement
+      val parsedMsg = dit4c.protobuf.scheduler.outbound.OutboundMessage.parseFrom(msg.data.toArray)
+      log.info(s"Msg from scheduler: $parsedMsg")
+      in ! SchedulerAggregate.ReceiveSchedulerMessage(parsedMsg)
     // From portal
     case msg: String =>
       log.info(s"Sending text to client: $msg")
       out ! TextMessage(msg)
+    case msg: dit4c.protobuf.scheduler.inbound.InboundMessage =>
+      out ! BinaryMessage(ByteString(msg.toByteArray))
+    case unknown =>
+      log.error(s"Unhandled message: $unknown")
+      context.stop(self)
   }
 
 }

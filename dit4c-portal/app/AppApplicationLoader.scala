@@ -68,22 +68,30 @@ class AppComponents(context: Context)
   }
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
+
+  // ClusterSharder/AggregateManager setup and eventbus subscription
   val schedulerSharder = SchedulerSharder()(actorSystem)
       .taggedWith[services.SchedulerSharder.type]
-  val clusterAggregateManager = ClusterSharder(schedulerSharder)(actorSystem)
+  system.eventStream.subscribe(schedulerSharder, classOf[SchedulerSharder.Envelope])
+  val clusterSharder = ClusterSharder(schedulerSharder)(actorSystem)
       .taggedWith[services.ClusterSharder.type]
+  system.eventStream.subscribe(clusterSharder, classOf[ClusterSharder.Envelope])
   val instanceAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.InstanceAggregateManager], clusterAggregateManager),
+      Props(classOf[services.InstanceAggregateManager], clusterSharder),
       "instance-aggregate-manager")
       .taggedWith[services.InstanceAggregateManager]
+  system.eventStream.subscribe(instanceAggregateManager, classOf[InstanceAggregateManager.InstanceEnvelope])
   val userAggregateManager = actorSystem.actorOf(
       Props(classOf[services.UserAggregateManager], instanceAggregateManager),
       "user-aggregate-manager")
       .taggedWith[services.UserAggregateManager]
+  system.eventStream.subscribe(userAggregateManager, classOf[UserAggregateManager.UserEnvelope])
   val identityAggregateManager = actorSystem.actorOf(
       Props(classOf[services.IdentityAggregateManager], userAggregateManager),
       "identity-aggregate-manager")
       .taggedWith[services.IdentityAggregateManager]
+  system.eventStream.subscribe(identityAggregateManager, classOf[IdentityAggregateManager.IdentityEnvelope])
+
   lazy val identityService: services.IdentityService = wire[services.IdentityService]
   lazy val sessionAuthenticatorSettings = SessionAuthenticatorSettings()
   lazy val clock = Clock()

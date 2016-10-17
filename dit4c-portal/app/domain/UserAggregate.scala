@@ -24,7 +24,7 @@ object UserAggregate {
   case class Data(instances: SortedSet[String] = SortedSet.empty)
 
   sealed trait Command
-  case class StartInstance(clusterId: String, image: String, callback: Uri) extends Command {
+  case class StartInstance(clusterId: String, image: String) extends Command {
     def toIAMCommand: InstanceAggregateManager.Command =
       (InstanceAggregateManager.StartInstance.apply _)
         .tupled(StartInstance.unapply(this).get)
@@ -61,7 +61,7 @@ class UserAggregate(
   val http = Http(context.system)
 
   def receiveCommand: PartialFunction[Any,Unit] = {
-    case msg @ StartInstance(clusterId, image, callback) =>
+    case msg @ StartInstance(clusterId, image) =>
       val op = (instanceAggregateManager ? msg.toIAMCommand)
       op.onSuccess {
         case InstanceAggregateManager.InstanceStarted(instanceId) =>

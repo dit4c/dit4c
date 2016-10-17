@@ -29,7 +29,7 @@ object ClusterAggregate {
 
   sealed trait Command
   case class Create(schedulerId: String) extends Command
-  case class StartInstance(image: String, portal: Uri) extends Command
+  case class StartInstance(image: String) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class TerminateInstance(instanceId: String) extends Command
 
@@ -51,12 +51,12 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
   import akka.pattern.pipe
 
   lazy val clusterId = self.path.name
-  override lazy val persistenceId: String = "Scheduler-" + self.path.name
+  override lazy val persistenceId: String = "Cluster-" + self.path.name
 
   implicit val m: Materializer = ActorMaterializer()
   import context.dispatcher
 
-    startWith(Uninitialized, NoData)
+  startWith(Uninitialized, NoData)
 
   when(Uninitialized) {
     case Event(Create(schedulerId), _) =>
@@ -67,9 +67,9 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
   }
 
   when(Active) {
-    case Event(StartInstance(image, callback), ClusterInfo(schedulerId)) =>
+    case Event(StartInstance(image), ClusterInfo(schedulerId)) =>
       var instanceId = timePrefix+randomId(16)
-      schedulerSharder forward SchedulerMessage(schedulerId).startInstance(instanceId, image, callback)
+      schedulerSharder forward SchedulerMessage(schedulerId).startInstance(instanceId, image)
       stay replying AllocatedInstanceId(clusterId, instanceId)
     case Event(GetInstanceStatus(instanceId), ClusterInfo(schedulerId)) =>
       schedulerSharder forward SchedulerMessage(schedulerId).getInstanceStatus(instanceId)
@@ -94,10 +94,10 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
   case class SchedulerMessage(schedulerId: String) {
 
 
-    def startInstance(instanceId: String, image: String, portal: Uri): SchedulerSharder.Envelope = wrapForScheduler {
+    def startInstance(instanceId: String, image: String): SchedulerSharder.Envelope = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
       InboundMessage(randomMsgId, InboundMessage.Payload.StartInstance(
-        StartInstance(instanceId, image, portal.toString)
+        StartInstance(instanceId, clusterId, image)
       ))
     }
 
@@ -134,7 +134,7 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
   private lazy val randomId: (Int) => String = {
     val base32 = (Range.inclusive('a','z').map(_.toChar) ++ Range.inclusive(2,7).map(_.toString.charAt(0)))
     (length: Int) =>
-      Stream.continually(Random.nextInt(33)).map(base32).take(length).mkString
+      Stream.continually(Random.nextInt(32)).map(base32).take(length).mkString
   }
 
 

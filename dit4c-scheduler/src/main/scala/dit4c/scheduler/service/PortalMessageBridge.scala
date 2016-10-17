@@ -14,9 +14,12 @@ import scala.concurrent.Future
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.event.LoggingReceive
 import akka.http.scaladsl.model.Uri
+import dit4c.scheduler.domain.RktClusterManager
 import dit4c.scheduler.domain.Instance
 import java.time.Instant
 import scala.util.Random
+import dit4c.scheduler.domain.Instance.InstanceSigningKey
+import dit4c.scheduler.domain.Instance.RSAPublicKey
 
 object PortalMessageBridge {
   case object BridgeClosed
@@ -29,11 +32,16 @@ object PortalMessageBridge {
         toByteString(msg).foreach { bs =>
           import dit4c.protobuf.scheduler.inbound.InboundMessage
           import InboundMessage.Payload
-          InboundMessage.parseFrom(bs.toArray).payload match {
-            case Payload.Empty => // Do nothing
-            case Payload.StartInstance(value) => sendToParent(value)
-            case Payload.DiscardInstance(value) => sendToParent(value)
-            case Payload.SaveInstance(value) => sendToParent(value)
+          val parsedMsg = InboundMessage.parseFrom(bs.toArray).payload match {
+            case Payload.Empty => None // Do nothing
+            case Payload.RequestInstanceStateUpdate(value) => Some(value)
+            case Payload.StartInstance(value) => Some(value)
+            case Payload.DiscardInstance(value) => Some(value)
+            case Payload.SaveInstance(value) => Some(value)
+          }
+          parsedMsg.foreach { msg =>
+            log.debug(s"portal sent message: $msg")
+            sendToParent(msg)
           }
         }
       case msg: TextMessage =>
@@ -42,18 +50,21 @@ object PortalMessageBridge {
         msg.textStream.runForeach(addPrefix.andThen(log.info))
       case BridgeClosed =>
         log.debug("portal message bridge closed - sending to parent")
-        context.parent ! BridgeClosed
+        sendToParent(BridgeClosed)
       case akka.actor.Status.Failure(e) =>
         log.error(s"portal message bridge connection failed: $e")
-        context.parent ! BridgeClosed
+        sendToParent(BridgeClosed)
       case msg =>
         throw new Exception(s"Unknown message: $msg")
     }
 
     def sendToParent[M](msg: M) { context.parent ! msg }
 
-    def toByteString(binaryMessage: BinaryMessage): Future[ByteString] =
-        binaryMessage.dataStream.runReduce((m: ByteString, n: ByteString) => m ++ n)
+    def toByteString(binaryMessage: BinaryMessage): Future[ByteString] = binaryMessage match {
+      case BinaryMessage.Strict(bs) => Future.successful(bs)
+      case BinaryMessage.Streamed(dataStream) =>
+        dataStream.runReduce((m: ByteString, n: ByteString) => m ++ n)
+    }
   }
 }
 
@@ -74,7 +85,7 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     inbound = context.watch(context.actorOf(Props[PortalMessageBridge.UnmarshallingActor], "unmarshaller"))
     inboundSink = Sink.actorRef(inbound, PortalMessageBridge.BridgeClosed)
 
-    outboundSource = Source.actorRef(1, OverflowStrategy.fail)
+    outboundSource = Source.actorRef(16, OverflowStrategy.fail)
     def outboundActorRefExtractor(nu: NotUsed, ref: ActorRef) = ref
     outbound = Http()(context.system).singleWebSocketRequest(
         WebSocketRequest.fromTargetUri(websocketUrl),
@@ -83,8 +94,13 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     context.watch(outbound)
   }
 
-  val receive: Receive = {
+  val receive: Receive = LoggingReceive {
     // Inbound
+    case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
+      import dit4c.scheduler.domain._
+      import dit4c.scheduler.service._
+      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+          RktClusterManager.GetInstanceStatus(instanceId))
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
@@ -106,14 +122,30 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
         case Instance.Finished => pb.InstanceStateUpdate.InstanceState.EXITED
       }
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate.apply(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
+        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
+      data.signingKey.foreach {
+        case RSAPublicKey(key) =>
+          val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
+            pb.AllocatedInstanceKey(data.instanceId, Some(
+                pb.AllocatedInstanceKey.RSAPublicKey(
+                    com.google.protobuf.ByteString.copyFrom(key.getPublicExponent.toByteArray),
+                    com.google.protobuf.ByteString.copyFrom(key.getModulus.toByteArray))))))
+          outbound ! toBinaryMessage(msg.toByteArray)
+      }
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate.apply(data.instanceId, Some(pbTimestamp(Instant.now)),
+        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)),
             pb.InstanceStateUpdate.InstanceState.ERRORED, data.errors.mkString("\n\n"))
+      ))
+      outbound ! toBinaryMessage(msg.toByteArray)
+    case RktClusterManager.UnknownInstance(instanceId) =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
+        pb.InstanceStateUpdate(instanceId, Some(pbTimestamp(Instant.now)),
+            pb.InstanceStateUpdate.InstanceState.UNKNOWN, "")
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
     case PortalMessageBridge.BridgeClosed =>

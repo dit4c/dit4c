@@ -119,7 +119,9 @@ class Instance(worker: ActorRef)
   when(Starting) {
     case Event(AssociateSigningKey(key), _) =>
       log.info(s"Received signing key: $key")
-      stay.applying(AssociatedSigningKey(key))
+      stay.applying(AssociatedSigningKey(key)).andThen { data =>
+        context.system.eventStream.publish(StatusReport(stateName, data))
+      }
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
       goto(Running).applying(ConfirmedStart())

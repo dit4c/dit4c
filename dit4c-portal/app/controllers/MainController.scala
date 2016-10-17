@@ -90,8 +90,7 @@ class MainController(
           implicit val timeout = Timeout(1.minute)
           (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.StartInstance(
               clusterLookup(userData.cluster),
-              imageLookup(userData.image),
-              routes.MainController.index.absoluteURL.stripSuffix("/")))).map {
+              imageLookup(userData.image)))).map {
             case InstanceAggregateManager.InstanceStarted(id) =>
               Ok(id)
           }
@@ -271,8 +270,12 @@ class MainController(
     }
 
   private def effectiveState(state: String, url: Option[String]) = state match {
-    case "Running" if url.isDefined  => "Available"
-    case "Running" if url.isEmpty    => "Started"
+    case "CREATED" => "Waiting for Image"
+    case "PRESTART" => "Starting"
+    case "STARTED" if url.isDefined  => "Available"
+    case "STARTED" if url.isEmpty    => "Started"
+    case "EXITED" => "Stopped"
+    case "ERRORED" => "Errored"
     case _ => state
   }
 
