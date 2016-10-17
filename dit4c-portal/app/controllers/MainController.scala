@@ -25,6 +25,11 @@ import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
 import com.mohiva.play.silhouette.api.exceptions.ProviderException
 import play.api.Environment
 import play.api.Mode
+import com.mohiva.play.silhouette.api.HandlerResult
+import com.mohiva.play.silhouette.api.actions.SecuredRequest
+import play.api.libs.streams.ActorFlow
+import play.api.http.websocket.TextMessage
+import akka.stream.Materializer
 
 class MainController(
     val environment: Environment,
@@ -34,7 +39,7 @@ class MainController(
     val silhouette: Silhouette[DefaultEnv],
     val identityService: IdentityService,
     val oauthDataHandler: InstanceOAuthDataHandler,
-    val socialProviders: SocialProviderRegistry)
+    val socialProviders: SocialProviderRegistry)(implicit system: ActorSystem, materializer: Materializer)
     extends Controller
     with I18nSupport {
 
@@ -44,7 +49,7 @@ class MainController(
 
   val log = play.Logger.underlying
 
-  def index = silhouette.UserAwareAction { request =>
+  def index = silhouette.UserAwareAction { implicit request =>
     request.identity match {
       case Some(IdentityService.User(_, _)) =>
         Ok(views.html.index(imageLookup.keys.toList.sorted))
@@ -53,31 +58,17 @@ class MainController(
     }
   }
 
-  def getInstances = silhouette.SecuredAction.async { implicit request =>
-    implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetAllInstanceIds)).flatMap {
-      case UserAggregate.UserInstances(instanceIds) =>
-        val idSeq = instanceIds.toSeq
-        Future.sequence(idSeq.map { instanceId =>
-          (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(instanceId, InstanceAggregate.GetStatus))
-            .collect { case msg: InstanceAggregate.RemoteStatus => Some(msg) }
-            .recover { case _ => None }
-        }).map { instances =>
-          val instancesResponse = InstancesResponse(
-            idSeq.zip(instances).map {
-              case (id, Some(remoteState)) =>
-                val url: Option[String] =
-                  remoteState.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(id, effectiveState(remoteState.state, url), url)
-              case (id, None) =>
-                InstanceResponse(id, "Unknown", None)
-            })
-          Ok(Json.toJson(instancesResponse))
-        }.recover {
-          case e =>
-            log.error("Get instances failed", e)
-            InternalServerError
-        }
+  def getInstances = WebSocket { requestHeader =>
+    implicit val dummyRequest = Request(requestHeader, AnyContentAsEmpty)
+    silhouette.SecuredRequestHandler { securedRequest: SecuredRequest[DefaultEnv, AnyContent] =>
+      Future.successful(HandlerResult(Ok, Some(securedRequest.identity)))
+    }.map {
+      case HandlerResult(r, Some(user)) =>
+        import play.api.http.websocket._
+        Right(ActorFlow.actorRef[Message, Message] { out =>
+          Props(classOf[GetInstancesActor], out, user, userAggregateManager, instanceAggregateManager)
+        })
+      case HandlerResult(r, None) => Left(r)
     }
   }
 
@@ -230,8 +221,6 @@ class MainController(
 
   case class NewInstanceRequest(image: String, cluster: String)
   case class InstanceRegistrationRequest(uri: String)
-  case class InstancesResponse(instances: Seq[InstanceResponse])
-  case class InstanceResponse(id: String, state: String, url: Option[String])
 
   private val imageLookup = Map(
     "Base (Alpine)" -> "docker://dit4c/dit4c-container-base:alpine",
@@ -248,16 +237,6 @@ class MainController(
   implicit private val readsInstanceRegistration: Reads[InstanceRegistrationRequest] =
     (__ \ 'uri).read[String].map(InstanceRegistrationRequest(_))
 
-  implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
-      (__ \ 'id).write[String] and
-      (__ \ 'state).write[String] and
-      (__ \ 'url).writeNullable[String]
-    )(unlift(InstanceResponse.unapply))
-
-  implicit private val writesInstancesResponse: Writes[InstancesResponse] = (
-      (__ \ 'instances).write[Seq[InstanceResponse]]
-    ).contramap({ case InstancesResponse(instances) => instances })
-
   private def noneIfProd[A](v: A): Option[A] = environment.mode match {
     case Mode.Prod => None
     case _ => Some(v)
@@ -269,8 +248,64 @@ class MainController(
       case None => Redirect(routes.MainController.index)
     }
 
+}
+
+class GetInstancesActor(out: ActorRef,
+    user: IdentityService.User,
+    userAggregateManager: ActorRef @@ UserAggregateManager,
+    instanceAggregateManager: ActorRef @@ InstanceAggregateManager)
+    extends Actor
+    with ActorLogging {
+  import play.api.libs.json._
+  import play.api.libs.functional.syntax._
+
+  var pollFunc: Option[Cancellable] = None
+
+  override def preStart = {
+    import context.dispatcher
+    import akka.pattern.pipe
+    implicit val timeout = Timeout(1.minute)
+    pollFunc = Some(context.system.scheduler.schedule(Duration.Zero, 5.seconds) {
+      (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
+        case UserAggregate.UserInstances(instanceIds) =>
+          instanceIds.toSeq.foreach { id =>
+            (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(id, InstanceAggregate.GetStatus))
+              .collect { case msg: InstanceAggregate.RemoteStatus =>
+                val url: Option[String] =
+                  msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
+                InstanceResponse(id, effectiveState(msg.state, url), url)
+              }
+              .recover { case _ =>
+                InstanceResponse(id, "Unknown", None)
+              }
+              .pipeTo(self)
+          }
+      }
+    })
+  }
+
+  override def postStop = {
+    pollFunc.foreach(_.cancel)
+  }
+
+  override def receive = {
+    case r: InstanceResponse =>
+      out ! TextMessage(Json.asciiStringify(Json.toJson(r)))
+    case unknown =>
+      log.error(s"Unhandled message: $unknown")
+      context.stop(self)
+  }
+
+  case class InstanceResponse(id: String, state: String, url: Option[String])
+
+  implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'state).write[String] and
+      (__ \ 'url).writeNullable[String]
+    )(unlift(InstanceResponse.unapply))
+
   private def effectiveState(state: String, url: Option[String]) = state match {
-    case "CREATED" => "Waiting for Image"
+    case "CREATED" => "Waiting For Image"
     case "PRESTART" => "Starting"
     case "STARTED" if url.isDefined  => "Available"
     case "STARTED" if url.isEmpty    => "Started"

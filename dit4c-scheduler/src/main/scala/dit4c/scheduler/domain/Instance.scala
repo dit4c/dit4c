@@ -119,9 +119,7 @@ class Instance(worker: ActorRef)
   when(Starting) {
     case Event(AssociateSigningKey(key), _) =>
       log.info(s"Received signing key: $key")
-      stay.applying(AssociatedSigningKey(key)).andThen { data =>
-        context.system.eventStream.publish(StatusReport(stateName, data))
-      }
+      stay.applying(AssociatedSigningKey(key)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
       goto(Running).applying(ConfirmedStart())
@@ -158,6 +156,10 @@ class Instance(worker: ActorRef)
       goto(Errored).applying(ErrorOccurred(msg))
   }
 
+  onTransition {
+    case (from, to) => emitStatusReportToEventStream(to)(stateData)
+  }
+
   def applyEvent(
       domainEvent: DomainEvent,
       currentData: Data): Instance.Data = {
@@ -180,6 +182,9 @@ class Instance(worker: ActorRef)
 
   def domainEventClassTag: ClassTag[Instance.DomainEvent] =
     classTag[DomainEvent]
+
+  protected def emitStatusReportToEventStream(state: Instance.State)(data: Instance.Data): Unit =
+    context.system.eventStream.publish(StatusReport(state, data))
 
 
 }

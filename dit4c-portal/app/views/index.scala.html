@@ -1,4 +1,4 @@
-@(imageNames: Seq[String], pageTitle: String = "App Instances")
+@(imageNames: Seq[String], pageTitle: String = "App Instances")(implicit request: RequestHeader)
 
 <!DOCTYPE html>
 <html>
@@ -137,17 +137,10 @@ function hideNewInstanceDialog() {
   }
   </style>
   <template>
-    <iron-ajax
-      auto
-      id="ajax-get-instances"
-      url="@routes.MainController.getInstances"
-      handle-as="json"
-      last-response="{{instancesResponse}}"
-      debounce-duration="300"></iron-ajax>
     <div class="layout vertical" style="width: 100%">
       <div class="section-heading">Running Instances</div>
       <div class="card-container">
-        <template id="running-instances" is="dom-repeat" items="[[instancesResponse.instances]]" filter="isRunning" observe="state">
+        <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" observe="state">
           <paper-card>
             <div class="card-content">
               <div class="instance-id">
@@ -170,7 +163,7 @@ function hideNewInstanceDialog() {
       </div>
       <div class="section-heading">Previous Instances</div>
       <div class="card-container">
-        <template is="dom-repeat" items="[[instancesResponse.instances]]" filter="isPrevious" observe="state">
+        <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state">
           <paper-card>
             <div class="card-content">
               <div class="instance-id">{{item.id}}</div>
@@ -188,6 +181,16 @@ function hideNewInstanceDialog() {
   <script>
   Polymer({
     is: "instances-container",
+    socket: null,
+    properties: {
+      instances: {
+        type: Array,
+        value: []
+      },
+      url: {
+        type: String
+      }
+    },
     listeners: {
       'terminated': 'refresh',
     },
@@ -227,14 +230,30 @@ function hideNewInstanceDialog() {
       }
     },
     ready: function() {
-      this.polling();
+      this.connect();
     },
-    polling: function() {
-      this.refresh();
-      this.async(this.polling, 10000);
+    connect: function() {
+      this.socket = new WebSocket(this.url.replace(/^http/, 'ws'));
+      this.socket.onerror = this.onError.bind(this);
+      this.socket.onopen = this.onOpen.bind(this);
+      this.socket.onmessage = this.onMessage.bind(this);
     },
-    refresh: function() {
-      document.getElementById('ajax-get-instances').generateRequest();
+    onError: function (error) {
+      this.fire('onerror', error);
+    },
+    onOpen: function (event) {
+      this.fire('onopen');
+    },
+    onMessage: function (event) {
+      var instanceStatusUpdate = JSON.parse(event.data);
+      for (var i = 0; i < this.get('instances').length; i++) {
+        var item = this.get(['instances', i]);
+        if (instanceStatusUpdate.id == item.id) {
+          this.splice('instances', i, 1, instanceStatusUpdate);
+          return;
+        }
+      }
+      this.push('instances', instanceStatusUpdate);
     }
   });
   </script>
@@ -278,15 +297,9 @@ function hideNewInstanceDialog() {
         </paper-dropdown-menu>
         <paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
       </form>
-      <script>
-      document.getElementById("new-instance-form").addEventListener('iron-form-response', function(event) {
-        console.log(event);
-        document.getElementById('instances').refresh()
-      });
-      </script>
     </div>
     <div id="main-content">
-      <instances-container id="instances"></instances-container>
+      <instances-container id="instances" url="@routes.MainController.getInstances.absoluteURL"></instances-container>
     </div>
   </div>
 </app-header-layout>

@@ -132,6 +132,9 @@ class InstanceAggregate(
       }
     case Event(VerifyJwt(token), InstanceData(clusterId, None, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
+    case Event(AssociateRsaPublicKey(e, n), InstanceData(_, Some(RsaJwk(ce, cn)), _)) if e == ce && n == cn =>
+      // Same as current - no need to update
+      stay replying Ack
     case Event(AssociateRsaPublicKey(e, n), InstanceData(_, _, _)) =>
       val requester = sender
       stay applying AssociatedRsaPublicKey(e, n) andThen { _ =>
