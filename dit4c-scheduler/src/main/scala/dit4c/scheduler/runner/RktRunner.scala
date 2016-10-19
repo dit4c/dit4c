@@ -57,10 +57,8 @@ class RktRunnerImpl(
       }
       .map(_.trim)
 
-  def guessServicePort(image: ImageId): Future[Int] = {
-    privileged(rktCmd)
-      .flatMap { rktCmd => ce(rktCmd :+ "image" :+ "cat-manifest" :+ image) }
-      .map(Json.parse)
+  def guessServicePort(image: ImageId): Future[Int] =
+    getImageManifest(image)
       .map { json =>
         // Extract all registered TCP ports
         val possiblePorts: Seq[Int] =
@@ -70,7 +68,6 @@ class RktRunnerImpl(
         // Pick the lowest
         possiblePorts.min
       }
-  }
 
   def start(
       instanceId: String,
@@ -162,6 +159,12 @@ class RktRunnerImpl(
         }.toSet
       }
 
+  protected[runner] def getImageManifest(image: ImageId): Future[JsObject] =
+    privileged(rktCmd)
+      .flatMap { rktCmd => ce(rktCmd :+ "image" :+ "cat-manifest" :+ image) }
+      .map(Json.parse)
+      .map(_.as[JsObject])
+
   private def rktCmd = which("rkt").map(_ :+ s"--dir=${config.rktDir}")
 
   private def systemdRunCmd = which("systemd-run")
@@ -209,8 +212,8 @@ class RktRunnerImpl(
           "DIT4C_INSTANCE_OAUTH_AUTHORIZE_URL" -> Uri(portalUri).withPath(Uri.Path("/login/oauth/authorize")).toString,
           "DIT4C_INSTANCE_OAUTH_ACCESS_TOKEN_URL" -> Uri(portalUri).withPath(Uri.Path("/login/oauth/access_token")).toString
       )
-      _ <- vfm.writeFile("env.sh",
-          (helperEnvVars.map({case (k, v) => s"$k=$v"}).toSeq.sorted.mkString("\n")+"\n").getBytes)
+      authImageAppJson <- getImageAppConfig(authImageId).map(addExtraEnvVars(_, helperEnvVars))
+      listenerImageAppJson <- getImageAppConfig(listenerImageId).map(addExtraEnvVars(_, helperEnvVars))
       _ <- vfm.writeFile("pki/instance-key.pem", privateKey.pkcs1.pem.getBytes)
       manifest = Json.obj(
         "acVersion" -> "0.8.4",
@@ -224,11 +227,13 @@ class RktRunnerImpl(
             "name" -> "helper-listener",
             "image" -> Json.obj(
               "id" -> listenerImageId),
+            "app" -> listenerImageAppJson,
             "mounts" -> Json.arr(configMountJson)),
           Json.obj(
             "name" -> "helper-auth",
             "image" -> Json.obj(
               "id" -> authImageId),
+            "app" -> authImageAppJson,
             "mounts" -> Json.arr(configMountJson))
         ),
         "volumes" -> Json.arr(configVolumeJson))
@@ -283,6 +288,26 @@ class RktRunnerImpl(
     protected def resolve(filename: String): String =
       Paths.get(baseDir).resolve(filename.stripPrefix("/")).toAbsolutePath.toString
   }
+
+  private def addExtraEnvVars(appConfig: JsObject, extraEnvVars: Map[String, String]): JsObject = {
+    // Helper functions
+    def jsObj2Tuple(obj: JsObject): Option[(String, String)] =
+      for {
+        name <- (obj \ "name").asOpt[String]
+        value <- (obj \ "value").asOpt[String]
+      } yield (name, value)
+    def tuple2jsObj(p: (String, String)): JsObject =
+      Json.obj("name" -> p._1, "value" -> p._2)
+    // Replacement
+    val newEnvVars: Map[String, String] = (appConfig \ "environment").asOpt[Seq[JsObject]]
+      .map(_.flatMap(jsObj2Tuple).toMap ++ extraEnvVars)
+      .getOrElse(extraEnvVars)
+    appConfig + ("environment", JsArray(newEnvVars.map(tuple2jsObj).toSeq))
+  }
+
+  private def getImageAppConfig(image: ImageId): Future[JsObject] =
+    getImageManifest(image)
+      .map(v => (v \ "app").as[JsObject])
 
   private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
 
