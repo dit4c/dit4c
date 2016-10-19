@@ -35,7 +35,7 @@ trait RktRunner {
       image: ImageId,
       portalUri: String): Future[RSAPublicKey]
   def stop(instanceId: String): Future[Unit]
-  def export(instanceId: String): Future[String]
+  def export(instanceId: String): Future[Unit]
 
 }
 
@@ -102,7 +102,7 @@ class RktRunnerImpl(
       }
       .map { _ => () }
 
-  def export(instanceId: String): Future[String] =
+  def export(instanceId: String): Future[Unit] =
     listRktPods
       .map { pods =>
         pods.find { p =>
@@ -119,14 +119,13 @@ class RktRunnerImpl(
           aciTmpName = Random.alphanumeric.take(40).mkString + ".aci"
           aciName = podAppName(instanceId) + ".aci"
           aciTmpPath <- vfm.absolutePath(aciTmpName)
-          aciPath <-
+          done <-
             privileged(rktCmd)
               .flatMap { rktCmd =>
                 ce(rktCmd :+ "export" :+ "--app" :+ podAppName(instanceId) :+ pod.uuid :+ aciTmpPath)
               }
               .flatMap { _ => vfm.moveFile(aciTmpName, aciName) }
-              .flatMap { _ => vfm.absolutePath(aciName) }
-        } yield aciPath
+        } yield done
       }
 
   protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
@@ -263,7 +262,7 @@ class RktRunnerImpl(
 
   private class VolumeFileManager(val baseDir: String) {
     def writeFile(filename: String, content: Array[Byte]): Future[String] = {
-      val f = Paths.get(baseDir).resolve(filename.stripPrefix("/"))
+      val f = resolve(filename)
       ce(Seq("sh", "-c", Seq(
             s"mkdir -p $$(dirname $f)",
             s"cat > $f",
@@ -271,14 +270,18 @@ class RktRunnerImpl(
             s"echo $f").mkString(" && ")), new ByteArrayInputStream(content))
     }
 
-    def absolutePath(filename: String): Future[String] = ce(Seq("readlink", "-f", filename)).map(_.trim)
+    def absolutePath(filename: String): Future[String] =
+      ce(Seq("readlink", "-f", resolve(filename))).map(_.trim)
 
     def moveFile(from: String, to: String): Future[Unit] = {
       ce(Seq("sh", "-c", Seq(
-            s"mkdir -p $$(dirname $from)",
-            s"mkdir -p $$(dirname $to)",
-            s"mv $from $to").mkString(" && "))).map(_ => ())
+            s"mkdir -p $$(dirname ${resolve(from)})",
+            s"mkdir -p $$(dirname ${resolve(to)})",
+            s"mv ${resolve(from)} ${resolve(to)}").mkString(" && "))).map(_ => ())
     }
+
+    protected def resolve(filename: String): String =
+      Paths.get(baseDir).resolve(filename.stripPrefix("/")).toAbsolutePath.toString
   }
 
   private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"

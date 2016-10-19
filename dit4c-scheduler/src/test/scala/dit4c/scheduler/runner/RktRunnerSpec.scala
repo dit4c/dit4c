@@ -426,10 +426,10 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
               )
             }.awaitFor(1.minutes)
           } and {
-            val exportedAciPath = Await.result(runner.export(instanceId), 1.minute)
-            commandExecutor(Seq("du", "-b", exportedAciPath)).map(_.takeWhile(_.isDigit).toInt) must {
-              not(throwA[Exception]) and
-              beGreaterThan(1024)
+            val c = runner.config
+            Await.result(runner.export(instanceId), 1.minute)
+            commandExecutor(Seq("ls", s"${c.rktDir}/dit4c-volumes/images/$instanceId/")) must {
+              contain(s"${c.instanceNamePrefix}-$instanceId.aci")
             }.awaitFor(1.minutes)
           }
         } finally {
