@@ -15,7 +15,8 @@ message DiscardInstance {
 message SaveInstance {
   string instanceId = 1;
   string clusterId = 2;
-  string imageServer = 3;
+  string saveHelperImageUrl = 3;
+  string imageServer = 4;
 }
 
 message RequestInstanceStateUpdate {
