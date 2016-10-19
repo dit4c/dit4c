@@ -35,6 +35,7 @@ trait RktRunner {
       image: ImageId,
       portalUri: String): Future[RSAPublicKey]
   def stop(instanceId: String): Future[Unit]
+  def export(instanceId: String): Future[String]
 
 }
 
@@ -83,7 +84,7 @@ class RktRunnerImpl(
         rkt <- rktCmd
         output <- ce(
             systemdRun ++
-            Seq(s"--unit=${config.instanceNamePrefix}-${instanceId}.service") ++
+            Seq(s"--unit=${podAppName(instanceId)}.service") ++
             rkt ++
             Seq("run", "--net=default", "--dns=8.8.8.8") ++
             Seq(s"--pod-manifest=$manifestFile")
@@ -97,9 +98,36 @@ class RktRunnerImpl(
       .flatMap { systemctl =>
         ce(
           systemctl :+ "stop" :+
-          s"${config.instanceNamePrefix}-${instanceId}.service")
+          s"${podAppName(instanceId)}.service")
       }
       .map { _ => () }
+
+  def export(instanceId: String): Future[String] =
+    listRktPods
+      .map { pods =>
+        pods.find { p =>
+          p.apps.contains(podAppName(instanceId)) &&
+          p.state == RktPod.States.Exited
+        }
+      }
+      .collect {
+        case Some(pod) => pod
+      }
+      .flatMap { pod =>
+        for {
+          vfm <- imageVolumeFileManager(instanceId)
+          aciTmpName = Random.alphanumeric.take(40).mkString + ".aci"
+          aciName = podAppName(instanceId) + ".aci"
+          aciTmpPath <- vfm.absolutePath(aciTmpName)
+          aciPath <-
+            privileged(rktCmd)
+              .flatMap { rktCmd =>
+                ce(rktCmd :+ "export" :+ "--app" :+ podAppName(instanceId) :+ pod.uuid :+ aciTmpPath)
+              }
+              .flatMap { _ => vfm.moveFile(aciTmpName, aciName) }
+              .flatMap { _ => vfm.absolutePath(aciName) }
+        } yield aciPath
+      }
 
   protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
     systemctlCmd
@@ -190,7 +218,7 @@ class RktRunnerImpl(
         "acKind" -> "PodManifest",
         "apps" -> Json.arr(
           Json.obj(
-            "name" -> s"${config.instanceNamePrefix}-${instanceId}",
+            "name" -> podAppName(instanceId),
             "image" -> Json.obj(
               "id" -> image)),
           Json.obj(
@@ -218,7 +246,15 @@ class RktRunnerImpl(
             "echo $DIR").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
 
   private def instanceVolumeFileManager(instanceId: String): Future[VolumeFileManager] = {
-    val dir = s"${config.rktDir}/dit4c-volumes/instance/$instanceId"
+    val dir = s"${config.rktDir}/dit4c-volumes/instances/$instanceId"
+    ce(Seq("sh", "-c", Seq(
+            s"mkdir -p $dir",
+            s"chmod o=rx $dir",
+            s"echo $dir").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+  }
+
+  private def imageVolumeFileManager(instanceId: String): Future[VolumeFileManager] = {
+    val dir = s"${config.rktDir}/dit4c-volumes/images/$instanceId"
     ce(Seq("sh", "-c", Seq(
             s"mkdir -p $dir",
             s"chmod o=rx $dir",
@@ -234,7 +270,18 @@ class RktRunnerImpl(
             s"test -f $f",
             s"echo $f").mkString(" && ")), new ByteArrayInputStream(content))
     }
+
+    def absolutePath(filename: String): Future[String] = ce(Seq("readlink", "-f", filename)).map(_.trim)
+
+    def moveFile(from: String, to: String): Future[Unit] = {
+      ce(Seq("sh", "-c", Seq(
+            s"mkdir -p $$(dirname $from)",
+            s"mkdir -p $$(dirname $to)",
+            s"mv $from $to").mkString(" && "))).map(_ => ())
+    }
   }
+
+  private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
 
   private def newKeyPair: (RSAPrivateKey, RSAPublicKey) = {
     val kpg = KeyPairGenerator.getInstance("RSA")

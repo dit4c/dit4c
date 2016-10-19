@@ -425,6 +425,12 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                   .state(be(RktPod.States.Exited))
               )
             }.awaitFor(1.minutes)
+          } and {
+            val exportedAciPath = Await.result(runner.export(instanceId), 1.minute)
+            commandExecutor(Seq("du", "-b", exportedAciPath)).map(_.takeWhile(_.isDigit).toInt) must {
+              not(throwA[Exception]) and
+              beGreaterThan(1024)
+            }.awaitFor(1.minutes)
           }
         } finally {
           serverBinding.unbind

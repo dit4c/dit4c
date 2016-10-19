@@ -119,6 +119,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   callbackUrl: String): Future[RSAPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
+              override def export(instanceId: String): Future[String] = ???
             }
 
         val manager =
@@ -177,6 +178,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   callbackUrl: String): Future[RSAPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
+              override def export(instanceId: String): Future[String] = ???
             }
 
         def createManager =
@@ -243,6 +245,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
+              override def export(instanceId: String): Future[String] = ???
             }
 
         val manager =
@@ -303,6 +306,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           image: String,
           callbackUrl: String): Future[RSAPublicKey] = ???
       override def stop(instanceId: String): Future[Unit] = ???
+      override def export(instanceId: String): Future[String] = ???
     }
 
   def mockFetchSshHostKey(
