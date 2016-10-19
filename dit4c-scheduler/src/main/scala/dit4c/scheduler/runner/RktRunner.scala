@@ -162,7 +162,7 @@ class RktRunnerImpl(
       servicePort <- guessServicePort(image)
       (privateKey, publicKey) = newKeyPair
       instanceKeyInternalPath = "/dit4c/pki/instance-key.pem"
-      vfm <- tempVolumeFileManager(s"instance-$instanceId")
+      vfm <- instanceVolumeFileManager(instanceId)
       configMountJson = Json.obj(
           "volume" -> "dit4c-instance-config",
           "path" -> "/dit4c")
@@ -216,6 +216,14 @@ class RktRunnerImpl(
             s"DIR=$$(mktemp -d --tmpdir $dirPrefix-XXXX)",
             "chmod o=rx $DIR",
             "echo $DIR").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+
+  private def instanceVolumeFileManager(instanceId: String): Future[VolumeFileManager] = {
+    val dir = s"${config.rktDir}/dit4c-volumes/instance/$instanceId"
+    ce(Seq("sh", "-c", Seq(
+            s"mkdir -p $dir",
+            s"chmod o=rx $dir",
+            s"echo $dir").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+  }
 
   private class VolumeFileManager(val baseDir: String) {
     def writeFile(filename: String, content: Array[Byte]): Future[String] = {
