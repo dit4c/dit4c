@@ -8,13 +8,18 @@ import java.security.MessageDigest
 import java.security.PublicKey
 import java.security.PrivateKey
 import org.bouncycastle.bcpg._
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openpgp._
 import org.bouncycastle.openpgp.operator.jcajce._
 import java.security.KeyPair
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
+import java.util.Date
+import java.security.Security
 
 object KeyHelpers {
+  // Necessary because of the way BouncyCastle specifies message digests
+  Security.addProvider(new BouncyCastleProvider());
 
   object KeyPairGenerators {
     object RSA {
@@ -115,7 +120,7 @@ object KeyHelpers {
     def openpgp(identity: String): PGPSecretKey = {
       val pair = new KeyPair(publicKey, privateKey)
       val sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA512)
-      val keyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, ???)
+      val keyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
       val secretKey = new PGPSecretKey(
           PGPSignature.DEFAULT_CERTIFICATION,
           keyPair, identity, sha1Calc, null, null,
@@ -133,7 +138,11 @@ object KeyHelpers {
   trait OpenPgpKey extends KeyFormat {
     def binary: Array[Byte] = captureOutputStream(encodeToStream)
 
-    def armoured: Array[Byte] = captureOutputStream(os => encodeToStream(new ArmoredOutputStream(os)))
+    def armoured: Array[Byte] = captureOutputStream { os =>
+      val aos = new ArmoredOutputStream(os)
+      encodeToStream(aos)
+      aos.close
+    }
 
     override def raw = binary
 
@@ -142,6 +151,7 @@ object KeyHelpers {
     private def captureOutputStream(f: OutputStream => Unit): Array[Byte] = {
       val out = new ByteArrayOutputStream()
       f(out)
+      out.close
       out.toByteArray
     }
   }
