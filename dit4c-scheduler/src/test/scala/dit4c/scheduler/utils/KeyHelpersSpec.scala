@@ -11,6 +11,11 @@ import org.scalacheck.Arbitrary
 import dit4c.scheduler.ScalaCheckHelpers
 import org.specs2.scalacheck.Parameters
 import org.specs2.matcher.Matcher
+import java.io.ByteArrayInputStream
+import org.bouncycastle.openpgp._
+import org.bouncycastle.openpgp.operator.jcajce._
+import org.bouncycastle.openpgp.operator.bc._
+import org.bouncycastle.bcpg._
 
 class KeyHelpersSpec extends Specification with ScalaCheck with ScalaCheckHelpers with AllExpectations {
 
@@ -41,13 +46,39 @@ class KeyHelpersSpec extends Specification with ScalaCheck with ScalaCheckHelper
     // We never want an empty string for these checks
     implicit val arbString = Arbitrary(genNonEmptyString)
 
-    "produce OpenPGP armoured secret keys" ! prop { (kp: RSAKeyTuple, identity: String) =>
-      val outputKey = kp.openpgp(identity).`private`.armoured
+    "produce OpenPGP armoured secret keys" ! prop { (kp: RSAKeyTuple, identity: String, passphrase: Option[String]) =>
+      val pgpKey = kp.openpgp(identity, passphrase)
+      val outputKey = pgpKey.`private`.armoured
       val outputKeyStr = new String(outputKey, "utf8")
-      val lines = outputKeyStr.lines.toSeq
-      lines must
-        haveFirstLine("-----BEGIN PGP PRIVATE KEY BLOCK-----") and
-        haveLastLine("-----END PGP PRIVATE KEY BLOCK-----")
+      val lines = outputKeyStr.lines.toSeq;
+      {
+        lines must
+          haveFirstLine("-----BEGIN PGP PRIVATE KEY BLOCK-----") and
+          haveLastLine("-----END PGP PRIVATE KEY BLOCK-----")
+      } and {
+        import scala.collection.JavaConversions._
+        val secretKeyCollection = new PGPSecretKeyRingCollection(
+            PGPUtil.getDecoderStream(new ByteArrayInputStream(outputKey)), new JcaKeyFingerprintCalculator())
+        secretKeyCollection.getKeyRings.next.getSecretKey must beLike { case sk =>
+          val privateKey = sk.extractPrivateKey(passphrase match {
+            case None => null
+            case Some(passphrase) =>
+              new BcPBESecretKeyDecryptorBuilder(new BcPGPDigestCalculatorProvider()).build(passphrase.toCharArray)
+          })
+          (sk.getKeyID must be_==(pgpKey.getKeyID)) and
+          (sk.getUserIDs.next must be_==(identity)) and
+          (privateKey.getPrivateKeyDataPacket must beLike {
+            case k: RSASecretBCPGKey =>
+              (k.getModulus must_== kp._1.getModulus) and
+              (k.getPrivateExponent must_== kp._1.getPrivateExponent)
+          }) and
+          (privateKey.getPublicKeyPacket.getKey must beLike {
+            case k: RSAPublicBCPGKey =>
+              (k.getModulus must_== kp._2.getModulus) and
+              (k.getPublicExponent must_== kp._2.getPublicExponent)
+          })
+        }
+      }
     }
   }
 

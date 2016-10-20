@@ -117,17 +117,26 @@ object KeyHelpers {
   implicit class RSAKeyPairHelper(pair: (RSAPrivateKey, RSAPublicKey)) {
     def privateKey = pair._1
     def publicKey = pair._2
-    def openpgp(identity: String): PGPSecretKey = {
+    def openpgp(identity: String, passphrase: Option[String] = None): PGPSecretKey = {
       val pair = new KeyPair(publicKey, privateKey)
-      val sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA512)
+      val sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1)
+      val sha512Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA512)
       val keyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
+      val secretKeyEncryptor =
+        passphrase
+            .map { p =>
+              new JcePBESecretKeyEncryptorBuilder(
+                  SymmetricKeyAlgorithmTags.AES_256,
+                  sha512Calc).setProvider("BC").build(p.toArray)
+            }
+            .getOrElse(null)
       val secretKey = new PGPSecretKey(
           PGPSignature.DEFAULT_CERTIFICATION,
           keyPair, identity, sha1Calc, null, null,
           new JcaPGPContentSignerBuilder(
               keyPair.getPublicKey().getAlgorithm(),
               HashAlgorithmTags.SHA512),
-          null)
+          secretKeyEncryptor)
       secretKey
     }
   }
