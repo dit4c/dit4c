@@ -125,6 +125,67 @@ class RktRunnerImpl(
         } yield done
       }
 
+
+  def uploadImage(
+      instanceId: String,
+      helperImage: String,
+      imageServer: String,
+      portalUri: String): Future[Unit] =
+    for {
+      helperImageId <- fetch(helperImage)
+      instanceKeysInternalPath = "/dit4c/instance/pki"
+      helperEnvVars = Map[String,String](
+        "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pem",
+        "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP" -> s"${instanceKeysInternalPath}/instance-key.openpgp.asc",
+        "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
+        "DIT4C_INSTANCE_JWT_KID" -> instanceId
+      )
+      helperAppConfigJson <- getImageAppConfig(helperImageId).map(addExtraEnvVars(_, helperEnvVars))
+      instanceConfigDir <- imageVolumeFileManager(instanceId).map(_.baseDir)
+      imageDir <- imageVolumeFileManager(instanceId).map(_.baseDir)
+      manifest = Json.obj(
+        "acVersion" -> "0.8.4",
+        "acKind" -> "PodManifest",
+        "apps" -> Json.arr(
+          Json.obj(
+            "name" -> s"upload-$instanceId",
+            "image" -> Json.obj("id" -> helperImageId),
+            "app" -> helperAppConfigJson,
+            "mounts" -> Json.arr(
+              Json.obj(
+                "volume" -> "dit4c-instance-config",
+                "path" -> "/dit4c/instance"),
+              Json.obj(
+                "volume" -> "dit4c-image-dir",
+                "path" -> "/dit4c/image")
+            )
+          )
+        ),
+        "volumes" -> Json.arr(
+          Json.obj(
+            "name" -> "dit4c-instance-config",
+            "kind" -> "host",
+            "readOnly" -> true,
+            "source" -> instanceConfigDir),
+          Json.obj(
+            "name" -> "dit4c-image-dir",
+            "kind" -> "host",
+            "readOnly" -> true,
+            "source" -> imageDir))
+      )
+      systemdRun <- privileged(systemdRunCmd)
+      rkt <- rktCmd
+      manifestFile <- tempVolumeFileManager(s"manifest-upload-$instanceId").flatMap(vfm =>
+        vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
+      output <- ce(
+          systemdRun ++
+          Seq(s"--unit=upload-${instanceId}.service") ++
+          rkt ++
+          Seq("run", "--net=default", "--dns=8.8.8.8") ++
+          Seq(s"--pod-manifest=$manifestFile")
+      )
+    } yield ()
+
   protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
     systemctlCmd
       .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"${config.instanceNamePrefix}*") }
@@ -215,6 +276,8 @@ class RktRunnerImpl(
       authImageAppJson <- getImageAppConfig(authImageId).map(addExtraEnvVars(_, helperEnvVars))
       listenerImageAppJson <- getImageAppConfig(listenerImageId).map(addExtraEnvVars(_, helperEnvVars))
       _ <- vfm.writeFile("pki/instance-key.pem", privateKey.pkcs1.pem.getBytes)
+      _ <- vfm.writeFile("pki/instance-key.openpgp.asc",
+          (privateKey, publicKey).openpgp(s"DIT4C Instance $instanceId").`private`.armoured)
       manifest = Json.obj(
         "acVersion" -> "0.8.4",
         "acKind" -> "PodManifest",
@@ -237,9 +300,8 @@ class RktRunnerImpl(
             "mounts" -> Json.arr(configMountJson))
         ),
         "volumes" -> Json.arr(configVolumeJson))
-      output <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
+      filepath <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
         vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
-      filepath = output.trim
     } yield (filepath, publicKey)
   }
 
@@ -272,7 +334,7 @@ class RktRunnerImpl(
             s"mkdir -p $$(dirname $f)",
             s"cat > $f",
             s"test -f $f",
-            s"echo $f").mkString(" && ")), new ByteArrayInputStream(content))
+            s"echo $f").mkString(" && ")), new ByteArrayInputStream(content)).map(_.trim)
     }
 
     def absolutePath(filename: String): Future[String] =

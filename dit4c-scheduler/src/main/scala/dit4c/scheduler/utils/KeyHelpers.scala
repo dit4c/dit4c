@@ -7,6 +7,12 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import java.security.MessageDigest
 import java.security.PublicKey
 import java.security.PrivateKey
+import org.bouncycastle.bcpg._
+import org.bouncycastle.openpgp._
+import org.bouncycastle.openpgp.operator.jcajce._
+import java.security.KeyPair
+import java.io.OutputStream
+import java.io.ByteArrayOutputStream
 
 object KeyHelpers {
 
@@ -100,6 +106,52 @@ object KeyHelpers {
     def pkcs1: DerEncoded with PemEncodable = new DerEncoded with PemEncodable {
       def raw = PrivateKeyInfo.getInstance(pkcs8.der).parsePrivateKey.toASN1Primitive.getEncoded
       override def pemName = "RSA PRIVATE KEY"
+    }
+  }
+
+  implicit class RSAKeyPairHelper(pair: (RSAPrivateKey, RSAPublicKey)) {
+    def privateKey = pair._1
+    def publicKey = pair._2
+    def openpgp(identity: String): PGPSecretKey = {
+      val pair = new KeyPair(publicKey, privateKey)
+      val sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA512)
+      val keyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, ???)
+      val secretKey = new PGPSecretKey(
+          PGPSignature.DEFAULT_CERTIFICATION,
+          keyPair, identity, sha1Calc, null, null,
+          new JcaPGPContentSignerBuilder(
+              keyPair.getPublicKey().getAlgorithm(),
+              HashAlgorithmTags.SHA512),
+          null)
+      secretKey
+    }
+  }
+
+  /**
+   * Key where raw format is DER-encoded
+   */
+  trait OpenPgpKey extends KeyFormat {
+    def binary: Array[Byte] = captureOutputStream(encodeToStream)
+
+    def armoured: Array[Byte] = captureOutputStream(os => encodeToStream(new ArmoredOutputStream(os)))
+
+    override def raw = binary
+
+    protected def encodeToStream(os: OutputStream): Unit
+
+    private def captureOutputStream(f: OutputStream => Unit): Array[Byte] = {
+      val out = new ByteArrayOutputStream()
+      f(out)
+      out.toByteArray
+    }
+  }
+
+  implicit class PGPSecretKeyHelper(secretKey: PGPSecretKey) {
+    def `private` = new OpenPgpKey {
+      override def encodeToStream(os: OutputStream) = secretKey.encode(os)
+    }
+    def public = new OpenPgpKey {
+      override def encodeToStream(os: OutputStream) = secretKey.getPublicKey.encode(os)
     }
   }
 
