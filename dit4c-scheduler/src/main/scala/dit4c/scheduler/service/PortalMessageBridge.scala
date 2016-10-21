@@ -106,6 +106,12 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, Instance.NamedImage(imageUrl), portalUri))
+    case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
+      import dit4c.scheduler.domain._
+      import dit4c.scheduler.service._
+      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+          RktClusterManager.InstanceEnvelope(instanceId,
+              Instance.Save(Instance.NamedImage(saveHelperImageUrl), imageServer)))
     case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
