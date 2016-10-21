@@ -84,7 +84,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         newWithProbes { (wsProbe: WSProbe, parentProbe: TestProbe, msgBridge: ActorRef) =>
           wsProbe.sendMessage(ByteString(msg.toByteArray))
           parentProbe.expectMsgPF(5.seconds) {
-            case cam.ClusterCommand(clusterId, ram.TerminateInstance(instanceId)) =>
+            case cam.ClusterCommand(clusterId, ram.InstanceEnvelope(instanceId, Instance.Discard)) =>
               // Success
               done
           }
@@ -112,7 +112,22 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
           Instance.StatusReport(Instance.Stopping, Instance.StartData(
             instanceId, Instance.NamedImage(imageUrl.toString),
             Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
-          Instance.StatusReport(Instance.Finished, Instance.StartData(
+          Instance.StatusReport(Instance.Exited, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Saving, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Saved, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Uploading, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Uploaded, Instance.StartData(
+            instanceId, Instance.NamedImage(imageUrl.toString),
+            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+          Instance.StatusReport(Instance.Discarded, Instance.StartData(
             instanceId, Instance.NamedImage(imageUrl.toString),
             Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Errored, Instance.ErrorData(

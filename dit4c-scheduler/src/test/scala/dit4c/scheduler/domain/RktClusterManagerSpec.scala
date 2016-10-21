@@ -116,10 +116,14 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  callbackUrl: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[RSAPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
+              override def uploadImage(instanceId: String,
+                  helperImage: String,
+                  imageServer: String,
+                  portalUri: String): Future[Unit] = ???
             }
 
         val manager =
@@ -175,10 +179,14 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  callbackUrl: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[RSAPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
+              override def uploadImage(instanceId: String,
+                  helperImage: String,
+                  imageServer: String,
+                  portalUri: String): Future[Unit] = ???
             }
 
         def createManager =
@@ -226,11 +234,11 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "TerminateInstance" >> {
-      "terminates an instance" >> {
+    "SaveInstance" >> {
+      "saves an instance" >> {
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system =
-          ActorSystem(s"RktClusterManager-TerminateInstance")
+          ActorSystem(s"RktClusterManager-SaveInstance")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
         val resolvedPublicKey = randomPublicKey
         val runnerFactory =
@@ -241,11 +249,15 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  callbackUrl: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[RSAPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
-              override def export(instanceId: String) = ???
+              override def export(instanceId: String) = Future.successful(())
+              override def uploadImage(instanceId: String,
+                  helperImage: String,
+                  imageServer: String,
+                  portalUri: String): Future[Unit] = Future.successful(())
             }
 
         val manager =
@@ -274,16 +286,82 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val instanceStatus = probe.expectMsgType[Instance.StatusReport]
           instanceStatus.state
         }).filter(_ == Instance.Running).head
-        // Now terminate the instance
-        probe.send(manager, TerminateInstance(response.instanceId))
-        probe.expectMsgType[RktClusterManager.TerminatingInstance.type]
-        // Poll 10 times, 100ms apart to check if we've terminated
+        // Now save the instance
+        val testSaveHelperImage = Instance.NamedImage("docker://busybox")
+        probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Save(testSaveHelperImage, "")))
+        probe.expectMsgType[Instance.Ack.type]
+        // Poll 10 times, 100ms apart to check if we've discarded the instance
         Stream.fill(10)({
           Thread.sleep(100)
           probe.send(manager, GetInstanceStatus(response.instanceId))
           val instanceStatus = probe.expectMsgType[Instance.StatusReport]
           instanceStatus.state
-        }).filter(_ == Instance.Finished).headOption must beSome
+        }).filter(_ == Instance.Uploaded).headOption must beSome
+      }
+    }
+
+    "DiscardInstance" >> {
+      "discards an instance" >> {
+        val managerPersistenceId = "Cluster-test-rkt"
+        implicit val system =
+          ActorSystem(s"RktClusterManager-DiscardInstance")
+        val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
+        val resolvedPublicKey = randomPublicKey
+        val runnerFactory =
+          (_: RktNode.ServerConnectionDetails, _: String) =>
+            new RktRunner {
+              override def fetch(imageName: String): Future[String] =
+                Future.successful(resolvedImageId)
+              override def start(
+                  instanceId: String,
+                  image: String,
+                  portalUri: String): Future[RSAPublicKey] =
+                Future.successful(resolvedPublicKey)
+              override def stop(instanceId: String): Future[Unit] =
+                Future.successful(())
+              override def export(instanceId: String) = ???
+              override def uploadImage(instanceId: String,
+                  helperImage: String,
+                  imageServer: String,
+                  portalUri: String): Future[Unit] = ???
+            }
+
+        val manager =
+            system.actorOf(
+                RktClusterManager.props(runnerFactory,
+                    mockFetchSshHostKey(randomPublicKey)),
+                managerPersistenceId)
+        // Create some nodes
+        val nodeIds = 1.to(3).map { i =>
+          val probe = TestProbe()
+          probe.send(manager, AddRktNode(
+              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          probe.send(manager, ConfirmRktNodeKeys(nodeId))
+          probe.expectMsgType[RktNode.NodeConfig]
+          nodeId
+        }
+        // Schedule an instance
+        val probe = TestProbe()
+        val testImage = NamedImage("docker://dit4c/gotty:latest")
+        val testCallback = "http://example.test/"
+        probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        Stream.continually({
+          probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          instanceStatus.state
+        }).filter(_ == Instance.Running).head
+        // Now discard the instance
+        probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Discard))
+        probe.expectMsgType[Instance.Ack.type]
+        // Poll 10 times, 100ms apart to check if we've discarded the instance
+        Stream.fill(10)({
+          Thread.sleep(100)
+          probe.send(manager, GetInstanceStatus(response.instanceId))
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          instanceStatus.state
+        }).filter(_ == Instance.Discarded).headOption must beSome
       }
     }
 
@@ -304,9 +382,13 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       override def start(
           instanceId: String,
           image: String,
-          callbackUrl: String): Future[RSAPublicKey] = ???
+          portalUri: String): Future[RSAPublicKey] = ???
       override def stop(instanceId: String): Future[Unit] = ???
       override def export(instanceId: String) = ???
+      def uploadImage(instanceId: String,
+          helperImage: String,
+          imageServer: String,
+          portalUri: String): Future[Unit] = ???
     }
 
   def mockFetchSshHostKey(

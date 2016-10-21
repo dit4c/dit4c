@@ -12,6 +12,10 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
   import context.dispatcher
 
   override val receive: Receive = {
+    case command: Command => receiveCmd(command)
+  }
+
+  protected def receiveCmd(command: Command): Unit = command match {
     case Fetch(image: Instance.NamedImage) =>
       val instance = sender
       runner.fetch(image.name).andThen {
@@ -29,13 +33,32 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to start image", instance, e)
       }
-    case Terminate(instanceId) =>
+    case Stop(instanceId) =>
       val instance = sender
       runner.stop(instanceId).andThen {
         case Success(imageId) =>
-          instance ! Instance.ConfirmTerminated
+          instance ! Instance.ConfirmExited
         case Failure(e) =>
           replyWithError("Unable to terminate image", instance, e)
+      }
+    case Discard(instanceId) =>
+      // TODO: Actually clean up instance
+      sender ! Instance.ConfirmDiscard
+    case Save(instanceId) =>
+      val instance = sender
+      runner.export(instanceId).andThen {
+        case Success(_) =>
+          instance ! Instance.ConfirmSaved
+        case Failure(e) =>
+          replyWithError("Unable to save image", instance, e)
+      }
+    case Upload(instanceId, helperImage, imageServer, portalUri) =>
+      val instance = sender
+      runner.uploadImage(instanceId, helperImage.name, imageServer, portalUri).andThen {
+        case Success(imageId) =>
+          instance ! Instance.ConfirmUpload
+        case Failure(e) =>
+          replyWithError("Unable to upload image", instance, e)
       }
   }
 

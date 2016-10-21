@@ -61,7 +61,7 @@ object RktClusterManager {
   case class StartInstance(
       instanceId: String, image: Instance.SourceImage, portalUri: String) extends Command
   case class GetInstanceStatus(id: Instance.Id) extends Command
-  case class TerminateInstance(id: Instance.Id) extends Command
+  case class InstanceEnvelope(id: Instance.Id, msg: Instance.Command) extends Command
 
   trait DomainEvent
   case class RktNodeRegistered(
@@ -73,7 +73,6 @@ object RktClusterManager {
   trait Response
   case class StartingInstance(instanceId: InstanceId) extends Response
   case object UnableToStartInstance extends Response
-  case object TerminatingInstance extends Response
   case class UnknownInstance(instanceId: InstanceId) extends Response
   case class RktNodeAdded(nodeId: RktNodeId) extends Response
 
@@ -144,14 +143,12 @@ class RktClusterManager(
             sender ! UnknownInstance(instanceId)
           }
       }
-    case TerminateInstance(instanceId) =>
+    case InstanceEnvelope(instanceId, msg: Instance.Command) =>
       context.child(InstancePersistenceId(instanceId)) match {
         case Some(ref) =>
           implicit val timeout = Timeout(10.seconds)
           import context.dispatcher
-          (ref ? Instance.Terminate)
-            .collect { case Instance.Ack => TerminatingInstance }
-            .pipeTo(sender)
+          ref forward msg
         case None => sender ! UnknownInstance(instanceId)
       }
 

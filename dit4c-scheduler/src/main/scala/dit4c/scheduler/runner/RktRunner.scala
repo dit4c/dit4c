@@ -36,6 +36,10 @@ trait RktRunner {
       portalUri: String): Future[RSAPublicKey]
   def stop(instanceId: String): Future[Unit]
   def export(instanceId: String): Future[Unit]
+  def uploadImage(instanceId: String,
+      helperImage: String,
+      imageServer: String,
+      portalUri: String): Future[Unit]
 
 }
 

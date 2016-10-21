@@ -110,16 +110,24 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
-          RktClusterManager.TerminateInstance(instanceId))
+          RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
     // Outbound
     case Instance.StatusReport(state, data: Instance.StartData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val pbState = state match {
+        case Instance.JustCreated => pb.InstanceStateUpdate.InstanceState.CREATED
         case Instance.WaitingForImage => pb.InstanceStateUpdate.InstanceState.CREATED
-        case Instance.Starting => pb.InstanceStateUpdate.InstanceState.PRESTART
+        case Instance.Starting => pb.InstanceStateUpdate.InstanceState.STARTING
         case Instance.Running => pb.InstanceStateUpdate.InstanceState.STARTED
-        case Instance.Stopping => pb.InstanceStateUpdate.InstanceState.STARTED
-        case Instance.Finished => pb.InstanceStateUpdate.InstanceState.EXITED
+        case Instance.Stopping => pb.InstanceStateUpdate.InstanceState.STOPPING
+        case Instance.Exited => pb.InstanceStateUpdate.InstanceState.EXITED
+        case Instance.Saved => pb.InstanceStateUpdate.InstanceState.SAVED
+        case Instance.Saving => pb.InstanceStateUpdate.InstanceState.SAVING
+        case Instance.Uploading => pb.InstanceStateUpdate.InstanceState.UPLOADING
+        case Instance.Uploaded => pb.InstanceStateUpdate.InstanceState.UPLOADED
+        case Instance.Discarding => pb.InstanceStateUpdate.InstanceState.DISCARDING
+        case Instance.Discarded => pb.InstanceStateUpdate.InstanceState.DISCARDED
+        case Instance.Errored => pb.InstanceStateUpdate.InstanceState.ERRORED
       }
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
         pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")

@@ -77,13 +77,17 @@ object ClusterRoutes {
     val currentState = sr.state.identifier
     sr.data match {
       case Instance.NoData => (currentState, None, None, None, None, None)
-      case Instance.StartData(id, providedImage, resolvedImage, callbackUrl, instanceKey) =>
+      case Instance.StartData(id, providedImage, resolvedImage, portalUri, instanceKey) =>
         val imageName = providedImage match {
           case Instance.NamedImage(name) => Some(name)
           case _: Instance.SourceImage => None
         }
         val imageId = resolvedImage.map(_.id)
-        (currentState, imageName, imageId, Some(callbackUrl), instanceKey, None)
+        (currentState, imageName, imageId, Some(portalUri), instanceKey, None)
+      case Instance.SaveData(instanceId, instanceKey, uploadHelperImage, imageServer, portalUri) =>
+        (currentState, None, None, Some(portalUri), Some(instanceKey), None)
+      case Instance.DiscardData(instanceId) =>
+        (currentState, None, None, None, None, None)
       case Instance.ErrorData(id, errors) =>
         (currentState, None, None, None, None, Some(errors))
     }

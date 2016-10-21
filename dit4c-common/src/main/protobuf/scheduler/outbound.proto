@@ -17,12 +17,19 @@ message InstanceStateUpdate {
   google.protobuf.Timestamp timestamp = 2;
   enum InstanceState {
     CREATED = 0;
-    PRESTART = 1;
+    STARTING = 1;
     STARTED = 2;
-    EXITED = 3;
-    SAVING = 4;
-    UNKNOWN = 98;
+    STOPPING = 3;
+    EXITED = 4;
+    SAVING = 5;
+    SAVED = 6;
+    UPLOADING = 7;
+    UPLOADED = 8;
+    DISCARDING = 9;
+    DISCARDED = 10;
+
     ERRORED = 99;
+    UNKNOWN = 100;
   }
   InstanceState state = 3;
   string additionalInfo = 4;
