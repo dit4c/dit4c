@@ -31,7 +31,8 @@ object ClusterAggregate {
   case class Create(schedulerId: String) extends Command
   case class StartInstance(image: String) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
-  case class TerminateInstance(instanceId: String) extends Command
+  case class SaveInstance(instanceId: String) extends Command
+  case class DiscardInstance(instanceId: String) extends Command
 
   sealed trait Response
   case object Ack extends Response
@@ -74,8 +75,11 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
     case Event(GetInstanceStatus(instanceId), ClusterInfo(schedulerId)) =>
       schedulerSharder forward SchedulerMessage(schedulerId).getInstanceStatus(instanceId)
       stay
-    case Event(TerminateInstance(instanceId), ClusterInfo(schedulerId)) =>
-      schedulerSharder forward SchedulerMessage(schedulerId).terminateInstance(instanceId)
+    case Event(SaveInstance(instanceId), ClusterInfo(schedulerId)) =>
+      schedulerSharder forward SchedulerMessage(schedulerId).saveInstance(instanceId)
+      stay
+    case Event(DiscardInstance(instanceId), ClusterInfo(schedulerId)) =>
+      schedulerSharder forward SchedulerMessage(schedulerId).discardInstance(instanceId)
       stay
   }
 
@@ -101,7 +105,14 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
       ))
     }
 
-    def terminateInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
+    def saveInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
+      import dit4c.protobuf.scheduler.inbound._
+      InboundMessage(randomMsgId, InboundMessage.Payload.SaveInstance(
+        SaveInstance(instanceId, clusterId, "", "") // TODO: complete
+      ))
+    }
+
+    def discardInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
       InboundMessage(randomMsgId, InboundMessage.Payload.DiscardInstance(
         DiscardInstance(instanceId, clusterId)

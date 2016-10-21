@@ -241,8 +241,9 @@ class RktRunnerImpl(
 
   private def systemctlCmd = which("systemctl")
 
-  private def privileged(cmd: Future[Seq[String]]): Future[Seq[String]] =
-    cmd.map(Seq("sudo", "-n", "--") ++ _)
+  private def privileged(cmd: Seq[String]): Seq[String] = Seq("sudo", "-n", "--") ++ cmd
+
+  private def privileged(cmd: Future[Seq[String]]): Future[Seq[String]] = cmd.map(privileged)
 
   protected[runner] def which(cmd: String): Future[Seq[String]] =
     ce(Seq("which", cmd))
@@ -316,45 +317,45 @@ class RktRunnerImpl(
   }
 
   private def tempVolumeFileManager(dirPrefix: String): Future[VolumeFileManager] =
-    ce(Seq("sh", "-c", Seq(
+    ce(privileged(Seq("sh", "-c", Seq(
             s"DIR=$$(mktemp -d --tmpdir $dirPrefix-XXXX)",
             "chmod o=rx $DIR",
-            "echo $DIR").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+            "echo $DIR").mkString(" && ")))).map(s => new VolumeFileManager(s.trim))
 
   private def instanceVolumeFileManager(instanceId: String): Future[VolumeFileManager] = {
     val dir = s"${config.rktDir}/dit4c-volumes/instances/$instanceId"
-    ce(Seq("sh", "-c", Seq(
+    ce(privileged(Seq("sh", "-c", Seq(
             s"mkdir -p $dir",
             s"chmod o=rx $dir",
-            s"echo $dir").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+            s"echo $dir").mkString(" && ")))).map(s => new VolumeFileManager(s.trim))
   }
 
   private def imageVolumeFileManager(instanceId: String): Future[VolumeFileManager] = {
     val dir = s"${config.rktDir}/dit4c-volumes/images/$instanceId"
-    ce(Seq("sh", "-c", Seq(
+    ce(privileged(Seq("sh", "-c", Seq(
             s"mkdir -p $dir",
             s"chmod o=rx $dir",
-            s"echo $dir").mkString(" && "))).map(s => new VolumeFileManager(s.trim))
+            s"echo $dir").mkString(" && ")))).map(s => new VolumeFileManager(s.trim))
   }
 
   private class VolumeFileManager(val baseDir: String) {
     def writeFile(filename: String, content: Array[Byte]): Future[String] = {
       val f = resolve(filename)
-      ce(Seq("sh", "-c", Seq(
+      ce(privileged(Seq("sh", "-c", Seq(
             s"mkdir -p $$(dirname $f)",
             s"cat > $f",
             s"test -f $f",
-            s"echo $f").mkString(" && ")), new ByteArrayInputStream(content)).map(_.trim)
+            s"echo $f").mkString(" && "))), new ByteArrayInputStream(content)).map(_.trim)
     }
 
     def absolutePath(filename: String): Future[String] =
-      ce(Seq("readlink", "-f", resolve(filename))).map(_.trim)
+      ce(privileged(Seq("readlink", "-f", resolve(filename)))).map(_.trim)
 
     def moveFile(from: String, to: String): Future[Unit] = {
-      ce(Seq("sh", "-c", Seq(
+      ce(privileged(Seq("sh", "-c", Seq(
             s"mkdir -p $$(dirname ${resolve(from)})",
             s"mkdir -p $$(dirname ${resolve(to)})",
-            s"mv ${resolve(from)} ${resolve(to)}").mkString(" && "))).map(_ => ())
+            s"mv ${resolve(from)} ${resolve(to)}").mkString(" && ")))).map(_ => ())
     }
 
     protected def resolve(filename: String): String =

@@ -52,7 +52,8 @@ object InstanceAggregate {
   case object GetStatus extends Command
   case object GetJwk extends Command
   case class VerifyJwt(token: String) extends Command
-  case object Terminate extends Command
+  case object Save extends Command
+  case object Discard extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateRsaPublicKey(publicExponent: BigInt, modulus: BigInt) extends Command
@@ -81,7 +82,7 @@ object InstanceAggregate {
 }
 
 class InstanceAggregate(
-    clusterAggregateManager: ActorRef @@ ClusterSharder.type)
+    clusterSharder: ActorRef @@ ClusterSharder.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -148,11 +149,11 @@ class InstanceAggregate(
       stay applying AssociatedUri(uri) andThen { _ =>
         requester ! Ack
       }
-    case Event(Terminate, InstanceData(clusterId, _, _)) =>
-      implicit val timeout = Timeout(1.minute)
-      (clusterAggregateManager ? ClusterSharder.Envelope(
-        clusterId, ClusterAggregate.TerminateInstance(instanceId)))
-        .pipeTo(sender)
+    case Event(Save, InstanceData(clusterId, _, _)) =>
+      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.SaveInstance(instanceId))
+      stay
+    case Event(Discard, InstanceData(clusterId, _, _)) =>
+      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.DiscardInstance(instanceId))
       stay
   }
 

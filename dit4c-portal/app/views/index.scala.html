@@ -76,35 +76,69 @@ function hideNewInstanceDialog() {
   document.getElementById("new-instance-open-button").style.display = "";
 }
 </script>
-<dom-module id="instance-terminate-button">
+<dom-module id="instance-save-button">
+  <template>
+    <iron-ajax id="xhr"
+      method="PUT"
+      url="{{url}}"
+      on-response="handleResponse"></iron-ajax>
+    <paper-icon-button icon="save"
+      title="save instance"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-save-button",
+    properties: {
+      instanceId: String,
+      url: {
+        type: String,
+        computed: 'saveUrl(instanceId)'
+      }
+    },
+    listeners: {
+      'click': 'save',
+    },
+    saveUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/save';
+    },
+    handleResponse: function() {
+      this.fire('saved', {"instanceId": this.instanceId});
+    },
+    discard: function() {
+      this.$.xhr.generateRequest();
+    }
+  });
+  </script>
+</dom-module>
+<dom-module id="instance-discard-button">
   <template>
     <iron-ajax id="xhr"
       method="PUT"
       url="{{url}}"
       on-response="handleResponse"></iron-ajax>
     <paper-icon-button icon="close"
-      title="terminate instance"></paper-icon-button>
+      title="discard instance"></paper-icon-button>
   </template>
   <script>
   Polymer({
-    is: "instance-terminate-button",
+    is: "instance-discard-button",
     properties: {
       instanceId: String,
       url: {
         type: String,
-        computed: 'terminateUrl(instanceId)'
+        computed: 'discardUrl(instanceId)'
       }
     },
     listeners: {
-      'click': 'terminate',
+      'click': 'discard',
     },
-    terminateUrl: function(instanceId) {
-      return '@routes.MainController.getInstances()'+instanceId+'/terminate';
+    discardUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/discard';
     },
     handleResponse: function() {
-      this.fire('terminated', {"instanceId": this.instanceId});
+      this.fire('discarded', {"instanceId": this.instanceId});
     },
-    terminate: function() {
+    discard: function() {
       this.$.xhr.generateRequest();
     }
   });
@@ -153,10 +187,11 @@ function hideNewInstanceDialog() {
             </div>
             <paper-progress
               value="100"
-              indeterminate="{{isTransitioning(item)}}"
+              indediscard="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
             <div class="card-actions layout horizontal-reverse">
-              <instance-terminate-button instance-id="{{item.id}}"></instance-terminate-button>
+              <instance-save-button instance-id="{{item.id}}"></instance-save-button>
+              <instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
             </div>
           </paper-card>
         </template>
@@ -171,7 +206,7 @@ function hideNewInstanceDialog() {
             </div>
             <paper-progress
               value="0"
-              indeterminate="{{isTransitioning(item)}}"
+              indediscard="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
           </paper-card>
         </template>
@@ -192,7 +227,7 @@ function hideNewInstanceDialog() {
       }
     },
     listeners: {
-      'terminated': 'refresh',
+      'discarded': 'refresh',
     },
     isPrevious: function(item) {
       return !this.isRunning(item);

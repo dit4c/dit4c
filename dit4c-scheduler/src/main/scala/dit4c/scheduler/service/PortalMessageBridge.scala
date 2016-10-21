@@ -118,7 +118,14 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
     // Outbound
-    case Instance.StatusReport(state, data: Instance.StartData) =>
+    case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
+        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)),
+            pb.InstanceStateUpdate.InstanceState.ERRORED, data.errors.mkString("\n\n"))
+      ))
+      outbound ! toBinaryMessage(msg.toByteArray)
+    case Instance.StatusReport(state, data: Instance.SomeData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val pbState = state match {
         case Instance.JustCreated => pb.InstanceStateUpdate.InstanceState.CREATED
@@ -139,22 +146,19 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
         pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
-      data.signingKey.foreach {
-        case RSAPublicKey(key) =>
-          val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
-            pb.AllocatedInstanceKey(data.instanceId, Some(
-                pb.AllocatedInstanceKey.RSAPublicKey(
-                    com.google.protobuf.ByteString.copyFrom(key.getPublicExponent.toByteArray),
-                    com.google.protobuf.ByteString.copyFrom(key.getModulus.toByteArray))))))
-          outbound ! toBinaryMessage(msg.toByteArray)
+      data match {
+        case data: Instance.StartData =>
+          data.signingKey.foreach {
+            case RSAPublicKey(key) =>
+              val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
+                pb.AllocatedInstanceKey(data.instanceId, Some(
+                    pb.AllocatedInstanceKey.RSAPublicKey(
+                        com.google.protobuf.ByteString.copyFrom(key.getPublicExponent.toByteArray),
+                        com.google.protobuf.ByteString.copyFrom(key.getModulus.toByteArray))))))
+              outbound ! toBinaryMessage(msg.toByteArray)
+          }
+        case _ => // No need to do anything
       }
-    case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
-      import dit4c.protobuf.scheduler.{outbound => pb}
-      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)),
-            pb.InstanceStateUpdate.InstanceState.ERRORED, data.errors.mkString("\n\n"))
-      ))
-      outbound ! toBinaryMessage(msg.toByteArray)
     case RktClusterManager.UnknownInstance(instanceId) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(

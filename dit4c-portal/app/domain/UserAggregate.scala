@@ -29,7 +29,8 @@ object UserAggregate {
       (InstanceAggregateManager.StartInstance.apply _)
         .tupled(StartInstance.unapply(this).get)
   }
-  case class TerminateInstance(instanceId: String) extends Command
+  case class SaveInstance(instanceId: String) extends Command
+  case class DiscardInstance(instanceId: String) extends Command
   case object GetAllInstanceIds extends Command
 
   sealed trait Response
@@ -72,11 +73,19 @@ class UserAggregate(
       persist(CreatedInstance(instanceId))(updateData)
     case GetAllInstanceIds =>
       sender ! UserInstances(data.instances)
-    case TerminateInstance(instanceId) =>
+    case SaveInstance(instanceId) =>
       if (data.instances.contains(instanceId)) {
         instanceAggregateManager forward
           InstanceAggregateManager.InstanceEnvelope(instanceId,
-              InstanceAggregate.Terminate)
+              InstanceAggregate.Save)
+      } else {
+        sender ! InstanceNotOwnedByUser
+      }
+    case DiscardInstance(instanceId) =>
+      if (data.instances.contains(instanceId)) {
+        instanceAggregateManager forward
+          InstanceAggregateManager.InstanceEnvelope(instanceId,
+              InstanceAggregate.Discard)
       } else {
         sender ! InstanceNotOwnedByUser
       }

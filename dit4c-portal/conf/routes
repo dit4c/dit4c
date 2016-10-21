@@ -7,7 +7,8 @@ GET     /authenticate/:provider             controllers.MainController.authentic
 POST    /authenticate/:provider             controllers.MainController.authenticate(provider)
 GET     /instances/                         controllers.MainController.getInstances
 POST    /instances/                         controllers.MainController.newInstance
-PUT     /instances/:instanceId/terminate    controllers.MainController.terminateInstance(instanceId)
+PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
+PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 PUT     /instances/                         controllers.MainController.instanceRegistration
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)

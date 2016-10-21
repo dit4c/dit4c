@@ -57,7 +57,7 @@ object Instance {
       uploadHelperImage: NamedImage,
       imageServer: String,
       portalUri: String) extends Data
-  case class DiscardData(instanceId: String) extends Data
+  case class DiscardData(instanceId: String) extends SomeData
   case class ErrorData(instanceId: String, errors: List[String]) extends SomeData
 
   trait Command
@@ -249,6 +249,9 @@ class Instance(worker: ActorRef)
 
   onTransition {
     case (from, to) =>
+      Option(stateData).collect {
+        case data: SomeData => log.info(s"Instance ${data.instanceId}: $from → $to")
+      }
       emitStatusReportToEventStream(to)(stateData)
   }
 

@@ -89,9 +89,19 @@ class MainController(
     )
   }
 
-  def terminateInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
+  def saveInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.TerminateInstance(instanceId))).map {
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.SaveInstance(instanceId))).map {
+      case InstanceAggregate.Ack =>
+        Accepted
+      case UserAggregate.InstanceNotOwnedByUser =>
+        Forbidden
+    }
+  }
+
+  def discardInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.DiscardInstance(instanceId))).map {
       case InstanceAggregate.Ack =>
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
@@ -306,12 +316,9 @@ class GetInstancesActor(out: ActorRef,
 
   private def effectiveState(state: String, url: Option[String]) = state match {
     case "CREATED" => "Waiting For Image"
-    case "PRESTART" => "Starting"
     case "STARTED" if url.isDefined  => "Available"
     case "STARTED" if url.isEmpty    => "Started"
-    case "EXITED" => "Stopped"
-    case "ERRORED" => "Errored"
-    case _ => state
+    case state => state.toUpperCase.head +: state.toLowerCase.tail
   }
 
 }
