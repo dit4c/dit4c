@@ -394,19 +394,6 @@ class RktRunnerImpl(
     )
   }
 
-  private def hostIp: Future[String] =
-    ce(Seq(
-        "sh", "-c",
-        "ip route get 8.8.8.8"))
-      .collect {
-        case s if s.startsWith("8.8.8.8") =>
-          s.lines.next.split(" ").last
-      }
-
-  private def jwtToken(id: String, key: RSAPrivateKey): String = {
-    Jwt.encode(s"""{"iss":"instance/$id"}""", key, JwtAlgorithm.RSASHA512)
-  }
-
   private def rktEnv(pairs: (String, String)*): JsArray = JsArray(
     pairs.map { case (k: String, v: String) => Json.obj("name" -> k, "value" -> v) })
 
