@@ -56,6 +56,7 @@ class RktRunnerImpl(
     privileged(rktCmd)
       .flatMap { rktCmd =>
         ce(rktCmd :+ "fetch" :+
+            "--no-store" :+ // See https://coreos.com/rkt/docs/latest/image-fetching-behavior.html
             "--insecure-options=image" :+ "--full" :+
             imageName)
       }
