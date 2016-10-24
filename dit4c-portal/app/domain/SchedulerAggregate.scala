@@ -115,13 +115,15 @@ class SchedulerAggregate()
       }
       stay
     case Event(SendSchedulerMessage(msg), _) =>
-      schedulerSocket match {
+      val response: Response = schedulerSocket match {
         case Some(ref) =>
           ref ! msg
+          SchedulerAggregate.Ack
         case None =>
           log.warning(s"Unable to send: $msg")
+          SchedulerAggregate.UnableToSendMessage
       }
-      stay
+      stay replying response
   }
 
   override def applyEvent(

@@ -92,20 +92,24 @@ class MainController(
   def saveInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
     (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.SaveInstance(instanceId))).map {
-      case InstanceAggregate.Ack =>
+      case SchedulerAggregate.Ack =>
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
         Forbidden
+      case SchedulerAggregate.UnableToSendMessage =>
+        InternalServerError
     }
   }
 
   def discardInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
     (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.DiscardInstance(instanceId))).map {
-      case InstanceAggregate.Ack =>
+      case SchedulerAggregate.Ack =>
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
         Forbidden
+      case SchedulerAggregate.UnableToSendMessage =>
+        InternalServerError
     }
   }
 
