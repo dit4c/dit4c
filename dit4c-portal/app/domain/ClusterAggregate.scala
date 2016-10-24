@@ -14,6 +14,7 @@ import ClusterAggregate._
 import java.time.Instant
 import scala.reflect._
 import scala.util.Random
+import utils.IdUtils
 
 object ClusterAggregate {
 
@@ -29,7 +30,7 @@ object ClusterAggregate {
 
   sealed trait Command
   case class Create(schedulerId: String) extends Command
-  case class StartInstance(image: String) extends Command
+  case class StartInstance(instanceId: String, image: String) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
@@ -43,7 +44,9 @@ object ClusterAggregate {
 
 }
 
-class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
+class ClusterAggregate(
+    schedulerSharder: ActorRef @@ SchedulerSharder.type,
+    imageServerConfig: ImageServerConfig)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -68,10 +71,9 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
   }
 
   when(Active) {
-    case Event(StartInstance(image), ClusterInfo(schedulerId)) =>
-      var instanceId = timePrefix+randomId(16)
+    case Event(StartInstance(instanceId, image), ClusterInfo(schedulerId)) =>
       schedulerSharder forward SchedulerMessage(schedulerId).startInstance(instanceId, image)
-      stay replying AllocatedInstanceId(clusterId, instanceId)
+      stay
     case Event(GetInstanceStatus(instanceId), ClusterInfo(schedulerId)) =>
       schedulerSharder forward SchedulerMessage(schedulerId).getInstanceStatus(instanceId)
       stay
@@ -108,7 +110,7 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
     def saveInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
       InboundMessage(randomMsgId, InboundMessage.Payload.SaveInstance(
-        SaveInstance(instanceId, clusterId, "", "") // TODO: complete
+        SaveInstance(instanceId, clusterId, imageServerConfig.saveHelper, imageServerConfig.server)
       ))
     }
 
@@ -129,24 +131,8 @@ class ClusterAggregate(schedulerSharder: ActorRef @@ SchedulerSharder.type)
     private def wrapForScheduler(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) =
       SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.SendSchedulerMessage(msg))
 
-    private def randomMsgId = timePrefix + randomId(16)
+    private def randomMsgId = IdUtils.timePrefix + IdUtils.randomId(16)
 
   }
-
-  /**
-   * Prefix based on time for easy sorting
-   */
-  protected def timePrefix = {
-    val now = Instant.now
-    f"${now.getEpochSecond}%016x".takeRight(10) + // 40-bit epoch seconds
-    f"${now.getNano / 100}%06x"// 24-bit 100 nanosecond slices
-  }
-
-  private lazy val randomId: (Int) => String = {
-    val base32 = (Range.inclusive('a','z').map(_.toChar) ++ Range.inclusive(2,7).map(_.toString.charAt(0)))
-    (length: Int) =>
-      Stream.continually(Random.nextInt(32)).map(base32).take(length).mkString
-  }
-
 
 }

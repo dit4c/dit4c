@@ -122,7 +122,7 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
       log.info(s"Text from scheduler: $msg")
     case msg: BinaryMessage =>
       val parsedMsg = dit4c.protobuf.scheduler.outbound.OutboundMessage.parseFrom(msg.data.toArray)
-      log.info(s"Msg from scheduler: $parsedMsg")
+      log.debug(s"Msg from scheduler: $parsedMsg")
       in ! SchedulerAggregate.ReceiveSchedulerMessage(parsedMsg)
     // From portal
     case msg: String =>

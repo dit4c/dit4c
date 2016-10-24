@@ -10,6 +10,8 @@ import scala.concurrent.duration._
 import domain.InstanceAggregate
 import domain.InstanceAggregate.RecordInstanceStart
 import akka.event.LoggingReceive
+import utils.IdUtils
+import domain.SchedulerAggregate
 
 object InstanceAggregateManager {
 
@@ -35,13 +37,15 @@ class InstanceAggregateManager(
     case StartInstance(clusterId, image) =>
       implicit val timeout = Timeout(1.minute)
       val requester = sender
-      (clusterAggregateManager ? ClusterSharder.Envelope(clusterId,
-          ClusterAggregate.StartInstance(image))).foreach {
-        case ClusterAggregate.AllocatedInstanceId(clusterId, instanceId) =>
-          (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
-            case InstanceAggregate.Ack =>
+      var instanceId = IdUtils.timePrefix+IdUtils.randomId(16)
+      (instanceRef(instanceId) ? RecordInstanceStart(clusterId)).map {
+        case InstanceAggregate.Ack =>
+          (clusterAggregateManager ? ClusterSharder.Envelope(
+              clusterId,
+              ClusterAggregate.StartInstance(instanceId, image))).map {
+            case SchedulerAggregate.Ack =>
               InstanceStarted(instanceId)
-          } pipeTo requester
+          }.pipeTo(requester)
       }
     case VerifyJwt(token) =>
       resolveJwtInstance(token) match {

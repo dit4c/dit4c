@@ -5,15 +5,18 @@ import com.softwaremill.tagging._
 import domain.ClusterAggregate
 import akka.event.LoggingReceive
 import akka.cluster.sharding._
+import domain.ImageServerConfig
 
 object ClusterSharder {
 
   case class Envelope(clusterId: String, msg: Any)
 
-  def apply(schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
+  def apply(
+      schedulerSharder: ActorRef @@ SchedulerSharder.type,
+      imageServerConfig: ImageServerConfig)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "ClusterAggregate",
-        entityProps = Props(classOf[ClusterAggregate], schedulerSharder),
+        entityProps = Props(classOf[ClusterAggregate], schedulerSharder, imageServerConfig),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)

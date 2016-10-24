@@ -56,7 +56,8 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
       val instance = sender
       runner.uploadImage(instanceId, helperImage.name, imageServer, portalUri).andThen {
         case Success(imageId) =>
-          instance ! Instance.ConfirmUpload
+          // We've simply started the upload process, so don't confirm the upload
+          log.info(s"Upload sucessfully initiated for $instanceId")
         case Failure(e) =>
           replyWithError("Unable to upload image", instance, e)
       }

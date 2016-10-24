@@ -69,11 +69,16 @@ class AppComponents(context: Context)
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
 
+  // Image save handling
+  val imageServerConfig = domain.ImageServerConfig(
+    configuration.underlying.as[String]("images.server"),
+    configuration.underlying.as[String]("images.saveHelper"))
+
   // ClusterSharder/AggregateManager setup and eventbus subscription
   val schedulerSharder = SchedulerSharder()(actorSystem)
       .taggedWith[services.SchedulerSharder.type]
   system.eventStream.subscribe(schedulerSharder, classOf[SchedulerSharder.Envelope])
-  val clusterSharder = ClusterSharder(schedulerSharder)(actorSystem)
+  val clusterSharder = ClusterSharder(schedulerSharder, imageServerConfig)(actorSystem)
       .taggedWith[services.ClusterSharder.type]
   system.eventStream.subscribe(clusterSharder, classOf[ClusterSharder.Envelope])
   val instanceAggregateManager = actorSystem.actorOf(

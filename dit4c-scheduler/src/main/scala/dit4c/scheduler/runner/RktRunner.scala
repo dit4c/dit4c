@@ -151,7 +151,7 @@ class RktRunnerImpl(
         "DIT4C_INSTANCE_JWT_KID" -> instanceId
       )
       helperAppConfigJson <- getImageAppConfig(helperImageId).map(addExtraEnvVars(_, helperEnvVars))
-      instanceConfigDir <- imageVolumeFileManager(instanceId).map(_.baseDir)
+      instanceConfigDir <- instanceVolumeFileManager(instanceId).map(_.baseDir)
       imageDir <- imageVolumeFileManager(instanceId).map(_.baseDir)
       manifest = Json.obj(
         "acVersion" -> "0.8.4",

@@ -195,6 +195,34 @@ class MainController(
       .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
   }
 
+  def imageRegistration = Action.async { implicit request =>
+    import InstanceAggregateManager.{InstanceEnvelope, VerifyJwt}
+    implicit val timeout = Timeout(1.minute)
+    val authHeaderRegex = "^Bearer (.*)$".r
+    request.headers.get("Authorization")
+      .collect { case authHeaderRegex(token) => token }
+      .map { token =>
+        (instanceAggregateManager ? VerifyJwt(token)).flatMap {
+          case InstanceAggregate.ValidJwt(instanceId) =>
+            log.debug(s"Valid JWT for $instanceId")
+            request.body.asText match {
+              case Some(uri) =>
+                (instanceAggregateManager ? InstanceEnvelope(instanceId, InstanceAggregate.AssociateImage(uri))).map { _ =>
+                  Ok("")
+                }.recover {
+                  case e => InternalServerError(e.getMessage)
+                }
+              case None =>
+                Future.successful(BadRequest("No valid image uri"))
+            }
+          case InstanceAggregate.InvalidJwt(msg) =>
+            log.warn(s"Invalid JWT: $msg\n${request.body}")
+            Future.successful(BadRequest(msg))
+        }
+      }
+      .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
+  }
+
   def webjars(path: String, file: String) =
     Assets.versioned(path, fudgeFileLocation(file))
 
@@ -278,7 +306,7 @@ class GetInstancesActor(out: ActorRef,
   override def preStart = {
     import context.dispatcher
     import akka.pattern.pipe
-    implicit val timeout = Timeout(1.minute)
+    implicit val timeout = Timeout(5.seconds)
     pollFunc = Some(context.system.scheduler.schedule(Duration.Zero, 5.seconds) {
       (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
         case UserAggregate.UserInstances(instanceIds) =>
@@ -289,7 +317,8 @@ class GetInstancesActor(out: ActorRef,
                   msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
                 InstanceResponse(id, effectiveState(msg.state, url), url)
               }
-              .recover { case _ =>
+              .recover { case e =>
+                log.error(e, s"Failed to get instance status for $id")
                 InstanceResponse(id, "Unknown", None)
               }
               .pipeTo(self)

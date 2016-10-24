@@ -94,7 +94,7 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     context.watch(outbound)
   }
 
-  val receive: Receive = LoggingReceive {
+  val receive: Receive = {
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._

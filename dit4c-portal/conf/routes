@@ -10,6 +10,7 @@ POST    /instances/                         controllers.MainController.newInstan
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
 PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 PUT     /instances/                         controllers.MainController.instanceRegistration
+PUT     /images/                            controllers.MainController.imageRegistration
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
 

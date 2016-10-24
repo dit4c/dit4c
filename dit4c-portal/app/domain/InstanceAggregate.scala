@@ -55,8 +55,9 @@ object InstanceAggregate {
   case object Save extends Command
   case object Discard extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
-  case class AssociateUri(uri: String) extends Command
   case class AssociateRsaPublicKey(publicExponent: BigInt, modulus: BigInt) extends Command
+  case class AssociateUri(uri: String) extends Command
+  case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
 
   sealed trait Response
@@ -78,6 +79,8 @@ object InstanceAggregate {
   case class AssociatedRsaPublicKey(
       publicExponent: BigInt, modulus: BigInt, timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedUri(
+      uri: String, timestamp: Instant = Instant.now) extends DomainEvent
+  case class AssociatedImage(
       uri: String, timestamp: Instant = Instant.now) extends DomainEvent
 }
 
@@ -102,6 +105,8 @@ class InstanceAggregate(
       stay replying DoesNotExist
     case Event(GetJwk, _) =>
       stay replying NoJwkExists
+    case Event(VerifyJwt(token), _) =>
+      stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
     case Event(RecordInstanceStart(clusterId), _) =>
       val requester = sender
       goto(Started).applying(StartedInstance(clusterId)).andThen { _ =>
@@ -149,6 +154,12 @@ class InstanceAggregate(
       stay applying AssociatedUri(uri) andThen { _ =>
         requester ! Ack
       }
+    case Event(AssociateImage(uri), InstanceData(_, _, _)) =>
+      val requester = sender
+      stay applying AssociatedImage(uri) andThen { _ =>
+        // TODO: Notify scheduler
+        requester ! Ack
+      }
     case Event(Save, InstanceData(clusterId, _, _)) =>
       clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.SaveInstance(instanceId))
       stay
@@ -165,6 +176,9 @@ class InstanceAggregate(
       data.copy(jwk = Some(RsaJwk(e, n)))
     case (AssociatedUri(uri, _), data: InstanceData) =>
       data.copy(uri = Some(uri))
+    case (AssociatedImage(uri, _), data: InstanceData) =>
+      // TODO: change data to indicate image is available
+      data
     case p =>
       throw new Exception(s"Unknown state/data combination: $p")
   }

@@ -104,7 +104,7 @@ function hideNewInstanceDialog() {
     handleResponse: function() {
       this.fire('saved', {"instanceId": this.instanceId});
     },
-    discard: function() {
+    save: function() {
       this.$.xhr.generateRequest();
     }
   });

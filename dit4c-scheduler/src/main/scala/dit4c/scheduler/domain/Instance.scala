@@ -56,7 +56,7 @@ object Instance {
       signingKey: InstanceSigningKey,
       uploadHelperImage: NamedImage,
       imageServer: String,
-      portalUri: String) extends Data
+      portalUri: String) extends SomeData
   case class DiscardData(instanceId: String) extends SomeData
   case class ErrorData(instanceId: String, errors: List[String]) extends SomeData
 
@@ -107,6 +107,8 @@ object Instance {
       val imageServer: String,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class RequestedDiscard(
+      val timestamp: Instant = Instant.now) extends DomainEvent
+  case class CommencedUpload(
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class ConfirmedExit(
       val timestamp: Instant = Instant.now) extends DomainEvent
@@ -210,7 +212,7 @@ class Instance(worker: ActorRef)
   when(Saved) {
     case Event(Upload, SaveData(id, _, helperImage, imageServer, portalUri)) =>
       val requester = sender
-      goto(Uploading).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
+      goto(Uploading).applying(CommencedUpload()).andThen { _ =>
         worker ! InstanceWorker.Upload(id, helperImage, imageServer, portalUri)
       }
   }
@@ -256,32 +258,61 @@ class Instance(worker: ActorRef)
   }
 
   onTransition {
-    case (_, Exited) if stateData.isInstanceOf[SaveData] => self ! ContinueSave
-    case (_, Exited) if stateData.isInstanceOf[DiscardData] => self ! ContinueDiscard
+    case (_, Exited) if stateData.isInstanceOf[SaveData] =>
+      log.info("continuing save")
+      self ! ContinueSave
+    case (_, Exited) if stateData.isInstanceOf[DiscardData] =>
+      log.info("continuing discard")
+      self ! ContinueDiscard
     case (_, Saved) => self ! Upload
   }
 
   def applyEvent(
       domainEvent: DomainEvent,
       currentData: Data): Instance.Data = {
-    (domainEvent, currentData) match {
-      case (Initiated(id, image, portalUri, _), NoData) =>
-        StartData(id, image, None, portalUri, None)
-      case (FetchedImage(image, _), data: StartData) =>
-        data.copy(resolvedImage = Some(image))
-      case (AssociatedSigningKey(key, _), data: StartData) =>
-        data.copy(signingKey = Some(key))
-      case (RequestedSave(helperImage, imageServer, _), StartData(id, _, _, portalUri, Some(signingKey))) =>
-        SaveData(id, signingKey, helperImage, imageServer, portalUri)
-      case (RequestedDiscard(_), StartData(id, _, _, _, _)) =>
-        DiscardData(id)
-      case (ErrorOccurred(msg, _), errorData: ErrorData) =>
-        errorData.copy(errors = errorData.errors :+ msg)
-      case (ErrorOccurred(msg, _), data: SomeData) =>
-        ErrorData(data.instanceId, List(msg))
-      case (e, d) =>
-        stop(PersistentFSM.Failure(s"Unhandled event/state: ($e, $d)"))
-        d
+    def unhandled(reason: String = "unanticipated") = {
+      val msg = s"Unhandled event/state: ($domainEvent, $currentData) → $reason"
+      log.error(msg)
+      stop(PersistentFSM.Failure(msg))
+      currentData
+    }
+    domainEvent match {
+      case Initiated(id, image, portalUri, _) => currentData match {
+        case NoData => StartData(id, image, None, portalUri, None)
+        case other => unhandled("Cannot initiate twice")
+      }
+      case FetchedImage(image, _) => currentData match {
+        case data: StartData => data.copy(resolvedImage = Some(image))
+        case other => unhandled()
+      }
+      case AssociatedSigningKey(key, _) => currentData match {
+        case data: StartData => data.copy(signingKey = Some(key))
+        case other => unhandled()
+      }
+      case RequestedSave(helperImage, imageServer, _) => currentData match {
+        case StartData(id, _, _, portalUri, Some(signingKey)) =>
+          SaveData(id, signingKey, helperImage, imageServer, portalUri)
+        case data: SaveData =>
+          // TODO: Get rid of this once we know how it happens
+          log.warning("Two requested saves really shouldn't happen!")
+          data.copy(uploadHelperImage = helperImage, imageServer = imageServer)
+        case other => unhandled()
+      }
+      case RequestedDiscard(_) => currentData match {
+        case StartData(id, _, _, _, _) => DiscardData(id)
+        case other => unhandled()
+      }
+      case ErrorOccurred(msg, _) => currentData match {
+        case errorData: ErrorData => errorData.copy(errors = errorData.errors :+ msg)
+        case data: SomeData => ErrorData(data.instanceId, List(msg))
+        case NoData => unhandled()
+      }
+      case ConfirmedDiscard(_) => currentData
+      case ConfirmedStart(_) => currentData
+      case ConfirmedExit(_) => currentData
+      case ConfirmedSave(_) => currentData
+      case CommencedUpload(_) => currentData
+      case ConfirmedUpload(_) => currentData
     }
   }
 
