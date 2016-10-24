@@ -223,6 +223,8 @@ class Instance(worker: ActorRef)
   }
 
   when(Uploaded, stateTimeout = 1.minute) {
+    case Event(ConfirmUpload, _) =>
+      stay // Idempotent
     case Event(StateTimeout, _) =>
       stop // Done lingering for new commands
   }

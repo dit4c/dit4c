@@ -38,6 +38,7 @@ object PortalMessageBridge {
             case Payload.StartInstance(value) => Some(value)
             case Payload.DiscardInstance(value) => Some(value)
             case Payload.SaveInstance(value) => Some(value)
+            case Payload.ConfirmInstanceUpload(value) => Some(value)
           }
           parsedMsg.foreach { msg =>
             log.debug(s"portal sent message: $msg")
@@ -94,7 +95,7 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     context.watch(outbound)
   }
 
-  val receive: Receive = {
+  val receive: Receive = LoggingReceive {
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
@@ -117,6 +118,11 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
+    case dit4c.protobuf.scheduler.inbound.ConfirmInstanceUpload(instanceId, clusterId) =>
+      import dit4c.scheduler.domain._
+      import dit4c.scheduler.service._
+      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+          RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
     // Outbound
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}

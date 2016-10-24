@@ -34,6 +34,7 @@ object ClusterAggregate {
   case class GetInstanceStatus(instanceId: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
+  case class ConfirmInstanceUpload(instanceId: String) extends Command
 
   sealed trait Response
   case object Ack extends Response
@@ -83,6 +84,9 @@ class ClusterAggregate(
     case Event(DiscardInstance(instanceId), ClusterInfo(schedulerId)) =>
       schedulerSharder forward SchedulerMessage(schedulerId).discardInstance(instanceId)
       stay
+    case Event(ConfirmInstanceUpload(instanceId), ClusterInfo(schedulerId)) =>
+      schedulerSharder forward SchedulerMessage(schedulerId).confirmUploadedInstance(instanceId)
+      stay
   }
 
   override def applyEvent(
@@ -98,7 +102,6 @@ class ClusterAggregate(
     classTag[DomainEvent]
 
   case class SchedulerMessage(schedulerId: String) {
-
 
     def startInstance(instanceId: String, image: String): SchedulerSharder.Envelope = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
@@ -118,6 +121,13 @@ class ClusterAggregate(
       import dit4c.protobuf.scheduler.inbound._
       InboundMessage(randomMsgId, InboundMessage.Payload.DiscardInstance(
         DiscardInstance(instanceId, clusterId)
+      ))
+    }
+
+    def confirmUploadedInstance(instanceId: String): SchedulerSharder.Envelope = wrapForScheduler {
+      import dit4c.protobuf.scheduler.inbound._
+      InboundMessage(randomMsgId, InboundMessage.Payload.ConfirmInstanceUpload(
+        ConfirmInstanceUpload(instanceId, clusterId)
       ))
     }
 

@@ -19,6 +19,11 @@ message SaveInstance {
   string imageServer = 4;
 }
 
+message ConfirmInstanceUpload {
+  string instanceId = 1;
+  string clusterId = 2;
+}
+
 message RequestInstanceStateUpdate {
   string instanceId = 1;
   string clusterId = 2;
@@ -31,5 +36,6 @@ message InboundMessage {
     DiscardInstance discardInstance = 3;
     SaveInstance saveInstance = 4;
     RequestInstanceStateUpdate requestInstanceStateUpdate = 5;
+    ConfirmInstanceUpload confirmInstanceUpload = 6;
   }
 }
