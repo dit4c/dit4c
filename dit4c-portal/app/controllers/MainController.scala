@@ -42,7 +42,8 @@ class MainController(
     val identityService: IdentityService,
     val oauthDataHandler: InstanceOAuthDataHandler,
     val socialProviders: SocialProviderRegistry,
-    val wsClient: WSClient)(implicit system: ActorSystem, materializer: Materializer)
+    val wsClient: WSClient,
+    val publicImages: Seq[PublicImage])(implicit system: ActorSystem, materializer: Materializer)
     extends Controller
     with I18nSupport {
 
@@ -295,13 +296,7 @@ class MainController(
   case class NewInstanceRequest(image: String, cluster: String)
   case class InstanceRegistrationRequest(uri: String)
 
-  private val imageLookup = Map(
-    "Base (Alpine)" -> "docker://dit4c/dit4c-container-base:alpine",
-    "IPython"      -> "docker://dit4c/dit4c-container-ipython",
-    "OpenRefine"   -> "docker://dit4c/dit4c-container-openrefine",
-    "NLTK"         -> "docker://dit4c/dit4c-container-nltk",
-    "RStudio"      -> "docker://dit4c/dit4c-container-rstudio"
-  )
+  private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 
   private val clusterLookup = Map(
     "Default" -> "default"

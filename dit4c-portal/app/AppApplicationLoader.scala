@@ -50,6 +50,7 @@ import services._
 import akka.cluster.Cluster
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.ahc.AhcWSClient
+import domain.PublicImage
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -70,6 +71,17 @@ class AppComponents(context: Context)
   }
   lazy val langs: Langs = wire[DefaultLangs]
   lazy val messsages: MessagesApi = wire[DefaultMessagesApi]
+
+  // Public images
+  val publicImages: Seq[PublicImage] =
+    for {
+      config <- configuration.getConfig("images.public").toSeq
+      key <- config.subKeys
+      c <- config.getConfig(key)
+      _ = println(c.getString("display").orElse(Some(key)), c.getString("image"))
+      display <- c.getString("display").orElse(Some(key))
+      image <- c.getString("image")
+    } yield PublicImage(display, image)
 
   // Image save handling
   val imageServerConfig = domain.ImageServerConfig(
