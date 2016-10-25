@@ -33,6 +33,7 @@ object UserAggregate {
   case class StartInstanceFromInstance(clusterId: String, sourceInstance: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
+  case class GetInstanceImageUrl(instanceId: String) extends Command
   case object GetAllInstanceIds extends Command
 
   sealed trait Response
@@ -85,6 +86,12 @@ class UserAggregate(
           case InstanceAggregate.NoImageExists =>
             sender ! InstanceAggregate.NoImageExists
         }
+      } else {
+        sender ! InstanceNotOwnedByUser
+      }
+    case GetInstanceImageUrl(instanceId) =>
+      if (data.instances.contains(instanceId)) {
+        instanceAggregateManager forward InstanceEnvelope(instanceId, InstanceAggregate.GetImage)
       } else {
         sender ! InstanceNotOwnedByUser
       }

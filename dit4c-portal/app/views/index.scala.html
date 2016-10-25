@@ -63,7 +63,7 @@ paper-dropdown-menu {
 }
 </style>
 <dom-module id="new-instance-dialog">
-  <style>  
+  <style>
 	#new-instance-form {
 	  padding-left: 20px;
 	  padding-right: 20px;
@@ -110,11 +110,9 @@ paper-dropdown-menu {
       }
     },
     isSet: function(v) {
-    	console.log(v);
     	return Boolean(v);
     },
     isNotSet: function(v) {
-      console.log(v);
       return !Boolean(v);
     },
     open: function() {
@@ -213,6 +211,33 @@ paper-dropdown-menu {
   });
   </script>
 </dom-module>
+<dom-module id="instance-export-button">
+  <style>  
+  a {
+    color: black;
+  }
+  </style>
+  <template>
+    <a href="{{downloadUrl(instanceId)}}" tabindex="-1">
+	    <paper-icon-button icon="file-download"
+	      title="download image"></paper-icon-button>
+    </a>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-export-button",
+    properties: {
+      instanceId: String
+    },
+    downloadUrl: function(instanceId) {
+    	return '@routes.MainController.getInstances()'+instanceId+'/export';
+    },
+    download: function() {
+      window.location.href = this.downloadUrl();
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="instances-container">
   <style>
   .section-heading {
@@ -231,6 +256,9 @@ paper-dropdown-menu {
     width: 100%;
     --paper-progress-active-color: var(--paper-light-blue-500);
     --paper-progress-secondary-color: var(--paper-light-blue-300);
+  }
+  paper-card .card-actions {
+    @@apply(--layout-horizontal-reverse);
   }
   .instance-id {
     @@apply(--paper-font-body2);
@@ -277,12 +305,13 @@ paper-dropdown-menu {
               value="0"
               indediscard="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
-            <div class="card-actions layout horizontal-reverse">
-              <paper-icon-button icon="file-download"
-                title="download image" disabled></paper-icon-button>
+            <div class="card-actions">
               <template is="dom-if" if="{{hasImage(item)}}">
+                <instance-export-button instance-id="{{item.id}}"></instance-export-button>
                 <instance-create-button instance-id="{{item.id}}"></instance-create-button>
               </template>
+              <!-- Kludgy spacer -->
+              <paper-icon-button icon="" disabled></paper-icon-button>
             </div>
           </paper-card>
         </template>

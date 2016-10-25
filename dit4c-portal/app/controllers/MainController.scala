@@ -30,6 +30,8 @@ import com.mohiva.play.silhouette.api.actions.SecuredRequest
 import play.api.libs.streams.ActorFlow
 import play.api.http.websocket.TextMessage
 import akka.stream.Materializer
+import play.api.libs.ws.WSClient
+import play.api.libs.ws.StreamedResponse
 
 class MainController(
     val environment: Environment,
@@ -39,7 +41,8 @@ class MainController(
     val silhouette: Silhouette[DefaultEnv],
     val identityService: IdentityService,
     val oauthDataHandler: InstanceOAuthDataHandler,
-    val socialProviders: SocialProviderRegistry)(implicit system: ActorSystem, materializer: Materializer)
+    val socialProviders: SocialProviderRegistry,
+    val wsClient: WSClient)(implicit system: ActorSystem, materializer: Materializer)
     extends Controller
     with I18nSupport {
 
@@ -115,6 +118,29 @@ class MainController(
         Forbidden
       case SchedulerAggregate.UnableToSendMessage =>
         InternalServerError
+    }
+  }
+
+  def exportImage(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+      case InstanceAggregate.InstanceImage(url) =>
+        wsClient.url(url).stream.map {
+          case StreamedResponse(headers, body) if headers.status == 200 =>
+            val filename = Uri(url).path.reverse.head
+            val responseHeaders: Seq[(String,String)] = headers.headers.toSeq.flatMap {
+              case (k, vs) => vs.map { (k, _) }
+            } :+ ("Content-Disposition" -> s"""attachment; filename="$filename"""")
+
+            Ok.chunked(body).withHeaders(responseHeaders: _*)
+          case StreamedResponse(headers, body) =>
+            log.error(s"Unable to fetch image for $instanceId: $headers")
+            InternalServerError
+        }
+      case InstanceAggregate.NoImageExists =>
+        Future.successful(NotFound)
+      case UserAggregate.InstanceNotOwnedByUser =>
+        Future.successful(Forbidden)
     }
   }
 

@@ -48,6 +48,8 @@ import utils.admin.SshRepl
 import ammonite.util.Bind
 import services._
 import akka.cluster.Cluster
+import play.api.libs.ws.WSClient
+import play.api.libs.ws.ahc.AhcWSClient
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
