@@ -47,6 +47,9 @@ libraryDependencies ++= {
       exclude(__, "github-com-web-animations-web-animations-js"),
     __ %  "github-com-PolymerElements-paper-button"                 % "1.0.12",
     __ %  "github-com-PolymerElements-paper-card"                   % "1.0.8",
+    __ %  "github-com-PolymerElements-paper-dialog"                 % "1.1.0"
+      exclude(__, "github-com-polymerelements-paper-dialog-behavior"),
+    __ %  "github-com-PolymerElements-paper-dialog-behavior"       % "1.2.7",
     __ %  "github-com-PolymerElements-paper-dropdown-menu"          % "1.2.2",
     __ %  "github-com-PolymerElements-paper-fab"                    % "1.1.0",
     __ %  "github-com-PolymerElements-paper-icon-button"            % "1.0.6",

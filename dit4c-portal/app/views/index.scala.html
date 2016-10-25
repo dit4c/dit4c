@@ -13,6 +13,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/iron-image/iron-image.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-card/paper-card.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-dialog/paper-dialog.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-progress/paper-progress.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-fab/paper-fab.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-dropdown-menu/paper-dropdown-menu.html")">
@@ -49,14 +50,8 @@ app-header {
   padding: 48px;
   height: 100%;
 }
-#new-instance-dialog {
-  background-color: white;
-  height: 100%;
-  padding: 48px;
-}
 paper-dropdown-menu {
   width: 200px;
-  margin-right: 20px;
 }
 #new-instance-form paper-button:not([disabled]) {
   background: var(--paper-light-blue-500);
@@ -66,16 +61,48 @@ paper-dropdown-menu {
   @@apply(--paper-font-subhead);
 }
 </style>
-<script type="text/javascript">
-function showNewInstanceDialog() {
-  document.getElementById("new-instance-dialog").style.display = "";
-  document.getElementById("new-instance-open-button").style.display = "none";
-}
-function hideNewInstanceDialog() {
-  document.getElementById("new-instance-dialog").style.display = "none";
-  document.getElementById("new-instance-open-button").style.display = "";
-}
-</script>
+<dom-module id="new-instance-dialog">
+  <style>  
+	#new-instance-form {
+	  padding-left: 20px;
+	  padding-right: 20px;
+	  @@apply(--layout-vertical);
+	  @@apply(--layout-justified);
+	}
+  </style>
+	<template>
+		<paper-dialog id="dialog" modal=true>
+		  <h2>New Instance</h2>
+		  <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
+		    <paper-dropdown-menu label="Image" name="image" required>
+			    <paper-listbox class="dropdown-content">
+            <content></content>
+			    </paper-listbox>
+			  </paper-dropdown-menu>
+		    <paper-dropdown-menu label="Cluster" name="cluster" required>
+		      <paper-listbox class="dropdown-content" selected="0">
+		        <paper-item>Default</paper-item>
+		      </paper-listbox>
+		    </paper-dropdown-menu>
+		  </form>
+		  <div class="buttons">
+		    <paper-button dialog-dismiss>Cancel</paper-button>
+		    <paper-button dialog-confirm autofocus on-click="submit">Create</paper-button>
+		  </div>
+		</paper-dialog>
+	</template>
+	<script>
+  Polymer({
+    is: "new-instance-dialog",
+    open: function() {
+    	this.$.dialog.open();
+    },
+    submit: function() {
+    	this.$['new-instance-form'].submit();
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="instance-save-button">
   <template>
     <iron-ajax id="xhr"
@@ -294,6 +321,11 @@ function hideNewInstanceDialog() {
   </script>
 </head>
 <body class="fullbleed">
+<new-instance-dialog id="newInstanceDialog">
+  @for(imageName <- imageNames) {
+  <paper-item>@imageName</paper-item>
+  }
+</new-instance-dialog>
 <app-header-layout>
   <app-header condenses fixed>
     <app-toolbar class="layout container horizontal justified">
@@ -307,32 +339,9 @@ function hideNewInstanceDialog() {
         </form>
       </div>
     </app-toolbar>
-    <paper-fab icon="add" id="new-instance-open-button" title="New Instance" onclick="showNewInstanceDialog()"></paper-fab>
+    <paper-fab icon="add" id="new-instance-open-button" title="New Instance" onclick="newInstanceDialog.open()"></paper-fab>
   </app-header>
   <div id="content-wrapper">
-    <div id="new-instance-dialog" class="layout vertical" style="display: none">
-      <div class="layout horizontal baseline justified">
-        <div class="section-heading flex">New Instance</div>
-        <paper-icon-button icon="close" id="new-instance-close-button"
-          title="close form"
-          onclick="hideNewInstanceDialog()"></paper-icon-button>
-      </div>
-      <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
-        <paper-dropdown-menu label="Image" name="image" required>
-          <paper-listbox class="dropdown-content">
-            @for(imageName <- imageNames) {
-            <paper-item>@imageName</paper-item>
-            }
-          </paper-listbox>
-        </paper-dropdown-menu>
-        <paper-dropdown-menu label="Cluster" name="cluster" required>
-          <paper-listbox class="dropdown-content" selected="0">
-            <paper-item>Default</paper-item>
-          </paper-listbox>
-        </paper-dropdown-menu>
-        <paper-button onclick="document.getElementById('new-instance-form').submit()">Create</paper-button>
-      </form>
-    </div>
     <div id="main-content">
       <instances-container id="instances" url="@routes.MainController.getInstances.absoluteURL"></instances-container>
     </div>
