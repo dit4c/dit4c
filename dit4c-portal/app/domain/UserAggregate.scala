@@ -16,6 +16,7 @@ import java.time.Instant
 import domain.{InstanceAggregate => IA }
 import scala.collection.immutable.SortedSet
 import services.{InstanceAggregateManager => IAM}
+import services.InstanceAggregateManager.InstanceEnvelope
 
 object UserAggregate {
 
@@ -29,6 +30,7 @@ object UserAggregate {
       (InstanceAggregateManager.StartInstance.apply _)
         .tupled(StartInstance.unapply(this).get)
   }
+  case class StartInstanceFromInstance(clusterId: String, sourceInstance: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
   case object GetAllInstanceIds extends Command
@@ -69,6 +71,23 @@ class UserAggregate(
           self ! InstanceCreationConfirmation(instanceId)
       }
       op pipeTo sender
+    case StartInstanceFromInstance(clusterId, sourceInstance) =>
+      if (data.instances.contains(sourceInstance)) {
+        (instanceAggregateManager ? InstanceEnvelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
+          case InstanceAggregate.InstanceImage(image) =>
+            val op = (instanceAggregateManager ?
+                InstanceAggregateManager.StartInstance(clusterId, image))
+            op.onSuccess {
+              case InstanceAggregateManager.InstanceStarted(instanceId) =>
+                self ! InstanceCreationConfirmation(instanceId)
+            }
+            op pipeTo sender
+          case InstanceAggregate.NoImageExists =>
+            sender ! InstanceAggregate.NoImageExists
+        }
+      } else {
+        sender ! InstanceNotOwnedByUser
+      }
     case InstanceCreationConfirmation(instanceId) =>
       persist(CreatedInstance(instanceId))(updateData)
     case GetAllInstanceIds =>

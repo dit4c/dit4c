@@ -6,6 +6,7 @@
 <title>DIT4C</title>
 <script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
 </script>
+<link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-form/iron-form.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-icons/iron-icons.html")">
@@ -71,14 +72,22 @@ paper-dropdown-menu {
 	}
   </style>
 	<template>
-		<paper-dialog id="dialog" modal=true>
+		<paper-dialog id="dialog">
 		  <h2>New Instance</h2>
 		  <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
-		    <paper-dropdown-menu label="Image" name="image" required>
-			    <paper-listbox class="dropdown-content">
-            <content></content>
-			    </paper-listbox>
-			  </paper-dropdown-menu>
+        <template is="dom-if" if="{{isSet(image)}}" restamp="true">
+          <span>{{image}}</span>
+          <input name="image" type="hidden" value="{{image}}" />
+        </template>
+        <template is="dom-if" if="{{isNotSet(image)}}" restamp="true">
+			    <paper-dropdown-menu label="Image" name="image" required>
+				    <paper-listbox class="dropdown-content">
+						  @for(imageName <- imageNames) {
+						  <paper-item>@imageName</paper-item>
+						  }
+				    </paper-listbox>
+				  </paper-dropdown-menu>
+        </template>
 		    <paper-dropdown-menu label="Cluster" name="cluster" required>
 		      <paper-listbox class="dropdown-content" selected="0">
 		        <paper-item>Default</paper-item>
@@ -94,6 +103,20 @@ paper-dropdown-menu {
 	<script>
   Polymer({
     is: "new-instance-dialog",
+    properties: {
+      image: {
+    	  type: String,
+    	  value: null
+      }
+    },
+    isSet: function(v) {
+    	console.log(v);
+    	return Boolean(v);
+    },
+    isNotSet: function(v) {
+      console.log(v);
+      return !Boolean(v);
+    },
     open: function() {
     	this.$.dialog.open();
     },
@@ -171,6 +194,25 @@ paper-dropdown-menu {
   });
   </script>
 </dom-module>
+<dom-module id="instance-create-button">
+  <template>
+    <new-instance-dialog id="dialog" image="[[instanceId]]">
+    </new-instance-dialog>
+    <paper-icon-button icon="add"
+      title="new instance" on-click="openDialog"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-create-button",
+    properties: {
+      instanceId: String
+    },
+    openDialog: function() {
+      this.$.dialog.open();
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="instances-container">
   <style>
   .section-heading {
@@ -235,6 +277,13 @@ paper-dropdown-menu {
               value="0"
               indediscard="{{isTransitioning(item)}}"
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
+            <div class="card-actions layout horizontal-reverse">
+              <paper-icon-button icon="file-download"
+                title="download image" disabled></paper-icon-button>
+              <template is="dom-if" if="{{hasImage(item)}}">
+                <instance-create-button instance-id="{{item.id}}"></instance-create-button>
+              </template>
+            </div>
           </paper-card>
         </template>
       </div>
@@ -291,6 +340,14 @@ paper-dropdown-menu {
         default:                    return   0;
       }
     },
+    hasImage: function(item) {
+      switch (item.state) {
+        case "Uploaded":
+          return true;
+        default:
+          return false;
+      }   
+    },
     ready: function() {
       this.connect();
     },
@@ -321,11 +378,7 @@ paper-dropdown-menu {
   </script>
 </head>
 <body class="fullbleed">
-<new-instance-dialog id="newInstanceDialog">
-  @for(imageName <- imageNames) {
-  <paper-item>@imageName</paper-item>
-  }
-</new-instance-dialog>
+<new-instance-dialog id="newInstanceDialog"></new-instance-dialog>
 <app-header-layout>
   <app-header condenses fixed>
     <app-toolbar class="layout container horizontal justified">

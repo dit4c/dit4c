@@ -79,11 +79,16 @@ class MainController(
         },
         userData => {
           implicit val timeout = Timeout(1.minute)
-          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.StartInstance(
-              clusterLookup(userData.cluster),
-              imageLookup(userData.image)))).map {
+          val cluster = clusterLookup(userData.cluster)
+          val uaOp = imageLookup.get(userData.image) match {
+            case Some(image) => UserAggregate.StartInstance(cluster, image)
+            case None => UserAggregate.StartInstanceFromInstance(cluster, userData.image)
+          }
+          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, uaOp)).map {
             case InstanceAggregateManager.InstanceStarted(id) =>
               Ok(id)
+            case InstanceAggregate.NoImageExists =>
+              NotFound
           }
         }
     )
@@ -257,7 +262,7 @@ class MainController(
         "image" -> nonEmptyText,
         "cluster" -> nonEmptyText
     )(NewInstanceRequest.apply)(NewInstanceRequest.unapply).verifying(r =>
-        imageLookup.contains(r.image) && clusterLookup.contains(r.cluster)
+        clusterLookup.contains(r.cluster)
     )
   )
 

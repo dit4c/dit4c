@@ -31,7 +31,8 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= {
   val __ = "org.webjars.bower" 
   Seq(
-    __ %  "webcomponentsjs"        % "0.7.21",
+    __ %  "webcomponentsjs"        % "0.7.22",
+    __ %  "github-com-Polymer-polymer"                              % "1.7.0",
     __ %  "github-com-web-animations-web-animations-js"             % "2.2.1",
     __ %  "github-com-PolymerLabs-promise-polyfill"                 % "1.0.0",
     __ %  "github-com-PolymerElements-iron-flex-layout"             % "1.3.1",

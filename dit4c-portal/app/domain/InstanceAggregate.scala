@@ -62,6 +62,7 @@ object InstanceAggregate {
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
+  case object GetImage extends Command
 
   sealed trait Response
   case object Ack extends Response
@@ -75,6 +76,9 @@ object InstanceAggregate {
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
+  sealed trait GetImageResponse extends Response
+  case class InstanceImage(url: String) extends GetImageResponse
+  case object NoImageExists extends GetImageResponse
 
   sealed trait DomainEvent extends BaseDomainEvent
   case class StartedInstance(
@@ -208,6 +212,10 @@ class InstanceAggregate(
       stay
     case Event(Discard, InstanceData(clusterId, _, _, _)) =>
       stay
+    case Event(GetImage, InstanceData(_, _, _, Some(imageUrl))) =>
+      stay replying InstanceImage(imageUrl)
+    case Event(GetImage, InstanceData(_, _, _, None)) =>
+      stay replying NoImageExists
   }
 
   when(Discarded) {
@@ -233,6 +241,11 @@ class InstanceAggregate(
       stay
     case Event(Discard, InstanceData(clusterId, _, _, _)) =>
       stay
+  }
+
+  whenUnhandled {
+    case Event(GetImage, _) =>
+      stay replying NoImageExists
   }
 
   override def applyEvent(
