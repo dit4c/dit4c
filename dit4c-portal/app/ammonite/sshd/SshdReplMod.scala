@@ -33,7 +33,7 @@ import ammonite.repl.Repl
 
 import scala.language.postfixOps
 
-/**
+/*
  * An ssh server which serves ammonite repl as it's shell channel.
  * To start listening for incoming connections call
  * [[start()]] method. You can [[stop()]] the server at any moment.
