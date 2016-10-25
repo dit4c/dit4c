@@ -101,11 +101,12 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
     with ActorLogging {
 
   var keepAlive: Option[Cancellable] = None
+  case object KeepAlive
 
   override def preStart = {
     import context.dispatcher
     keepAlive = Some(
-        context.system.scheduler.schedule(1.second, 20.seconds, self, Instant.now.toString))
+        context.system.scheduler.schedule(1.second, 20.seconds, self, KeepAlive))
     in ! SchedulerGatewayActor.Up(self)
   }
 
@@ -125,6 +126,8 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
       log.debug(s"Msg from scheduler: $parsedMsg")
       in ! SchedulerAggregate.ReceiveSchedulerMessage(parsedMsg)
     // From portal
+    case KeepAlive =>
+      self ! Instant.now.toString
     case msg: String =>
       log.info(s"Sending text to client: $msg")
       out ! TextMessage(msg)
