@@ -99,7 +99,7 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     override def rktRunnerConfig =
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
-          "dit4c-instance-",
+          "dit4c-instance",
           config.authImage,
           config.listenerImage)
   }
