@@ -120,10 +120,14 @@ class UserAggregate(
         sender ! InstanceNotOwnedByUser
       }
     case ReceiveSharedInstance(sourceUserId, instanceId) =>
-      log.info(s"$userId receiving shared instance from $sourceUserId: $instanceId")
-      persist(ReceivedSharedInstance(sourceUserId, instanceId)) { evt =>
-        updateData(evt)
+      if (data.instances.contains(instanceId)) {
         sender ! InstanceReceived
+      } else {
+        log.info(s"$userId receiving shared instance from $sourceUserId: $instanceId")
+        persist(ReceivedSharedInstance(sourceUserId, instanceId)) { evt =>
+          updateData(evt)
+          sender ! InstanceReceived
+        }
       }
   }
 

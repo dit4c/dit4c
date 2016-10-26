@@ -167,17 +167,25 @@ class MainController(
     }
   }
 
-  def redeemSharingLink(token: String) = silhouette.SecuredAction.async { implicit request =>
-    implicit val timeout = Timeout(1.minute)
-    authorizationCodeGenerator.decode[InstanceSharingAuthorization](token) match {
-      case Success(a) =>
-        val msg = UserAggregate.ReceiveSharedInstance(a.userId, a.instanceId)
-        (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, msg)).map {
-          case UserAggregate.InstanceReceived =>
-            Redirect(routes.MainController.index())
+  def redeemSharingLink(token: String) = silhouette.UserAwareAction.async { implicit request =>
+    request.identity match {
+      case Some(user: IdentityService.User) =>
+        authorizationCodeGenerator.decode[InstanceSharingAuthorization](token) match {
+          case Success(a) =>
+            implicit val timeout = Timeout(1.minute)
+            val msg = UserAggregate.ReceiveSharedInstance(a.userId, a.instanceId)
+            (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, msg)).map {
+              case UserAggregate.InstanceReceived =>
+                Redirect(routes.MainController.index())
+            }
+          case Failure(exception) =>
+            Future.successful(Forbidden(exception.getMessage))
         }
-      case Failure(exception) =>
-        Future.successful(Forbidden(exception.getMessage))
+      case None =>
+        Future.successful {
+          Redirect(routes.MainController.index)
+            .withSession("redirect_uri" -> routes.MainController.redeemSharingLink(token).absoluteURL())
+        }
     }
   }
 
