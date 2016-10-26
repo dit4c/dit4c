@@ -84,11 +84,14 @@ class RktRunnerImpl(
           generateManifestFile(instanceId, image, portalUri)
         systemdRun <- privileged(systemdRunCmd)
         rkt <- rktCmd
+        // must be <64 characters, not start with "-" and not be entirely digits
+        hostname = "i-"+instanceId.toLowerCase.filter(_.isLetterOrDigit).take(61)
         output <- ce(
             systemdRun ++
             Seq(s"--unit=${podAppName(instanceId)}.service") ++
             rkt ++
             Seq("run", "--net=default", "--dns=8.8.8.8") ++
+            Seq(s"--hostname=$hostname", "--hosts-entry", s"127.0.0.1=$hostname") ++
             Seq(s"--pod-manifest=$manifestFile")
         )
       } yield publicKey
