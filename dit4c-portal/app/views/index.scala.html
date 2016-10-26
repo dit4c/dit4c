@@ -211,6 +211,57 @@ paper-dropdown-menu {
   });
   </script>
 </dom-module>
+<dom-module id="instance-share-button">
+  <style>  
+  #link-text {
+    width: 30em;
+    max-width: 100%;
+  }
+  </style>
+  <template>
+    <iron-ajax id="xhr"
+      method="POST"
+      url="{{url}}"
+      handle-as="json"
+      last-response="{{link}}"
+      on-response="handleResponse"></iron-ajax>
+    <paper-dialog id="dialog">
+      <div>
+        <paper-input id="link-text" label="sharing link"
+          value="{{link.url}}" on-click="clickText">
+        </paper-input>
+      </div>
+      <p>Expires @@ {{link.expires}}</p>
+    </paper-dialog>
+    <paper-icon-button icon="link"
+      title="share instance" on-click="generateLink"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-share-button",
+    properties: {
+      instanceId: String,
+      link: Object,
+      url: {
+        type: String,
+        computed: 'shareUrl(instanceId)'
+      }
+    },
+    shareUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/share';
+    },
+    generateLink: function() {
+      this.$.xhr.generateRequest();
+    },
+    handleResponse: function() {
+      this.$.dialog.open();
+    },
+    clickText: function() {
+      this.$['link-text'].$.input.select();
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="instance-export-button">
   <style>  
   a {
@@ -307,6 +358,7 @@ paper-dropdown-menu {
               secondary-progress="{{stateProgress(item)}}"></paper-progress>
             <div class="card-actions">
               <template is="dom-if" if="{{hasImage(item)}}">
+                <instance-share-button instance-id="{{item.id}}"></instance-share-button>
                 <instance-export-button instance-id="{{item.id}}"></instance-export-button>
                 <instance-create-button instance-id="{{item.id}}"></instance-create-button>
               </template>

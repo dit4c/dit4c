@@ -35,15 +35,19 @@ object UserAggregate {
   case class DiscardInstance(instanceId: String) extends Command
   case class GetInstanceImageUrl(instanceId: String) extends Command
   case object GetAllInstanceIds extends Command
+  case class ReceiveSharedInstance(sourceUserId: String, instanceId: String) extends Command
 
   sealed trait Response
   case object UnableToStartInstance extends Response
   case object InstanceNotOwnedByUser extends Response
   case class UserInstances(instanceIds: Set[String]) extends Response
+  case object InstanceReceived extends Response
 
   sealed trait DomainEvent { def timestamp: Instant }
   case class CreatedInstance(
       instanceId: String, timestamp: Instant = Instant.now) extends DomainEvent
+  case class ReceivedSharedInstance(
+      sourceUserId: String, instanceId: String, timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
@@ -115,6 +119,12 @@ class UserAggregate(
       } else {
         sender ! InstanceNotOwnedByUser
       }
+    case ReceiveSharedInstance(sourceUserId, instanceId) =>
+      log.info(s"$userId receiving shared instance from $sourceUserId: $instanceId")
+      persist(ReceivedSharedInstance(sourceUserId, instanceId)) { evt =>
+        updateData(evt)
+        sender ! InstanceReceived
+      }
   }
 
   def receiveRecover: PartialFunction[Any,Unit] = {
@@ -123,6 +133,8 @@ class UserAggregate(
 
   val updateData: DomainEvent => Unit = {
     case CreatedInstance(instanceId, _) =>
+      data = data.copy(instances = data.instances + instanceId)
+    case ReceivedSharedInstance(_, instanceId, _) =>
       data = data.copy(instances = data.instances + instanceId)
   }
 

@@ -32,6 +32,10 @@ import play.api.http.websocket.TextMessage
 import akka.stream.Materializer
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.StreamedResponse
+import utils.oauth.AuthorizationCodeGenerator
+import java.time.Instant
+import scala.util.Failure
+import scala.util.Success
 
 class MainController(
     val environment: Environment,
@@ -43,6 +47,7 @@ class MainController(
     val oauthDataHandler: InstanceOAuthDataHandler,
     val socialProviders: SocialProviderRegistry,
     val wsClient: WSClient,
+    val authorizationCodeGenerator: AuthorizationCodeGenerator,
     val publicImages: Seq[PublicImage])(implicit system: ActorSystem, materializer: Materializer)
     extends Controller
     with I18nSupport {
@@ -142,6 +147,37 @@ class MainController(
         Future.successful(NotFound)
       case UserAggregate.InstanceNotOwnedByUser =>
         Future.successful(Forbidden)
+    }
+  }
+
+  def createSharingLink(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+      case InstanceAggregate.InstanceImage(_) =>
+        val payload = InstanceSharingAuthorization(request.identity.id, instanceId)
+        // Good - it's a preserved instance, so we can go ahead
+        val expires = Instant.now
+        val token = authorizationCodeGenerator.create(payload, 60.minutes)
+        val url = routes.MainController.redeemSharingLink(token).absoluteURL()
+        Future.successful(Ok(Json.toJson(InstanceSharingLink(url, expires))))
+      case InstanceAggregate.NoImageExists =>
+        Future.successful(NotFound)
+      case UserAggregate.InstanceNotOwnedByUser =>
+        Future.successful(Forbidden)
+    }
+  }
+
+  def redeemSharingLink(token: String) = silhouette.SecuredAction.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    authorizationCodeGenerator.decode[InstanceSharingAuthorization](token) match {
+      case Success(a) =>
+        val msg = UserAggregate.ReceiveSharedInstance(a.userId, a.instanceId)
+        (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, msg)).map {
+          case UserAggregate.InstanceReceived =>
+            Redirect(routes.MainController.index())
+        }
+      case Failure(exception) =>
+        Future.successful(Forbidden(exception.getMessage))
     }
   }
 
@@ -295,6 +331,18 @@ class MainController(
 
   case class NewInstanceRequest(image: String, cluster: String)
   case class InstanceRegistrationRequest(uri: String)
+  case class InstanceSharingAuthorization(userId: String, instanceId: String)
+  case class InstanceSharingLink(url: String, expires: Instant)
+
+  implicit val formatInstanceSharingAuthorization: OFormat[InstanceSharingAuthorization] = (
+      (__ \ 'user).format[String] and
+      (__ \ 'instance).format[String]
+  )(InstanceSharingAuthorization.apply, unlift(InstanceSharingAuthorization.unapply))
+
+  implicit val writesInstanceSharingLink: OWrites[InstanceSharingLink] = (
+      (__ \ 'url).write[String] and
+      (__ \ 'expires).write[String]
+  )((isl: InstanceSharingLink) => (isl.url, isl.expires.toString))
 
   private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 

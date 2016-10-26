@@ -10,8 +10,10 @@ POST    /instances/                         controllers.MainController.newInstan
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
 PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 GET     /instances/:instanceId/export       controllers.MainController.exportImage(instanceId)
+POST    /instances/:instanceId/share        controllers.MainController.createSharingLink(instanceId)
 PUT     /instances/                         controllers.MainController.instanceRegistration
 PUT     /images/                            controllers.MainController.imageRegistration
+GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
 
