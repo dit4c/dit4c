@@ -123,7 +123,10 @@ class SchedulerAggregate()
           log.warning(s"Unable to send: $msg")
           SchedulerAggregate.UnableToSendMessage
       }
-      stay replying response
+      if (sender == context.system.deadLetters) stay
+      else {
+        stay replying response
+      }
   }
 
   override def applyEvent(

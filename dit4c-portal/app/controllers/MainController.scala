@@ -36,6 +36,7 @@ import utils.oauth.AuthorizationCodeGenerator
 import java.time.Instant
 import scala.util.Failure
 import scala.util.Success
+import play.api.http.websocket.CloseMessage
 
 class MainController(
     val environment: Environment,
@@ -389,7 +390,7 @@ class GetInstancesActor(out: ActorRef,
     import context.dispatcher
     import akka.pattern.pipe
     implicit val timeout = Timeout(5.seconds)
-    pollFunc = Some(context.system.scheduler.schedule(Duration.Zero, 5.seconds) {
+    pollFunc = Some(context.system.scheduler.schedule(1.micro, 5.seconds) {
       (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
         case UserAggregate.UserInstances(instanceIds) =>
           instanceIds.toSeq.foreach { id =>
@@ -416,6 +417,8 @@ class GetInstancesActor(out: ActorRef,
   override def receive = {
     case r: InstanceResponse =>
       out ! TextMessage(Json.asciiStringify(Json.toJson(r)))
+    case _: CloseMessage =>
+      context.stop(self)
     case unknown =>
       log.error(s"Unhandled message: $unknown")
       context.stop(self)

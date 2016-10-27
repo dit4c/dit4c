@@ -322,7 +322,7 @@ paper-dropdown-menu {
     <div class="layout vertical" style="width: 100%">
       <div class="section-heading">Running Instances</div>
       <div class="card-container">
-        <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" observe="state">
+        <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" sort="reverseOrderById" observe="state">
           <paper-card>
             <div class="card-content">
               <div class="instance-id">
@@ -346,7 +346,7 @@ paper-dropdown-menu {
       </div>
       <div class="section-heading">Previous Instances</div>
       <div class="card-container">
-        <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state">
+        <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state" sort="reverseOrderById">
           <paper-card>
             <div class="card-content">
               <div class="instance-id">{{item.id}}</div>
@@ -382,9 +382,6 @@ paper-dropdown-menu {
       url: {
         type: String
       }
-    },
-    listeners: {
-      'discarded': 'refresh',
     },
     isPrevious: function(item) {
       return !this.isRunning(item);
@@ -454,6 +451,11 @@ paper-dropdown-menu {
         }
       }
       this.push('instances', instanceStatusUpdate);
+    },
+    reverseOrderById: function(a, b) {
+    	if (a.id < b.id) return 1;
+    	if (a.id > b.id) return -1;
+    	return 0;
     }
   });
   </script>

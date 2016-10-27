@@ -78,7 +78,6 @@ class AppComponents(context: Context)
       config <- configuration.getConfig("images.public").toSeq
       key <- config.subKeys
       c <- config.getConfig(key)
-      _ = println(c.getString("display").orElse(Some(key)), c.getString("image"))
       display <- c.getString("display").orElse(Some(key))
       image <- c.getString("image")
     } yield PublicImage(display, image)

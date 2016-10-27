@@ -139,7 +139,7 @@ class InstanceAggregate(
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved)
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
-          clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.ConfirmInstanceUpload(instanceId))
+          clusterSharder ! ClusterSharder.Envelope(clusterId, ClusterAggregate.ConfirmInstanceUpload(instanceId))
           stay
         case _ => stay
       }
