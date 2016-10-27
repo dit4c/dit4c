@@ -352,8 +352,8 @@ class MainController(
 
   implicit val writesInstanceSharingLink: OWrites[InstanceSharingLink] = (
       (__ \ 'url).write[String] and
-      (__ \ 'expires).write[String]
-  )((isl: InstanceSharingLink) => (isl.url, isl.expires.toString))
+      (__ \ 'expires).write[Instant]
+  )((isl: InstanceSharingLink) => (isl.url, isl.expires))
 
   private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 
@@ -397,14 +397,14 @@ class GetInstancesActor(out: ActorRef,
         case UserAggregate.UserInstances(instanceIds) =>
           instanceIds.toSeq.foreach { id =>
             (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(id, InstanceAggregate.GetStatus))
-              .collect { case msg: InstanceAggregate.RemoteStatus =>
+              .collect { case msg: InstanceAggregate.CurrentStatus =>
                 val url: Option[String] =
                   msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(id, effectiveState(msg.state, url), url)
+                InstanceResponse(id, effectiveState(msg.state, url), url, msg.timestamps)
               }
               .recover { case e =>
                 log.error(e, s"Failed to get instance status for $id")
-                InstanceResponse(id, "Unknown", None)
+                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps())
               }
               .pipeTo(self)
           }
@@ -426,12 +426,19 @@ class GetInstancesActor(out: ActorRef,
       context.stop(self)
   }
 
-  case class InstanceResponse(id: String, state: String, url: Option[String])
+  case class InstanceResponse(
+      id: String, state: String, url: Option[String], timestamps: InstanceAggregate.EventTimestamps)
+
+  implicit private val writesEventTimestamps: Writes[InstanceAggregate.EventTimestamps] = (
+      (__ \ 'created).writeNullable[Instant] and
+      (__ \ 'completed).writeNullable[Instant]
+    )(unlift(InstanceAggregate.EventTimestamps.unapply))
 
   implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
       (__ \ 'id).write[String] and
       (__ \ 'state).write[String] and
-      (__ \ 'url).writeNullable[String]
+      (__ \ 'url).writeNullable[String] and
+      (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps]
     )(unlift(InstanceResponse.unapply))
 
   private def effectiveState(state: String, url: Option[String]) = state match {

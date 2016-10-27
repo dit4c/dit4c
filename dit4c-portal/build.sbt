@@ -63,7 +63,8 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-paper-ripple"                 % "1.0.5",
     __ %  "github-com-PolymerElements-app-layout"                   % "0.9.1"
       exclude(__, "github-com-polymerelements-iron-media-query")
-      exclude(__, "github-com-polymerelements-iron-scroll-target-behavior")
+      exclude(__, "github-com-polymerelements-iron-scroll-target-behavior"),
+    __ % "moment" % "2.15.2"
   )
 }
 

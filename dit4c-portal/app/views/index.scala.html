@@ -6,6 +6,8 @@
 <title>DIT4C</title>
 <script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
 </script>
+<script src="@routes.Assets.versioned("lib/moment/min/moment-with-locales.min.js")">
+</script>
 @trackingScript
 <link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
@@ -63,64 +65,107 @@ paper-dropdown-menu {
   @@apply(--paper-font-subhead);
 }
 </style>
+<script type="text/javascript">
+moment.locale(window.navigator.userLanguage || window.navigator.language);
+</script>
+<dom-module id="local-time">
+  <template>
+    <span>
+    <template is="dom-if" if$="[[instantdefined]]">
+      <content select=".prefix"></content>
+      <span title="{{instant}}">{{display}}</span>
+      <content select=".suffix"></content>
+    </template>
+    <span hidden$="[[instantdefined]]">
+      <content select=".or-else"></content>
+    </span>
+    </span>
+  </template>
+  <script>
+  Polymer({
+    is: "local-time",
+    properties: {
+      instant: String,
+      format: {
+        type: String,
+        value: 'LLL Z'
+      },
+      instantdefined: {
+        type: Boolean,
+        computed: 'isDefined(instant)'
+      },
+      display: {
+        type: String,
+        computed: 'computeDisplay(instant, format)'
+      }
+    },
+    isDefined: function(instant) {
+      return Boolean(instant);
+    },
+    computeDisplay: function(instant, format) {
+      return moment(instant).format(format);
+    }
+  });
+  </script>
+</dom-module>
 <dom-module id="new-instance-dialog">
   <style>
-	#new-instance-form {
-	  padding-left: 20px;
-	  padding-right: 20px;
-	  @@apply(--layout-vertical);
-	  @@apply(--layout-justified);
-	}
+  #new-instance-form {
+    padding-left: 20px;
+    padding-right: 20px;
+    @@apply(--layout-vertical);
+    @@apply(--layout-justified);
+  }
   </style>
-	<template>
-		<paper-dialog id="dialog">
-		  <h2>New Instance</h2>
-		  <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
+  <template>
+    <paper-dialog id="dialog">
+      <h2>New Instance</h2>
+      <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
         <template is="dom-if" if="{{isSet(image)}}" restamp="true">
           <span>{{image}}</span>
           <input name="image" type="hidden" value="{{image}}" />
         </template>
         <template is="dom-if" if="{{isNotSet(image)}}" restamp="true">
-			    <paper-dropdown-menu label="Image" name="image" required>
-				    <paper-listbox class="dropdown-content">
-						  @for(imageName <- imageNames) {
-						  <paper-item>@imageName</paper-item>
-						  }
-				    </paper-listbox>
-				  </paper-dropdown-menu>
+          <paper-dropdown-menu label="Image" name="image" required>
+            <paper-listbox class="dropdown-content">
+              @for(imageName <- imageNames) {
+              <paper-item>@imageName</paper-item>
+              }
+            </paper-listbox>
+          </paper-dropdown-menu>
         </template>
-		    <paper-dropdown-menu label="Cluster" name="cluster" required>
-		      <paper-listbox class="dropdown-content" selected="0">
-		        <paper-item>Default</paper-item>
-		      </paper-listbox>
-		    </paper-dropdown-menu>
-		  </form>
-		  <div class="buttons">
-		    <paper-button dialog-dismiss>Cancel</paper-button>
-		    <paper-button dialog-confirm autofocus on-click="submit">Create</paper-button>
-		  </div>
-		</paper-dialog>
-	</template>
-	<script>
+        <paper-dropdown-menu label="Cluster" name="cluster" required>
+          <paper-listbox class="dropdown-content" selected="0">
+            <paper-item>Default</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+      </form>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm autofocus on-click="submit">Create</paper-button>
+      </div>
+    </paper-dialog>
+  </template>
+  <script>
   Polymer({
     is: "new-instance-dialog",
     properties: {
       image: {
-    	  type: String,
-    	  value: null
+        type: String,
+        value: null
       }
     },
     isSet: function(v) {
-    	return Boolean(v);
+      return Boolean(v);
     },
     isNotSet: function(v) {
       return !Boolean(v);
     },
     open: function() {
-    	this.$.dialog.open();
+      this.$.dialog.open();
     },
     submit: function() {
-    	this.$['new-instance-form'].submit();
+      this.$['new-instance-form'].submit();
     }
   });
   </script>
@@ -232,7 +277,11 @@ paper-dropdown-menu {
           value="{{link.url}}" on-click="clickText">
         </paper-input>
       </div>
-      <p>Expires @@ {{link.expires}}</p>
+      <div>
+        <local-time instant="{{link.expires}}">
+          <span class="prefix">Expires</span>
+        </local-time>
+      </div>
       <div class="buttons">
         <paper-button dialog-dismiss>Got it!</paper-button>
       </div>
@@ -274,8 +323,8 @@ paper-dropdown-menu {
   </style>
   <template>
     <a href="{{downloadUrl(instanceId)}}" tabindex="-1">
-	    <paper-icon-button icon="file-download"
-	      title="download image"></paper-icon-button>
+      <paper-icon-button icon="file-download"
+        title="download image"></paper-icon-button>
     </a>
   </template>
   <script>
@@ -285,7 +334,7 @@ paper-dropdown-menu {
       instanceId: String
     },
     downloadUrl: function(instanceId) {
-    	return '@routes.MainController.getInstances()'+instanceId+'/export';
+      return '@routes.MainController.getInstances()'+instanceId+'/export';
     },
     download: function() {
       window.location.href = this.downloadUrl();
@@ -304,6 +353,7 @@ paper-dropdown-menu {
     padding-bottom: 20px;
   }
   paper-card {
+    min-width: 300px;
     margin-right: 10px;
     margin-bottom: 10px;
   }
@@ -321,6 +371,16 @@ paper-dropdown-menu {
   .instance-state {
     @@apply(--paper-font-body1);
   }
+  .instance-time {
+    @@apply(--paper-font-body1);
+    font-size: 75%;
+    border-bottom: solid 1px var(--paper-light-blue-50); 
+  }
+  .instance-time .label {
+    display: inline-block;
+    min-width: 8em;
+    font-style: italic;
+  }
   </style>
   <template>
     <div class="layout vertical" style="width: 100%">
@@ -336,6 +396,9 @@ paper-dropdown-menu {
                 <template is="dom-if" if="{{!item.url}}">{{item.id}}</template>
               </div>
               <div class="instance-state">{{item.state}}</div>
+              <local-time class="instance-time" instant="{{item.timestamps.created}}">
+                <span class="label prefix">Created</span>
+              </local-time>
             </div>
             <paper-progress
               value="100"
@@ -355,6 +418,17 @@ paper-dropdown-menu {
             <div class="card-content">
               <div class="instance-id">{{item.id}}</div>
               <div class="instance-state">{{item.state}}</div>
+              <div class="instance-time">
+                <local-time instant="{{item.timestamps.created}}">
+                  <span class="label prefix">Created</span>
+                </local-time>
+              </div>
+              <div class="instance-time">
+                <local-time instant="{{item.timestamps.completed}}">
+                  <span class="label prefix">Completed</span>
+                  <span class="or-else">&nbsp;</span>
+                </local-time>
+              </div>
             </div>
             <paper-progress
               value="0"
@@ -457,9 +531,9 @@ paper-dropdown-menu {
       this.push('instances', instanceStatusUpdate);
     },
     reverseOrderById: function(a, b) {
-    	if (a.id < b.id) return 1;
-    	if (a.id > b.id) return -1;
-    	return 0;
+      if (a.id < b.id) return 1;
+      if (a.id > b.id) return -1;
+      return 0;
     }
   });
   </script>

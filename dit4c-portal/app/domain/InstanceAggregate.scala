@@ -49,7 +49,12 @@ object InstanceAggregate {
       clusterId: String,
       jwk: Option[PublicJwk] = None,
       uri: Option[String] = None,
-      imageUrl: Option[String] = None) extends Data
+      imageUrl: Option[String] = None,
+      timestamps: EventTimestamps = EventTimestamps()) extends Data
+
+  case class EventTimestamps(
+      created: Option[Instant] = None,
+      completed: Option[Instant] = None)
 
   sealed trait Command
   case object GetStatus extends Command
@@ -68,8 +73,8 @@ object InstanceAggregate {
   case object Ack extends Response
   sealed trait StatusResponse extends Response
   case object DoesNotExist extends StatusResponse
-  case class RemoteStatus(
-      state: String, uri: Option[String]) extends StatusResponse
+  case class CurrentStatus(
+      state: String, uri: Option[String], timestamps: EventTimestamps) extends StatusResponse
   sealed trait GetJwkResponse extends Response
   case class InstanceJwk(jwk: JsObject) extends GetJwkResponse
   case object NoJwkExists extends GetJwkResponse
@@ -83,6 +88,8 @@ object InstanceAggregate {
   sealed trait DomainEvent extends BaseDomainEvent
   case class StartedInstance(
       clusterId: String, timestamp: Instant = Instant.now) extends DomainEvent
+  case class DiscardedInstance(timestamp: Instant = Instant.now) extends DomainEvent
+  case class PreservedInstance(timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedRsaPublicKey(
       publicExponent: BigInt, modulus: BigInt, timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedUri(
@@ -122,7 +129,7 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _)) =>
+    case Event(GetStatus, InstanceData(clusterId, _, _, _, _)) =>
       // Start actor listening
       context.actorOf(
           Props(classOf[GetStatusRequestActor], sender),
@@ -131,29 +138,29 @@ class InstanceAggregate(
       context.system.eventStream.publish(
           ClusterSharder.Envelope(clusterId, ClusterAggregate.GetInstanceStatus(instanceId)))
       stay
-    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(clusterId, _, uri, imageUrl)) =>
+    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(clusterId, _, uri, imageUrl, ts)) =>
       // Tell any listening actors
-      context.actorSelection("get-status-request-*") ! RemoteStatus(state.toString, uri)
+      context.actorSelection("get-status-request-*") ! CurrentStatus(state.toString, uri, ts)
       state match {
-        case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded)
-        case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved)
+        case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance())
+        case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
           clusterSharder ! ClusterSharder.Envelope(clusterId, ClusterAggregate.ConfirmInstanceUpload(instanceId))
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _)) =>
+    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _, _)) =>
       stay replying InstanceJwk(jwk.toJson)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _)) =>
+    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _, _)) =>
       stay replying {
         jwk(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociateRsaPublicKey(e, n), InstanceData(_, Some(RsaJwk(ce, cn)), _, _)) if e == ce && n == cn =>
+    case Event(AssociateRsaPublicKey(e, n), InstanceData(_, Some(RsaJwk(ce, cn)), _, _, _)) if e == ce && n == cn =>
       // Same as current - no need to update
       stay replying Ack
     case Event(AssociateRsaPublicKey(e, n), _: InstanceData) =>
@@ -161,7 +168,7 @@ class InstanceAggregate(
       stay applying AssociatedRsaPublicKey(e, n) andThen { _ =>
         requester ! Ack
       }
-    case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri), _)) if currentUri == newUri =>
+    case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri), _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
     case Event(AssociateUri(uri), _: InstanceData) =>
@@ -175,29 +182,29 @@ class InstanceAggregate(
         // TODO: Notify scheduler
         requester ! Ack
       }
-    case Event(Save, InstanceData(clusterId, _, _, _)) =>
+    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
       clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.SaveInstance(instanceId))
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _)) =>
+    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
       clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.DiscardInstance(instanceId))
       stay
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _)) =>
-      stay replying RemoteStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None)
+    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _)) =>
+    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _, _)) =>
       stay replying InstanceJwk(jwk.toJson)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _)) =>
+    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _, _)) =>
       stay replying {
         jwk(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(_: AssociateRsaPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -208,19 +215,19 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _)) =>
+    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _)) =>
+    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
       stay
-    case Event(GetImage, InstanceData(_, _, _, Some(imageUrl))) =>
+    case Event(GetImage, InstanceData(_, _, _, Some(imageUrl), _)) =>
       stay replying InstanceImage(imageUrl)
-    case Event(GetImage, InstanceData(_, _, _, None)) =>
+    case Event(GetImage, InstanceData(_, _, _, None, _)) =>
       stay replying NoImageExists
   }
 
   when(Discarded) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _)) =>
-      stay replying RemoteStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None)
+    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -237,9 +244,9 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _)) =>
+    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _)) =>
+    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
       stay
   }
 
@@ -250,16 +257,36 @@ class InstanceAggregate(
 
   override def applyEvent(
       domainEvent: DomainEvent,
-      currentData: Data): Data = (domainEvent, currentData) match {
-    case (StartedInstance(clusterId, _), _) => InstanceData(clusterId)
-    case (AssociatedRsaPublicKey(e, n, _), data: InstanceData) =>
-      data.copy(jwk = Some(RsaJwk(e, n)))
-    case (AssociatedUri(uri, _), data: InstanceData) =>
-      data.copy(uri = Some(uri))
-    case (AssociatedImage(uri, _), data: InstanceData) =>
-      data.copy(imageUrl = Some(uri))
-    case p =>
-      throw new Exception(s"Unknown state/data combination: $p")
+      currentData: Data): Data = {
+    def unhandled: Data =
+      try {
+        currentData
+      } finally {
+        throw new Exception(s"Unknown state/data combination: ($domainEvent, $currentData)")
+      }
+    domainEvent match {
+      case StartedInstance(clusterId, ts) => InstanceData(clusterId, timestamps = EventTimestamps(Some(ts)) )
+      case PreservedInstance(ts) => currentData match {
+        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = Some(ts)))
+        case _ => unhandled
+      }
+      case DiscardedInstance(ts) => currentData match {
+        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = Some(ts)))
+        case _ => unhandled
+      }
+      case AssociatedRsaPublicKey(e, n, _) => currentData match {
+        case data: InstanceData => data.copy(jwk = Some(RsaJwk(e, n)))
+        case _ => unhandled
+      }
+      case AssociatedUri(uri, _) => currentData match {
+        case data: InstanceData => data.copy(uri = Some(uri))
+        case _ => unhandled
+      }
+      case AssociatedImage(uri, _) => currentData match {
+        case data: InstanceData => data.copy(imageUrl = Some(uri))
+        case _ => unhandled
+      }
+    }
   }
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
