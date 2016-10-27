@@ -87,6 +87,13 @@ class AppComponents(context: Context)
     configuration.underlying.as[String]("images.server"),
     configuration.underlying.as[String]("images.saveHelper"))
 
+  val trackingScripts = TrackingScripts(play.twirl.api.HtmlFormat.fill(List[Option[play.twirl.api.Html]](
+    configuration.getString("tracking.ga.id").map { trackingId =>
+      views.html.includes.tracking.ga(trackingId,
+          configuration.getBoolean("tracking.ga.errors").getOrElse(false))
+    }
+  ).flatten))
+
   // ClusterSharder/AggregateManager setup and eventbus subscription
   val schedulerSharder = SchedulerSharder()(actorSystem)
       .taggedWith[services.SchedulerSharder.type]

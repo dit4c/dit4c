@@ -37,10 +37,12 @@ import java.time.Instant
 import scala.util.Failure
 import scala.util.Success
 import play.api.http.websocket.CloseMessage
+import play.twirl.api.Html
 
 class MainController(
     val environment: Environment,
     val messagesApi: MessagesApi,
+    val trackingScripts: TrackingScripts,
     val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
     val userAggregateManager: ActorRef @@ UserAggregateManager,
     val silhouette: Silhouette[DefaultEnv],
@@ -62,9 +64,9 @@ class MainController(
   def index = silhouette.UserAwareAction { implicit request =>
     request.identity match {
       case Some(IdentityService.User(_, _)) =>
-        Ok(views.html.index(imageLookup.keys.toList.sorted))
+        Ok(views.html.index(imageLookup.keys.toList.sorted, trackingScripts.html))
       case None =>
-        Ok(views.html.login(noneIfProd(loginForm), socialProviders))
+        Ok(views.html.login(noneIfProd(loginForm), socialProviders, trackingScripts.html))
     }
   }
 
@@ -194,7 +196,7 @@ class MainController(
     loginForm.bindFromRequest.fold(
       formWithErrors => Future.successful {
         // binding failure, you retrieve the form containing errors:
-        BadRequest(views.html.login(noneIfProd(formWithErrors), socialProviders))
+        BadRequest(views.html.login(noneIfProd(formWithErrors), socialProviders, trackingScripts.html))
       },
       userData => {
         val loginInfo = LoginInfo("dummy", userData.identity)
@@ -442,3 +444,5 @@ class GetInstancesActor(out: ActorRef,
 }
 
 case class LoginData(identity: String)
+
+case class TrackingScripts(html: Html)

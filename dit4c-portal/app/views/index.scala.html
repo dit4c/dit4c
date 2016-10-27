@@ -1,4 +1,4 @@
-@(imageNames: Seq[String], pageTitle: String = "App Instances")(implicit request: RequestHeader)
+@(imageNames: Seq[String], trackingScript: Html, pageTitle: String = "App Instances")(implicit request: RequestHeader)
 
 <!DOCTYPE html>
 <html>
@@ -6,6 +6,7 @@
 <title>DIT4C</title>
 <script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
 </script>
+@trackingScript
 <link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-form/iron-form.html")">

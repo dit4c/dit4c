@@ -1,4 +1,4 @@
-@(dummyIdForm: Option[Form[controllers.LoginData]], socialProviders: com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry )(implicit messages: Messages)
+@(dummyIdForm: Option[Form[controllers.LoginData]], socialProviders: com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry, trackingScript: Html)(implicit messages: Messages)
 
 <!DOCTYPE html>
 <html>
@@ -38,6 +38,7 @@ paper-button.provider {
   text-decoration: initial;
 }
 </style>
+@trackingScript
 <script>
 function submit(form) {
 	var valid = Polymer.dom(form).querySelectorAll('paper-input').reduce(function(wasValid, n) {
