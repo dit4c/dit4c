@@ -22,7 +22,8 @@
     <paper-dialog id="dialog">
       <div>
         <paper-input id="link-text" label="sharing link"
-          value="{{link.url}}" on-click="clickText">
+          value="{{link.url}}"
+          on-click="selectText">
         </paper-input>
       </div>
       <div>
@@ -31,7 +32,7 @@
         </local-time>
       </div>
       <div class="buttons">
-        <paper-button dialog-dismiss>Got it!</paper-button>
+        <paper-button on-click="closeDialog">Got it!</paper-button>
       </div>
     </paper-dialog>
     <paper-icon-button icon="link"
@@ -57,8 +58,13 @@
     handleResponse: function() {
       this.$.dialog.open();
     },
-    clickText: function() {
+    selectText: function() {
       this.$['link-text'].$.input.select();
+    },
+    closeDialog: function() {
+    // Hack to handle weird "already opened=false" behaviour
+      this.$.dialog.opened = true;
+      this.$.dialog.close();
     }
   });
   </script>
