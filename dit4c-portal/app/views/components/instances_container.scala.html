@@ -7,6 +7,14 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.WebComponentsController.component("friendly-name")">
+<link rel="import" href="@routes.WebComponentsController.component("instance-create-button")">
+<link rel="import" href="@routes.WebComponentsController.component("instance-discard-button")">
+<link rel="import" href="@routes.WebComponentsController.component("instance-export-button")">
+<link rel="import" href="@routes.WebComponentsController.component("instance-save-button")">
+<link rel="import" href="@routes.WebComponentsController.component("instance-share-button")">
+<link rel="import" href="@routes.WebComponentsController.component("local-time")">
+<link rel="import" href="@routes.WebComponentsController.component("new-instance-dialog")">
 
 <dom-module id="instances-container">
   <style>
@@ -31,8 +39,12 @@
   paper-card .card-actions {
     @@apply(--layout-horizontal-reverse);
   }
-  .instance-id {
+  .instance-name {
     @@apply(--paper-font-body2);
+  }
+  .instance-id {
+    @@apply(--paper-font-code1);
+    font-size: 75%;
   }
   .instance-state {
     @@apply(--paper-font-body1);
@@ -55,13 +67,14 @@
         <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" sort="reverseOrderById" observe="state">
           <paper-card>
             <div class="card-content">
-              <div class="instance-id">
+              <div class="instance-name">
                 <template is="dom-if" if="{{item.url}}">
-                  <a href="{{item.url}}">{{item.id}}</a>
+                  <a href="{{item.url}}"><friendly-name value="{{item.id}}"></friendly-name></a>
                 </template>
-                <template is="dom-if" if="{{!item.url}}">{{item.id}}</template>
+                <template is="dom-if" if="{{!item.url}}"><friendly-name value="{{item.id}}"></friendly-name></template>
               </div>
               <div class="instance-state">{{item.state}}</div>
+              <div class="instance-id" title="Instance ID">{{item.id}}</div>
               <local-time class="instance-time" instant="{{item.timestamps.created}}">
                 <span class="label prefix">Created</span>
               </local-time>
@@ -82,8 +95,9 @@
         <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state" sort="reverseOrderById">
           <paper-card>
             <div class="card-content">
-              <div class="instance-id">{{item.id}}</div>
+              <div class="instance-name"><friendly-name value="{{item.id}}"></friendly-name></div>
               <div class="instance-state">{{item.state}}</div>
+              <div class="instance-id" title="Instance ID">{{item.id}}</div>
               <div class="instance-time">
                 <local-time instant="{{item.timestamps.created}}">
                   <span class="label prefix">Created</span>
