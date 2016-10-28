@@ -14,8 +14,11 @@ POST    /instances/:instanceId/share        controllers.MainController.createSha
 PUT     /instances/                         controllers.MainController.instanceRegistration
 PUT     /images/                            controllers.MainController.imageRegistration
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
+
+# Assets
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
+GET     /web-components/:name.html          controllers.WebComponentsController.component(name)
 
 # Websocket messaging
 GET     /messaging/scheduler/:id            controllers.MessagingController.schedulerSocket(id)

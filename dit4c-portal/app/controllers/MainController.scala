@@ -59,7 +59,7 @@ class MainController(
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
 
-  val log = play.Logger.underlying
+  val log = play.api.Logger(this.getClass)
 
   def index = silhouette.UserAwareAction { implicit request =>
     request.identity match {

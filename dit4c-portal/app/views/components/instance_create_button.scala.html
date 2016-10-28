@@ -1,0 +1,24 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+<link rel="import" href="@routes.WebComponentsController.component("new-instance-dialog")">
+
+<dom-module id="instance-create-button">
+  <template>
+    <new-instance-dialog id="dialog" image="[[instanceId]]">
+    </new-instance-dialog>
+    <paper-icon-button icon="add"
+      title="new instance" on-click="openDialog"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-create-button",
+    properties: {
+      instanceId: String
+    },
+    openDialog: function() {
+      this.$.dialog.open();
+    }
+  });
+  </script>
+</dom-module>

@@ -1,0 +1,39 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/iron-ajax/iron-ajax.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+
+<dom-module id="instance-discard-button">
+  <template>
+    <iron-ajax id="xhr"
+      method="PUT"
+      url="{{url}}"
+      on-response="handleResponse"></iron-ajax>
+    <paper-icon-button icon="close"
+      title="discard instance"></paper-icon-button>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-discard-button",
+    properties: {
+      instanceId: String,
+      url: {
+        type: String,
+        computed: 'discardUrl(instanceId)'
+      }
+    },
+    listeners: {
+      'click': 'discard',
+    },
+    discardUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/discard';
+    },
+    handleResponse: function() {
+      this.fire('discarded', {"instanceId": this.instanceId});
+    },
+    discard: function() {
+      this.$.xhr.generateRequest();
+    }
+  });
+  </script>
+</dom-module>

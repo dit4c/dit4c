@@ -1,0 +1,75 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-form/iron-form.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-icons/iron-icons.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-dialog/paper-dialog.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-dropdown-menu/paper-dropdown-menu.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-item/paper-item.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-listbox/paper-listbox.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+
+<dom-module id="new-instance-dialog">
+  <style>
+  #new-instance-form {
+    padding-left: 20px;
+    padding-right: 20px;
+    @@apply(--layout-vertical);
+    @@apply(--layout-justified);
+  }
+  </style>
+  <template>
+    <paper-dialog id="dialog">
+      <h2>New Instance</h2>
+      <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
+        <template is="dom-if" if="{{isSet(image)}}" restamp="true">
+          <span>{{image}}</span>
+          <input name="image" type="hidden" value="{{image}}" />
+        </template>
+        <template is="dom-if" if="{{isNotSet(image)}}" restamp="true">
+          <paper-dropdown-menu label="Image" name="image" required>
+            <paper-listbox class="dropdown-content">
+              <content select=".image-option"></content>
+            </paper-listbox>
+          </paper-dropdown-menu>
+        </template>
+        <paper-dropdown-menu label="Cluster" name="cluster" required>
+          <paper-listbox class="dropdown-content" selected="0">
+            <paper-item>Default</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+      </form>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm autofocus on-click="submit">Create</paper-button>
+      </div>
+    </paper-dialog>
+  </template>
+  <script>
+  Polymer({
+    is: "new-instance-dialog",
+    properties: {
+      image: {
+        type: String,
+        value: null
+      }
+    },
+    isSet: function(v) {
+      return Boolean(v);
+    },
+    isNotSet: function(v) {
+      return !Boolean(v);
+    },
+    open: function() {
+      this.$.dialog.open();
+    },
+    submit: function() {
+      this.$['new-instance-form'].submit();
+    }
+  });
+  </script>
+</dom-module>

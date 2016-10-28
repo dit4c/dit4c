@@ -1,0 +1,28 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+
+<dom-module id="instance-export-button">
+  <style>  
+  a {
+    color: black;
+  }
+  </style>
+  <template>
+    <a href="{{downloadUrl(instanceId)}}" tabindex="-1">
+      <paper-icon-button icon="file-download"
+        title="download image"></paper-icon-button>
+    </a>
+  </template>
+  <script>
+  Polymer({
+    is: "instance-export-button",
+    properties: {
+      instanceId: String
+    },
+    downloadUrl: function(instanceId) {
+      return '@routes.MainController.getInstances()'+instanceId+'/export';
+    }
+  });
+  </script>
+</dom-module>

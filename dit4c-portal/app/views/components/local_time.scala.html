@@ -1,0 +1,48 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<script src="@routes.Assets.versioned("lib/moment/min/moment-with-locales.min.js")">
+</script>
+
+<dom-module id="local-time">
+  <template>
+    <span>
+    <template is="dom-if" if$="[[instantdefined]]">
+      <content select=".prefix"></content>
+      <span title="{{instant}}">{{display}}</span>
+      <content select=".suffix"></content>
+    </template>
+    <span hidden$="[[instantdefined]]">
+      <content select=".or-else"></content>
+    </span>
+    </span>
+  </template>
+	<script type="text/javascript">
+	moment.locale(window.navigator.userLanguage || window.navigator.language);
+	</script>
+  <script>
+  Polymer({
+    is: "local-time",
+    properties: {
+      instant: String,
+      format: {
+        type: String,
+        value: 'LLL Z'
+      },
+      instantdefined: {
+        type: Boolean,
+        computed: 'isDefined(instant)'
+      },
+      display: {
+        type: String,
+        computed: 'computeDisplay(instant, format)'
+      }
+    },
+    isDefined: function(instant) {
+      return Boolean(instant);
+    },
+    computeDisplay: function(instant, format) {
+      return moment(instant).format(format);
+    }
+  });
+  </script>
+</dom-module>

@@ -161,6 +161,7 @@ class AppComponents(context: Context)
   lazy val keyServerController = wire[KeyServerController]
   lazy val oauthServerController = wire[OAuthServerController]
   lazy val messagingController = wire[MessagingController]
+  lazy val webComponentsController = wire[WebComponentsController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
   // SSH admin server

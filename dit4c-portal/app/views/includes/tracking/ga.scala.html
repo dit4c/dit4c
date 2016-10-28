@@ -12,13 +12,15 @@ ga('send', 'pageview');
 
 @if(sendJsErrors) {
 window.addEventListener('error', function(e) {
-  _gaq.push([
-     '_trackEvent',
-     'JavaScript Error',
-     e.message,
-     e.filename + ':  ' + e.lineno,
-     true
-  ]);
+	if (_gaq) {
+	  _gaq.push([
+	     '_trackEvent',
+	     'JavaScript Error',
+	     e.message,
+	     e.filename + ':  ' + e.lineno,
+	     true
+	  ]);
+	}
 });
 }
 </script>
