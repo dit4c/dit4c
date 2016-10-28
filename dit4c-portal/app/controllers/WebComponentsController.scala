@@ -18,24 +18,23 @@ class WebComponentsController(
   val log = play.api.Logger(this.getClass)
 
   def component(name: String) = Action { request =>
-    withEtagCheck(request) {
-      reflectiveComponentLookup(name) match {
-        case Some(f) => Ok(f(request, messagesApi))
-        case None => NotFound
-      }
+    reflectiveComponentLookup(name) match {
+      case Some(f) => withEtagCheck(request, f(request, messagesApi))(Ok(_))
+      case None => NotFound
     }
   }
 
-  def withEtagCheck(request: RequestHeader)(block: => Result): Result = {
+  /**
+   * Content-based ETag check doesn't save the server any effort, but it does save bandwidth.
+   */
+  protected def withEtagCheck(request: RequestHeader, content: Html)(block: Html => Result): Result = {
     val expectedETag =
       (new ETagBuilder())
-        .including(request.acceptLanguages.mkString)
-        .including(request.host)
-        .including(request.uri)
+        .including(content.body)
         .build
     request.headers.get(HeaderNames.IF_NONE_MATCH) match {
       case Some(etag) if etag == expectedETag => NotModified
-      case None => block.withHeaders(HeaderNames.ETAG -> expectedETag)
+      case _ => block(content).withHeaders(HeaderNames.ETAG -> expectedETag)
     }
   }
 
