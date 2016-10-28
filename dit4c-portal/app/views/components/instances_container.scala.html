@@ -33,8 +33,14 @@
   }
   paper-card paper-progress {
     width: 100%;
-    --paper-progress-active-color: var(--paper-light-blue-500);
-    --paper-progress-secondary-color: var(--paper-light-blue-300);
+  }
+  paper-card.running-instance paper-progress {
+    --paper-progress-container-color: var(--paper-grey-300);
+    --paper-progress-active-color: var(--paper-light-blue-300);
+  }
+  paper-card.previous-instance paper-progress {
+    --paper-progress-container-color: var(--paper-light-blue-300);
+    --paper-progress-active-color: var(--paper-grey-300);
   }
   paper-card .card-actions {
     @@apply(--layout-horizontal-reverse);
@@ -65,7 +71,7 @@
       <div class="section-heading">Running Instances</div>
       <div class="card-container">
         <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" sort="reverseOrderById" observe="state">
-          <paper-card>
+          <paper-card class="running-instance">
             <div class="card-content">
               <div class="instance-name">
                 <template is="dom-if" if="{{item.url}}">
@@ -75,14 +81,14 @@
               </div>
               <div class="instance-state">{{item.state}}</div>
               <div class="instance-id" title="Instance ID">{{item.id}}</div>
-              <local-time class="instance-time" instant="{{item.timestamps.created}}">
-                <span class="label prefix">Created</span>
-              </local-time>
+              <div class="instance-time">
+	              <local-time instant="{{item.timestamps.created}}">
+	                <span class="label prefix">Created</span>
+	              </local-time>
+	            </div>
             </div>
             <paper-progress
-              value="100"
-              indediscard="{{isTransitioning(item)}}"
-              secondary-progress="{{stateProgress(item)}}"></paper-progress>
+              value="{{stateProgress(item)}}"></paper-progress>
             <div class="card-actions layout horizontal-reverse">
               <instance-save-button instance-id="{{item.id}}"></instance-save-button>
               <instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
@@ -93,7 +99,7 @@
       <div class="section-heading">Previous Instances</div>
       <div class="card-container">
         <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state" sort="reverseOrderById">
-          <paper-card>
+          <paper-card class="previous-instance">
             <div class="card-content">
               <div class="instance-name"><friendly-name value="{{item.id}}"></friendly-name></div>
               <div class="instance-state">{{item.state}}</div>
@@ -111,9 +117,7 @@
               </div>
             </div>
             <paper-progress
-              value="0"
-              indediscard="{{isTransitioning(item)}}"
-              secondary-progress="{{stateProgress(item)}}"></paper-progress>
+              value="{{stateProgress(item)}}"></paper-progress>
             <div class="card-actions">
               <template is="dom-if" if="{{hasImage(item)}}">
                 <instance-share-button instance-id="{{item.id}}"></instance-share-button>
@@ -161,6 +165,8 @@
         case "Starting":
         case "Started":
         case "Stopping":
+        case "Saving":
+        case "Uploading":
           return true;
         default:
           return false;
@@ -172,8 +178,12 @@
         case "Starting":            return  50;
         case "Started":             return  75;
         case "Available":           return 100;
-        case "Stopping":            return 100;
-        default:                    return   0;
+        case "Stopping":            return   0;
+        case "Saving":              return  33;
+        case "Uploading":           return  67;
+        case "Uploaded":            return 100;
+        case "Discarded":           return 100;
+        default:                    return 100;
       }
     },
     hasImage: function(item) {
