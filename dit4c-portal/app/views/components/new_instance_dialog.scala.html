@@ -44,8 +44,8 @@
         </paper-dropdown-menu>
       </form>
       <div class="buttons">
-        <paper-button dialog-dismiss>Cancel</paper-button>
-        <paper-button dialog-confirm autofocus on-click="submit">Create</paper-button>
+        <paper-button dialog-dismiss on-click="close">Cancel</paper-button>
+        <paper-button dialog-confirm on-click="submit">Create</paper-button>
       </div>
     </paper-dialog>
   </template>
@@ -67,8 +67,13 @@
     open: function() {
       this.$.dialog.open();
     },
+    close: function() {
+      this.$.dialog.opened = true;
+      this.$.dialog.close();
+    },
     submit: function() {
       this.$['new-instance-form'].submit();
+      this.close();
     }
   });
   </script>
