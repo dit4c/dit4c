@@ -13,6 +13,7 @@ import pdi.jwt.JwtJson
 import akka.actor.ActorRef
 import dit4c.protobuf.scheduler.outbound.AllocatedInstanceKey
 import java.security.spec.RSAPublicKeySpec
+import domain.InstanceAggregate.AssociatePGPPublicKey
 
 object SchedulerAggregate {
 
@@ -97,21 +98,15 @@ class SchedulerAggregate()
     case Event(ReceiveSchedulerMessage(msg), _) =>
       import dit4c.protobuf.scheduler.outbound.OutboundMessage.Payload
       import services.InstanceAggregateManager.InstanceEnvelope
-      import domain.InstanceAggregate.AssociateRsaPublicKey
+      import domain.InstanceAggregate.AssociatePGPPublicKey
       msg.payload match {
         case Payload.Empty => // Do nothing
         case Payload.InstanceStateUpdate(msg) =>
           val envelope = InstanceEnvelope(msg.instanceId, msg)
           context.system.eventStream.publish(envelope)
         case Payload.AllocatedInstanceKey(msg) =>
-          for {
-            key <- msg.rsaPublickey
-            modulus = BigInt(key.modulus.toByteArray)
-            publicExponent = BigInt(key.publicExponent.toByteArray)
-            envelope = InstanceEnvelope(msg.instanceId, AssociateRsaPublicKey(publicExponent, modulus))
-          } yield {
-            context.system.eventStream.publish(envelope)
-          }
+          val envelope = InstanceEnvelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
+          context.system.eventStream.publish(envelope)
       }
       stay
     case Event(SendSchedulerMessage(msg), _) =>

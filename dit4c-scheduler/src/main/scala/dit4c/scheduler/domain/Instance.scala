@@ -8,6 +8,7 @@ import java.time.Instant
 import java.security.interfaces.{RSAPublicKey => JavaRSAPublicKey}
 import akka.actor.Props
 import akka.actor.ActorRef
+import org.bouncycastle.openpgp.PGPPublicKey
 
 object Instance {
 
@@ -22,8 +23,7 @@ object Instance {
   case class NamedImage(name: ImageName) extends SourceImage
   case class LocalImage(id: ImageId) extends SourceImage
 
-  sealed trait InstanceSigningKey
-  case class RSAPublicKey(key: JavaRSAPublicKey) extends InstanceSigningKey
+  case class InstanceSigningKey(key: PGPPublicKey)
 
   sealed trait State extends BasePersistentFSMState
   case object JustCreated extends State

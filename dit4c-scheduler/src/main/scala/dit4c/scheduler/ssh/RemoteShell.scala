@@ -39,7 +39,7 @@ object RemoteShell {
       userPrivateKey: RSAPrivateKey,
       userPublicKey: RSAPublicKey,
       hostPublicKey: RSAPublicKey): CommandExecutor = {
-    import dit4c.scheduler.utils.KeyHelpers._
+    import dit4c.common.KeyHelpers._
     val jsch = new JSch
     jsch.addIdentity("id",
         toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,

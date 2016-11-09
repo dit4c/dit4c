@@ -26,14 +26,11 @@ import java.security.spec.RSAPublicKeySpec
 import java.security.KeyFactory
 import scala.util.Random
 import dit4c.protobuf.scheduler.outbound.InstanceStateUpdate
+import org.bouncycastle.openpgp.PGPPublicKey
 
 object InstanceAggregate {
 
   type JwtValidator = String => Either[String, Unit]
-
-  trait PublicJwk extends JwtValidator {
-    def toJson: JsObject
-  }
 
   sealed trait State extends PersistentFSM.FSMState {
     override def identifier = this.getClass.getSimpleName.stripSuffix("$")
@@ -47,7 +44,7 @@ object InstanceAggregate {
   case object NoData extends Data
   case class InstanceData(
       clusterId: String,
-      jwk: Option[PublicJwk] = None,
+      key: Option[PGPPublicKey] = None,
       uri: Option[String] = None,
       imageUrl: Option[String] = None,
       timestamps: EventTimestamps = EventTimestamps()) extends Data
@@ -63,7 +60,7 @@ object InstanceAggregate {
   case object Save extends Command
   case object Discard extends Command
   case class RecordInstanceStart(clusterId: String) extends Command
-  case class AssociateRsaPublicKey(publicExponent: BigInt, modulus: BigInt) extends Command
+  case class AssociatePGPPublicKey(armoredKey: String) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
@@ -90,8 +87,7 @@ object InstanceAggregate {
       clusterId: String, timestamp: Instant = Instant.now) extends DomainEvent
   case class DiscardedInstance(timestamp: Instant = Instant.now) extends DomainEvent
   case class PreservedInstance(timestamp: Instant = Instant.now) extends DomainEvent
-  case class AssociatedRsaPublicKey(
-      publicExponent: BigInt, modulus: BigInt, timestamp: Instant = Instant.now) extends DomainEvent
+  case class AssociatedPGPPublicKey(key: String, timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedUri(
       uri: String, timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedImage(
@@ -107,6 +103,7 @@ class InstanceAggregate(
   import context.dispatcher
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
+  import dit4c.common.KeyHelpers._
   implicit val m: Materializer = ActorMaterializer()
 
   lazy val instanceId: String = self.path.name
@@ -150,24 +147,33 @@ class InstanceAggregate(
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _, _)) =>
-      stay replying InstanceJwk(jwk.toJson)
+    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
+      stay replying key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
     case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
       stay replying {
-        jwk(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
+        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
     case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociateRsaPublicKey(e, n), InstanceData(_, Some(RsaJwk(ce, cn)), _, _, _)) if e == ce && n == cn =>
-      // Same as current - no need to update
-      stay replying Ack
-    case Event(AssociateRsaPublicKey(e, n), _: InstanceData) =>
+    case Event(AssociatePGPPublicKey(kStr), InstanceData(_, possibleKey, _, _, _)) =>
       val requester = sender
-      stay applying AssociatedRsaPublicKey(e, n) andThen { _ =>
-        requester ! Ack
-      }
+      parseArmoredPublicKey(kStr).right.flatMap(checkPublicKeyIsSuitable).fold({
+        message =>
+          log.error(message)
+          stay
+      }, {
+        newKey =>
+          possibleKey match {
+            case Some(existingKey) if newKey.getFingerprint == existingKey.getFingerprint =>
+              stay // It's the same, so nothing to do
+            case _ =>
+              stay applying AssociatedPGPPublicKey(kStr) andThen { _ =>
+                requester ! Ack
+              }
+          }
+      })
     case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri), _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
@@ -196,17 +202,17 @@ class InstanceAggregate(
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, InstanceData(clusterId, Some(jwk), _, _, _)) =>
-      stay replying InstanceJwk(jwk.toJson)
+    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
+      stay replying getJwkResponse(key)
     case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(jwk), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
       stay replying {
-        jwk(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
+        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
     case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(_: AssociateRsaPublicKey, _) =>
+    case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
     case Event(AssociateUri(uri), _) =>
@@ -235,7 +241,7 @@ class InstanceAggregate(
       stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt("Instance has been discarded")
-    case Event(_: AssociateRsaPublicKey, _) =>
+    case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
     case Event(AssociateUri(uri), _) =>
@@ -274,8 +280,9 @@ class InstanceAggregate(
         case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = Some(ts)))
         case _ => unhandled
       }
-      case AssociatedRsaPublicKey(e, n, _) => currentData match {
-        case data: InstanceData => data.copy(jwk = Some(RsaJwk(e, n)))
+      case AssociatedPGPPublicKey(keyData, _) => currentData match {
+        case data: InstanceData =>
+          data.copy(key = Some(parseArmoredPublicKey(keyData).right.get))
         case _ => unhandled
       }
       case AssociatedUri(uri, _) => currentData match {
@@ -292,27 +299,18 @@ class InstanceAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
-  case class RsaJwk(publicExponent: BigInt, modulus: BigInt) extends PublicJwk {
-    val key: PublicKey =
-      KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus.bigInteger, publicExponent.bigInteger))
+  private def getJwkResponse(key: PGPPublicKey): GetJwkResponse = key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
 
-    override def apply(token: String) =
-      JwtJson.decode(token, key)
-        .toOption.toRight("Failed to verify JWT with key")
-        .right.flatMap { claim =>
-          if (claim.isValid) Right(())
-          else Left("Claim is not valid at this time")
-        }
+  private def validateJwk(key: PGPPublicKey)(token: String) =
+    key.asJavaPublicKey.map { publicKey =>
+       JwtJson.decode(token, publicKey)
+         .toOption.toRight("Failed to verify JWT with key")
+         .right.flatMap { claim =>
+           if (claim.isValid) Right(())
+           else Left("Claim is not valid at this time")
+         }
+    }.getOrElse(Left("Unable to convert key to one capable of validating JWTs"))
 
-    override def toJson =
-      Json.obj(
-          "kty" -> "RSA",
-          "e" -> base64Url(publicExponent),
-          "n" -> base64Url(modulus))
-
-    protected def base64Url(bi: BigInt): String =
-      JwtBase64.encodeString(bi.toByteArray)
-  }
 
 }
 

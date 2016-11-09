@@ -1,4 +1,4 @@
-package dit4c.scheduler.utils
+package dit4c.common
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
@@ -8,7 +8,6 @@ import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import org.specs2.specification.AllExpectations
 import org.scalacheck.Arbitrary
-import dit4c.scheduler.ScalaCheckHelpers
 import org.specs2.scalacheck.Parameters
 import org.specs2.matcher.Matcher
 import java.io.ByteArrayInputStream
@@ -16,38 +15,26 @@ import org.bouncycastle.openpgp._
 import org.bouncycastle.openpgp.operator.jcajce._
 import org.bouncycastle.openpgp.operator.bc._
 import org.bouncycastle.bcpg._
+import java.util.Date
 
-class KeyHelpersSpec extends Specification with ScalaCheck with ScalaCheckHelpers with AllExpectations {
+class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations {
 
   implicit val params = Parameters(minTestsOk = 20)
 
-  type RSAKeyTuple = (RSAPrivateKey, RSAPublicKey)
-
-  val genRsaTuples: Gen[RSAKeyTuple] = {
-    val kpg = KeyPairGenerator.getInstance("RSA")
-    for {
-      keyLength <- Gen.frequency(
-           10 -> 1024,
-            1 -> 2048
-        )
-    } yield {
-      kpg.initialize(keyLength)
-      val kp = kpg.genKeyPair()
-      val priv = kp.getPrivate.asInstanceOf[RSAPrivateKey]
-      val pub = kp.getPublic.asInstanceOf[RSAPublicKey]
-      (priv, pub)
-    }
-  }
+  case class KeyBits(n: Int)
 
   "KeyHelpers" should {
     import KeyHelpers._
 
-    implicit val arbRSAKeyTuple = Arbitrary(genRsaTuples)
     // We never want an empty string for these checks
+    implicit val arbKeyBits: Arbitrary[KeyBits] = Arbitrary(Gen.frequency(10 -> 1024, 1 -> 2048).map(KeyBits.apply))
+    val genNonEmptyString: Gen[String] =
+      Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
+        .suchThat(!_.isEmpty)
     implicit val arbString = Arbitrary(genNonEmptyString)
 
-    "produce OpenPGP armoured secret keys" ! prop { (kp: RSAKeyTuple, identity: String, passphrase: Option[String]) =>
-      val pgpKey = kp.openpgp(identity, passphrase)
+    "produce OpenPGP armoured secret keys" >> prop({ (identity: String, bits: KeyBits, passphrase: Option[String]) =>
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, passphrase)
       val outputKey = pgpKey.`private`.armoured
       val outputKeyStr = new String(outputKey, "utf8")
       val lines = outputKeyStr.lines.toSeq;
@@ -67,19 +54,30 @@ class KeyHelpersSpec extends Specification with ScalaCheck with ScalaCheckHelper
           })
           (sk.getKeyID must be_==(pgpKey.getKeyID)) and
           (sk.getUserIDs.next must be_==(identity)) and
-          (privateKey.getPrivateKeyDataPacket must beLike {
-            case k: RSASecretBCPGKey =>
-              (k.getModulus must_== kp._1.getModulus) and
-              (k.getPrivateExponent must_== kp._1.getPrivateExponent)
-          }) and
-          (privateKey.getPublicKeyPacket.getKey must beLike {
-            case k: RSAPublicBCPGKey =>
-              (k.getModulus must_== kp._2.getModulus) and
-              (k.getPublicExponent must_== kp._2.getPublicExponent)
-          })
+          (sk.getPublicKey must beLike({ case pubKey =>
+            val desiredFlags = {
+              import org.bouncycastle.bcpg.sig.KeyFlags._
+              AUTHENTICATION|ENCRYPT_COMMS|ENCRYPT_STORAGE|SIGN_DATA
+            }
+            val sig = pubKey.getSignaturesForKeyID(pubKey.getKeyID).toList.head
+            (sig.getCreationTime must beLessThan(new Date())) and
+            // If at least required bits are set, then bit-wise AND of desiredFlags should be desiredFlags
+            ((sig.getHashedSubPackets.getKeyFlags & desiredFlags) must_==(desiredFlags))
+          }))
         }
       }
-    }
+    })
+
+    "parse armored public keys" >> prop({ (identity: String, bits: KeyBits) =>
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, None)
+      val outputKey = pgpKey.`public`.armoured
+      val outputKeyStr = new String(outputKey, "utf8")
+      parseArmoredPublicKey(outputKeyStr) must beRight(beLike[PGPPublicKey] {
+        case parsedKey =>
+          parsedKey.getFingerprint must_==(pgpKey.getPublicKey.getFingerprint)
+      })
+    })
+
   }
 
   def haveFirstLine(s: String) = (be_==(s)) ^^ { (xs: Seq[String]) => xs.head }

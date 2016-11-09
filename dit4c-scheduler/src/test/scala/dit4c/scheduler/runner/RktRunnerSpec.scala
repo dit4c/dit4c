@@ -386,6 +386,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
             }.awaitFor(1.minutes)
           } and {
             import org.specs2.matcher.JsonType._
+            import dit4c.common.KeyHelpers._
             podCallback must beSome {
               matchA[HttpRequest]
                 .method(be_==(HttpMethods.PUT))
@@ -400,7 +401,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                   } ^^ { h: HttpHeader =>
                     val encodedJwt = h.value.split(" ").last
                     // Token must decode with public key
-                    JwtJson.decode(encodedJwt, instancePublicKey)
+                    JwtJson.decode(encodedJwt, instancePublicKey.asJavaPublicKey.get)
                   })
                 })
                 .entity(beLike[ResponseEntity] {

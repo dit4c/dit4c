@@ -15,8 +15,10 @@ import pdi.jwt.Jwt
 import pdi.jwt.algorithms.JwtAsymetricAlgorithm
 import pdi.jwt.JwtAlgorithm
 import akka.http.scaladsl.model.Uri
-import dit4c.scheduler.utils.KeyHelpers._
+import dit4c.common.KeyHelpers._
 import java.nio.file.Paths
+import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPSecretKey
 
 object RktRunner {
   case class Config(
@@ -33,7 +35,7 @@ trait RktRunner {
   def start(
       instanceId: String,
       image: ImageId,
-      portalUri: String): Future[RSAPublicKey]
+      portalUri: String): Future[PGPPublicKey]
   def stop(instanceId: String): Future[Unit]
   def export(instanceId: String): Future[Unit]
   def uploadImage(instanceId: String,
@@ -77,7 +79,7 @@ class RktRunnerImpl(
   def start(
       instanceId: String,
       image: ImageId,
-      portalUri: String): Future[RSAPublicKey] =
+      portalUri: String): Future[PGPPublicKey] =
     if (instanceId.matches("""[a-z0-9\-]+""")) {
       for {
         (manifestFile, publicKey) <-
@@ -260,12 +262,12 @@ class RktRunnerImpl(
   private def generateManifestFile(
       instanceId: String,
       image: ImageId,
-      portalUri: String): Future[(String, RSAPublicKey)] = {
+      portalUri: String): Future[(String, PGPPublicKey)] = {
     for {
       authImageId <- fetch(config.authImage)
       listenerImageId <- fetch(config.listenerImage)
       servicePort <- guessServicePort(image)
-      (privateKey, publicKey) = newKeyPair
+      secretKey = generateNewKey(instanceId)
       instanceKeyInternalPath = "/dit4c/pki/instance-key.pem"
       vfm <- instanceVolumeFileManager(instanceId)
       configMountJson = Json.obj(
@@ -289,10 +291,10 @@ class RktRunnerImpl(
       )
       authImageAppJson <- getImageAppConfig(authImageId).map(addExtraEnvVars(_, helperEnvVars))
       listenerImageAppJson <- getImageAppConfig(listenerImageId).map(addExtraEnvVars(_, helperEnvVars))
-      _ <- vfm.writeFile("pki/instance-key.pem", privateKey.pkcs1.pem.getBytes)
+      _ <- vfm.writeFile("pki/instance-key.pem", secretKey.asRSAPrivateKey().pkcs1.pem.getBytes)
       // Export key with passphrase, otherwise GnuPG can refuse to read it
       _ <- vfm.writeFile("pki/instance-key.openpgp.asc",
-          (privateKey, publicKey).openpgp(s"DIT4C Instance $instanceId", Some(instanceId)).`private`.armoured)
+          secretKey.encryptedWith(None, Some(instanceId)).`private`.armoured)
       manifest = Json.obj(
         "acVersion" -> "0.8.4",
         "acKind" -> "PodManifest",
@@ -317,7 +319,7 @@ class RktRunnerImpl(
         "volumes" -> Json.arr(configVolumeJson))
       filepath <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
         vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
-    } yield (filepath, publicKey)
+    } yield (filepath, secretKey.getPublicKey)
   }
 
   private def tempVolumeFileManager(dirPrefix: String): Future[VolumeFileManager] =
@@ -388,15 +390,8 @@ class RktRunnerImpl(
 
   private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
 
-  private def newKeyPair: (RSAPrivateKey, RSAPublicKey) = {
-    val kpg = KeyPairGenerator.getInstance("RSA")
-    kpg.initialize(2048)
-    val kp = kpg.generateKeyPair
-    (
-      kp.getPrivate.asInstanceOf[RSAPrivateKey],
-      kp.getPublic.asInstanceOf[RSAPublicKey]
-    )
-  }
+  private def generateNewKey(instanceId: String): PGPSecretKey =
+    PGPKeyGenerators.RSA(s"DIT4C Instance $instanceId")
 
   private def rktEnv(pairs: (String, String)*): JsArray = JsArray(
     pairs.map { case (k: String, v: String) => Json.obj("name" -> k, "value" -> v) })

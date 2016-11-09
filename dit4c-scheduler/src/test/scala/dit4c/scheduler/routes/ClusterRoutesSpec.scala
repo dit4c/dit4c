@@ -28,7 +28,8 @@ import java.security.interfaces.RSAPublicKey
 import scala.util.Random
 import pdi.jwt.JwtBase64
 import akka.http.scaladsl.model.headers.Location
-import dit4c.scheduler.utils.KeyHelpers._
+import dit4c.common.KeyHelpers._
+import org.bouncycastle.openpgp.PGPPublicKey
 
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with PlayJsonSupport
@@ -181,7 +182,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       .setGens(genAggregateId, Gen.identifier, genNodeConfig(true))
 
    "get instance status" >> prop({
-      (clusterId: String, instanceId: String, imageName: String, portalUri: Uri, signingKey: RSAPublicKey) =>
+      (clusterId: String, instanceId: String, imageName: String, portalUri: Uri, signingKey: PGPPublicKey) =>
         val path = basePath / clusterId / "instances" / instanceId
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
@@ -196,7 +197,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       NamedImage(imageName),
                       None,
                       portalUri.toString,
-                      Some(Instance.RSAPublicKey(signingKey))))
+                      Some(Instance.InstanceSigningKey(signingKey))))
           }
         }
         Get(path) ~> routes(testActor) ~> check {
@@ -216,7 +217,9 @@ class ClusterRoutesSpec extends Specs2RouteTest
 
   }
 
-  private implicit val arbPublicKey = Arbitrary(Gen.resultOf(randomPublicKey _))
+  private implicit val arbRSAPublicKey = Arbitrary(Gen.resultOf(randomPublicKey _))
+
+  private implicit val arbPGPPublicKey = Arbitrary(Gen.identifier.map(PGPKeyGenerators.RSA(_, 1024).getPublicKey))
 
   private implicit val arbNodeConfig = Arbitrary(genNodeConfig(false))
 

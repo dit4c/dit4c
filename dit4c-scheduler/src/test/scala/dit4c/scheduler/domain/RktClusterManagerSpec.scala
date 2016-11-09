@@ -24,6 +24,8 @@ import dit4c.scheduler.runner.RktRunner
 import dit4c.scheduler.domain.Instance.NamedImage
 import akka.actor.Terminated
 import java.nio.file.Paths
+import org.bouncycastle.openpgp.PGPPublicKey
+import dit4c.common.KeyHelpers
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -65,7 +67,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       "initializes RktNode with config" >> {
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system = ActorSystem("RktClusterManager-AddRktNode")
-        val hostPublicKey = randomPublicKey
+        val hostPublicKey = randomRSAPublicKey
         val manager =
             system.actorOf(
                 RktClusterManager.props(mockRktRunnerFactory,
@@ -89,7 +91,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val manager =
             system.actorOf(
                 RktClusterManager.props(mockRktRunnerFactory,
-                    mockFetchSshHostKey(randomPublicKey)),
+                    mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
         val probe = TestProbe()
         probe.send(manager, AddRktNode(
@@ -107,7 +109,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-start")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPublicKey
+        val resolvedPublicKey = randomPGPPublicKey
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -116,7 +118,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[PGPPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
@@ -129,7 +131,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val manager =
             system.actorOf(
                 RktClusterManager.props(runnerFactory,
-                    mockFetchSshHostKey(randomPublicKey)),
+                    mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
@@ -170,7 +172,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-restart")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPublicKey
+        val resolvedPublicKey = randomPGPPublicKey
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -179,7 +181,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[PGPPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
@@ -192,7 +194,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         def createManager =
             system.actorOf(
                 RktClusterManager.props(runnerFactory,
-                    mockFetchSshHostKey(randomPublicKey)),
+                    mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
         val manager = createManager
         // Create some nodes
@@ -240,7 +242,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-SaveInstance")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPublicKey
+        val resolvedPublicKey = randomPGPPublicKey
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -249,7 +251,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[PGPPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
@@ -263,7 +265,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val manager =
             system.actorOf(
                 RktClusterManager.props(runnerFactory,
-                    mockFetchSshHostKey(randomPublicKey)),
+                    mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
@@ -306,7 +308,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-DiscardInstance")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPublicKey
+        val resolvedPublicKey = randomPGPPublicKey
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -315,7 +317,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[RSAPublicKey] =
+                  portalUri: String): Future[PGPPublicKey] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
@@ -329,7 +331,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val manager =
             system.actorOf(
                 RktClusterManager.props(runnerFactory,
-                    mockFetchSshHostKey(randomPublicKey)),
+                    mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
@@ -367,13 +369,15 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
 
   }
 
-  def randomPublicKey: RSAPublicKey = {
+  def randomRSAPublicKey: RSAPublicKey = {
     val sr = SecureRandom.getInstance("SHA1PRNG")
     val kpg = KeyPairGenerator.getInstance("RSA")
     kpg.initialize(512, sr)
     kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
   }
 
+  def randomPGPPublicKey: PGPPublicKey =
+      KeyHelpers.PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).getPublicKey
 
   def mockRktRunnerFactory(
       cd: RktNode.ServerConnectionDetails, dir: String): RktRunner =
@@ -382,7 +386,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       override def start(
           instanceId: String,
           image: String,
-          portalUri: String): Future[RSAPublicKey] = ???
+          portalUri: String): Future[PGPPublicKey] = ???
       override def stop(instanceId: String): Future[Unit] = ???
       override def export(instanceId: String) = ???
       def uploadImage(instanceId: String,

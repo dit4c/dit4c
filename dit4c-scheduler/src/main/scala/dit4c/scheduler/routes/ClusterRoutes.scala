@@ -24,7 +24,7 @@ import dit4c.scheduler.domain.Instance
 import java.util.Base64
 import dit4c.scheduler.ssh.RemoteShell
 import java.math.BigInteger
-import dit4c.scheduler.utils.KeyHelpers._
+import dit4c.common.KeyHelpers._
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -63,7 +63,7 @@ object ClusterRoutes {
 
   implicit val writesInstanceSigningKey: Writes[Instance.InstanceSigningKey] =
     Writes {
-      case Instance.RSAPublicKey(key) => Json.toJson(key)
+      case Instance.InstanceSigningKey(key) => Json.toJson(key.asRSAPublicKey)
     }
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (

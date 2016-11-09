@@ -19,7 +19,6 @@ import dit4c.scheduler.domain.Instance
 import java.time.Instant
 import scala.util.Random
 import dit4c.scheduler.domain.Instance.InstanceSigningKey
-import dit4c.scheduler.domain.Instance.RSAPublicKey
 
 object PortalMessageBridge {
   case object BridgeClosed
@@ -154,13 +153,10 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       outbound ! toBinaryMessage(msg.toByteArray)
       data match {
         case data: Instance.StartData =>
-          data.signingKey.foreach {
-            case RSAPublicKey(key) =>
+          import dit4c.common.KeyHelpers._
+          data.signingKey.map(_.key).foreach { key =>
               val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
-                pb.AllocatedInstanceKey(data.instanceId, Some(
-                    pb.AllocatedInstanceKey.RSAPublicKey(
-                        com.google.protobuf.ByteString.copyFrom(key.getPublicExponent.toByteArray),
-                        com.google.protobuf.ByteString.copyFrom(key.getModulus.toByteArray))))))
+                pb.AllocatedInstanceKey(data.instanceId, new String(key.armoured, "UTF-8"))))
               outbound ! toBinaryMessage(msg.toByteArray)
           }
         case _ => // No need to do anything

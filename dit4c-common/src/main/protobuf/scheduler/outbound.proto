@@ -5,11 +5,8 @@ package dit4c.protobuf.scheduler;
 
 message AllocatedInstanceKey {
   string instanceId = 1;
-  message RSAPublicKey {
-    bytes publicExponent = 1;
-    bytes modulus = 2;
-  }
-  RSAPublicKey rsaPublickey = 2;
+  // ASCII armored, and must support encryption, signing & authentication
+  string pgpPublicKeyBlock = 2;
 }
 
 message InstanceStateUpdate {
