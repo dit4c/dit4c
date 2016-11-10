@@ -291,14 +291,25 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         // Now save the instance
         val testSaveHelperImage = Instance.NamedImage("docker://busybox")
         probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Save(testSaveHelperImage, "")))
-        probe.expectMsgType[Instance.Ack.type](1.minute)
-        // Poll 10 times, 100ms apart to check if we've discarded the instance
-        Stream.fill(10)({
-          Thread.sleep(100)
-          probe.send(manager, GetInstanceStatus(response.instanceId))
-          val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
-          instanceStatus.state
-        }).filter(_ == Instance.Uploaded).headOption must beSome
+        probe.expectMsgType[Instance.Ack.type](1.minute);
+        {
+          // Poll 10 times, 100ms apart to check if we're uploading the instance
+          Stream.fill(10)({
+            Thread.sleep(100)
+            probe.send(manager, GetInstanceStatus(response.instanceId))
+            val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
+            instanceStatus.state
+          }).filter(_ == Instance.Uploading).headOption must beSome
+        } and {
+          probe.send(manager, InstanceEnvelope(response.instanceId, Instance.ConfirmUpload))
+          // Poll 10 times, 100ms apart to check we've confirmed the upload and shifted state
+          Stream.fill(10)({
+            Thread.sleep(100)
+            probe.send(manager, GetInstanceStatus(response.instanceId))
+            val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
+            instanceStatus.state
+          }).filter(_ == Instance.Uploaded).headOption must beSome
+        }
       }
     }
 
