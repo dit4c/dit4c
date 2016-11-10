@@ -5,6 +5,8 @@ import akka.actor.ActorRef
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 import akka.actor.ActorLogging
+import akka.actor.TypedActor.PostStop
+import akka.actor.Cancellable
 
 object RktInstanceScheduler {
 
@@ -22,10 +24,16 @@ class RktInstanceScheduler(
   import RktInstanceScheduler._
   private object TimedOut
 
+  var cancelTimeout: Option[Cancellable] = None
+
   override def preStart = {
     implicit val ec = context.dispatcher
     sequentiallyCheckNodes(Random.shuffle(nodes.keys.toList))
-    context.system.scheduler.scheduleOnce(completeWithin, self, TimedOut)
+    cancelTimeout = Some(context.system.scheduler.scheduleOnce(completeWithin, self, TimedOut))
+  }
+
+  override def postStop = {
+    cancelTimeout.foreach(_.cancel)
   }
 
   override val receive: Receive = {
@@ -39,6 +47,7 @@ class RktInstanceScheduler(
         context.become({
           case RktNode.WorkerCreated(worker) =>
             context.parent ! WorkerFound(nodeId, worker)
+            log.info(s"Instance worker provided by $nodeId")
             context.stop(self)
           case TimedOut =>
             log.warning(

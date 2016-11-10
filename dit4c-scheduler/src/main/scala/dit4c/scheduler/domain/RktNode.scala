@@ -139,7 +139,9 @@ class RktNode(
         RequestInstanceWorker | RequireInstanceWorker,
         NodeConfig(connectionDetails, rktDir, _)) =>
       val runner = createRunner(connectionDetails, rktDir)
-      val worker = context.actorOf(Props(classOf[RktInstanceWorker], runner))
+      val worker = context.actorOf(
+          Props(classOf[RktInstanceWorker], runner),
+          "instance-worker-"+Random.alphanumeric.take(20).mkString)
       stay replying WorkerCreated(worker)
   }
 

@@ -98,7 +98,7 @@ object Instance {
       val image: LocalImage,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class AssociatedSigningKey(
-      val key: InstanceSigningKey,
+      val key: String,
       val timestamp: Instant = Instant.now) extends DomainEvent
   case class ConfirmedStart(
       val timestamp: Instant = Instant.now) extends DomainEvent
@@ -127,6 +127,7 @@ object Instance {
 class Instance(worker: ActorRef)
     extends PersistentFSM[Instance.State, Instance.Data, Instance.DomainEvent] {
   import Instance._
+  import dit4c.common.KeyHelpers._
 
   lazy val persistenceId = self.path.name
 
@@ -154,9 +155,10 @@ class Instance(worker: ActorRef)
   }
 
   when(Starting) {
-    case Event(AssociateSigningKey(key), _) =>
-      log.info(s"Received signing key: $key")
-      stay.applying(AssociatedSigningKey(key)).andThen(emitStatusReportToEventStream(stateName))
+    case Event(AssociateSigningKey(isk), _) =>
+      log.info(s"Received signing key: $isk")
+      val keyData = new String(isk.key.armoured)
+      stay.applying(AssociatedSigningKey(keyData)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
       goto(Running).applying(ConfirmedStart())
@@ -288,7 +290,7 @@ class Instance(worker: ActorRef)
         case other => unhandled()
       }
       case AssociatedSigningKey(key, _) => currentData match {
-        case data: StartData => data.copy(signingKey = Some(key))
+        case data: StartData => data.copy(signingKey = Some(InstanceSigningKey(parseArmoredPublicKey(key).right.get)))
         case other => unhandled()
       }
       case RequestedSave(helperImage, imageServer, _) => currentData match {

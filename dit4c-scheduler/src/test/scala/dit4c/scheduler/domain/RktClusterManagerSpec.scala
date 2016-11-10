@@ -25,7 +25,7 @@ import dit4c.scheduler.domain.Instance.NamedImage
 import akka.actor.Terminated
 import java.nio.file.Paths
 import org.bouncycastle.openpgp.PGPPublicKey
-import dit4c.common.KeyHelpers
+import dit4c.common.KeyHelpers.PGPKeyGenerators
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -55,7 +55,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               system.actorOf(RktClusterManager.props(rktRunnerConfig), managerPersistenceId)
           val probe = TestProbe()
           probe.send(manager, GetRktNodeState(rktNodeId))
-          probe.expectMsgType[RktNode.Data] must {
+          probe.expectMsgType[RktNode.Data](1.minute) must {
             be(RktNode.NoConfig)
           }
         }).setGens(Gen.identifier, Gen.listOfN(8, Gen.numChar).map(_.mkString))
@@ -76,9 +76,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         probe.send(manager, AddRktNode(
             "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val response = probe.expectMsgType[RktNodeAdded]
+        val response = probe.expectMsgType[RktNodeAdded](1.minute)
         probe.send(manager, ClusterManager.GetStatus)
-        val clusterState = probe.expectMsgType[ClusterInfo]
+        val clusterState = probe.expectMsgType[ClusterInfo](1.minute)
         ( clusterState.nodeIds must contain(response.nodeId) )
       }
     }
@@ -96,9 +96,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         probe.send(manager, AddRktNode(
             "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+        val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
         probe.send(manager, ConfirmRktNodeKeys(nodeId))
-        val updatedConfig = probe.expectMsgType[RktNode.NodeConfig]
+        val updatedConfig = probe.expectMsgType[RktNode.NodeConfig](1.minute)
         ( updatedConfig.readyToConnect must beTrue )
       }
     }
@@ -138,9 +138,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
               s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
-          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
           probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.NodeConfig]
+          probe.expectMsgType[RktNode.NodeConfig](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -148,7 +148,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
-        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance](1.minute)
         (response must {
           import scala.language.experimental.macros
           matchA[RktClusterManager.StartingInstance]
@@ -157,7 +157,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         {
           probe.send(manager, GetInstanceStatus(response.instanceId))
           val instanceStatus =
-            probe.expectMsgType[Instance.StatusReport]
+            probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.data must beLike {
             case Instance.StartData(id, providedImage, _, callback, _) =>
               ( id must be_==(response.instanceId) ) and
@@ -202,9 +202,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
               s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
-          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
           probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.NodeConfig]
+          probe.expectMsgType[RktNode.NodeConfig](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -212,7 +212,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
-        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance](1.minute)
         (response must {
           import scala.language.experimental.macros
           matchA[RktClusterManager.StartingInstance]
@@ -221,11 +221,11 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         {
           probe.watch(manager)
           probe.send(manager, Shutdown)
-          probe.expectMsgType[Terminated]
+          probe.expectMsgType[Terminated](1.minute)
           val newManager = createManager
           probe.send(newManager, GetInstanceStatus(response.instanceId))
           val instanceStatus =
-            probe.expectMsgType[Instance.StatusReport]
+            probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.data must beLike {
             case Instance.StartData(id, providedImage, _, callback, key) =>
               ( id must be_==(response.instanceId) ) and
@@ -272,9 +272,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
               s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
-          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
           probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.NodeConfig]
+          probe.expectMsgType[RktNode.NodeConfig](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -282,21 +282,21 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
-        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance](1.minute)
         Stream.continually({
           probe.send(manager, GetInstanceStatus(response.instanceId))
-          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.state
         }).filter(_ == Instance.Running).head
         // Now save the instance
         val testSaveHelperImage = Instance.NamedImage("docker://busybox")
         probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Save(testSaveHelperImage, "")))
-        probe.expectMsgType[Instance.Ack.type]
+        probe.expectMsgType[Instance.Ack.type](1.minute)
         // Poll 10 times, 100ms apart to check if we've discarded the instance
         Stream.fill(10)({
           Thread.sleep(100)
           probe.send(manager, GetInstanceStatus(response.instanceId))
-          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.state
         }).filter(_ == Instance.Uploaded).headOption must beSome
       }
@@ -307,6 +307,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system =
           ActorSystem(s"RktClusterManager-DiscardInstance")
+        val log = system.log
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
         val resolvedPublicKey = randomPGPPublicKey
         val runnerFactory =
@@ -338,9 +339,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
               s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
-          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded]
+          val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
           probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.NodeConfig]
+          probe.expectMsgType[RktNode.NodeConfig](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -348,20 +349,20 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val testImage = NamedImage("docker://dit4c/gotty:latest")
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
-        val response = probe.expectMsgType[RktClusterManager.StartingInstance]
+        val response = probe.expectMsgType[RktClusterManager.StartingInstance](1.minute)
         Stream.continually({
           probe.send(manager, GetInstanceStatus(response.instanceId))
-          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.state
         }).filter(_ == Instance.Running).head
         // Now discard the instance
         probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Discard))
-        probe.expectMsgType[Instance.Ack.type]
+        probe.expectMsgType[Instance.Ack.type](1.minute)
         // Poll 10 times, 100ms apart to check if we've discarded the instance
         Stream.fill(10)({
           Thread.sleep(100)
           probe.send(manager, GetInstanceStatus(response.instanceId))
-          val instanceStatus = probe.expectMsgType[Instance.StatusReport]
+          val instanceStatus = probe.expectMsgType[Instance.StatusReport](1.minute)
           instanceStatus.state
         }).filter(_ == Instance.Discarded).headOption must beSome
       }
@@ -376,8 +377,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
   }
 
-  def randomPGPPublicKey: PGPPublicKey =
-      KeyHelpers.PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).getPublicKey
+  def randomPGPPublicKey: PGPPublicKey = PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).getPublicKey
 
   def mockRktRunnerFactory(
       cd: RktNode.ServerConnectionDetails, dir: String): RktRunner =

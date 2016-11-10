@@ -13,6 +13,7 @@ import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import akka.util.Timeout
+import scala.util.Random
 
 object RktClusterManager {
   type RktNodeId = String
@@ -124,7 +125,8 @@ class RktClusterManager(
         context.actorOf(Props(classOf[RktInstanceScheduler],
           state.nodeIds.map(id => (id, getNodeActor(id))).toMap,
           1.minute,
-          false))
+          false),
+          "instance-scheduler-"+op.instanceId)
       operationsAwaitingInstanceWorkers +=
         (instanceSchedulerRef -> PendingOperation(sender,op))
     case op @ GetInstanceStatus(instanceId) =>
@@ -133,10 +135,11 @@ class RktClusterManager(
         case None =>
           if (state.instanceNodeMappings.contains(instanceId)) {
             val instanceSchedulerRef =
-            context.actorOf(Props(classOf[RktInstanceScheduler],
-              state.instanceNodeMappings.get(instanceId).map(id => (id, getNodeActor(id))).toMap,
-              1.minute,
-              true))
+                context.actorOf(Props(classOf[RktInstanceScheduler],
+                  state.instanceNodeMappings.get(instanceId).map(id => (id, getNodeActor(id))).toMap,
+                  1.minute,
+                  true),
+                  "instance-scheduler-"+instanceId)
             operationsAwaitingInstanceWorkers +=
               (instanceSchedulerRef -> PendingOperation(sender,op))
           } else {

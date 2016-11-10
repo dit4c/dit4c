@@ -3,7 +3,7 @@ package dit4c.scheduler.domain
 import dit4c.scheduler.runner.RktRunner
 import akka.actor._
 import scala.util._
-import java.security.interfaces.RSAPublicKey
+import org.bouncycastle.openpgp.PGPPublicKey
 
 class RktInstanceWorker(runner: RktRunner) extends Actor
     with ActorLogging with InstanceWorker {
@@ -27,7 +27,7 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
     case Start(instanceId, Instance.LocalImage(imageId), callbackUrl) =>
       val instance = sender
       runner.start(instanceId, imageId, callbackUrl).andThen {
-        case Success(key: RSAPublicKey) =>
+        case Success(key: PGPPublicKey) =>
           instance ! Instance.AssociateSigningKey(Instance.InstanceSigningKey(key))
           instance ! Instance.ConfirmStart
         case Failure(e) =>
