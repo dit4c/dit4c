@@ -23,8 +23,6 @@ object Instance {
   case class NamedImage(name: ImageName) extends SourceImage
   case class LocalImage(id: ImageId) extends SourceImage
 
-  case class InstanceSigningKey(key: PGPPublicKey)
-
   sealed trait State extends BasePersistentFSMState
   case object JustCreated extends State
   case object WaitingForImage extends State
@@ -50,10 +48,10 @@ object Instance {
       providedImage: SourceImage,
       resolvedImage: Option[LocalImage],
       portalUri: String,
-      signingKey: Option[InstanceSigningKey]) extends SomeData
+      signingKey: Option[PGPPublicKey]) extends SomeData
   case class SaveData(
       instanceId: String,
-      signingKey: InstanceSigningKey,
+      signingKey: PGPPublicKey,
       uploadHelperImage: NamedImage,
       imageServer: String,
       portalUri: String) extends SomeData
@@ -67,7 +65,7 @@ object Instance {
       image: SourceImage,
       portalUri: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
-  case class AssociateSigningKey(key: InstanceSigningKey) extends Command
+  case class AssociateSigningKey(key: PGPPublicKey) extends Command
   case object ConfirmStart extends Command
   case object ConfirmExited extends Command
   case object Discard extends Command
@@ -155,9 +153,9 @@ class Instance(worker: ActorRef)
   }
 
   when(Starting) {
-    case Event(AssociateSigningKey(isk), _) =>
-      log.info(s"Received signing key: $isk")
-      val keyData = new String(isk.key.armoured)
+    case Event(AssociateSigningKey(key), _) =>
+      log.info(s"Received signing key: $key")
+      val keyData = new String(key.armoured)
       stay.applying(AssociatedSigningKey(keyData)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
@@ -290,7 +288,7 @@ class Instance(worker: ActorRef)
         case other => unhandled()
       }
       case AssociatedSigningKey(key, _) => currentData match {
-        case data: StartData => data.copy(signingKey = Some(InstanceSigningKey(parseArmoredPublicKey(key).right.get)))
+        case data: StartData => data.copy(signingKey = Some(parseArmoredPublicKey(key).right.get))
         case other => unhandled()
       }
       case RequestedSave(helperImage, imageServer, _) => currentData match {

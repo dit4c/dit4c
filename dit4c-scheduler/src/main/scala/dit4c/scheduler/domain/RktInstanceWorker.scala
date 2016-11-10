@@ -28,7 +28,7 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
       val instance = sender
       runner.start(instanceId, imageId, callbackUrl).andThen {
         case Success(key: PGPPublicKey) =>
-          instance ! Instance.AssociateSigningKey(Instance.InstanceSigningKey(key))
+          instance ! Instance.AssociateSigningKey(key)
           instance ! Instance.ConfirmStart
         case Failure(e) =>
           replyWithError("Unable to start image", instance, e)

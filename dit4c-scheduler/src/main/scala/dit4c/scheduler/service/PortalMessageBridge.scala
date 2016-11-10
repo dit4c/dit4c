@@ -18,7 +18,6 @@ import dit4c.scheduler.domain.RktClusterManager
 import dit4c.scheduler.domain.Instance
 import java.time.Instant
 import scala.util.Random
-import dit4c.scheduler.domain.Instance.InstanceSigningKey
 
 object PortalMessageBridge {
   case object BridgeClosed
@@ -154,7 +153,7 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       data match {
         case data: Instance.StartData =>
           import dit4c.common.KeyHelpers._
-          data.signingKey.map(_.key).foreach { key =>
+          data.signingKey.foreach { key =>
               val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
                 pb.AllocatedInstanceKey(data.instanceId, new String(key.armoured, "UTF-8"))))
               outbound ! toBinaryMessage(msg.toByteArray)

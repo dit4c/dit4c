@@ -25,6 +25,7 @@ import java.util.Base64
 import dit4c.scheduler.ssh.RemoteShell
 import java.math.BigInteger
 import dit4c.common.KeyHelpers._
+import org.bouncycastle.openpgp.PGPPublicKey
 
 object ClusterRoutes {
   import play.api.libs.json._
@@ -61,9 +62,9 @@ object ClusterRoutes {
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
 
-  implicit val writesInstanceSigningKey: Writes[Instance.InstanceSigningKey] =
-    Writes {
-      case Instance.InstanceSigningKey(key) => Json.toJson(key.asRSAPublicKey)
+  implicit val writesPGPPublicKey: Writes[PGPPublicKey] =
+    Writes { key =>
+      Json.toJson(key.asRSAPublicKey)
     }
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
@@ -71,7 +72,7 @@ object ClusterRoutes {
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
       (__ \ 'portal).writeNullable[String] and
-      (__ \ 'key).writeNullable[Instance.InstanceSigningKey] and
+      (__ \ 'key).writeNullable[PGPPublicKey] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier

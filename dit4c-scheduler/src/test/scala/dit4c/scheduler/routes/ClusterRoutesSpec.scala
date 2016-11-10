@@ -197,7 +197,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       NamedImage(imageName),
                       None,
                       portalUri.toString,
-                      Some(Instance.InstanceSigningKey(signingKey))))
+                      Some(signingKey)))
           }
         }
         Get(path) ~> routes(testActor) ~> check {
