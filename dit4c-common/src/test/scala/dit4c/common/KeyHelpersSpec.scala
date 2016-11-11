@@ -16,6 +16,10 @@ import org.bouncycastle.openpgp.operator.jcajce._
 import org.bouncycastle.openpgp.operator.bc._
 import org.bouncycastle.bcpg._
 import java.util.Date
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
+import scala.sys.process.ProcessIO
+import java.io.InputStream
 
 class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations {
 
@@ -76,6 +80,21 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
         case parsedKey =>
           parsedKey.getFingerprint must_==(pgpKey.getPublicKey.getFingerprint)
       })
+    })
+
+    "produce PCKS#1 keys from PGP keys" >> prop({ (identity: String, bits: KeyBits) =>
+      import sys.process._
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, None)
+      val is = new ByteArrayInputStream(pgpKey.asRSAPrivateKey().pkcs1.pem.getBytes)
+      val os = new ByteArrayOutputStream()
+      def sendToOs(in: InputStream) = Iterator.continually(in.read).takeWhile(_>=0).foreach(os.write)
+      val processIO = new ProcessIO(_ => (), sendToOs, sendToOs, true)
+      "openssl rsa -check".#<(is).run(processIO).exitValue must beLike {
+        case 0 => ok
+        case other =>
+          val output = new String(os.toByteArray())
+          ko(s"OpenSSL check of key failed\n$output")
+      }
     })
 
   }
