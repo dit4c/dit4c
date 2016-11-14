@@ -29,6 +29,7 @@ import pdi.jwt.JwtBase64
 import java.io.ByteArrayInputStream
 import org.bouncycastle.openpgp.jcajce.JcaPGPPublicKeyRingCollection
 import org.bouncycastle.bcpg.sig.KeyFlags
+import java.security.spec.RSAPrivateCrtKeySpec
 
 object KeyHelpers {
 
@@ -266,9 +267,13 @@ object KeyHelpers {
               new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toArray)
             }
             .getOrElse(null)
-      val k = secretKey.extractPrivateKey(decryptor).getPrivateKeyDataPacket.asInstanceOf[RSASecretBCPGKey]
-      KeyFactory.getInstance("RSA").generatePrivate(new RSAPrivateKeySpec(k.getModulus, k.getPrivateExponent))
-        .asInstanceOf[RSAPrivateKey]
+      val priv = secretKey.extractPrivateKey(decryptor).getPrivateKeyDataPacket.asInstanceOf[RSASecretBCPGKey]
+      val pub = secretKey.extractPrivateKey(decryptor).getPublicKeyPacket.getKey.asInstanceOf[RSAPublicBCPGKey]
+      val factory = KeyFactory.getInstance("RSA", "BC")
+      val params = new RSAPrivateCrtKeySpec(
+          priv.getModulus, pub.getPublicExponent, priv.getPrivateExponent, priv.getPrimeP, priv.getPrimeQ,
+          priv.getPrimeExponentP, priv.getPrimeExponentQ, priv.getCrtCoefficient)
+      factory.generatePrivate(params).asInstanceOf[RSAPrivateKey]
     }
   }
 

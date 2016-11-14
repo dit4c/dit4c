@@ -55,26 +55,26 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
   import dit4c.scheduler.runner.CommandExecutorHelper
   val commandExecutor = (LocalCommandExecutor.apply _)
 
-  val testImageUrl: URL = new URL(
-    "https://quay.io/c1/aci/quay.io/prometheus/busybox/latest/aci/linux/amd64/")
-  val testImage: String = {
-    val imagePath = "/tmp/rkt-test-image.aci"
+  def downloadFile(originUrl: URL, destPath: String): String =
     Await.result(
-      commandExecutor(Seq("stat", imagePath))
-        .map(_ => imagePath)
+      commandExecutor(Seq("stat", destPath))
+        .map(_ => destPath)
         .recover {
           case _ =>
             import sys.process._
             val os = new PipedOutputStream()
             val is = new PipedInputStream(os)
             // Create stream to write input to a file
-            commandExecutor(Seq("sh", "-c", s"cat - > $imagePath"), is)
+            commandExecutor(Seq("sh", "-c", s"cat - > $destPath"), is)
             // Stream from the provided URL to the piped output
-            testImageUrl.#>(os).!!
-            imagePath
+            originUrl.#>(os).!!
+            destPath
         },
       1.minute)
-  }
+
+  val testImage: String = downloadFile(
+      new URL("https://quay.io/c1/aci/quay.io/prometheus/busybox/latest/aci/linux/amd64/"),
+      "/tmp/rkt-test-image.aci")
 
   def before = {
     Await.result(
@@ -86,11 +86,17 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
   override def foreach[R: AsResult](f: RktRunnerImpl => R) = withRktDir { rktDir =>
     val defaultSchedulerConfig = dit4c.scheduler.utils.SchedulerConfig("")
+    val authHelperImage: String = downloadFile(
+        new URL(defaultSchedulerConfig.authImage),
+        "/tmp/dit4c-test-helper-auth.aci")
+    val listenerHelperImage: String = downloadFile(
+        new URL(defaultSchedulerConfig.listenerImage),
+        "/tmp/dit4c-test-helper-listener.aci")
     val runner = new RktRunnerImpl(commandExecutor, RktRunner.Config(
         rktDir,
         "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase,
-        defaultSchedulerConfig.authImage,
-        defaultSchedulerConfig.listenerImage))
+        authHelperImage,
+        listenerHelperImage))
     AsResult(f(runner))
   }
 
@@ -336,7 +342,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
       }
 
       "should work with image IDs" >> { runner: RktRunnerImpl =>
-        var podCallback: Option[HttpRequest] = None
+        val podCallback = Promise[HttpRequest]
         val serverBinding = {
           implicit val system = ActorSystem()
           implicit val materializer = ActorMaterializer()
@@ -346,7 +352,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
             serverSource.to(Sink.foreach { connection =>
               connection handleWithSyncHandler {
                 case req: HttpRequest =>
-                  podCallback = Some(req)
+                  podCallback.trySuccess(req)
                   HttpResponse(200, entity = "")
               }
             }).run,
@@ -387,7 +393,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
           } and {
             import org.specs2.matcher.JsonType._
             import dit4c.common.KeyHelpers._
-            podCallback must beSome {
+            podCallback.future must {
               matchA[HttpRequest]
                 .method(be_==(HttpMethods.PUT))
                 .headers(contain {
@@ -412,7 +418,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                         { beMatching("https?://[a-z0-9\\.]+".r.anchored) } ^^
                         { bs: ByteString => bs.decodeString("utf8") })
                 })
-            }
+            }.awaitFor(1.minute)
           } and {
             runner.stop(instanceId) must {
               not(throwA[Exception])

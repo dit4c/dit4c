@@ -19,6 +19,7 @@ import dit4c.common.KeyHelpers._
 import java.nio.file.Paths
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPSecretKey
+import org.slf4j.LoggerFactory
 
 object RktRunner {
   case class Config(
@@ -50,6 +51,8 @@ class RktRunnerImpl(
     val config: RktRunner.Config)(
         implicit ec: ExecutionContext) extends RktRunner {
 
+  val log = LoggerFactory.getLogger(this.getClass)
+
   if (!config.instanceNamePrefix.matches("""[a-z0-9\-]+"""))
     throw new IllegalArgumentException(
         "Only lower-case alphanumerics & '-' allowed for instance prefix")
@@ -57,12 +60,17 @@ class RktRunnerImpl(
   def fetch(imageName: String): Future[ImageId] =
     privileged(rktCmd)
       .flatMap { rktCmd =>
+        log.debug(s"Fetching image: $imageName")
         ce(rktCmd :+ "fetch" :+
             "--no-store" :+ // See https://coreos.com/rkt/docs/latest/image-fetching-behavior.html
             "--insecure-options=image" :+ "--full" :+
             imageName)
       }
       .map(_.trim)
+      .map { imageId =>
+        log.debug(s"Fetched image: $imageName → $imageId")
+        imageId
+      }
 
   def guessServicePort(image: ImageId): Future[Int] =
     getImageManifest(image)
