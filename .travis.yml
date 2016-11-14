@@ -1,7 +1,5 @@
 language: scala
 sudo: true
-services:
-  - docker
 jdk:
   - oraclejdk8
 scala:
@@ -10,64 +8,8 @@ cache:
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
-    - $HOME/nginx
-addons:
-  apt:
-    packages:
-    - couchdb
-before_install:
-  - |
-    BASE=$HOME && \
-    test -f $BASE/nginx/sbin/nginx || \
-    (curl -L -s https://github.com/nginx/nginx/archive/release-1.9.5.tar.gz | tar xz -C $BASE && \
-    cd $BASE/nginx-release-1.9.5 && \
-    auto/configure \
-        --prefix=$BASE/nginx \
-        --conf-path=$BASE/etc/nginx/nginx.conf \
-        --http-log-path=/dev/stdout \
-        --error-log-path=/dev/stderr \
-        --with-http_auth_request_module \
-        --with-http_v2_module \
-        --with-http_ssl_module \
-        --without-http_ssi_module \
-        --without-http_userid_module \
-        --without-http_access_module \
-        --without-http_auth_basic_module \
-        --without-http_autoindex_module \
-        --without-http_geo_module \
-        --without-http_split_clients_module \
-        --without-http_fastcgi_module \
-        --without-http_uwsgi_module \
-        --without-http_scgi_module \
-        --without-http_memcached_module \
-        --without-http_limit_conn_module \
-        --without-http_limit_req_module \
-        --without-http_empty_gif_module \
-        --without-http_browser_module && \
-    make && \
-    make install && \
-    cd - && \
-    rm -rf $BASE/nginx-release-1.9.5) && \
-    ls -laR $BASE/nginx && \
-    export PATH=$BASE/nginx/sbin:$PATH
-  - |
-    RKT_VERSION=v1.9.1 &&
-    docker build -t rkt-systemd - <<< "
-    FROM fedora/systemd-systemd
-    RUN dnf update -y && dnf install -y --allowerasing tar which sudo iproute && \
-      cd /opt && \
-      curl -sL https://github.com/coreos/rkt/releases/download/$RKT_VERSION/rkt-$RKT_VERSION.tar.gz | tar xz && \
-      mv rkt-$RKT_VERSION rkt && \
-      ln -s /opt/rkt/rkt /usr/bin/rkt && \
-      groupadd -r rkt"
-  - docker run --name=rkt-systemd --privileged -dt -e 'container=docker' -v /sys/fs/cgroup:/sys/fs/cgroup:ro rkt-systemd
 before_script:
   - echo $PATH
-  - couchdb -V
-  - nginx -V
-  - docker exec -i rkt-systemd /lib/systemd/systemd --version
-  - docker exec -i rkt-systemd /opt/rkt/rkt version
-  - docker exec -i rkt-systemd sudo -nv
   - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
 script:
   # Test script
@@ -77,12 +19,3 @@ script:
   - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
 after_success:
   - sbt coveralls
-after_script:
-  - docker logs rkt-systemd && docker exec rkt-systemd journalctl --boot && docker rm -f rkt-systemd
-notifications:
-  webhooks:
-    urls:
-      - https://webhooks.gitter.im/e/f8d2a73ac3672d8e7a8e
-    on_success: change
-    on_failure: always
-    on_start: false
