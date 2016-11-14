@@ -58,7 +58,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           probe.expectMsgType[RktNode.Data](1.minute) must {
             be(RktNode.NoConfig)
           }
-        }).setGens(Gen.identifier, Gen.listOfN(8, Gen.numChar).map(_.mkString))
+        }).setGens(Gen.identifier, Gen.listOfN(8, Gen.numChar).map(_.mkString)).noShrink
       }
 
     }
