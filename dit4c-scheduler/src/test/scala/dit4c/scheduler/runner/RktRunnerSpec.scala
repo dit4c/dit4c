@@ -503,9 +503,9 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         in: InputStream,
         out: OutputStream,
         err: OutputStream): Future[Int] = {
-      // Use Docker container when testing on Travis CI
+      // Allow usage for Docker container for systemd
       val prependCmd =
-        if (sys.env.contains("TRAVIS")) {
+        if (sys.env.contains("USE_DOCKER")) {
           Seq("docker", "exec", "-i", "rkt-systemd")
         } else Seq()
       val actualCmd = prependCmd ++ cmd
