@@ -33,7 +33,8 @@
       return function(id) {
         var adj = pick(adjectives, hashCode(id));
         var noun = pick(nouns, hashCode(reverse(id)));
-        return adj + ' ' + noun;
+        var suffix = id.slice(-3);
+        return adj + ' ' + noun + ' ' + suffix;
       };
     })()
   });
