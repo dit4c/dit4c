@@ -59,7 +59,7 @@ object InstanceAggregate {
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
   case object Discard extends Command
-  case class RecordInstanceStart(clusterId: String) extends Command
+  case class Start(clusterId: String, image: String) extends Command
   case class AssociatePGPPublicKey(armoredKey: String) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
@@ -67,6 +67,7 @@ object InstanceAggregate {
   case object GetImage extends Command
 
   sealed trait Response
+  case class Started(instanceId: String) extends Response
   case object Ack extends Response
   sealed trait StatusResponse extends Response
   case object DoesNotExist extends StatusResponse
@@ -118,10 +119,16 @@ class InstanceAggregate(
       stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
-    case Event(RecordInstanceStart(clusterId), _) =>
+    case Event(Start(clusterId, image), _) =>
       val requester = sender
       goto(Started).applying(StartedInstance(clusterId)).andThen { _ =>
-        requester ! Ack
+        implicit val timeout = Timeout(1.minute)
+        (clusterSharder ? ClusterSharder.Envelope(
+              clusterId,
+              ClusterAggregate.StartInstance(instanceId, image))).map {
+            case SchedulerAggregate.Ack =>
+              Started(instanceId)
+          }.pipeTo(requester)
       }
   }
 

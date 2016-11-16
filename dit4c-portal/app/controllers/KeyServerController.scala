@@ -3,7 +3,7 @@ package controllers
 import com.softwaremill.tagging._
 import akka.actor.ActorRef
 import utils.auth.DefaultEnv
-import services.InstanceAggregateManager
+import services.InstanceSharder
 import scala.concurrent.ExecutionContext
 import play.api.mvc.Controller
 import scala.concurrent.Future
@@ -16,7 +16,7 @@ import play.api.libs.functional.syntax._
 import play.api.mvc.Action
 
 class KeyServerController(
-    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager)(implicit ec: ExecutionContext)
+    val instanceSharder: ActorRef @@ InstanceSharder.type)(implicit ec: ExecutionContext)
     extends Controller {
 
   import akka.pattern.ask
@@ -48,7 +48,7 @@ class KeyServerController(
 
 
   def instanceJwkFromId(id: String): Future[Option[JsObject]] =
-    (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(id, InstanceAggregate.GetJwk)).collect {
+    (instanceSharder ? InstanceSharder.Envelope(id, InstanceAggregate.GetJwk)).collect {
       case InstanceAggregate.InstanceJwk(jwk) => Some(jwk)
       case InstanceAggregate.NoJwkExists => None
     }

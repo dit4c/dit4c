@@ -21,7 +21,7 @@ object IdentityService {
 }
 
 class IdentityService(
-    val identityAggregateManager: ActorRef @@ IdentityAggregateManager)(implicit ec: ExecutionContext)
+    val identitySharder: ActorRef @@ IdentitySharder.type)(implicit ec: ExecutionContext)
     extends SilhouetteIdentityService[IdentityService.User] {
   import IdentityService._
   import akka.pattern.ask
@@ -29,8 +29,7 @@ class IdentityService(
   implicit val timeout = Timeout(1.minute)
 
   def retrieve(loginInfo: LoginInfo): Future[Option[User]] =
-    (identityAggregateManager ? IdentityAggregateManager.IdentityEnvelope(
-        toIdentityKey(loginInfo), IdentityAggregate.GetUser)).collect {
-    case IdentityAggregate.UserFound(id) => Some(User(id, loginInfo))
-  }
+    (identitySharder ? IdentitySharder.Envelope(toIdentityKey(loginInfo), IdentityAggregate.GetUser)).collect {
+      case IdentityAggregate.UserFound(id) => Some(User(id, loginInfo))
+    }
 }

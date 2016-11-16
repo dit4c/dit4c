@@ -4,9 +4,10 @@ import akka.actor.ActorRef
 import scala.concurrent.duration._
 import com.softwaremill.tagging._
 import akka.persistence.fsm.PersistentFSM
-import services.UserAggregateManager
 import java.time.Instant
 import scala.reflect.{ClassTag, classTag}
+import java.util.Base64
+import services.UserSharder
 
 object IdentityAggregate {
 
@@ -34,10 +35,12 @@ object IdentityAggregate {
 }
 
 class IdentityAggregate(
-    key: IdentityAggregate.Key,
-    userAggregateManager: ActorRef @@ UserAggregateManager)
+    userSharder: ActorRef @@ UserSharder.type)
       extends PersistentFSM[IdentityAggregate.State, IdentityAggregate.Data, IdentityAggregate.DomainEvent] {
   import IdentityAggregate._
+
+  val key: IdentityAggregate.Key = new String(Base64.getUrlDecoder().decode(self.path.name), "utf8")
+  override lazy val persistenceId: String = "Identity-" + self.path.name
 
   startWith(Unassociated, IdentityData())
 
@@ -46,9 +49,9 @@ class IdentityAggregate(
   when(Unassociated) {
     case Event(GetUser, _) =>
       notifyWhenAssociated +:= sender
-      userAggregateManager ! UserAggregateManager.CreateNewUser
+      userSharder ! UserSharder.CreateNewUser
       stay
-    case Event(UserAggregateManager.CreatedUser(userId), _) =>
+    case Event(UserAggregate.CreateResponse(userId), _) =>
       goto(Associated) applying(AssociatedUser(userId))
   }
 
@@ -69,8 +72,6 @@ class IdentityAggregate(
     case (AssociatedUser(userId, _), data: IdentityData) =>
       data.copy(associatedUserId = Some(userId))
   }
-
-  override def persistenceId = self.path.name
 
   def domainEventClassTag: ClassTag[DomainEvent] = classTag[DomainEvent]
 

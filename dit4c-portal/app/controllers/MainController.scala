@@ -43,8 +43,8 @@ class MainController(
     val environment: Environment,
     val messagesApi: MessagesApi,
     val trackingScripts: TrackingScripts,
-    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
-    val userAggregateManager: ActorRef @@ UserAggregateManager,
+    val instanceSharder: ActorRef @@ InstanceSharder.type,
+    val userSharder: ActorRef @@ UserSharder.type,
     val silhouette: Silhouette[DefaultEnv],
     val identityService: IdentityService,
     val oauthDataHandler: InstanceOAuthDataHandler,
@@ -78,7 +78,7 @@ class MainController(
       case HandlerResult(r, Some(user)) =>
         import play.api.http.websocket._
         Right(ActorFlow.actorRef[Message, Message] { out =>
-          Props(classOf[GetInstancesActor], out, user, userAggregateManager, instanceAggregateManager)
+          Props(classOf[GetInstancesActor], out, user, userSharder, instanceSharder)
         })
       case HandlerResult(r, None) => Left(r)
     }
@@ -96,11 +96,9 @@ class MainController(
             case Some(image) => UserAggregate.StartInstance(cluster, image)
             case None => UserAggregate.StartInstanceFromInstance(cluster, userData.image)
           }
-          (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, uaOp)).map {
-            case InstanceAggregateManager.InstanceStarted(id) =>
-              Ok(id)
-            case InstanceAggregate.NoImageExists =>
-              NotFound
+          (userSharder ? UserSharder.Envelope(request.identity.id, uaOp)).map {
+            case InstanceAggregate.Started(id) => Ok(id)
+            case InstanceAggregate.NoImageExists => NotFound
           }
         }
     )
@@ -108,7 +106,7 @@ class MainController(
 
   def saveInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.SaveInstance(instanceId))).map {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.SaveInstance(instanceId))).map {
       case SchedulerAggregate.Ack =>
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
@@ -120,7 +118,7 @@ class MainController(
 
   def discardInstance(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.DiscardInstance(instanceId))).map {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.DiscardInstance(instanceId))).map {
       case SchedulerAggregate.Ack =>
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
@@ -132,7 +130,7 @@ class MainController(
 
   def exportImage(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
       case InstanceAggregate.InstanceImage(url) =>
         wsClient.url(url).stream.map {
           case StreamedResponse(headers, body) if headers.status == 200 =>
@@ -155,7 +153,7 @@ class MainController(
 
   def createSharingLink(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userAggregateManager ? UserAggregateManager.UserEnvelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
       case InstanceAggregate.InstanceImage(_) =>
         val payload = InstanceSharingAuthorization(request.identity.id, instanceId)
         // Good - it's a preserved instance, so we can go ahead
@@ -177,7 +175,7 @@ class MainController(
           case Success(a) =>
             implicit val timeout = Timeout(1.minute)
             val msg = UserAggregate.ReceiveSharedInstance(a.userId, a.instanceId)
-            (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, msg)).map {
+            (userSharder ? UserSharder.Envelope(user.id, msg)).map {
               case UserAggregate.InstanceReceived =>
                 Redirect(routes.MainController.index())
             }
@@ -247,56 +245,66 @@ class MainController(
   }
 
   def instanceRegistration = Action.async { implicit request =>
-    import InstanceAggregateManager.{InstanceEnvelope, VerifyJwt}
     implicit val timeout = Timeout(1.minute)
     val authHeaderRegex = "^Bearer (.*)$".r
     request.headers.get("Authorization")
       .collect { case authHeaderRegex(token) => token }
       .map { token =>
-        (instanceAggregateManager ? VerifyJwt(token)).flatMap {
-          case InstanceAggregate.ValidJwt(instanceId) =>
-            log.debug(s"Valid JWT for $instanceId")
-            request.body.asText match {
-              case Some(uri) =>
-                (instanceAggregateManager ? InstanceEnvelope(instanceId, InstanceAggregate.AssociateUri(uri))).map { _ =>
-                  Ok("")
-                }.recover {
-                  case e => InternalServerError(e.getMessage)
-                }
-              case None =>
-                Future.successful(BadRequest("No valid uri"))
-            }
-          case InstanceAggregate.InvalidJwt(msg) =>
-            log.warn(s"Invalid JWT: $msg\n${request.body}")
+        InstanceSharder.resolveJwtInstanceId(token) match {
+          case Left(msg) =>
+            log.error(token)
             Future.successful(BadRequest(msg))
+          case Right(instanceId) =>
+            (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token))).flatMap {
+              case InstanceAggregate.ValidJwt(instanceId) =>
+                log.debug(s"Valid JWT for $instanceId")
+                request.body.asText match {
+                  case Some(uri) =>
+                    (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.AssociateUri(uri))).map { _ =>
+                      Ok("")
+                    }.recover {
+                      case e => InternalServerError(e.getMessage)
+                    }
+                  case None =>
+                    Future.successful(BadRequest("No valid uri"))
+                }
+              case InstanceAggregate.InvalidJwt(msg) =>
+                log.warn(s"Invalid JWT: $msg\n${request.body}")
+                Future.successful(BadRequest(msg))
+            }
         }
       }
       .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
   }
 
   def imageRegistration = Action.async { implicit request =>
-    import InstanceAggregateManager.{InstanceEnvelope, VerifyJwt}
     implicit val timeout = Timeout(1.minute)
     val authHeaderRegex = "^Bearer (.*)$".r
     request.headers.get("Authorization")
       .collect { case authHeaderRegex(token) => token }
       .map { token =>
-        (instanceAggregateManager ? VerifyJwt(token)).flatMap {
-          case InstanceAggregate.ValidJwt(instanceId) =>
-            log.debug(s"Valid JWT for $instanceId")
-            request.body.asText match {
-              case Some(uri) =>
-                (instanceAggregateManager ? InstanceEnvelope(instanceId, InstanceAggregate.AssociateImage(uri))).map { _ =>
-                  Ok("")
-                }.recover {
-                  case e => InternalServerError(e.getMessage)
-                }
-              case None =>
-                Future.successful(BadRequest("No valid image uri"))
-            }
-          case InstanceAggregate.InvalidJwt(msg) =>
-            log.warn(s"Invalid JWT: $msg\n${request.body}")
+        InstanceSharder.resolveJwtInstanceId(token) match {
+          case Left(msg) =>
+            log.error(token)
             Future.successful(BadRequest(msg))
+          case Right(instanceId) =>
+            (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token))).flatMap {
+              case InstanceAggregate.ValidJwt(instanceId) =>
+                log.debug(s"Valid JWT for $instanceId")
+                request.body.asText match {
+                  case Some(uri) =>
+                    (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.AssociateImage(uri))).map { _ =>
+                      Ok("")
+                    }.recover {
+                      case e => InternalServerError(e.getMessage)
+                    }
+                  case None =>
+                    Future.successful(BadRequest("No valid image uri"))
+                }
+              case InstanceAggregate.InvalidJwt(msg) =>
+                log.warn(s"Invalid JWT: $msg\n${request.body}")
+                Future.successful(BadRequest(msg))
+            }
         }
       }
       .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
@@ -379,8 +387,8 @@ class MainController(
 
 class GetInstancesActor(out: ActorRef,
     user: IdentityService.User,
-    userAggregateManager: ActorRef @@ UserAggregateManager,
-    instanceAggregateManager: ActorRef @@ InstanceAggregateManager)
+    userSharder: ActorRef @@ UserSharder.type,
+    instanceSharder: ActorRef @@ InstanceSharder.type)
     extends Actor
     with ActorLogging {
   import play.api.libs.json._
@@ -393,10 +401,10 @@ class GetInstancesActor(out: ActorRef,
     import akka.pattern.pipe
     implicit val timeout = Timeout(5.seconds)
     pollFunc = Some(context.system.scheduler.schedule(1.micro, 5.seconds) {
-      (userAggregateManager ? UserAggregateManager.UserEnvelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
+      (userSharder ? UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
         case UserAggregate.UserInstances(instanceIds) =>
           instanceIds.toSeq.foreach { id =>
-            (instanceAggregateManager ? InstanceAggregateManager.InstanceEnvelope(id, InstanceAggregate.GetStatus))
+            (instanceSharder ? InstanceSharder.Envelope(id, InstanceAggregate.GetStatus))
               .collect { case msg: InstanceAggregate.CurrentStatus =>
                 val url: Option[String] =
                   msg.uri.map(Uri(_).withPath(Uri.Path./).toString)

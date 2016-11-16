@@ -20,6 +20,7 @@ import play.api.libs.functional.syntax._
 import scala.util.Random
 import java.time.Instant
 import java.util.Date
+import play.api.Logger
 
 object InstanceOAuthDataHandler {
   implicit def authInfoFormat[U](implicit ru: Reads[U], wu: Writes[U]): Format[AuthInfo[U]] = (
@@ -32,9 +33,11 @@ object InstanceOAuthDataHandler {
 
 class InstanceOAuthDataHandler(
     val authorizationCodeGenerator: AuthorizationCodeGenerator,
-    val instanceAggregateManager: ActorRef @@ InstanceAggregateManager,
+    val instanceSharder: ActorRef @@ InstanceSharder.type,
     val identityService: IdentityService
     )(implicit ec: ExecutionContext) extends DataHandler[IdentityService.User] {
+
+  val log = Logger(this.getClass)
 
   import akka.pattern.ask
   import InstanceOAuthDataHandler._
@@ -48,11 +51,18 @@ class InstanceOAuthDataHandler(
       .collect[Future[Boolean]] {
         case cred if cred.clientId.startsWith("instance-") && cred.clientSecret.isDefined =>
           implicit val timeout = Timeout(1.minute)
-          (instanceAggregateManager ? InstanceAggregateManager.VerifyJwt(cred.clientSecret.get)).map {
-            case InstanceAggregate.ValidJwt(instanceId) =>
-              cred.clientId == s"instance-$instanceId"
-            case InstanceAggregate.InvalidJwt =>
-              false
+          val token = cred.clientSecret.get
+          InstanceSharder.resolveJwtInstanceId(token) match {
+            case Left(msg) =>
+              log.error(token)
+              Future.successful(false)
+            case Right(instanceId) =>
+              (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token))).map {
+                case InstanceAggregate.ValidJwt(instanceId) =>
+                  cred.clientId == s"instance-$instanceId"
+                case InstanceAggregate.InvalidJwt =>
+                  false
+              }
           }
       }
       .getOrElse(Future.successful(false))

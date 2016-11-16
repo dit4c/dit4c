@@ -9,14 +9,12 @@ import scala.concurrent.Future
 import akka.util.ByteString
 import akka.stream.ActorMaterializer
 import akka.stream.Materializer
-import services.InstanceAggregateManager
 import akka.persistence.PersistentActor
 import akka.util.Timeout
 import java.time.Instant
 import domain.{InstanceAggregate => IA }
 import scala.collection.immutable.SortedSet
-import services.{InstanceAggregateManager => IAM}
-import services.InstanceAggregateManager.InstanceEnvelope
+import services.InstanceSharder
 
 object UserAggregate {
 
@@ -25,9 +23,10 @@ object UserAggregate {
   case class Data(instances: SortedSet[String] = SortedSet.empty)
 
   sealed trait Command
+  case object Create extends Command
   case class StartInstance(clusterId: String, image: String) extends Command {
-    def toIAMCommand: InstanceAggregateManager.Command =
-      (InstanceAggregateManager.StartInstance.apply _)
+    def toIAMCommand: InstanceSharder.Command =
+      (InstanceSharder.StartInstance.apply _)
         .tupled(StartInstance.unapply(this).get)
   }
   case class StartInstanceFromInstance(clusterId: String, sourceInstance: String) extends Command
@@ -38,6 +37,7 @@ object UserAggregate {
   case class ReceiveSharedInstance(sourceUserId: String, instanceId: String) extends Command
 
   sealed trait Response
+  case class CreateResponse(userId: UserAggregate.Id) extends Response
   case object UnableToStartInstance extends Response
   case object InstanceNotOwnedByUser extends Response
   case class UserInstances(instanceIds: Set[String]) extends Response
@@ -52,13 +52,13 @@ object UserAggregate {
 }
 
 class UserAggregate(
-    userId: UserAggregate.Id,
-    instanceAggregateManager: ActorRef @@ InstanceAggregateManager) extends PersistentActor with ActorLogging {
+    instanceSharder: ActorRef @@ InstanceSharder.type) extends PersistentActor with ActorLogging {
   import UserAggregate._
   import play.api.libs.json._
   import akka.pattern.{ask, pipe}
 
-  override lazy val persistenceId = self.path.name
+  val userId: UserAggregate.Id = self.path.name
+  override lazy val persistenceId = "User-"+userId
 
   implicit val m: Materializer = ActorMaterializer()
   import context.dispatcher
@@ -69,21 +69,23 @@ class UserAggregate(
   val http = Http(context.system)
 
   def receiveCommand: PartialFunction[Any,Unit] = {
+    case Create =>
+      sender ! CreateResponse(userId)
     case msg @ StartInstance(clusterId, image) =>
-      val op = (instanceAggregateManager ? msg.toIAMCommand)
+      val op = (instanceSharder ? msg.toIAMCommand)
       op.onSuccess {
-        case InstanceAggregateManager.InstanceStarted(instanceId) =>
+        case InstanceAggregate.Started(instanceId) =>
           self ! InstanceCreationConfirmation(instanceId)
       }
       op pipeTo sender
     case StartInstanceFromInstance(clusterId, sourceInstance) =>
       if (data.instances.contains(sourceInstance)) {
-        (instanceAggregateManager ? InstanceEnvelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
+        (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
           case InstanceAggregate.InstanceImage(image) =>
-            val op = (instanceAggregateManager ?
-                InstanceAggregateManager.StartInstance(clusterId, image))
+            val op = (instanceSharder ?
+                InstanceSharder.StartInstance(clusterId, image))
             op.onSuccess {
-              case InstanceAggregateManager.InstanceStarted(instanceId) =>
+              case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)
             }
             op pipeTo sender
@@ -95,7 +97,7 @@ class UserAggregate(
       }
     case GetInstanceImageUrl(instanceId) =>
       if (data.instances.contains(instanceId)) {
-        instanceAggregateManager forward InstanceEnvelope(instanceId, InstanceAggregate.GetImage)
+        instanceSharder forward InstanceSharder.Envelope(instanceId, InstanceAggregate.GetImage)
       } else {
         sender ! InstanceNotOwnedByUser
       }
@@ -105,17 +107,13 @@ class UserAggregate(
       sender ! UserInstances(data.instances)
     case SaveInstance(instanceId) =>
       if (data.instances.contains(instanceId)) {
-        instanceAggregateManager forward
-          InstanceAggregateManager.InstanceEnvelope(instanceId,
-              InstanceAggregate.Save)
+        instanceSharder forward InstanceSharder.Envelope(instanceId, InstanceAggregate.Save)
       } else {
         sender ! InstanceNotOwnedByUser
       }
     case DiscardInstance(instanceId) =>
       if (data.instances.contains(instanceId)) {
-        instanceAggregateManager forward
-          InstanceAggregateManager.InstanceEnvelope(instanceId,
-              InstanceAggregate.Discard)
+        instanceSharder forward InstanceSharder.Envelope(instanceId, InstanceAggregate.Discard)
       } else {
         sender ! InstanceNotOwnedByUser
       }

@@ -101,21 +101,15 @@ class AppComponents(context: Context)
   val clusterSharder = ClusterSharder(schedulerSharder, imageServerConfig)(actorSystem)
       .taggedWith[services.ClusterSharder.type]
   system.eventStream.subscribe(clusterSharder, classOf[ClusterSharder.Envelope])
-  val instanceAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.InstanceAggregateManager], clusterSharder),
-      "instance-aggregate-manager")
-      .taggedWith[services.InstanceAggregateManager]
-  system.eventStream.subscribe(instanceAggregateManager, classOf[InstanceAggregateManager.InstanceEnvelope])
-  val userAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.UserAggregateManager], instanceAggregateManager),
-      "user-aggregate-manager")
-      .taggedWith[services.UserAggregateManager]
-  system.eventStream.subscribe(userAggregateManager, classOf[UserAggregateManager.UserEnvelope])
-  val identityAggregateManager = actorSystem.actorOf(
-      Props(classOf[services.IdentityAggregateManager], userAggregateManager),
-      "identity-aggregate-manager")
-      .taggedWith[services.IdentityAggregateManager]
-  system.eventStream.subscribe(identityAggregateManager, classOf[IdentityAggregateManager.IdentityEnvelope])
+  val instanceAggregateManager = InstanceSharder(clusterSharder)(actorSystem)
+      .taggedWith[services.InstanceSharder.type]
+  system.eventStream.subscribe(instanceAggregateManager, classOf[InstanceSharder.Envelope])
+  val userAggregateManager = UserSharder(instanceAggregateManager)(actorSystem)
+      .taggedWith[services.UserSharder.type]
+  system.eventStream.subscribe(userAggregateManager, classOf[UserSharder.Envelope])
+  val identitySharder = IdentitySharder(userAggregateManager)(actorSystem)
+      .taggedWith[services.IdentitySharder.type]
+  system.eventStream.subscribe(identitySharder, classOf[IdentitySharder.Envelope])
 
   lazy val identityService: services.IdentityService = wire[services.IdentityService]
   lazy val sessionAuthenticatorSettings = SessionAuthenticatorSettings()

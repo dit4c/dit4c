@@ -40,15 +40,15 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "true if instance with valid JWT secret" >> prop({ (instanceId: String) =>
         val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         val params = Map(
             "client_id" -> Seq(s"instance-$instanceId"),
             "client_secret" -> Seq(JwtJson.encode(JwtClaim("", Some(s"instance-$instanceId")))))
         val fResponse = dh.validateClient(new AuthorizationRequest(Map.empty, params))
         (fResponse.isCompleted must beFalse) and {
           probe.receiveOne(10.seconds) match {
-            case InstanceAggregateManager.VerifyJwt(token) =>
+            case InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token)) =>
               probe.reply(InstanceAggregate.ValidJwt(instanceId))
             case msg =>
               failure(s"Unknown message: $msg")
@@ -60,15 +60,15 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "false if instance JWT verification fails" >> prop({ (instanceId: String) =>
         val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         val params = Map(
             "client_id" -> Seq(s"instance-$instanceId"),
             "client_secret" -> Seq(JwtJson.encode(JwtClaim("", Some(s"instance-$instanceId")))))
         val fResponse = dh.validateClient(new AuthorizationRequest(Map.empty, params))
         (fResponse.isCompleted must beFalse) and {
           probe.receiveOne(10.seconds) match {
-            case InstanceAggregateManager.VerifyJwt(token) =>
+            case InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token)) =>
               probe.reply(InstanceAggregate.InvalidJwt)
             case msg =>
               failure(s"Unknown message: $msg")
@@ -80,8 +80,8 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "false if client_id doesn't match JWT" >> prop({ (instanceId: String) =>
         val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         val otherId = "notthesameissuer"
         val params = Map(
             "client_id" -> Seq(s"instance-$instanceId"),
@@ -89,7 +89,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
         val fResponse = dh.validateClient(new AuthorizationRequest(Map.empty, params))
         (fResponse.isCompleted must beFalse) and {
           probe.receiveOne(10.seconds) match {
-            case InstanceAggregateManager.VerifyJwt(token) =>
+            case InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token)) =>
               probe.reply(InstanceAggregate.ValidJwt(otherId))
             case msg =>
               failure(s"Unknown message: $msg")
@@ -101,8 +101,8 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "always false without credentials" >> {
         val probe = TestProbe()(actorSystem("dh-vc-nocreds"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         (dh.validateClient(new AuthorizationRequest(Map.empty, Map.empty)) must beFalse.await) and
         (probe.msgAvailable must beFalse)
       }
@@ -110,8 +110,8 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "always false if not an instance" >> {
         val probe = TestProbe()(actorSystem("dh-vc-notinstance"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         val params = Map(
             "client_id" -> Seq("not_an_instance"),
             "client_secret" -> Seq("whatever"))
@@ -126,15 +126,15 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
       "extracts info from code and then resolves user identity" >> prop({ (instanceId: String, info: AuthInfo[IdentityService.User]) =>
         val probe = TestProbe()(actorSystem("dh-vc-instance"))
         val dh = new InstanceOAuthDataHandler(acg,
-            probe.ref.taggedWith[InstanceAggregateManager],
-            new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+            probe.ref.taggedWith[InstanceSharder.type],
+            new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
         import LoginInfo.jsonFormat
         import InstanceOAuthDataHandler.authInfoFormat
         val code = Await.result(dh.createAuthCode(info), 1.second)
         val fResponse = dh.findAuthInfoByCode(code)
         (fResponse.isCompleted must beFalse) and {
           probe.receiveOne(10.seconds) match {
-            case IdentityAggregateManager.IdentityEnvelope(key, IdentityAggregate.GetUser) if key == IdentityService.toIdentityKey(info.user.loginInfo) =>
+            case IdentitySharder.Envelope(key, IdentityAggregate.GetUser) if key == IdentityService.toIdentityKey(info.user.loginInfo) =>
               probe.reply(IdentityAggregate.UserFound(info.user.id))
             case msg =>
               failure(s"Unknown message: $msg")
@@ -160,8 +160,8 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
 
   def stubbedDataHandler(probe: TestProbe) =
     new InstanceOAuthDataHandler(acg,
-        probe.ref.taggedWith[InstanceAggregateManager],
-        new IdentityService(probe.ref.taggedWith[IdentityAggregateManager]))
+        probe.ref.taggedWith[InstanceSharder.type],
+        new IdentityService(probe.ref.taggedWith[IdentitySharder.type]))
 
   def actorSystem(name: String) = ActorSystem(name, ConfigFactory.load(actorSystemConfig))
 

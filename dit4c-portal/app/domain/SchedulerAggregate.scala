@@ -97,15 +97,15 @@ class SchedulerAggregate()
       stay
     case Event(ReceiveSchedulerMessage(msg), _) =>
       import dit4c.protobuf.scheduler.outbound.OutboundMessage.Payload
-      import services.InstanceAggregateManager.InstanceEnvelope
+      import services.InstanceSharder
       import domain.InstanceAggregate.AssociatePGPPublicKey
       msg.payload match {
         case Payload.Empty => // Do nothing
         case Payload.InstanceStateUpdate(msg) =>
-          val envelope = InstanceEnvelope(msg.instanceId, msg)
+          val envelope = InstanceSharder.Envelope(msg.instanceId, msg)
           context.system.eventStream.publish(envelope)
         case Payload.AllocatedInstanceKey(msg) =>
-          val envelope = InstanceEnvelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
+          val envelope = InstanceSharder.Envelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
           context.system.eventStream.publish(envelope)
       }
       stay

@@ -11,7 +11,7 @@ import play.api.mvc.Controller
 import scalaoauth2.provider._
 import services._
 import utils.auth.DefaultEnv
-import services.UserAggregateManager.UserEnvelope
+import services.UserSharder.Envelope
 import domain.UserAggregate.{ GetAllInstanceIds, UserInstances }
 import akka.util.Timeout
 import akka.http.scaladsl.model.Uri
@@ -19,7 +19,7 @@ import play.api.mvc.Request
 
 class OAuthServerController(
     val silhouette: Silhouette[DefaultEnv],
-    val userAggregateManager: ActorRef @@ UserAggregateManager,
+    val userSharder: ActorRef @@ UserSharder.type,
     val oauthDataHandler: InstanceOAuthDataHandler)(implicit ec: ExecutionContext)
     extends Controller
     with OAuth2Provider {
@@ -72,7 +72,7 @@ class OAuthServerController(
   }
 
   private def checkUserOwnsInstance(userId: String, instanceId: String): Future[Boolean] =
-    (userAggregateManager ? UserEnvelope(userId, GetAllInstanceIds)).collect {
+    (userSharder ? UserSharder.Envelope(userId, GetAllInstanceIds)).collect {
       case UserInstances(instanceIds) =>
         instanceIds.contains(instanceId)
     }
