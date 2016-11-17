@@ -69,9 +69,11 @@ paper-dropdown-menu {
       <div id="page-title">@pageTitle</div>
       <div>
         <form id="logout" method="post" action="@routes.MainController.logout">
-          <paper-button onclick="document.getElementById('logout').submit()">
-            Logout
-          </paper-button>
+          <paper-icon-button
+            title=""
+            icon="exit-to-app"
+            onclick="document.getElementById('logout').submit()">
+          </paper-icon-button>
         </form>
       </div>
     </app-toolbar>
