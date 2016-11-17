@@ -47,7 +47,6 @@ object KeyHelpers {
           kpg.init(new RSAKeyGenerationParameters(publicExponent.bigInteger, new SecureRandom(), bits, 256))
           kpg.generateKeyPair
         }
-        val sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1)
         val keyPair = new BcPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
         // Various flags/preferences we want to embed into the certificate (unalterable after signing)
         val hashedSubpacketVector = {
@@ -68,12 +67,12 @@ object KeyHelpers {
               .map { p =>
                 new JcePBESecretKeyEncryptorBuilder(
                     SymmetricKeyAlgorithmTags.AES_256,
-                    sha256DigestCalculator).setProvider("BC").build(p.toArray)
+                    sha1DigestCalculator).setProvider("BC").build(p.toArray)
               }
               .getOrElse(null)
         val secretKey = new PGPSecretKey(
             PGPSignature.DEFAULT_CERTIFICATION,
-            keyPair, identity, sha1Calc, hashedSubpacketVector, null,
+            keyPair, identity, sha1DigestCalculator, hashedSubpacketVector, null,
             new JcaPGPContentSignerBuilder(
                 keyPair.getPublicKey().getAlgorithm(),
                 HashAlgorithmTags.SHA256),
@@ -243,28 +242,11 @@ object KeyHelpers {
     def public = new OpenPgpKey {
       override def encodeToStream(os: OutputStream) = secretKey.getPublicKey.encode(os)
     }
-    def encryptedWith(oldPassphrase: Option[String], newPassphrase: Option[String]) = {
-      val decryptor =
-        oldPassphrase
-              .map { pass =>
-                new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toArray)
-              }
-              .getOrElse(null)
-      val encryptor =
-        newPassphrase
-              .map { pass =>
-                (new JcePBESecretKeyEncryptorBuilder(
-                    SymmetricKeyAlgorithmTags.AES_256,
-                    sha256DigestCalculator)).setProvider("BC").build(pass.toArray)
-              }
-              .getOrElse(null)
-      PGPSecretKey.copyWithNewPassword(secretKey, decryptor, encryptor)
-    }
-    def asRSAPrivateKey(passphrase: Option[String] = None): RSAPrivateKey = {
+    def asRSAPrivateKey(passphrase: Option[String]): RSAPrivateKey = {
       val decryptor =
         passphrase
             .map { pass =>
-              new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toArray)
+              new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toCharArray)
             }
             .getOrElse(null)
       val priv = secretKey.extractPrivateKey(decryptor).getPrivateKeyDataPacket.asInstanceOf[RSASecretBCPGKey]
@@ -305,8 +287,9 @@ object KeyHelpers {
     def asJavaPublicKey: Option[PublicKey] = scala.util.Try(publicKey.asRSAPublicKey).toOption
   }
 
+  protected def sha1DigestCalculator =
+    new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1)
 
   protected def sha256DigestCalculator =
     new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build().get(HashAlgorithmTags.SHA256)
-
 }

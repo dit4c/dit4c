@@ -67,7 +67,15 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
             (sig.getCreationTime must beLessThan(new Date())) and
             // If at least required bits are set, then bit-wise AND of desiredFlags should be desiredFlags
             ((sig.getHashedSubPackets.getKeyFlags & desiredFlags) must_==(desiredFlags))
-          }))
+          })) and
+          ({
+            val expectedKey = pgpKey.extractPrivateKey(passphrase match {
+              case None => null
+              case Some(passphrase) =>
+                new BcPBESecretKeyDecryptorBuilder(new BcPGPDigestCalculatorProvider()).build(passphrase.toCharArray)
+            })
+            privateKey.getPrivateKeyDataPacket.getEncoded must_==(expectedKey.getPrivateKeyDataPacket.getEncoded)
+          })
         }
       }
     })
@@ -82,10 +90,10 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       })
     })
 
-    "produce PCKS#1 keys from PGP keys" >> prop({ (identity: String, bits: KeyBits) =>
+    "produce PCKS#1 keys from PGP keys" >> prop({ (identity: String, bits: KeyBits, passphrase: Option[String]) =>
       import sys.process._
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, None)
-      val is = new ByteArrayInputStream(pgpKey.asRSAPrivateKey().pkcs1.pem.getBytes)
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, passphrase)
+      val is = new ByteArrayInputStream(pgpKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
       val os = new ByteArrayOutputStream()
       def sendToOs(in: InputStream) = Iterator.continually(in.read).takeWhile(_>=0).foreach(os.write)
       val processIO = new ProcessIO(_ => (), sendToOs, sendToOs, true)

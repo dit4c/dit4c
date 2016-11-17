@@ -157,7 +157,7 @@ class RktRunnerImpl(
         "DIT4C_IMAGE_ID" -> instanceId,
         "DIT4C_IMAGE_SERVER" -> imageServer,
         "DIT4C_IMAGE_UPLOAD_NOTIFICATION_URL" -> Uri(portalUri).withPath(Uri.Path("/images/")).toString,
-        "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pem",
+        "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
         "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP" -> s"${instanceKeysInternalPath}/instance-key.openpgp.asc",
         "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP_PASSPHRASE" -> instanceId,
         "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
@@ -275,8 +275,10 @@ class RktRunnerImpl(
       authImageId <- fetch(config.authImage)
       listenerImageId <- fetch(config.listenerImage)
       servicePort <- guessServicePort(image)
-      secretKey = generateNewKey(instanceId)
-      instanceKeyInternalPath = "/dit4c/pki/instance-key.pem"
+      // Export key with passphrase, otherwise GnuPG can refuse to read it
+      secretKeyPassphrase = instanceId
+      secretKey = PGPKeyGenerators.RSA(s"DIT4C Instance $instanceId", passphrase = Some(secretKeyPassphrase))
+      instanceKeysInternalPath = "/dit4c/pki"
       vfm <- instanceVolumeFileManager(instanceId)
       configMountJson = Json.obj(
           "volume" -> "dit4c-instance-config",
@@ -286,8 +288,14 @@ class RktRunnerImpl(
           "kind" -> "host",
           "readOnly" -> true,
           "source" -> vfm.baseDir)
+      _ <- vfm.writeFile("pki/instance-key.pkcs1.pem",
+          secretKey.asRSAPrivateKey(Some(secretKeyPassphrase)).pkcs1.pem.getBytes)
+      _ <- vfm.writeFile("pki/instance-key.openpgp.asc", secretKey.`private`.armoured)
       helperEnvVars = Map[String, String](
-          "DIT4C_INSTANCE_PRIVATE_KEY" -> instanceKeyInternalPath,
+          "DIT4C_INSTANCE_PRIVATE_KEY" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
+          "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
+          "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP" -> s"${instanceKeysInternalPath}/instance-key.openpgp.asc",
+          "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP_PASSPHRASE" -> secretKeyPassphrase,
           "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
           "DIT4C_INSTANCE_JWT_KID" -> instanceId,
           "DIT4C_INSTANCE_HELPER_AUTH_HOST" -> "127.68.73.84",
@@ -299,10 +307,6 @@ class RktRunnerImpl(
       )
       authImageAppJson <- getImageAppConfig(authImageId).map(addExtraEnvVars(_, helperEnvVars))
       listenerImageAppJson <- getImageAppConfig(listenerImageId).map(addExtraEnvVars(_, helperEnvVars))
-      _ <- vfm.writeFile("pki/instance-key.pem", secretKey.asRSAPrivateKey().pkcs1.pem.getBytes)
-      // Export key with passphrase, otherwise GnuPG can refuse to read it
-      _ <- vfm.writeFile("pki/instance-key.openpgp.asc",
-          secretKey.encryptedWith(None, Some(instanceId)).`private`.armoured)
       manifest = Json.obj(
         "acVersion" -> "0.8.4",
         "acKind" -> "PodManifest",
@@ -397,9 +401,6 @@ class RktRunnerImpl(
       .map(v => (v \ "app").as[JsObject])
 
   private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
-
-  private def generateNewKey(instanceId: String): PGPSecretKey =
-    PGPKeyGenerators.RSA(s"DIT4C Instance $instanceId")
 
   private def rktEnv(pairs: (String, String)*): JsArray = JsArray(
     pairs.map { case (k: String, v: String) => Json.obj("name" -> k, "value" -> v) })
