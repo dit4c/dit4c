@@ -54,7 +54,7 @@ class InstanceOAuthDataHandler(
           val token = cred.clientSecret.get
           InstanceSharder.resolveJwtInstanceId(token) match {
             case Left(msg) =>
-              log.error(token)
+              log.error(msg)
               Future.successful(false)
             case Right(instanceId) =>
               (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token))).map {

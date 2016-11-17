@@ -46,6 +46,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
             "client_id" -> Seq(s"instance-$instanceId"),
             "client_secret" -> Seq(JwtJson.encode(JwtClaim("", Some(s"instance-$instanceId")))))
         val fResponse = dh.validateClient(new AuthorizationRequest(Map.empty, params))
+        // Response can only complete immediately if the token is incorrectly formed
         (fResponse.isCompleted must beFalse) and {
           probe.receiveOne(10.seconds) match {
             case InstanceSharder.Envelope(instanceId, InstanceAggregate.VerifyJwt(token)) =>
@@ -55,7 +56,7 @@ class InstanceOAuthDataHandlerSpec(implicit ee: ExecutionEnv)
           }
           fResponse must beTrue.await
         }
-      })
+      }).setGen(Gen.identifier)
 
       "false if instance JWT verification fails" >> prop({ (instanceId: String) =>
         val probe = TestProbe()(actorSystem("dh-vc-instance"))
