@@ -9,7 +9,7 @@ scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 libraryDependencies ++= {
   Seq(
     "com.typesafe.akka"   %%  "akka-http-core"  % akkaV,
-    "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.43" % "protobuf",
+    "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbV % "protobuf",
     "org.bouncycastle"    %   "bcpkix-jdk15on"  % "1.55",
     "org.bouncycastle"    %   "bcpg-jdk15on"    % "1.55",
     "com.pauldijou"       %%  "jwt-play-json"   % "0.7.1",

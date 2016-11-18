@@ -12,6 +12,7 @@ scalacOptions := Seq(
 
 libraryDependencies ++= {
   Seq(
+    "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbV % "protobuf",
     "ch.qos.logback"      %   "logback-classic"       % logbackV,
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,
     "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
@@ -55,6 +56,11 @@ sourceGenerators in Compile <+= (sourceManaged in Compile, name, version, cacheD
     }
   cache(Set( dir / "dit4c" / "scheduler" / "AppMetadataImpl.scala" )).toSeq
 }
+
+// Generate protobuf classes for Akka serialization
+PB.targets in Compile := Seq(
+  scalapb.gen(grpc = false) -> (sourceManaged in Compile).value
+)
 
 // Download rkt for testing
 resourceGenerators in Test <+=
