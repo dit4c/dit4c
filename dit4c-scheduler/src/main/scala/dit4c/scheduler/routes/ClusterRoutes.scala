@@ -62,9 +62,9 @@ object ClusterRoutes {
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
 
-  implicit val writesPGPPublicKey: Writes[PGPPublicKey] =
+  implicit val writesSigningKey: Writes[Instance.SigningKey] =
     Writes { key =>
-      Json.toJson(key.asRSAPublicKey)
+      Json.toJson(key.asPGPPublicKey.asRSAPublicKey)
     }
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
@@ -72,7 +72,7 @@ object ClusterRoutes {
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
       (__ \ 'portal).writeNullable[String] and
-      (__ \ 'key).writeNullable[PGPPublicKey] and
+      (__ \ 'key).writeNullable[Instance.SigningKey] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier

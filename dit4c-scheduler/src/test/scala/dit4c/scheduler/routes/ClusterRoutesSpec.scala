@@ -7,7 +7,6 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import org.specs2.matcher.JsonType
 import dit4c.scheduler.service.ClusterAggregateManager
-import akka.actor.Props
 import org.specs2.ScalaCheck
 import akka.http.scaladsl.model.StatusCodes
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -197,7 +196,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       NamedImage(imageName),
                       None,
                       portalUri.toString,
-                      Some(signingKey)))
+                      Some(Instance.SigningKey(signingKey))))
           }
         }
         Get(path) ~> routes(testActor) ~> check {

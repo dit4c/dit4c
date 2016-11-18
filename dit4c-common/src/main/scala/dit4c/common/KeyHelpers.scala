@@ -217,11 +217,11 @@ object KeyHelpers {
   trait OpenPgpKey extends KeyFormat {
     def binary: Array[Byte] = captureOutputStream(encodeToStream)
 
-    def armoured: Array[Byte] = captureOutputStream { os =>
+    def armored: String = new String(captureOutputStream { os =>
       val aos = new ArmoredOutputStream(os)
       encodeToStream(aos)
       aos.close
-    }
+    }, "ASCII")
 
     override def raw = binary
 

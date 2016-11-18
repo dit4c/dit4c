@@ -290,7 +290,7 @@ class RktRunnerImpl(
           "source" -> vfm.baseDir)
       _ <- vfm.writeFile("pki/instance-key.pkcs1.pem",
           secretKey.asRSAPrivateKey(Some(secretKeyPassphrase)).pkcs1.pem.getBytes)
-      _ <- vfm.writeFile("pki/instance-key.openpgp.asc", secretKey.`private`.armoured)
+      _ <- vfm.writeFile("pki/instance-key.openpgp.asc", secretKey.`private`.armored)
       helperEnvVars = Map[String, String](
           "DIT4C_INSTANCE_PRIVATE_KEY" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
           "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
@@ -365,6 +365,9 @@ class RktRunnerImpl(
             s"test -f $f",
             s"echo $f").mkString(" && "))), new ByteArrayInputStream(content)).map(_.trim)
     }
+
+    def writeFile(filename: String, content: String): Future[String] =
+      writeFile(filename, content.getBytes)
 
     def absolutePath(filename: String): Future[String] =
       ce(privileged(Seq("readlink", "-f", resolve(filename)))).map(_.trim)
