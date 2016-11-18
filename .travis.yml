@@ -1,21 +1,23 @@
 language: scala
 sudo: false
 jdk:
-  - oraclejdk8
+- oraclejdk8
 scala:
-  - 2.11.8
+- 2.11.8
 cache:
   directories:
-    - $HOME/.ivy2/cache
-    - $HOME/.sbt/boot/
+  - "$HOME/.ivy2/cache"
+  - "$HOME/.sbt/boot/"
 before_script:
-  - echo $PATH
-  - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
+- echo $PATH
+- sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
 script:
-  # Test script
-  - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M coverage test && sbt coverageAggregate
-  # Tricks to avoid unnecessary cache updates
-  - find $HOME/.sbt -name "*.lock" | xargs rm
-  - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
+- sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M coverage test && sbt
+  coverageAggregate
+- find $HOME/.sbt -name "*.lock" | xargs rm
+- find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
 after_success:
-  - sbt coveralls
+- sbt coveralls
+notifications:
+  slack:
+    secure: CvQrl/OQx9BzIG+G8mrUYnCtYmvjoElXFDxb3q7KnA65H4plp3sKORHk74Gy3vwOeSdxRXgIutoNnrZjn0x2foP+gnLQ5IMu2I69tphBBAb/TLRzIu57H4Vi0EB3oWTTlYLfjKnyhzUvpj1+AG7exzWY3ASom0j+BG9z8Tl/ywQ=
