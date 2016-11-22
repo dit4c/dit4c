@@ -16,7 +16,9 @@ libraryDependencies ++= {
     "ch.qos.logback"      %   "logback-classic"       % logbackV,
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,
     "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
+    "com.typesafe.akka"   %%  "akka-remote"           % akkaV,
     "com.typesafe.akka"   %%  "akka-slf4j"            % akkaV,
+    "com.twitter"         %%  "chill-akka"            % "0.8.1",
     "com.jcraft"          %   "jsch"                  % "0.1.53",
     "com.github.scopt"    %%  "scopt"                 % "3.4.0",
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
@@ -39,23 +41,6 @@ scalacOptions ++= Seq("-feature")
 packSettings
 
 packMain := Map("dit4c-scheduler" -> "dit4c.scheduler.Main")
-
-// Produce scala object that knows the app version
-sourceGenerators in Compile <+= (sourceManaged in Compile, name, version, cacheDirectory) map { (dir, name, version, cacheDir) =>
-  val cache =
-    FileFunction.cached(cacheDir / "version", inStyle = FilesInfo.hash, outStyle = FilesInfo.hash) { in: Set[File] =>
-      val file = in.toSeq.head
-      val content =
-        s"""|package dit4c.scheduler
-            |object AppMetadataImpl extends utils.AppMetadata {
-            |  override def name = "$name"
-            |  override def version = "$version"
-            |}""".stripMargin
-      IO.write(file, content);
-      Set(file)
-    }
-  cache(Set( dir / "dit4c" / "scheduler" / "AppMetadataImpl.scala" )).toSeq
-}
 
 // Generate protobuf classes for Akka serialization
 PB.targets in Compile := Seq(

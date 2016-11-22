@@ -10,7 +10,7 @@ import akka.actor.Cancellable
 
 object RktInstanceScheduler {
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case class WorkerFound(nodeId: String, worker: ActorRef) extends Response
   case object NoWorkersAvailable extends Response
 

@@ -60,18 +60,12 @@ object RktClusterManager {
   case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends Command
   case class RegisterRktNode(requester: ActorRef) extends Command
   case class StartInstance(
-      instanceId: String, image: Instance.SourceImage, portalUri: String) extends Command
+      instanceId: String, image: String, portalUri: String) extends Command
   case class GetInstanceStatus(id: Instance.Id) extends Command
   case class InstanceEnvelope(id: Instance.Id, msg: Instance.Command) extends Command
 
-  trait DomainEvent
-  case class RktNodeRegistered(
-      nodeId: String, timestamp: Instant = Instant.now) extends DomainEvent
-  case class InstanceAssignedToNode(
-      instanceId: String, nodeId: String,
-      timestamp: Instant = Instant.now) extends DomainEvent
-
-  trait Response
+  trait Response extends ClusterManager.Response
+  case class CurrentClusterInfo(clusterInfo: ClusterInfo) extends Response with ClusterManager.GetStatusResponse
   case class StartingInstance(instanceId: InstanceId) extends Response
   case object UnableToStartInstance extends Response
   case class UnknownInstance(instanceId: InstanceId) extends Response
@@ -85,6 +79,7 @@ class RktClusterManager(
     extends PersistentActor
     with ClusterManager
     with ActorLogging {
+  import dit4c.scheduler.domain.rktclustermanager._
   import ClusterManager._
   import RktClusterManager._
   import akka.pattern.{ask, pipe}
@@ -98,7 +93,7 @@ class RktClusterManager(
     Map.empty[ActorRef, PendingOperation]
 
   override def receiveCommand = {
-    case GetStatus => sender ! state
+    case GetStatus => sender ! CurrentClusterInfo(state)
 
     case AddRktNode(host, port, username, rktDir) =>
       val id = RktNode.newId

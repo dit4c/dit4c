@@ -1,0 +1,25 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package dit4c.scheduler.domain.rktclustermanager;
+
+option (scalapb.options) = {
+  flat_package: true
+  single_file: true
+  import: "dit4c.scheduler.domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+message RktNodeRegistered {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktclustermanager.DomainEvent";
+  string nodeId = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message InstanceAssignedToNode {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktclustermanager.DomainEvent";
+  string instanceId = 1;
+  string nodeId = 2;
+  google.protobuf.Timestamp timestamp = 100;
+}

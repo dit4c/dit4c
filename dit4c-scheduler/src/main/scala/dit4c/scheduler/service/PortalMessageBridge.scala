@@ -18,9 +18,10 @@ import dit4c.scheduler.domain.RktClusterManager
 import dit4c.scheduler.domain.Instance
 import java.time.Instant
 import scala.util.Random
+import dit4c.common.KryoSerializable
 
 object PortalMessageBridge {
-  case object BridgeClosed
+  case object BridgeClosed extends KryoSerializable
   class UnmarshallingActor extends Actor with ActorLogging {
     implicit val materializer = ActorMaterializer()
 
@@ -104,20 +105,23 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
-          RktClusterManager.StartInstance(instanceId, Instance.NamedImage(imageUrl), portalUri))
+          RktClusterManager.StartInstance(instanceId, imageUrl, portalUri))
     case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
       import dit4c.scheduler.domain._
+      import dit4c.scheduler.domain.{instance => i}
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId,
-              Instance.Save(Instance.NamedImage(saveHelperImageUrl), imageServer)))
+              Instance.Save(saveHelperImageUrl, imageServer)))
     case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
+      import dit4c.scheduler.domain.{instance => i}
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
     case dit4c.protobuf.scheduler.inbound.ConfirmInstanceUpload(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
+      import dit4c.scheduler.domain.{instance => i}
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))

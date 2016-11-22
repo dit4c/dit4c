@@ -1,0 +1,29 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package dit4c.scheduler.domain.rktnode;
+
+option (scalapb.options) = {
+  flat_package: true
+  single_file: true
+  import: "dit4c.scheduler.domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+message Initialized {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
+  string host = 1;
+  uint32 port = 2;
+  string username = 3;
+  string clientPrivateKeyPKCS8PEM = 4;
+  string clientPublicKeyPKCS8PEM = 5;
+  string serverPublicKeyPKCS8PEM = 6;
+  string rktDir = 7;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message KeysConfirmed {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}

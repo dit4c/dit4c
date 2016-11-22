@@ -16,19 +16,19 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
   }
 
   protected def receiveCmd(command: Command): Unit = command match {
-    case Fetch(image: Instance.NamedImage) =>
+    case Fetch(imageName: String) =>
       val instance = sender
-      runner.fetch(image.name).andThen {
+      runner.fetch(imageName).andThen {
         case Success(imageId) =>
-          instance ! Instance.ReceiveImage(Instance.LocalImage(imageId))
+          instance ! Instance.ReceiveImage(imageId)
         case Failure(e) =>
           replyWithError("Unable to fetch image", instance, e)
       }
-    case Start(instanceId, Instance.LocalImage(imageId), callbackUrl) =>
+    case Start(instanceId, imageId, callbackUrl) =>
       val instance = sender
       runner.start(instanceId, imageId, callbackUrl).andThen {
         case Success(key: PGPPublicKey) =>
-          instance ! Instance.AssociateSigningKey(Instance.SigningKey(key))
+          instance ! Instance.AssociateSigningKey(Instance.SigningKey(key).armoredPgpPublicKeyBlock)
           instance ! Instance.ConfirmStart
         case Failure(e) =>
           replyWithError("Unable to start image", instance, e)
@@ -52,9 +52,9 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to save image", instance, e)
       }
-    case Upload(instanceId, helperImage, imageServer, portalUri) =>
+    case Upload(instanceId, helperImageName, imageServer, portalUri) =>
       val instance = sender
-      runner.uploadImage(instanceId, helperImage.name, imageServer, portalUri).andThen {
+      runner.uploadImage(instanceId, helperImageName, imageServer, portalUri).andThen {
         case Success(imageId) =>
           // We've simply started the upload process, so don't confirm the upload
           log.info(s"Upload sucessfully initiated for $instanceId")

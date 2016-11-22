@@ -20,7 +20,12 @@ concurrentRestrictions in Global := Seq(
 )
 
 // Project definitions (automatically aggregated)
-lazy val common      = project in file("dit4c-common")
+lazy val common = (project in file("dit4c-common")).
+  enablePlugins(BuildInfoPlugin).
+  settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version),
+    buildInfoPackage := "dit4c.common"
+  )
 
 lazy val portal = (project in file("dit4c-portal")).dependsOn(common).enablePlugins(PlayScala, SbtWeb)
 

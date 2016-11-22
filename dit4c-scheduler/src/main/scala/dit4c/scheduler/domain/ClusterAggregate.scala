@@ -5,13 +5,12 @@ import java.time.Instant
 import scala.reflect.{ClassTag, classTag}
 import akka.actor._
 import akka.persistence.fsm.PersistentFSM
+import com.google.protobuf.timestamp.Timestamp
+import dit4c.scheduler.domain.clusteraggregate.DomainEvent
+import ClusterAggregate.{State, Data}
 
 object ClusterAggregate {
-
-  type ClusterType = ClusterTypes.Value
-  object ClusterTypes extends Enumeration {
-    val Rkt = Value("rkt")
-  }
+  import dit4c.scheduler.domain.clusteraggregate.ClusterType
 
   def props(pId: String, defaultConfigProvider: DefaultConfigProvider): Props =
     Props(classOf[ClusterAggregate], pId, defaultConfigProvider)
@@ -26,40 +25,41 @@ object ClusterAggregate {
       manager: ActorRef,
       val `type`: ClusterType) extends Data
 
-  trait Command
+  trait Command extends BaseCommand
   case class Initialize(`type`: ClusterType) extends Command
   case object GetState extends Command
 
-  trait DomainEvent extends BaseDomainEvent
-  case class InitializedWithType(
-      clusterType: ClusterType,
-      timestamp: Instant = Instant.now) extends DomainEvent
-
-  trait Response
-  case object AlreadyInitialized extends Response
+  trait Response extends BaseResponse
+  trait InitializeResponse extends Response
+  trait GetStateResponse extends Response
+  case object UninitializedCluster extends GetStateResponse
+  case class ClusterOfType(`type`: ClusterType) extends GetStateResponse
+  case object ClusterInitialized extends InitializeResponse
+  case object AlreadyInitialized extends InitializeResponse
 
 }
 
 class ClusterAggregate(val persistenceId: String, defaultConfigProvider: DefaultConfigProvider)
-    extends PersistentFSM[ClusterAggregate.State, ClusterAggregate.Data, ClusterAggregate.DomainEvent]
+    extends PersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
+  import dit4c.scheduler.domain.clusteraggregate._
   import ClusterAggregate._
 
   startWith(Uninitialized, Unmanaged)
 
   when(Uninitialized) {
     case Event(GetState, _) =>
-      stay replying Uninitialized
+      stay replying UninitializedCluster
     case Event(Initialize(t), _) =>
       goto(Active).applying(InitializedWithType(t)).andThen {
         case data =>
-          sender ! Active
+          sender ! ClusterInitialized
       }
   }
 
   when(Active) {
     case Event(GetState, ManagedCluster(_, t)) =>
-      stay replying t
+      stay replying ClusterOfType(t)
     case Event(init: Initialize, _) =>
       stay replying AlreadyInitialized
     case Event(msg, c: ManagedCluster) =>
@@ -87,7 +87,9 @@ class ClusterAggregate(val persistenceId: String, defaultConfigProvider: Default
     s"${persistenceId}-${t}"
 
   private def managerProps(t: ClusterType) = t match {
-    case ClusterTypes.Rkt => RktClusterManager.props(defaultConfigProvider.rktRunnerConfig)(context.dispatcher)
+    case ClusterType.Rkt => RktClusterManager.props(defaultConfigProvider.rktRunnerConfig)(context.dispatcher)
+    case ClusterType.Unrecognized(v) =>
+      throw new Exception(s"Unrecognised cluster type: $v")
   }
 
 }

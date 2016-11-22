@@ -17,6 +17,9 @@ addSbtPlugin("com.typesafe.play" % "sbt-plugin" % playV)
 // Other //
 ///////////
 
+// Incorporate build info into runtime
+addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.6.1")
+
 // Bundle to single jar
 addSbtPlugin("org.scala-sbt.plugins" % "sbt-onejar" % "0.8")
 

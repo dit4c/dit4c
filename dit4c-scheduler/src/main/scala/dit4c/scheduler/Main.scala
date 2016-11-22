@@ -9,8 +9,10 @@ object Main extends App {
 
   val appMetadata: AppMetadata = {
     val mirror = universe.runtimeMirror(getClass.getClassLoader)
-    mirror.reflectModule(mirror.staticModule("dit4c.scheduler.AppMetadataImpl"))
-        .instance.asInstanceOf[AppMetadata]
+    new AppMetadata() {
+      override def name = dit4c.common.BuildInfo.name
+      override def version = dit4c.common.BuildInfo.version
+    }
   }
 
   (new SchedulerConfigParser(appMetadata))

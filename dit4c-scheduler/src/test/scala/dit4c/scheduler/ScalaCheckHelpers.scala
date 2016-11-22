@@ -2,7 +2,7 @@ package dit4c.scheduler
 
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary
-import dit4c.scheduler.domain.ClusterAggregate.ClusterTypes
+import dit4c.scheduler.domain.clusteraggregate.ClusterType
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
 
@@ -10,7 +10,7 @@ object ScalaCheckHelpers extends ScalaCheckHelpers
 
 trait ScalaCheckHelpers {
 
-  implicit val arbClusterType = Arbitrary(Gen.oneOf(ClusterTypes.values.toSeq))
+  implicit val arbClusterType = Arbitrary(Gen.oneOf(Seq[ClusterType](ClusterType.Rkt)))
   implicit val arbUri = Arbitrary(genUri)
 
   val genNonEmptyString: Gen[String] =

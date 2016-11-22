@@ -1,18 +1,22 @@
 syntax = "proto3";
+import "scalapb/scalapb.proto";
 package dit4c.protobuf.scheduler;
 
 message StartInstance {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   string clusterId = 2;
   string imageUrl = 3;
 }
 
 message DiscardInstance {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   string clusterId = 2;
 }
 
 message SaveInstance {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   string clusterId = 2;
   string saveHelperImageUrl = 3;
@@ -20,16 +24,19 @@ message SaveInstance {
 }
 
 message ConfirmInstanceUpload {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   string clusterId = 2;
 }
 
 message RequestInstanceStateUpdate {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   string clusterId = 2;
 }
 
 message InboundMessage {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string messageId = 1;
   oneof payload {
     StartInstance startInstance = 2;

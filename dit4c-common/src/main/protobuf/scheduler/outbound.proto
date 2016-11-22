@@ -1,15 +1,18 @@
 syntax = "proto3";
 import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
 
 package dit4c.protobuf.scheduler;
 
 message AllocatedInstanceKey {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   // ASCII armored, and must support encryption, signing & authentication
   string pgpPublicKeyBlock = 2;
 }
 
 message InstanceStateUpdate {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
   google.protobuf.Timestamp timestamp = 2;
   enum InstanceState {
@@ -33,6 +36,7 @@ message InstanceStateUpdate {
 }
 
 message OutboundMessage {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string messageId = 1;
   oneof payload {
     InstanceStateUpdate instanceStateUpdate = 2;

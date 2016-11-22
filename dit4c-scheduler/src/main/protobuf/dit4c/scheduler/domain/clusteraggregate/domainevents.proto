@@ -1,0 +1,22 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package dit4c.scheduler.domain.clusteraggregate;
+
+option (scalapb.options) = {
+  flat_package: true
+  single_file: true
+  import: "dit4c.scheduler.domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+enum ClusterType {
+  Rkt = 0;
+}
+
+message InitializedWithType {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.clusteraggregate.DomainEvent";
+  ClusterType clusterType = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
