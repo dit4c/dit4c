@@ -2,10 +2,10 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 
-package dit4c.scheduler.domain.rktnode;
+package dit4c.scheduler.domain;
 
 option (scalapb.options) = {
-  flat_package: true
+  flat_package: false
   single_file: true
   import: "dit4c.scheduler.domain.BaseDomainEvent"
   preamble: "sealed trait DomainEvent extends BaseDomainEvent"
