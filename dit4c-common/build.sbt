@@ -27,6 +27,8 @@ fork := true
 
 scalacOptions ++= Seq("-feature")
 
+managedSourceDirectories in Compile += target.value / "protobuf-generated"
+
 PB.targets in Compile := Seq(
-  scalapb.gen(grpc = false) -> (sourceManaged in Compile).value
+  scalapb.gen(grpc = false) -> (target.value / "protobuf-generated")
 )
