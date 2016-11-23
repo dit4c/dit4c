@@ -12,13 +12,16 @@ DIT4C is a scalable platform for providing containerized web-based programming a
 
 All authentication is via federated identity providers - all a user needs is a modern web browser.
 
-Current environments available are:
+Some of the current environments available are:
  * [Base][dit4c-container-base] - web-based TTY sessions and basic file management
- * [IPython Notebook + Base][dit4c-container-ipython]
+ * [Jupyter Notebook + Base][dit4c-container-ipython]
+ * [NLTK + Jupyter Notebook + Base][dit4c-container-nltk]
+ * [OpenRefine + Base][dit4c-container-openrefine]
  * [RStudio + Base][dit4c-container-rstudio]
- * [IJulia + Base][dit4c-container-ijulia]
+ * [Apache Zeppelin + Base][dit4c-container-zeppelin]
  * [X11][dit4c-container-x11] - Base + X11 sessions via HTML5 VNC client
  * [Octave + X11][dit4c-container-octave]
+ * [QGIS + Jupyter + RStudio + X11] - QGIS with supporting Python & R environments
 
 ## Motivation
 
@@ -65,10 +68,12 @@ _Many things have changed in DIT4C 0.10. Updated installation instructions will 
 [coreos]: https://coreos.com/
 [dit4c-container-base]: https://registry.hub.docker.com/u/dit4c/dit4c-container-base/
 [dit4c-container-ipython]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ipython/
-[dit4c-container-rstudio]: https://registry.hub.docker.com/u/dit4c/dit4c-container-rstudio/
-[dit4c-container-ijulia]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ijulia/
-[dit4c-container-x11]: https://registry.hub.docker.com/u/dit4c/dit4c-container-x11/
+[dit4c-container-nltk]: https://registry.hub.docker.com/u/dit4c/dit4c-container-nltk/
 [dit4c-container-octave]: https://registry.hub.docker.com/u/dit4c/dit4c-container-octave/
+[dit4c-container-qgis]: https://registry.hub.docker.com/u/dit4c/dit4c-container-qgis/
+[dit4c-container-rstudio]: https://registry.hub.docker.com/u/dit4c/dit4c-container-rstudio/
+[dit4c-container-x11]: https://registry.hub.docker.com/u/dit4c/dit4c-container-x11/
+[dit4c-container-zeppelin]: https://registry.hub.docker.com/u/dit4c/dit4c-container-zeppelin/
 [dit4c-deploy-routing]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-routing/
 [dit4c-deploy-portal]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-portal/
 [dit4c-deploy-compute]: https://registry.hub.docker.com/u/dit4c/dit4c-deploy-compute/
