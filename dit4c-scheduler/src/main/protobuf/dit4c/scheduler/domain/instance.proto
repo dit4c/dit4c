@@ -8,6 +8,7 @@ option (scalapb.options) = {
   flat_package: false
   single_file: true
   import: "dit4c.scheduler.domain.BaseDomainEvent"
+  preamble: "// $COVERAGE-OFF$Generated code"
   preamble: "sealed trait DomainEvent extends BaseDomainEvent"
 };
 

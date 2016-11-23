@@ -2,6 +2,11 @@ syntax = "proto3";
 import "scalapb/scalapb.proto";
 package dit4c.protobuf.scheduler;
 
+option (scalapb.options) = {
+  single_file: true
+  preamble: "// $COVERAGE-OFF$Generated code"
+};
+
 message StartInstance {
   option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
