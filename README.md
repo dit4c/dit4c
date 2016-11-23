@@ -22,7 +22,7 @@ Current environments available are:
 
 ## Motivation
 
-DIT4C has two is focused on meeting two needs:
+DIT4C is focused on meeting two needs:
 * Training sessions - having a working install right from the beginning means training participants start programming sooner, and do so in a consistent environment.
 * Reproducible research - container sharing and export allows complete working environments to be exchanged and archived.
 
