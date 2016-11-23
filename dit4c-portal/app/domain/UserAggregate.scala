@@ -43,16 +43,12 @@ object UserAggregate {
   case class UserInstances(instanceIds: Set[String]) extends Response
   case object InstanceReceived extends Response
 
-  sealed trait DomainEvent { def timestamp: Instant }
-  case class CreatedInstance(
-      instanceId: String, timestamp: Instant = Instant.now) extends DomainEvent
-  case class ReceivedSharedInstance(
-      sourceUserId: String, instanceId: String, timestamp: Instant = Instant.now) extends DomainEvent
-
 }
 
 class UserAggregate(
     instanceSharder: ActorRef @@ InstanceSharder.type) extends PersistentActor with ActorLogging {
+  import domain.BaseDomainEvent.now
+  import domain.user._
   import UserAggregate._
   import play.api.libs.json._
   import akka.pattern.{ask, pipe}
@@ -102,7 +98,7 @@ class UserAggregate(
         sender ! InstanceNotOwnedByUser
       }
     case InstanceCreationConfirmation(instanceId) =>
-      persist(CreatedInstance(instanceId))(updateData)
+      persist(CreatedInstance(instanceId, now))(updateData)
     case GetAllInstanceIds =>
       sender ! UserInstances(data.instances)
     case SaveInstance(instanceId) =>
@@ -122,7 +118,7 @@ class UserAggregate(
         sender ! InstanceReceived
       } else {
         log.info(s"$userId receiving shared instance from $sourceUserId: $instanceId")
-        persist(ReceivedSharedInstance(sourceUserId, instanceId)) { evt =>
+        persist(ReceivedSharedInstance(sourceUserId, instanceId, now)) { evt =>
           updateData(evt)
           sender ! InstanceReceived
         }

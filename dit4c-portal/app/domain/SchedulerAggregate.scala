@@ -14,6 +14,7 @@ import akka.actor.ActorRef
 import dit4c.protobuf.scheduler.outbound.AllocatedInstanceKey
 import java.security.spec.RSAPublicKeySpec
 import domain.InstanceAggregate.AssociatePGPPublicKey
+import domain.scheduler.DomainEvent
 
 object SchedulerAggregate {
 
@@ -27,7 +28,7 @@ object SchedulerAggregate {
   case object NoData extends Data
   case object SchedulerInfo extends Data
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object Create extends Command
   case class VerifyJwt(token: String) extends Command
   case class RegisterSocket(socketActor: ActorRef) extends Command
@@ -35,7 +36,7 @@ object SchedulerAggregate {
   case class ReceiveSchedulerMessage(msg: dit4c.protobuf.scheduler.outbound.OutboundMessage) extends Command
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case object Ack extends Response
   sealed trait VerifyJwtResponse extends Response
   case object ValidJwt extends VerifyJwtResponse
@@ -44,15 +45,14 @@ object SchedulerAggregate {
   case object MessageSent extends Response
   case object UnableToSendMessage extends Response
 
-  sealed trait DomainEvent extends BaseDomainEvent
-  case class Created(timestamp: Instant = Instant.now) extends DomainEvent
-
 }
 
 class SchedulerAggregate()
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
+  import BaseDomainEvent.now
+  import domain.scheduler._
   implicit val m: Materializer = ActorMaterializer()
 
   lazy val schedulerId = self.path.name
@@ -65,7 +65,7 @@ class SchedulerAggregate()
   when(Uninitialized) {
     case Event(Create, _) =>
       val requester = sender
-      goto(Active).applying(Created()).andThen { _ =>
+      goto(Active).applying(Created(now)).andThen { _ =>
         requester ! Ack
       }
     case Event(VerifyJwt(_), _) =>

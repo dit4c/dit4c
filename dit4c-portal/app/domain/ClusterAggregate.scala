@@ -15,6 +15,7 @@ import java.time.Instant
 import scala.reflect._
 import scala.util.Random
 import utils.IdUtils
+import domain.cluster.DomainEvent
 
 object ClusterAggregate {
 
@@ -28,7 +29,7 @@ object ClusterAggregate {
   case object NoData extends Data
   case class ClusterInfo(schedulerId: String) extends Data
 
-  sealed trait Command
+  sealed trait Command extends BaseResponse
   case class Create(schedulerId: String) extends Command
   case class StartInstance(instanceId: String, image: String) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
@@ -36,12 +37,9 @@ object ClusterAggregate {
   case class DiscardInstance(instanceId: String) extends Command
   case class ConfirmInstanceUpload(instanceId: String) extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case object Ack extends Response
   case class AllocatedInstanceId(clusterId: String, instanceId: String) extends Response
-
-  sealed trait DomainEvent extends BaseDomainEvent
-  case class Created(schedulerId: String, timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
@@ -51,6 +49,8 @@ class ClusterAggregate(
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
+  import BaseDomainEvent._
+  import domain.cluster._
   import ClusterAggregate._
   import play.api.libs.json._
   import akka.pattern.pipe
@@ -66,7 +66,7 @@ class ClusterAggregate(
   when(Uninitialized) {
     case Event(Create(schedulerId), _) =>
       val requester = sender
-      goto(Active).applying(Created(schedulerId)).andThen { _ =>
+      goto(Active).applying(Created(schedulerId, now)).andThen { _ =>
         requester ! Ack
       }
   }
