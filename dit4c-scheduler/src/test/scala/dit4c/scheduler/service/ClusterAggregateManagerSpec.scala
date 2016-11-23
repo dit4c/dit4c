@@ -22,7 +22,9 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
 
   implicit val system = ActorSystem("ClusterAggregateManagerSpec")
 
+  import dit4c.scheduler.domain.clusteraggregate.ClusterType
   import ScalaCheckHelpers._
+  import dit4c.scheduler.domain.ClusterAggregate._
   import ClusterAggregateManager._
 
   val defaultConfigProvider = new DefaultConfigProvider {
@@ -42,8 +44,8 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
       "exists" >> {
         val probe = TestProbe()
         probe.send(clusterAggregateManager, GetCluster("default"))
-        probe.expectMsgType[ClusterAggregate.ClusterType] must {
-          be_==(ClusterAggregate.ClusterTypes.Rkt)
+        probe.expectMsgType[GetStateResponse] must {
+          be_==(ClusterOfType(ClusterType.Rkt))
         }
       }
 
@@ -51,8 +53,8 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         probe.send(clusterAggregateManager,
             ClusterCommand("default", ClusterAggregate.GetState))
-        probe.expectMsgType[ClusterAggregate.ClusterType] must {
-          be_==(ClusterAggregate.ClusterTypes.Rkt)
+        probe.expectMsgType[GetStateResponse] must {
+          be_==(ClusterOfType(ClusterType.Rkt))
         }
       }
     }
@@ -60,8 +62,8 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     "not have any other random clusters" >> prop({ id: String =>
       val probe = TestProbe()
       probe.send(clusterAggregateManager, GetCluster(id))
-      probe.expectMsgType[ClusterAggregate.State] must {
-        be_==(ClusterAggregate.Uninitialized)
+      probe.expectMsgType[GetStateResponse] must {
+        be_==(UninitializedCluster)
       }
     }).setGen(genNonEmptyString)
   }

@@ -78,6 +78,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         import dit4c.protobuf.scheduler.{inbound => pb}
         import dit4c.scheduler.service.{ClusterAggregateManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
+        import dit4c.scheduler.domain.{instance => i}
         val msg = pb.InboundMessage(randomMsgId,
             pb.InboundMessage.Payload.DiscardInstance(
                 pb.DiscardInstance(randomInstanceId, clusterId)))
@@ -102,34 +103,34 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         val dummyLocalImageId = "sha512-"+Stream.fill(64)("0").mkString
         val msgs: List[Instance.StatusReport] =
           Instance.StatusReport(Instance.WaitingForImage, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString), None, portalUri.toString, None)) ::
+            instanceId, imageUrl.toString, None, portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Starting, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Running, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Stopping, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Exited, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Saving, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Saved, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Uploading, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Uploaded, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Discarded, Instance.StartData(
-            instanceId, Instance.NamedImage(imageUrl.toString),
-            Some(Instance.LocalImage(dummyLocalImageId)), portalUri.toString, None)) ::
+            instanceId, imageUrl.toString,
+            Some(dummyLocalImageId), portalUri.toString, None)) ::
           Instance.StatusReport(Instance.Errored, Instance.ErrorData(
             instanceId, List("A bunch", "of errors", "occurred"))) ::
           Nil

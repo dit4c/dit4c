@@ -13,8 +13,12 @@ import scala.concurrent.Future
 import java.security.PublicKey
 import akka.actor.ActorRef
 import java.time.Instant
+import com.google.protobuf.timestamp.Timestamp
+import dit4c.scheduler.domain.rktnode.DomainEvent
+import RktNode.{State, Data}
 
 object RktNode {
+  import BaseDomainEvent.now
 
   type NodeId = String
 
@@ -56,7 +60,7 @@ object RktNode {
       rktDir: String,
       readyToConnect: Boolean) extends Data
 
-  trait Command
+  trait Command extends BaseCommand
   case object GetState extends Command
   case object RequestInstanceWorker extends Command
   case object RequireInstanceWorker extends Command
@@ -68,32 +72,25 @@ object RktNode {
   case class FinishInitializing(
       init: Initialize,
       serverPublicKey: ServerPublicKey,
-      replyTo: ActorRef)
+      replyTo: ActorRef) extends Command
   case object ConfirmKeys extends Command
 
-  trait Response
+  trait Response extends BaseResponse
+  trait GetStateResponse extends Response
+  case object DoesNotExist extends GetStateResponse
+  case class Exists(nodeConfig: NodeConfig) extends GetStateResponse
+  case class ConfirmKeysResponse(nodeConfig: NodeConfig) extends Response
   trait InstanceWorkerResponse extends Response
   case class WorkerCreated(worker: ActorRef) extends InstanceWorkerResponse
   case class UnableToProvideWorker(msg: String) extends InstanceWorkerResponse
-
-  /**
-   * Note that domain events are the only persisted events. All the other FSM
-   * "events" could be commands or something else.
-   */
-  trait DomainEvent extends BaseDomainEvent
-  case class Initialized(
-      connectionDetails: ServerConnectionDetails,
-      rktDir: String,
-      timestamp: Instant = Instant.now) extends DomainEvent
-  case class KeysConfirmed(
-      timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
 class RktNode(
     createRunner: RktClusterManager.RktRunnerFactory,
     fetchSshHostKey: RktClusterManager.HostKeyChecker)
-    extends PersistentFSM[RktNode.State, RktNode.Data, RktNode.DomainEvent] {
+    extends PersistentFSM[State, Data, DomainEvent] {
+  import dit4c.scheduler.domain.rktnode._
   import RktNode._
 
   lazy val persistenceId = self.path.name
@@ -101,8 +98,6 @@ class RktNode(
   startWith(JustCreated, NoConfig)
 
   when(JustCreated) {
-    case Event(GetState, data) =>
-      stay replying data
     case Event(init: Initialize, _) =>
       import context.dispatcher
       val replyTo = sender
@@ -113,11 +108,15 @@ class RktNode(
       }
       stay
     case Event(FinishInitializing(init, serverPublicKey, replyTo), _) =>
+      import dit4c.common.KeyHelpers._
       val clientKeyPair: ClientKeyPair = createKeyPair
-      val scd = ServerConnectionDetails(
-          init.host, init.port, init.username, clientKeyPair, serverPublicKey)
       goto(PendingKeyConfirmation)
-        .applying(Initialized(scd, init.rktDir))
+        .applying(Initialized(
+            init.host, init.port, init.username,
+            clientKeyPair.`private`.pkcs8.pem,
+            clientKeyPair.public.pkcs8.pem,
+            serverPublicKey.public.pkcs8.pem,
+            init.rktDir))
         .andThen {
           case data =>
             context.parent ! RktClusterManager.RegisterRktNode(replyTo)
@@ -125,12 +124,10 @@ class RktNode(
   }
 
   when(PendingKeyConfirmation) {
-    case Event(GetState, data) =>
-      stay replying data
     case Event(ConfirmKeys, data) =>
       goto(Active).applying(KeysConfirmed()).andThen {
-        case data =>
-          sender ! data
+        case data: NodeConfig =>
+          sender ! ConfirmKeysResponse(data)
       }
   }
 
@@ -146,8 +143,10 @@ class RktNode(
   }
 
   whenUnhandled {
-    case Event(GetState, data) =>
-      stay replying data
+    case Event(GetState, NoConfig) =>
+      stay replying DoesNotExist
+    case Event(GetState, c: NodeConfig) =>
+      stay replying Exists(c)
     case Event(RequestInstanceWorker, _) =>
       stay replying UnableToProvideWorker("Node is not currently active")
   }
@@ -157,8 +156,21 @@ class RktNode(
       domainEvent: DomainEvent,
       dataBeforeEvent: Data): RktNode.Data = {
     domainEvent match {
-      case Initialized(connectionDetails, rktDir, _) =>
-        NodeConfig(connectionDetails, rktDir, false)
+      case Initialized(host, port, username, clientPrivateKeyPKCS8PEM, clientPublicKeyPKCS8PEM, serverPublicKeyPKCS8PEM, rktDir, _) =>
+        import dit4c.common.KeyHelpers._
+        NodeConfig(
+          ServerConnectionDetails(
+            host, port, username,
+            ClientKeyPair(
+              parsePkcs8PemPublicKey(clientPublicKeyPKCS8PEM)
+                .right.get.asInstanceOf[RSAPublicKey],
+              parsePkcs8PemPrivateKey(clientPrivateKeyPKCS8PEM)
+                .right.get.asInstanceOf[RSAPrivateKey]),
+            ServerPublicKey(
+              parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
+                .right.get.asInstanceOf[RSAPublicKey])
+          ),
+          rktDir, false)
       case KeysConfirmed(_) =>
         dataBeforeEvent match {
           case c: NodeConfig => c.copy(readyToConnect = true)

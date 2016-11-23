@@ -9,19 +9,31 @@ import java.security.interfaces.{RSAPublicKey => JavaRSAPublicKey}
 import akka.actor.Props
 import akka.actor.ActorRef
 import org.bouncycastle.openpgp.PGPPublicKey
+import com.google.protobuf.timestamp.Timestamp
+import dit4c.scheduler.domain.instance.DomainEvent
+import Instance.{State, Data}
 
 object Instance {
-
   type Id = String
   type ImageName = String
   type ImageId = String
+  type NamedImage = String
+  type LocalImage = String
+  type SigningKeyData = String
 
   def props(worker: ActorRef): Props =
     Props(classOf[Instance], worker)
 
-  sealed trait SourceImage
-  case class NamedImage(name: ImageName) extends SourceImage
-  case class LocalImage(id: ImageId) extends SourceImage
+  object SigningKey {
+    import dit4c.common.KeyHelpers._
+    def apply(k: PGPPublicKey): SigningKey = SigningKey(k.armored)
+  }
+  case class SigningKey(armoredPgpPublicKeyBlock: String) {
+    import dit4c.common.KeyHelpers._
+    def asPGPPublicKey: PGPPublicKey = {
+      parseArmoredPublicKey(armoredPgpPublicKeyBlock).right.get
+    }
+  }
 
   sealed trait State extends BasePersistentFSMState
   case object JustCreated extends State
@@ -45,33 +57,33 @@ object Instance {
   }
   case class StartData(
       instanceId: String,
-      providedImage: SourceImage,
-      resolvedImage: Option[LocalImage],
+      providedImage: String,
+      resolvedImage: Option[String],
       portalUri: String,
-      signingKey: Option[PGPPublicKey]) extends SomeData
+      signingKey: Option[SigningKey]) extends SomeData
   case class SaveData(
       instanceId: String,
-      signingKey: PGPPublicKey,
-      uploadHelperImage: NamedImage,
+      signingKey: SigningKey,
+      uploadHelperImage: String,
       imageServer: String,
       portalUri: String) extends SomeData
   case class DiscardData(instanceId: String) extends SomeData
   case class ErrorData(instanceId: String, errors: List[String]) extends SomeData
 
-  trait Command
+  trait Command extends BaseCommand
   case object GetStatus extends Command
   case class Initiate(
       instanceId: String,
-      image: SourceImage,
+      image: NamedImage,
       portalUri: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
-  case class AssociateSigningKey(key: PGPPublicKey) extends Command
+  case class AssociateSigningKey(key: SigningKeyData) extends Command
   case object ConfirmStart extends Command
   case object ConfirmExited extends Command
   case object Discard extends Command
   case object ConfirmDiscard extends Command
   case class Save(
-      helperImage: Instance.NamedImage,
+      helperImage: NamedImage,
       imageServer: String) extends Command
   protected case object ContinueSave extends Command
   protected case object ContinueDiscard extends Command
@@ -80,51 +92,18 @@ object Instance {
   case object ConfirmUpload extends Command
   case class Error(msg: String) extends Command
 
-  trait Response
+  sealed trait Response extends BaseResponse
   case class StatusReport(
       state: Instance.State,
-      data: Instance.Data)
-  case object Ack
-
-  sealed trait DomainEvent extends BaseDomainEvent
-  case class Initiated(
-      val instanceId: String,
-      val image: SourceImage,
-      val portalUri: String,
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class FetchedImage(
-      val image: LocalImage,
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class AssociatedSigningKey(
-      val key: String,
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ConfirmedStart(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class RequestedSave(
-      val helperImage: NamedImage,
-      val imageServer: String,
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class RequestedDiscard(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class CommencedUpload(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ConfirmedExit(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ConfirmedDiscard(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ConfirmedSave(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ConfirmedUpload(
-      val timestamp: Instant = Instant.now) extends DomainEvent
-  case class ErrorOccurred(
-      val message: String,
-      val timestamp: Instant = Instant.now) extends DomainEvent
-
+      data: Instance.Data) extends Response
+  case object Ack extends Response
 }
 
 class Instance(worker: ActorRef)
-    extends PersistentFSM[Instance.State, Instance.Data, Instance.DomainEvent] {
+    extends PersistentFSM[State, Data, DomainEvent] {
+  import dit4c.scheduler.domain.instance._
   import Instance._
+  import BaseDomainEvent.now
   import dit4c.common.KeyHelpers._
 
   lazy val persistenceId = self.path.name
@@ -132,13 +111,13 @@ class Instance(worker: ActorRef)
   startWith(JustCreated, NoData)
 
   when(JustCreated) {
-    case Event(Initiate(id, image @ NamedImage(imageName), callback), _) =>
-      val domainEvent = Initiated(id, image, callback)
+    case Event(Initiate(id, imageName, callback), _) =>
+      val domainEvent = Initiated(id, imageName, callback)
       val requester = sender
       goto(WaitingForImage).applying(domainEvent).andThen {
         case data =>
-          log.info(s"Fetching image: $image")
-          worker ! InstanceWorker.Fetch(image)
+          log.info(s"Fetching image: $imageName")
+          worker ! InstanceWorker.Fetch(imageName)
           requester ! Ack
       }
   }
@@ -153,13 +132,12 @@ class Instance(worker: ActorRef)
   }
 
   when(Starting) {
-    case Event(AssociateSigningKey(key), _) =>
-      log.info(s"Received signing key: $key")
-      val keyData = new String(key.armoured)
+    case Event(AssociateSigningKey(keyData), _) =>
+      log.info(s"Received signing key: $keyData")
       stay.applying(AssociatedSigningKey(keyData)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
-      goto(Running).applying(ConfirmedStart())
+      goto(Running).applying(ConfirmedStart(now))
   }
 
   when(Running) {
@@ -171,7 +149,7 @@ class Instance(worker: ActorRef)
       }
     case Event(Discard, StartData(id, _, _, _, _)) =>
       val requester = sender
-      goto(Stopping).applying(RequestedDiscard()).andThen { _ =>
+      goto(Stopping).applying(RequestedDiscard(now)).andThen { _ =>
         worker ! InstanceWorker.Stop(id)
         requester ! Ack
       }
@@ -179,7 +157,7 @@ class Instance(worker: ActorRef)
 
   when(Stopping) {
     case Event(ConfirmExited, _) =>
-      goto(Exited).applying(ConfirmedExit())
+      goto(Exited).applying(ConfirmedExit(now))
   }
 
   when(Exited) {
@@ -191,7 +169,7 @@ class Instance(worker: ActorRef)
       }
     case Event(Discard, _) =>
       val requester = sender
-      goto(Discarding).applying(RequestedDiscard()).andThen { _ =>
+      goto(Discarding).applying(RequestedDiscard(now)).andThen { _ =>
         worker ! InstanceWorker.Discard
         requester ! Ack
       }
@@ -206,20 +184,20 @@ class Instance(worker: ActorRef)
 
   when(Saving) {
     case Event(ConfirmSaved, _) =>
-      goto(Saved).applying(ConfirmedSave())
+      goto(Saved).applying(ConfirmedSave(now))
   }
 
   when(Saved) {
     case Event(Upload, SaveData(id, _, helperImage, imageServer, portalUri)) =>
       val requester = sender
-      goto(Uploading).applying(CommencedUpload()).andThen { _ =>
+      goto(Uploading).applying(CommencedUpload(now)).andThen { _ =>
         worker ! InstanceWorker.Upload(id, helperImage, imageServer, portalUri)
       }
   }
 
   when(Uploading) {
     case Event(ConfirmUpload, _) =>
-      goto(Uploaded).applying(ConfirmedUpload())
+      goto(Uploaded).applying(ConfirmedUpload(now))
   }
 
   when(Uploaded, stateTimeout = 1.minute) {
@@ -231,7 +209,7 @@ class Instance(worker: ActorRef)
 
   when(Discarding) {
     case Event(ConfirmDiscard, _) =>
-      goto(Discarded).applying(ConfirmedDiscard())
+      goto(Discarded).applying(ConfirmedDiscard(now))
   }
 
   when(Discarded, stateTimeout = 1.minute) {
@@ -248,7 +226,7 @@ class Instance(worker: ActorRef)
     case Event(GetStatus, data) =>
       stay replying StatusReport(stateName, data)
     case Event(Error(msg), _) =>
-      goto(Errored).applying(ErrorOccurred(msg))
+      goto(Errored).applying(ErrorOccurred(msg, now))
   }
 
   onTransition {
@@ -279,16 +257,16 @@ class Instance(worker: ActorRef)
       currentData
     }
     domainEvent match {
-      case Initiated(id, image, portalUri, _) => currentData match {
-        case NoData => StartData(id, image, None, portalUri, None)
+      case Initiated(id, imageName, portalUri, _) => currentData match {
+        case NoData => StartData(id, imageName, None, portalUri, None)
         case other => unhandled("Cannot initiate twice")
       }
-      case FetchedImage(image, _) => currentData match {
-        case data: StartData => data.copy(resolvedImage = Some(image))
+      case FetchedImage(imageId, _) => currentData match {
+        case data: StartData => data.copy(resolvedImage = Some(imageId))
         case other => unhandled()
       }
-      case AssociatedSigningKey(key, _) => currentData match {
-        case data: StartData => data.copy(signingKey = Some(parseArmoredPublicKey(key).right.get))
+      case AssociatedSigningKey(armoredKeyStr, _) => currentData match {
+        case data: StartData => data.copy(signingKey = Some(SigningKey(armoredKeyStr)))
         case other => unhandled()
       }
       case RequestedSave(helperImage, imageServer, _) => currentData match {
@@ -318,7 +296,7 @@ class Instance(worker: ActorRef)
     }
   }
 
-  def domainEventClassTag: ClassTag[Instance.DomainEvent] =
+  def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
   protected def emitStatusReportToEventStream(state: Instance.State)(data: Instance.Data): Unit =

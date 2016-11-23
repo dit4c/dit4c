@@ -7,7 +7,6 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import org.specs2.matcher.JsonType
 import dit4c.scheduler.service.ClusterAggregateManager
-import akka.actor.Props
 import org.specs2.ScalaCheck
 import akka.http.scaladsl.model.StatusCodes
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -34,6 +33,7 @@ import org.bouncycastle.openpgp.PGPPublicKey
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with PlayJsonSupport
     with ScalaCheck with ScalaCheckHelpers {
+  import dit4c.scheduler.domain.clusteraggregate.ClusterType
 
   val basePath: Uri.Path = Uri.Path / "clusters"
   implicit def path2uri(path: Uri.Path) = Uri(path=path)
@@ -51,16 +51,16 @@ class ClusterRoutesSpec extends Specs2RouteTest
       "exists" >> prop { id: String =>
         def testActor = new Actor {
           import ClusterAggregateManager.GetCluster
-          import ClusterAggregate.ClusterTypes.Rkt
+          import ClusterAggregate.ClusterOfType
           def receive = {
-            case GetCluster(`id`) => sender ! Rkt
+            case GetCluster(`id`) => sender ! ClusterOfType(ClusterType.Rkt)
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
           (status must beSuccess) and
           (Json.prettyPrint(entityAs[JsValue]) must {
             /("id" -> id)
-            /("type" -> ClusterAggregate.ClusterTypes.Rkt.toString)
+            /("type" -> ClusterType.Rkt.toString)
           })
         }
       }
@@ -68,9 +68,9 @@ class ClusterRoutesSpec extends Specs2RouteTest
       "does not exist" >> prop { id: String =>
         def testActor = new Actor {
           import ClusterAggregateManager.GetCluster
-          import ClusterAggregate.Uninitialized
+          import ClusterAggregate.UninitializedCluster
           def receive = {
-            case GetCluster(`id`) => sender ! Uninitialized
+            case GetCluster(`id`) => sender ! UninitializedCluster
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
@@ -92,11 +92,12 @@ class ClusterRoutesSpec extends Specs2RouteTest
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import RktClusterManager.{AddRktNode, RktNodeAdded, GetRktNodeState}
+          import RktNode.Exists
           def receive = {
             case ClusterCommand(`clusterId`, _: AddRktNode) =>
               sender ! RktNodeAdded(nodeId)
             case ClusterCommand(`clusterId`, GetRktNodeState(`nodeId`)) =>
-              sender ! nodeConfig
+              sender ! Exists(nodeConfig)
             case cmd => println(cmd)
           }
         }
@@ -187,17 +188,17 @@ class ClusterRoutesSpec extends Specs2RouteTest
         def testActor = new Actor {
           import ClusterAggregateManager.ClusterCommand
           import RktClusterManager.GetInstanceStatus
-          import Instance.{StatusReport, WaitingForImage, StartData, NamedImage}
+          import Instance.{StatusReport, WaitingForImage, StartData}
           def receive = {
             case ClusterCommand(`clusterId`, GetInstanceStatus(`instanceId`)) =>
               sender ! StatusReport(
                   Instance.WaitingForImage,
                   StartData(
                       instanceId,
-                      NamedImage(imageName),
+                      imageName,
                       None,
                       portalUri.toString,
-                      Some(signingKey)))
+                      Some(Instance.SigningKey(signingKey))))
           }
         }
         Get(path) ~> routes(testActor) ~> check {

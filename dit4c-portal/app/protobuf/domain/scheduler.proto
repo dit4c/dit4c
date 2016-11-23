@@ -1,0 +1,17 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package domain.scheduler;
+
+option (scalapb.options) = {
+  flat_package: true
+  single_file: true
+  import: "domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+message Created {
+  option (scalapb.message).extends = "domain.scheduler.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}

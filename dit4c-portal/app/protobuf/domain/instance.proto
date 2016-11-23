@@ -1,0 +1,46 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package domain;
+
+option (scalapb.options) = {
+  flat_package: false
+  single_file: true
+  import: "domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+message StartedInstance {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string clusterId = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message DiscardedInstance {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message PreservedInstance {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AssociatedPGPPublicKey {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string pgpPublicKeyBlock = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AssociatedUri {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string uri = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AssociatedImage {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string uri = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}

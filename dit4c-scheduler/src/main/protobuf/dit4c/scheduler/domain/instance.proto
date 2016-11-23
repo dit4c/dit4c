@@ -1,0 +1,80 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package dit4c.scheduler.domain;
+
+option (scalapb.options) = {
+  flat_package: false
+  single_file: true
+  import: "dit4c.scheduler.domain.BaseDomainEvent"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+message Initiated {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  string instanceId = 1;
+  string imageName = 2;
+  string portalUri = 3;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message FetchedImage {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  string imageId = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AssociatedSigningKey {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  string pgpPublicKeyBlock = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message RequestedSave {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  string helperImage = 1;
+  string imageServer = 2;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message RequestedDiscard {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message CommencedUpload {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ConfirmedStart {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ConfirmedExit {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ConfirmedDiscard {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ConfirmedSave {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ConfirmedUpload {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ErrorOccurred {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
+  string message = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}

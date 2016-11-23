@@ -8,6 +8,8 @@ import java.time.Instant
 import scala.reflect.{ClassTag, classTag}
 import java.util.Base64
 import services.UserSharder
+import domain.identity.DomainEvent
+import IdentityAggregate.{State, Data}
 
 object IdentityAggregate {
 
@@ -22,21 +24,20 @@ object IdentityAggregate {
   sealed trait Data
   case class IdentityData(associatedUserId: Option[UserAggregate.Id] = None) extends Data
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object GetUser extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   sealed trait GetUserResponse extends Response
   case class UserFound(userId: UserAggregate.Id) extends GetUserResponse
-
-  sealed trait DomainEvent extends BaseDomainEvent
-  case class AssociatedUser(userId: String, timestamp: Instant = Instant.now) extends DomainEvent
 
 }
 
 class IdentityAggregate(
     userSharder: ActorRef @@ UserSharder.type)
-      extends PersistentFSM[IdentityAggregate.State, IdentityAggregate.Data, IdentityAggregate.DomainEvent] {
+      extends PersistentFSM[State, Data, DomainEvent] {
+  import BaseDomainEvent.now
+  import domain.identity._
   import IdentityAggregate._
 
   val key: IdentityAggregate.Key = new String(Base64.getUrlDecoder().decode(self.path.name), "utf8")
@@ -52,7 +53,7 @@ class IdentityAggregate(
       userSharder ! UserSharder.CreateNewUser
       stay
     case Event(UserAggregate.CreateResponse(userId), _) =>
-      goto(Associated) applying(AssociatedUser(userId))
+      goto(Associated) applying(AssociatedUser(userId, now))
   }
 
   onTransition {

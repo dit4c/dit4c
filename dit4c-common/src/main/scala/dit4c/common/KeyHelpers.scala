@@ -30,6 +30,11 @@ import java.io.ByteArrayInputStream
 import org.bouncycastle.openpgp.jcajce.JcaPGPPublicKeyRingCollection
 import org.bouncycastle.bcpg.sig.KeyFlags
 import java.security.spec.RSAPrivateCrtKeySpec
+import java.io.StringReader
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import java.security.Key
 
 object KeyHelpers {
 
@@ -107,6 +112,31 @@ object KeyHelpers {
         case Nil => Left("No keys in specified data")
         case Seq(key) => Right(key)
         case xs => Left(s"Data should have contained a single key, but contained ${xs.length}")
+      }
+  }
+
+  def parsePkcs8PemPrivateKey(s: String): Either[String, PrivateKey] =
+    parsePkcs8PemKey(s).right.flatMap {
+      case v: PrivateKey => Right(v)
+      case _ => Left("Not a private key")
+    }
+
+  def parsePkcs8PemPublicKey(s: String): Either[String, PublicKey] =
+    parsePkcs8PemKey(s).right.flatMap {
+      case v: PublicKey => Right(v)
+      case _ => Left("Not a public key")
+    }
+
+  protected def parsePkcs8PemKey(s: String): Either[String, Key] = {
+    import scala.util.Try
+    val converter = new JcaPEMKeyConverter().setProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+    Try((new PEMParser(new StringReader(s))).readObject)
+      .map(Right.apply)
+      .getOrElse(Left("Unable to parse key"))
+      .right.flatMap {
+        case v: PrivateKeyInfo => Right(converter.getPrivateKey(v))
+        case v: SubjectPublicKeyInfo => Right(converter.getPublicKey(v))
+        case _ => Left("Not a key")
       }
   }
 
@@ -217,11 +247,11 @@ object KeyHelpers {
   trait OpenPgpKey extends KeyFormat {
     def binary: Array[Byte] = captureOutputStream(encodeToStream)
 
-    def armoured: Array[Byte] = captureOutputStream { os =>
+    def armored: String = new String(captureOutputStream { os =>
       val aos = new ArmoredOutputStream(os)
       encodeToStream(aos)
       aos.close
-    }
+    }, "ASCII")
 
     override def raw = binary
 

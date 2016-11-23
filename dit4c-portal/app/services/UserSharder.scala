@@ -13,9 +13,10 @@ import domain.UserAggregate
 import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ClusterShardingSettings
+import domain.BaseCommand
 
 object UserSharder {
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object CreateNewUser extends Command
   case class Envelope(userId: UserAggregate.Id, msg: Any) extends Command
 

@@ -7,6 +7,7 @@ import dit4c.scheduler.domain.RktClusterManager
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import dit4c.scheduler.domain.ClusterAggregate
+import dit4c.scheduler.domain.clusteraggregate.ClusterType
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
@@ -58,13 +59,13 @@ object ClusterRoutes {
   )((host: String, port: Int, username: String) =>
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
-  implicit val writesClusterType: OWrites[ClusterAggregate.ClusterType] = (
+  implicit val writesClusterType: OWrites[ClusterType] = (
       (__ \ 'type).write[String]
-  ).contramap { (t: ClusterAggregate.ClusterType) => t.toString }
+  ).contramap { (t: ClusterType) => t.toString }
 
-  implicit val writesPGPPublicKey: Writes[PGPPublicKey] =
+  implicit val writesSigningKey: Writes[Instance.SigningKey] =
     Writes { key =>
-      Json.toJson(key.asRSAPublicKey)
+      Json.toJson(key.asPGPPublicKey.asRSAPublicKey)
     }
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (
@@ -72,19 +73,14 @@ object ClusterRoutes {
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
       (__ \ 'portal).writeNullable[String] and
-      (__ \ 'key).writeNullable[PGPPublicKey] and
+      (__ \ 'key).writeNullable[Instance.SigningKey] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier
     sr.data match {
       case Instance.NoData => (currentState, None, None, None, None, None)
       case Instance.StartData(id, providedImage, resolvedImage, portalUri, instanceKey) =>
-        val imageName = providedImage match {
-          case Instance.NamedImage(name) => Some(name)
-          case _: Instance.SourceImage => None
-        }
-        val imageId = resolvedImage.map(_.id)
-        (currentState, imageName, imageId, Some(portalUri), instanceKey, None)
+        (currentState, Some(providedImage), resolvedImage, Some(portalUri), instanceKey, None)
       case Instance.SaveData(instanceId, instanceKey, uploadHelperImage, imageServer, portalUri) =>
         (currentState, None, None, Some(portalUri), Some(instanceKey), None)
       case Instance.DiscardData(instanceId) =>
@@ -139,8 +135,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
     pathEndOrSingleSlash {
       get {
         onSuccess(clusterAggregateManager ? GetCluster(clusterId)) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case t: ClusterAggregate.ClusterType => complete(t)
+          case UninitializedCluster => complete(StatusCodes.NotFound)
+          case ClusterOfType(t) => complete(t)
         }
       }
     } ~
@@ -177,7 +173,7 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
             onSuccess(clusterAggregateManager ?
                 ClusterCommand(clusterId,
                     RktClusterManager.GetRktNodeState(nodeId))) {
-              case node: RktNode.NodeConfig =>
+              case RktNode.Exists(node) =>
                 extractUri { thisUri => extractLog { log =>
                   val nodeUri = Uri(thisUri.path / nodeId toString)
                   val clientPublicKey = node.connectionDetails.clientKey.public.ssh.authorizedKeys
@@ -203,8 +199,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       get {
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case node: RktNode.NodeConfig => complete(node)
+          case RktNode.DoesNotExist => complete(StatusCodes.NotFound)
+          case RktNode.Exists(node) => complete(node)
         }
       }
     } ~
@@ -212,8 +208,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       put {
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, ConfirmRktNodeKeys(nodeId))) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case node: RktNode.NodeConfig => complete(node)
+          case RktNode.DoesNotExist => complete(StatusCodes.NotFound)
+          case RktNode.Exists(node) => complete(node)
         }
       }
     }

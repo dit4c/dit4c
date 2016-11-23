@@ -9,9 +9,9 @@ import scala.util.matching.Regex
 
 object ClusterAggregateManager {
 
-  import ClusterAggregate.ClusterType
+  import clusteraggregate.ClusterType
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case class CreateCluster(id: String, `type`: ClusterType) extends Command
   case class GetCluster(id: String) extends Command
   case class ClusterCommand(
@@ -23,7 +23,7 @@ object ClusterAggregateManager {
 }
 
 class ClusterAggregateManager(defaultConfigProvider: DefaultConfigProvider) extends Actor with ActorLogging {
-
+  import clusteraggregate._
   import ClusterAggregateManager._
 
   override def preStart {
@@ -33,12 +33,12 @@ class ClusterAggregateManager(defaultConfigProvider: DefaultConfigProvider) exte
   def receive = {
     case "createDefaultCluster" =>
       val id = "default"
-      val t = ClusterAggregate.ClusterTypes.Rkt
+      val t = ClusterType.Rkt
       processAggregateCommand(aggregateId(id),
           ClusterAggregate.Initialize(t))
     case GetCluster(id) if !isValidClusterId(id) =>
       // Invalid IDs will forever be uninitialized clusters
-      sender ! ClusterAggregate.Uninitialized
+      sender ! ClusterAggregate.UninitializedCluster
     case GetCluster(id) =>
       processAggregateCommand(aggregateId(id), ClusterAggregate.GetState)
     case ClusterCommand(id, msg) =>

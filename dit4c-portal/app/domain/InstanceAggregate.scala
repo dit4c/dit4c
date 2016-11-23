@@ -3,7 +3,8 @@ package domain
 import akka.actor._
 import akka.persistence.fsm._
 import pdi.jwt._
-import domain.InstanceAggregate.{Data, DomainEvent, State}
+import domain.InstanceAggregate.{Data, State}
+import domain.instance.DomainEvent
 import scala.concurrent.duration._
 import scala.reflect._
 import com.softwaremill.tagging._
@@ -83,16 +84,6 @@ object InstanceAggregate {
   case class InstanceImage(url: String) extends GetImageResponse
   case object NoImageExists extends GetImageResponse
 
-  sealed trait DomainEvent extends BaseDomainEvent
-  case class StartedInstance(
-      clusterId: String, timestamp: Instant = Instant.now) extends DomainEvent
-  case class DiscardedInstance(timestamp: Instant = Instant.now) extends DomainEvent
-  case class PreservedInstance(timestamp: Instant = Instant.now) extends DomainEvent
-  case class AssociatedPGPPublicKey(key: String, timestamp: Instant = Instant.now) extends DomainEvent
-  case class AssociatedUri(
-      uri: String, timestamp: Instant = Instant.now) extends DomainEvent
-  case class AssociatedImage(
-      uri: String, timestamp: Instant = Instant.now) extends DomainEvent
 }
 
 class InstanceAggregate(
@@ -100,6 +91,8 @@ class InstanceAggregate(
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
+  import BaseDomainEvent._
+  import domain.instance._
   import InstanceAggregate._
   import context.dispatcher
   import play.api.libs.json._
@@ -121,7 +114,7 @@ class InstanceAggregate(
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
     case Event(Start(clusterId, image), _) =>
       val requester = sender
-      goto(Started).applying(StartedInstance(clusterId)).andThen { _ =>
+      goto(Started).applying(StartedInstance(clusterId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
         (clusterSharder ? ClusterSharder.Envelope(
               clusterId,
@@ -278,13 +271,13 @@ class InstanceAggregate(
         throw new Exception(s"Unknown state/data combination: ($domainEvent, $currentData)")
       }
     domainEvent match {
-      case StartedInstance(clusterId, ts) => InstanceData(clusterId, timestamps = EventTimestamps(Some(ts)) )
+      case StartedInstance(clusterId, ts) => InstanceData(clusterId, timestamps = EventTimestamps(ts) )
       case PreservedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = Some(ts)))
+        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
       case DiscardedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = Some(ts)))
+        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
       case AssociatedPGPPublicKey(keyData, _) => currentData match {
