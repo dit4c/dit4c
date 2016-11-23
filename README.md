@@ -22,93 +22,38 @@ Current environments available are:
 
 ## Motivation
 
-The primary focus of DIT4C is [Software Carpentry Bootcamps][swc]. Having a working install right from the beginning means participants start programming sooner, and do so in a consistent environment.
+DIT4C has two is focused on meeting two needs:
+* Training sessions - having a working install right from the beginning means training participants start programming sooner, and do so in a consistent environment.
+* Reproducible research - container sharing and export allows complete working environments to be exchanged and archived.
 
 
 ## Architecture
 
-DIT4C separates the portal environment which manages user access and containers from the compute nodes that provide them. In production environments, the components are designed to be deployed inside [Docker][docker] containers.
+DIT4C separates the portal environment which manages user access and containers from the compute nodes that provide them.
 
-![DIT4C Architecture Diagram](docs/architecture.png)
+Core services:
+* portal - user-facing UI and scheduler coordination
+* scheduler - manages compute clusters and schedules containers on individual nodes
 
-### Components
+Auxiliary "helper" container images:
+* dit4c-helper-listener-*
+  - [dit4c-helper-listener-ngrok2](https://github.com/dit4c/dit4c-helper-listener-ngrok2) - development image that exposes containers via [ngrok.com](https://ngrok.com/) (don't use this in production)
+  - [dit4c-helper-listener-ngrok1](https://github.com/dit4c/dit4c-helper-listener-ngrok1) - image for exposing containers via your own ngrok1 servers
+* [dit4c-helper-auth-portal](https://github.com/dit4c/dit4c-helper-auth-portal/) - proxies container services behind portal-provided auth
+* [dit4c-helper-upload-webdav](https://github.com/dit4c/dit4c-helper-upload-webdav/) - uploads saved images to a webdav server
 
- * __highcommand__ - user authentication and container management portal.
- * __gatehouse__ - authorization checker for containers.
- * __machineshop__ - high-level API server for container management.
+_Many things have changed in DIT4C 0.10. An updated architecture diagram will be added soon._
+
 
 ### Security
 
-All container web traffic needs to authenticated and authorized by _gatehouse_. To avoid network lag, _gatehouse_ doesn't communicate directly with _highcommand_. Instead, it _highcommand_ signs a cookie which lists the containers the user is allowed to access. When the user accesses the container, that cookie is verified by _gatehouse_ and if the container is on the allowed list the traffic is authorized. For added security _highcommand_ rotates its keys regularly, so _gatehouse_ regularly fetches the valid key list (`/public-keys`) from _highcommand_.
+All container instances are issued an OpenPGP key prior to starting which is convertible to a [JSON Web Key (JWK)](https://tools.ietf.org/html/draft-ietf-jose-json-web-key-41) or SSH key. This allows container helpers to independently contact the portal to update and retrieve information using a signed [JSON Web Token (JWT)](https://jwt.io/).
 
-Similarly, _machineshop_ also fetches _highcommand_ keys, and uses them to authenticate privileged requests following the [HTTP Signatures spec][http-signatures].
+The portal also provides keys via a public registry, which will allow future helpers to authenticate independently to other services or retrieve encrypted content. This is still a work in progress.
 
 ## Installing
 
-To install DIT4C, you will need:
-
- * a domain name with DNS that allows you to create wildcard entries.
- * a SSL certificate for the domain and its wildcard. eg. `my.domain.example.test` & `*.my.domain.example.test`
- * at least one Linux host with Docker installed. ([CoreOS][coreos] is ideal.)
- * for authentication, at least one of:
-   * a [RapidAAF account][rapidaaf] account or
-   * a [GitHub][github-auth] application.
-
-DIT4C has three Docker containers used to bootstrap new environments:
- * [dit4c-deploy-routing][dit4c-deploy-routing]
- * [dit4c-deploy-portal][dit4c-deploy-portal]
- * [dit4c-deploy-compute][dit4c-deploy-compute]
-
-To deploy a routing node, put your certificate and private key (`server.crt` & `server.key`) in `/opt/ssl`.
-
-Once those files are in place, to deploy routing infrastructure, run:
-
-```shell
-# Change DIT4C_DOMAIN to your domain name
-docker run --name dit4c_deploy_routing --rm \
-           -e DIT4C_DOMAIN=my.domain.example.test \
-           -v /var/run/docker.sock:/var/run/docker.sock \
-           dit4c/dit4c-deploy-routing
-```
-
-To deploy a portal, put your DIT4C portal configuration (`dit4c-highcommand.conf`) in `/opt/config`.
-
-```
-application.baseUrl: "https://<your_domain_here>/"
-application.secret: "<your_really_super_secret_cookie_signing_key_here>"
-
-rapidaaf: {
-  url: "<your_rapidaaf_redirect_url_here>",
-  key: "<your_rapidaaf_secret_key_here>"
-}
-
-github: {
-  id: "<your_github_application_id_here>",
-  secret: "<your_github_application_secret_here>"
-}
-```
-
-Once those files are in place, to deploy a portal, run:
-
-```shell
-# Change DIT4C_DOMAIN to your domain name
-docker run --name dit4c_deploy_portal --rm \
-           -e DIT4C_DOMAIN=my.domain.example.test \
-           -v /var/run/docker.sock:/var/run/docker.sock \
-           dit4c/dit4c-deploy-portal
-```
-
-You will need to populate the Hipache record for your portal (`frontend:my.domain.example.net`). You can use `etcdctl` to do this manually, and [dit4c-cluster-manager][dit4c-cluster-manager] exists for maintaining this automatically.
-
-To deploy a compute node (preferably on another host), run:
-
-```shell
-# Change PORTAL_URL to reflect your domain name
-docker run --name dit4c_deploy_compute --rm \
-           -e PORTAL_URL=https://my.domain.example.test \
-           -v /var/run/docker.sock:/var/run/docker.sock \
-           dit4c/dit4c-deploy-compute
-```
+_Many things have changed in DIT4C 0.10. Updated installation instructions will be added soon._
 
 
 [swc]: http://software-carpentry.org/
@@ -118,7 +63,6 @@ docker run --name dit4c_deploy_compute --rm \
 [github-auth]: https://developer.github.com/guides/basics-of-authentication/#registering-your-app
 [docker]: https://www.docker.com/
 [coreos]: https://coreos.com/
-[http-signatures]: https://web-payments.org/specs/source/http-signatures/
 [dit4c-container-base]: https://registry.hub.docker.com/u/dit4c/dit4c-container-base/
 [dit4c-container-ipython]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ipython/
 [dit4c-container-rstudio]: https://registry.hub.docker.com/u/dit4c/dit4c-container-rstudio/
