@@ -8,7 +8,7 @@ DIT4C is a scalable platform for providing containerized web-based programming a
 
  * Client == Modern web browser
  * No local credentials: use your [GitHub][github] or [AAF][aaf] account
- * Based on Docker - runs on bare metal or cloud computing
+ * Based on [rkt](https://coreos.com/rkt/) - run ACIs or Docker images on bare metal or cloud computing
 
 All authentication is via federated identity providers - all a user needs is a modern web browser.
 
@@ -64,7 +64,6 @@ _Many things have changed in DIT4C 0.10. Updated installation instructions will 
 [rapidaaf]: https://rapid.aaf.edu.au/
 [github]: https://github.com/
 [github-auth]: https://developer.github.com/guides/basics-of-authentication/#registering-your-app
-[docker]: https://www.docker.com/
 [coreos]: https://coreos.com/
 [dit4c-container-base]: https://registry.hub.docker.com/u/dit4c/dit4c-container-base/
 [dit4c-container-ipython]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ipython/
