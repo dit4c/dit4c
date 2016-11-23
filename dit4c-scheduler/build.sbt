@@ -18,7 +18,7 @@ libraryDependencies ++= {
     "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
     "com.typesafe.akka"   %%  "akka-remote"           % akkaV,
     "com.typesafe.akka"   %%  "akka-slf4j"            % akkaV,
-    "com.twitter"         %%  "chill-akka"            % "0.8.1",
+    "com.twitter"         %%  "chill-akka"            % chillV,
     "com.jcraft"          %   "jsch"                  % "0.1.53",
     "com.github.scopt"    %%  "scopt"                 % "3.4.0",
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
@@ -42,9 +42,10 @@ packSettings
 
 packMain := Map("dit4c-scheduler" -> "dit4c.scheduler.Main")
 
-// Generate protobuf classes for Akka serialization
+managedSourceDirectories in Compile += target.value / "protobuf-generated"
+
 PB.targets in Compile := Seq(
-  scalapb.gen(grpc = false) -> (sourceManaged in Compile).value
+  scalapb.gen(grpc = false) -> (target.value / "protobuf-generated")
 )
 
 // Download rkt for testing

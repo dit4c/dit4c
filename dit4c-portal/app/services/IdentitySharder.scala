@@ -7,10 +7,11 @@ import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ClusterShardingSettings
 import akka.cluster.sharding.ShardRegion
 import domain.IdentityAggregate
+import domain.BaseCommand
 
 object IdentitySharder {
 
-  final case class Envelope(identityKey: String, payload: Any)
+  final case class Envelope(identityKey: String, payload: Any) extends BaseCommand
 
   def apply(userSharder: ActorRef @@ UserSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(

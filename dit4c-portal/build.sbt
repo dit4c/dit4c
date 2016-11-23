@@ -7,6 +7,7 @@ libraryDependencies ++= Seq(
   "com.softwaremill.macwire"  %%  "macros"  % macwireV    % "provided",
   "com.softwaremill.macwire"  %%  "util"    % macwireV,
   "de.heikoseeberger"         %%  "akka-http-play-json"   % "1.7.0",
+  "com.twitter"               %%  "chill-akka"            % chillV,
   "com.typesafe.akka"         %%  "akka-http-core"        % akkaV,
   "com.typesafe.akka"         %%  "akka-persistence"      % akkaV,
   "com.typesafe.akka"         %%  "akka-cluster"          % akkaV,
@@ -22,14 +23,16 @@ libraryDependencies ++= Seq(
   "com.lihaoyi"               %   "ammonite-sshd"         % "0.7.7" cross CrossVersion.full,
   ws,
   specs2,
+  "com.trueaccord.scalapb"    %% "scalapb-runtime"    % scalapbV % "protobuf",
   "org.specs2"                %%  "specs2-core"       % specs2V % "test",
   "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test",
-  "com.typesafe.akka"         %%  "akka-testkit"      % akkaV % "test"
+  "com.typesafe.akka"         %%  "akka-testkit"      % akkaV % "test",
+  "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.0" % "test"
 )
 
 // Bower WebJars
 libraryDependencies ++= {
-  val __ = "org.webjars.bower" 
+  val __ = "org.webjars.bower"
   Seq(
     __ %  "webcomponentsjs"        % "0.7.22",
     __ %  "github-com-Polymer-polymer"                              % "1.7.0",
@@ -91,3 +94,9 @@ routesGenerator := InjectedRoutesGenerator
 
 // Speed up resolution times
 updateOptions := updateOptions.value.withCachedResolution(true)
+
+managedSourceDirectories in Compile += target.value / "protobuf-generated"
+
+PB.targets in Compile := Seq(
+  scalapb.gen(grpc = false) -> (target.value / "protobuf-generated")
+)

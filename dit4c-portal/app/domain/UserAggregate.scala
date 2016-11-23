@@ -22,7 +22,7 @@ object UserAggregate {
 
   case class Data(instances: SortedSet[String] = SortedSet.empty)
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object Create extends Command
   case class StartInstance(clusterId: String, image: String) extends Command {
     def toIAMCommand: InstanceSharder.Command =
@@ -36,7 +36,7 @@ object UserAggregate {
   case object GetAllInstanceIds extends Command
   case class ReceiveSharedInstance(sourceUserId: String, instanceId: String) extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case class CreateResponse(userId: UserAggregate.Id) extends Response
   case object UnableToStartInstance extends Response
   case object InstanceNotOwnedByUser extends Response
