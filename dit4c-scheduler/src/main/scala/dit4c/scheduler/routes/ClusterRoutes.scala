@@ -199,8 +199,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       get {
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, GetRktNodeState(nodeId))) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case node: RktNode.NodeConfig => complete(node)
+          case RktNode.DoesNotExist => complete(StatusCodes.NotFound)
+          case RktNode.Exists(node) => complete(node)
         }
       }
     } ~
@@ -208,8 +208,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
       put {
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, ConfirmRktNodeKeys(nodeId))) {
-          case Uninitialized => complete(StatusCodes.NotFound)
-          case node: RktNode.NodeConfig => complete(node)
+          case RktNode.DoesNotExist => complete(StatusCodes.NotFound)
+          case RktNode.Exists(node) => complete(node)
         }
       }
     }
