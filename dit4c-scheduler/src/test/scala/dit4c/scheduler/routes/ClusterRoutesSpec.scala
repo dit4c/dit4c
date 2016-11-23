@@ -137,7 +137,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
           import RktClusterManager.GetRktNodeState
           def receive = {
             case ClusterCommand(`clusterId`, GetRktNodeState(nodeId)) =>
-              sender ! response
+              sender ! RktNode.Exists(response)
           }
         }
         Get(path) ~> routes(testActor) ~> check {
@@ -173,7 +173,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
           import RktClusterManager.ConfirmRktNodeKeys
           def receive = {
             case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(nodeId)) =>
-              sender ! response
+              sender ! RktNode.Exists(response)
           }
         }
         Put(path) ~> routes(testActor) ~> check {
