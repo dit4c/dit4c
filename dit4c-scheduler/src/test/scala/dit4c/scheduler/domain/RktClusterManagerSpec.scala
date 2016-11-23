@@ -50,9 +50,11 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem("RktClusterManager-GetRktNodeState-Uninitialized")
         prop({ (managerPersistenceId: String, rktNodeId: String) =>
-          val manager =
-              system.actorOf(RktClusterManager.props(rktRunnerConfig), managerPersistenceId)
           val probe = TestProbe()
+          val manager =
+            probe.childActorOf(
+                RktClusterManager.props(rktRunnerConfig),
+                managerPersistenceId)
           probe.send(manager, GetRktNodeState(rktNodeId))
           probe.expectMsgType[RktNode.GetStateResponse](1.minute) must {
             be(RktNode.DoesNotExist)
@@ -67,12 +69,12 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system = ActorSystem("RktClusterManager-AddRktNode")
         val hostPublicKey = randomRSAPublicKey
+        val probe = TestProbe()
         val manager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(mockRktRunnerFactory,
                     mockFetchSshHostKey(hostPublicKey)),
                 managerPersistenceId)
-        val probe = TestProbe()
         probe.send(manager, AddRktNode(
             "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
         val response = probe.expectMsgType[RktNodeAdded](1.minute)
@@ -87,12 +89,12 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         val managerPersistenceId = "Cluster-test-rkt"
         implicit val system =
           ActorSystem("RktClusterManager-ConfirmRktNodeKeys")
+        val probe = TestProbe()
         val manager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(mockRktRunnerFactory,
                     mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
-        val probe = TestProbe()
         probe.send(manager, AddRktNode(
             "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
         val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
@@ -126,9 +128,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
             }
-
+        val probe = TestProbe()
         val manager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(runnerFactory,
                     mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
@@ -143,7 +145,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           nodeId
         }
         // Schedule an instance
-        val probe = TestProbe()
         val testImage = "docker://dit4c/gotty:latest"
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
@@ -190,8 +191,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   portalUri: String): Future[Unit] = ???
             }
 
+        val probe = TestProbe()
         def createManager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(runnerFactory,
                     mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
@@ -207,7 +209,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           nodeId
         }
         // Schedule an instance
-        val probe = TestProbe()
         val testImage = "docker://dit4c/gotty:latest"
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
@@ -261,9 +262,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   imageServer: String,
                   portalUri: String): Future[Unit] = Future.successful(())
             }
-
+        val probe = TestProbe()
         val manager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(runnerFactory,
                     mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
@@ -278,7 +279,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           nodeId
         }
         // Schedule an instance
-        val probe = TestProbe()
         val testImage = "docker://dit4c/gotty:latest"
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
@@ -340,9 +340,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
             }
-
+        val probe = TestProbe()
         val manager =
-            system.actorOf(
+            probe.childActorOf(
                 RktClusterManager.props(runnerFactory,
                     mockFetchSshHostKey(randomRSAPublicKey)),
                 managerPersistenceId)
@@ -357,7 +357,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           nodeId
         }
         // Schedule an instance
-        val probe = TestProbe()
         val testImage = "docker://dit4c/gotty:latest"
         val testCallback = "http://example.test/"
         probe.send(manager, StartInstance(randomInstanceId, testImage, testCallback))
