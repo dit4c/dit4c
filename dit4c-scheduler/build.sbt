@@ -48,6 +48,8 @@ PB.targets in Compile := Seq(
   scalapb.gen(grpc = false) -> (target.value / "protobuf-generated")
 )
 
+coverageExcludedPackages := "<empty>;dit4c\\.scheduler\\.runner"
+
 // Download rkt for testing
 resourceGenerators in Test <+=
   (resourceManaged in Test, name, version, streams) map { (dir, n, v, s) =>

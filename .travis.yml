@@ -12,11 +12,11 @@ before_script:
 - echo $PATH
 - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
 script:
-- sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M coverage test && sbt
-  coverageAggregate
+- sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M coverage test coverageReport
 - find $HOME/.sbt -name "*.lock" | xargs rm
 - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
 after_success:
+- sbt coverageAggregate
 - sbt coveralls
 notifications:
   slack:
