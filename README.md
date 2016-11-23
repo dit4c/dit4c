@@ -21,7 +21,7 @@ Some of the current environments available are:
  * [Apache Zeppelin + Base][dit4c-container-zeppelin]
  * [X11][dit4c-container-x11] - Base + X11 sessions via HTML5 VNC client
  * [Octave + X11][dit4c-container-octave]
- * [QGIS + Jupyter + RStudio + X11] - QGIS with supporting Python & R environments
+ * [QGIS + Jupyter + RStudio + X11][dit4c-container-zeppelin] - QGIS with supporting Python & R environments
 
 ## Motivation
 
@@ -70,6 +70,7 @@ _Many things have changed in DIT4C 0.10. Updated installation instructions will 
 [dit4c-container-ipython]: https://registry.hub.docker.com/u/dit4c/dit4c-container-ipython/
 [dit4c-container-nltk]: https://registry.hub.docker.com/u/dit4c/dit4c-container-nltk/
 [dit4c-container-octave]: https://registry.hub.docker.com/u/dit4c/dit4c-container-octave/
+[dit4c-container-openrefine]: https://registry.hub.docker.com/u/dit4c/dit4c-container-openrefine/
 [dit4c-container-qgis]: https://registry.hub.docker.com/u/dit4c/dit4c-container-qgis/
 [dit4c-container-rstudio]: https://registry.hub.docker.com/u/dit4c/dit4c-container-rstudio/
 [dit4c-container-x11]: https://registry.hub.docker.com/u/dit4c/dit4c-container-x11/
