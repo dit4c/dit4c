@@ -95,6 +95,8 @@ routesGenerator := InjectedRoutesGenerator
 // Speed up resolution times
 updateOptions := updateOptions.value.withCachedResolution(true)
 
+coverageExcludedPackages := "views.*"
+
 managedSourceDirectories in Compile += target.value / "protobuf-generated"
 
 PB.targets in Compile := Seq(
