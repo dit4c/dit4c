@@ -20,4 +20,7 @@ after_success:
 - sbt coveralls
 notifications:
   slack:
-    secure: CvQrl/OQx9BzIG+G8mrUYnCtYmvjoElXFDxb3q7KnA65H4plp3sKORHk74Gy3vwOeSdxRXgIutoNnrZjn0x2foP+gnLQ5IMu2I69tphBBAb/TLRzIu57H4Vi0EB3oWTTlYLfjKnyhzUvpj1+AG7exzWY3ASom0j+BG9z8Tl/ywQ=
+    rooms:
+      secure: CvQrl/OQx9BzIG+G8mrUYnCtYmvjoElXFDxb3q7KnA65H4plp3sKORHk74Gy3vwOeSdxRXgIutoNnrZjn0x2foP+gnLQ5IMu2I69tphBBAb/TLRzIu57H4Vi0EB3oWTTlYLfjKnyhzUvpj1+AG7exzWY3ASom0j+BG9z8Tl/ywQ=
+    on_success: change
+    on_failure: change
