@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import ammonite.ops.Path
 import ammonite.ops.tmp.{dir => tmpdir}
 import ammonite.sshd.SshServerConfig
-import ammonite.sshd.SshdReplMod
+import ammonite.sshd.SshdRepl
 import javax.inject.Inject
 import play.api.Configuration
 import play.api.Environment
@@ -39,10 +39,10 @@ case class SshRepl @Inject() (
       hostKeyFile = Some(hostKeyFile)
     )
   }
-  val replServer = new SshdReplMod(
+  val replServer = new SshdRepl(
       sshServerConfig,
       replArgs = bindings,
-      classloader = classloader)
+      classLoader = classloader)
   // Attach to lifecycle
   lifecycle.addStopHook { () =>
     Future.successful(replServer.stop())

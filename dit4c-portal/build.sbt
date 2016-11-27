@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.mohiva"                %%  "play-silhouette-crypto-jca" % "4.0.0-RC1",
   "com.iheart"                %%  "ficus"                 % "1.2.3",
   "com.nulab-inc"             %%  "play2-oauth2-provider" % "0.17.2",
-  "com.lihaoyi"               %   "ammonite-sshd"         % "0.7.7" cross CrossVersion.full,
+  "com.lihaoyi"               %   "ammonite-sshd"         % "0.8.0" cross CrossVersion.full,
   ws,
   specs2,
   "com.trueaccord.scalapb"    %% "scalapb-runtime"    % scalapbV % "protobuf",
