@@ -1,5 +1,6 @@
 package dit4c.common
 
+import com.softwaremill.tagging._
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
@@ -21,31 +22,42 @@ import java.io.OutputStream
 import scala.sys.process.ProcessIO
 import java.io.InputStream
 import java.security.KeyPair
+import java.io.File
 
 class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations {
 
+  import KeyHelpers._
+
   implicit val params = Parameters(minTestsOk = 20)
 
-  case class KeyBits(n: Int)
+  trait KeyBitsTag
+  type KeyBits = Int @@ KeyBitsTag
+
+  trait PGPIdentityTag
+  type PGPIdentity = String @@ PGPIdentityTag
+
+  trait PassphraseTag
+  type Passphrase = String @@ PassphraseTag
+
+
+  implicit val arbKeyBits: Arbitrary[KeyBits] =
+    Arbitrary(Gen.frequency(10 -> 1024, 1 -> 2048).map(_.taggedWith[KeyBitsTag]))
+  val genNonEmptyString =
+    Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
+      .suchThat(!_.isEmpty)
+  implicit val arbPGPIdentity = Arbitrary(genNonEmptyString.map(_.taggedWith[PGPIdentityTag]))
+  implicit val arbPassphrase = Arbitrary(genNonEmptyString.map(_.taggedWith[PassphraseTag]))
+  implicit val arbKeyPair =
+    Arbitrary(arbKeyBits.arbitrary.map { bits: KeyBits =>
+      val kpg = KeyPairGenerator.getInstance("RSA")
+      kpg.initialize(bits)
+      kpg.generateKeyPair
+    })
 
   "KeyHelpers" should {
-    import KeyHelpers._
 
-    // We never want an empty string for these checks
-    implicit val arbKeyBits: Arbitrary[KeyBits] = Arbitrary(Gen.frequency(10 -> 1024, 1 -> 2048).map(KeyBits.apply))
-    val genNonEmptyString: Gen[String] =
-      Gen.oneOf(Gen.alphaStr, Arbitrary.arbString.arbitrary)
-        .suchThat(!_.isEmpty)
-    implicit val arbString = Arbitrary(genNonEmptyString)
-    implicit val arbKeyPair =
-      Arbitrary(arbKeyBits.arbitrary.map { bits: KeyBits =>
-        val kpg = KeyPairGenerator.getInstance("RSA")
-        kpg.initialize(bits.n)
-        kpg.generateKeyPair
-      })
-
-    "produce OpenPGP armoured secret keys" >> prop({ (identity: String, bits: KeyBits, passphrase: Option[String]) =>
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, passphrase)
+    "produce OpenPGP armoured secret keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
       val outputKey = pgpKey.`private`.armored
       val lines = outputKey.lines.toSeq;
       {
@@ -86,8 +98,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       }
     })
 
-    "parse armored public keys" >> prop({ (identity: String, bits: KeyBits) =>
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, None)
+    "parse armored public keys" >> prop({ (identity: PGPIdentity, bits: KeyBits) =>
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
       val outputKey = pgpKey.`public`.armored
       parseArmoredPublicKey(outputKey) must beRight(beLike[PGPPublicKey] {
         case parsedKey =>
@@ -95,9 +107,9 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       })
     })
 
-    "produce PCKS#1 keys from PGP keys" >> prop({ (identity: String, bits: KeyBits, passphrase: Option[String]) =>
+    "produce PCKS#1 keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
       import sys.process._
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits.n, passphrase)
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
       val is = new ByteArrayInputStream(pgpKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
       val os = new ByteArrayOutputStream()
       def sendToOs(in: InputStream) = Iterator.continually(in.read).takeWhile(_>=0).foreach(os.write)
@@ -110,7 +122,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       }
     })
 
-    "produce & read PCKS#8 private keys with RSA private keys" >> prop({ (identity: String, kp: KeyPair) =>
+    "produce & read PCKS#8 private keys with RSA private keys" >> prop({ (identity: PGPIdentity, kp: KeyPair) =>
       import sys.process._
       val pemStr = kp.getPrivate.pkcs8.pem
       val is = new ByteArrayInputStream(pemStr.getBytes)
@@ -126,7 +138,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       (parsePkcs8PemPrivateKey(pemStr) must_== Right(kp.getPrivate))
     })
 
-    "produce & read PCKS#8 public keys with RSA public keys" >> prop({ (identity: String, kp: KeyPair) =>
+    "produce & read PCKS#8 public keys with RSA public keys" >> prop({ (identity: PGPIdentity, kp: KeyPair) =>
       val pemStr = kp.getPublic.pkcs8.pem
       val is = new ByteArrayInputStream(pemStr.getBytes)
       val os = new ByteArrayOutputStream()
@@ -135,10 +147,51 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       parsePkcs8PemPublicKey(pemStr) must_== Right(kp.getPublic)
     })
 
+    "produce OpenSSH keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits) =>
+      import sys.process._
+      val tmpKeyring = File.createTempFile("keyring", ".kbx")
+      tmpKeyring.deleteOnExit()
+      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val generatedString = pgpKey.getPublicKey.asOpenSSH
+      val armoredPublicKey = pgpKey.`public`.armored;
+      val gpgSshKey = {
+        val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
+        val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath}"
+        val keyIdPattern = """key (\w+):""".r.unanchored
+        s"$gpgCmd --import".#<(is).exitCodeOutErr match {
+          case (0, _, err @ keyIdPattern(keyId)) =>
+            // Exporting a master key with --export-ssh-key requires a "!" suffix
+            stringToProcess(s"$gpgCmd --trusted-key $keyId --export-ssh-key $keyId!").exitCodeOutErr match {
+              case (0, out, _) =>
+                // format: <alg_header> <key_data> <comment>
+                // Get key without the comment
+                out.split(" ").init.mkString(" ")
+              case _ => throw new Exception(s"gpg ssh export failed: $t")
+            }
+          case t => throw new Exception(s"gpg import failed: $t")
+        }
+      }
+      generatedString must beSome(gpgSshKey)
+    })
+
   }
 
   def haveFirstLine(s: String) = (be_==(s)) ^^ { (xs: Seq[String]) => xs.head }
   def haveLastLine(s: String) = (be_==(s)) ^^ { (xs: Seq[String]) => xs.last }
 
+  implicit class ProcessBuilderHelper(pb: sys.process.ProcessBuilder) {
 
+    def exitCodeOutErr: (Int, String, String) = {
+      import sys.process._
+      val out = new ByteArrayOutputStream()
+      val err = new ByteArrayOutputStream()
+      def connect(os: OutputStream)(is: InputStream) = Iterator.continually(is.read).takeWhile(_>=0).foreach(os.write)
+      val processIO = new ProcessIO(_ => (), connect(out), connect(err), true)
+      val exitCode = pb.run(processIO).exitValue
+      out.flush
+      err.flush
+      (exitCode, new String(out.toByteArray, "utf8"), new String(err.toByteArray, "utf8"))
+    }
+
+  }
 }

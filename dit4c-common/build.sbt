@@ -13,6 +13,8 @@ libraryDependencies ++= {
     "org.bouncycastle"    %   "bcpkix-jdk15on"  % "1.55",
     "org.bouncycastle"    %   "bcpg-jdk15on"    % "1.55",
     "com.pauldijou"       %%  "jwt-play-json"   % "0.7.1",
+    "com.softwaremill.macwire"  %%  "macros"    % macwireV % "provided",
+    "com.softwaremill.macwire"  %%  "util"      % macwireV % "test",
     "com.typesafe.play"   %%  "play-json"       % playV % "provided",
     "com.typesafe.play"   %%  "play-json"       % playV % "test",
     "com.typesafe.akka"   %%  "akka-http-testkit" % akkaV % "test",

@@ -313,6 +313,15 @@ object KeyHelpers {
       JwtBase64.encodeString(bi.toByteArray)
   }
 
+  implicit class PGPPublicKeyOpenSSHHelper(publicKey: PGPPublicKey) {
+    def asOpenSSH: Option[String] =
+      Some(publicKey.getPublicKeyPacket.getKey)
+        .collect {
+          case k: RSAPublicBCPGKey =>
+            publicKey.asRSAPublicKey.ssh.authorizedKeys
+        }
+  }
+
   implicit class PGPPublicKeyJavaPublicKeyHelper(publicKey: PGPPublicKey) {
     def asJavaPublicKey: Option[PublicKey] = scala.util.Try(publicKey.asRSAPublicKey).toOption
   }
