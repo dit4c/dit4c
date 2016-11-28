@@ -4,6 +4,10 @@ jdk:
 - oraclejdk8
 scala:
 - 2.11.8
+addons:
+  apt:
+    packages:
+    - gnupg2
 cache:
   directories:
   - "$HOME/.ivy2/cache"
