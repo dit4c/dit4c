@@ -166,7 +166,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
                 // format: <alg_header> <key_data> <comment>
                 // Get key without the comment
                 out.split(" ").init.mkString(" ")
-              case _ => throw new Exception(s"gpg ssh export failed: $t")
+              case t => throw new Exception(s"gpg ssh export failed: $t")
             }
           case t => throw new Exception(s"gpg import failed: $t")
         }
