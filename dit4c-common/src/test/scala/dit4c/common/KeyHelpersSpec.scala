@@ -156,7 +156,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       val armoredPublicKey = pgpKey.`public`.armored;
       val gpgSshKey = {
         val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
-        val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath}"
+        val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath} --keyid-format 0xlong"
         val keyIdPattern = """key (\w+):""".r.unanchored
         s"$gpgCmd --import".#<(is).exitCodeOutErr match {
           case (0, _, err @ keyIdPattern(keyId)) =>
