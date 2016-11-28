@@ -11,9 +11,9 @@ cache:
   - "/tmp/gnupg/bin/"
 before_script:
 - mkdir -p /tmp/gnupg/bin && export PATH=$PATH:/tmp/gnupg/bin
-- test -f /tmp/gnupg/bin/gpg2 || curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg2" > /tmp/gnupg/bin/gpg2 && chmod +x /tmp/gnupg/bin/gpg2
-- test -f /tmp/gnupg/bin/gpg-agent || curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg-agent" > /tmp/gnupg/bin/gpg-agent && chmod +x /tmp/gnupg/bin/gpg-agent
-- test -f /tmp/gnupg/bin/gpg-connect-agent || curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg-connect-agent" > /tmp/gnupg/bin/gpg-connect-agent && chmod +x /tmp/gnupg/bin/gpg-connect-agent
+- curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg2" > /tmp/gnupg/bin/gpg2 && chmod +x /tmp/gnupg/bin/gpg2
+- curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg-agent" > /tmp/gnupg/bin/gpg-agent && chmod +x /tmp/gnupg/bin/gpg-agent
+- curl -L "https://bintray.com/dit4c/build-utils/download_file?file_path=gnupg-2.1.16%2Fgpg-connect-agent" > /tmp/gnupg/bin/gpg-connect-agent && chmod +x /tmp/gnupg/bin/gpg-connect-agent
 - echo $PATH
 - sbt ++$TRAVIS_SCALA_VERSION -J-XX:ReservedCodeCacheSize=256M clean update
 script:
