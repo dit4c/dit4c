@@ -23,6 +23,7 @@ import scala.sys.process.ProcessIO
 import java.io.InputStream
 import java.security.KeyPair
 import java.io.File
+import org.specs2.execute.Result
 
 class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations {
 
@@ -148,30 +149,32 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
     })
 
     "produce OpenSSH keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits) =>
-      import sys.process._
-      val tmpKeyring = File.createTempFile("keyring", ".kbx")
-      tmpKeyring.deleteOnExit()
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
-      val generatedString = pgpKey.getPublicKey.asOpenSSH
-      val armoredPublicKey = pgpKey.`public`.armored;
-      val gpgSshKey = {
-        val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
-        val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath} --keyid-format 0xlong"
-        val keyIdPattern = """key (\w+):""".r.unanchored
-        s"$gpgCmd --import".#<(is).exitCodeOutErr match {
-          case (0, _, err @ keyIdPattern(keyId)) =>
-            // Exporting a master key with --export-ssh-key requires a "!" suffix
-            stringToProcess(s"$gpgCmd --trusted-key $keyId --export-ssh-key $keyId!").exitCodeOutErr match {
-              case (0, out, _) =>
-                // format: <alg_header> <key_data> <comment>
-                // Get key without the comment
-                out.split(" ").init.mkString(" ")
-              case t => throw new Exception(s"gpg ssh export failed: $t")
-            }
-          case t => throw new Exception(s"gpg import failed: $t")
+         ifGpgAvailable {
+        val tmpKeyring = File.createTempFile("keyring", ".kbx")
+        tmpKeyring.deleteOnExit()
+        val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+        val generatedString = pgpKey.getPublicKey.asOpenSSH
+        val armoredPublicKey = pgpKey.`public`.armored;
+        val gpgSshKey = {
+          import sys.process._
+          val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
+          val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath} --keyid-format 0xlong"
+          val keyIdPattern = """key (\w+):""".r.unanchored
+          s"$gpgCmd --import".#<(is).exitCodeOutErr match {
+            case (0, _, err @ keyIdPattern(keyId)) =>
+              // Exporting a master key with --export-ssh-key requires a "!" suffix
+              stringToProcess(s"$gpgCmd --trusted-key $keyId --export-ssh-key $keyId!").exitCodeOutErr match {
+                case (0, out, _) =>
+                  // format: <alg_header> <key_data> <comment>
+                  // Get key without the comment
+                  out.split(" ").init.mkString(" ")
+                case t => throw new Exception(s"gpg ssh export failed: $t")
+              }
+            case t => throw new Exception(s"gpg import failed: $t")
+          }
         }
+        generatedString must beSome(gpgSshKey)
       }
-      generatedString must beSome(gpgSshKey)
     })
 
   }
@@ -194,4 +197,14 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
     }
 
   }
+
+  def ifGpgAvailable(f: => Result): Result = {
+    import sys.process.{stringToProcess => asProc}
+    if (asProc("which gpg2").exitCodeOutErr._1 == 0 && asProc("gpg2 --version").lineStream.head.contains(" 2.1."))
+      f
+    else
+      skipped("No usable version of GPG available")
+  }
+
+
 }
