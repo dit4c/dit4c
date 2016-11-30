@@ -105,7 +105,7 @@ object RemoteShell {
             in))
         channel.setOutputStream(out)
         channel.setErrStream(err)
-        channel.connect(1000)
+        channel.connect() // Default timeout → 1000 x 50ms
         while (channel.isConnected) {
           Thread.sleep(10)
         }
