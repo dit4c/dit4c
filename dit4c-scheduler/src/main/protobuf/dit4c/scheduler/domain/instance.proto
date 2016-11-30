@@ -26,7 +26,7 @@ message FetchedImage {
   google.protobuf.Timestamp timestamp = 100;
 }
 
-message AssociatedSigningKey {
+message AssociatedKeys {
   option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
   string pgpPublicKeyBlock = 1;
   google.protobuf.Timestamp timestamp = 100;

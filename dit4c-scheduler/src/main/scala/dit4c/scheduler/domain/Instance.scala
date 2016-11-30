@@ -19,16 +19,16 @@ object Instance {
   type ImageId = String
   type NamedImage = String
   type LocalImage = String
-  type SigningKeyData = String
+  type KeyData = String
 
   def props(worker: ActorRef): Props =
     Props(classOf[Instance], worker)
 
-  object SigningKey {
+  object InstanceKeys {
     import dit4c.common.KeyHelpers._
-    def apply(k: PGPPublicKeyRing): SigningKey = SigningKey(k.armored)
+    def apply(k: PGPPublicKeyRing): InstanceKeys = InstanceKeys(k.armored)
   }
-  case class SigningKey(armoredPgpPublicKeyBlock: String) {
+  case class InstanceKeys(armoredPgpPublicKeyBlock: String) {
     import dit4c.common.KeyHelpers._
     def asPGPPublicKeyRing: PGPPublicKeyRing = {
       parseArmoredPublicKeyRing(armoredPgpPublicKeyBlock).right.get
@@ -60,10 +60,10 @@ object Instance {
       providedImage: String,
       resolvedImage: Option[String],
       portalUri: String,
-      signingKey: Option[SigningKey]) extends SomeData
+      keys: Option[InstanceKeys]) extends SomeData
   case class SaveData(
       instanceId: String,
-      signingKey: SigningKey,
+      keys: InstanceKeys,
       uploadHelperImage: String,
       imageServer: String,
       portalUri: String) extends SomeData
@@ -77,7 +77,7 @@ object Instance {
       image: NamedImage,
       portalUri: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
-  case class AssociateSigningKey(key: SigningKeyData) extends Command
+  case class AssociateKeys(key: KeyData) extends Command
   case object ConfirmStart extends Command
   case object ConfirmExited extends Command
   case object Discard extends Command
@@ -132,9 +132,9 @@ class Instance(worker: ActorRef)
   }
 
   when(Starting) {
-    case Event(AssociateSigningKey(keyData), _) =>
-      log.info(s"Received signing key: $keyData")
-      stay.applying(AssociatedSigningKey(keyData)).andThen(emitStatusReportToEventStream(stateName))
+    case Event(AssociateKeys(keyData), _) =>
+      log.info(s"Received keys: $keyData")
+      stay.applying(AssociatedKeys(keyData)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
       goto(Running).applying(ConfirmedStart(now))
@@ -265,8 +265,8 @@ class Instance(worker: ActorRef)
         case data: StartData => data.copy(resolvedImage = Some(imageId))
         case other => unhandled()
       }
-      case AssociatedSigningKey(armoredKeyStr, _) => currentData match {
-        case data: StartData => data.copy(signingKey = Some(SigningKey(armoredKeyStr)))
+      case AssociatedKeys(armoredKeyStr, _) => currentData match {
+        case data: StartData => data.copy(keys = Some(InstanceKeys(armoredKeyStr)))
         case other => unhandled()
       }
       case RequestedSave(helperImage, imageServer, _) => currentData match {

@@ -63,7 +63,7 @@ object ClusterRoutes {
       (__ \ 'type).write[String]
   ).contramap { (t: ClusterType) => t.toString }
 
-  implicit val writesSigningKey: Writes[Instance.SigningKey] =
+  implicit val writesSigningKey: Writes[Instance.InstanceKeys] =
     Writes { key =>
       Json.toJson(key.asPGPPublicKeyRing.getPublicKey.asRSAPublicKey)
     }
@@ -73,7 +73,7 @@ object ClusterRoutes {
       (__ \ 'image \ 'name).writeNullable[String] and
       (__ \ 'image \ 'id).writeNullable[String] and
       (__ \ 'portal).writeNullable[String] and
-      (__ \ 'key).writeNullable[Instance.SigningKey] and
+      (__ \ 'key).writeNullable[Instance.InstanceKeys] and
       (__ \ 'errors).writeNullable[Seq[String]]
   )( (sr: Instance.StatusReport) => {
     val currentState = sr.state.identifier
@@ -96,7 +96,7 @@ object ClusterRoutes {
     OWrites { obj =>
       writesInstanceStatusReport.writes(obj.sr).deepMerge {
         obj.sr.data match {
-          case d: Instance.StartData if d.signingKey.isDefined =>
+          case d: Instance.StartData if d.keys.isDefined =>
             (__ \ 'key \ 'jwk \ 'kid).write[String].writes( obj.id)
           case _ => Json.obj()
         }

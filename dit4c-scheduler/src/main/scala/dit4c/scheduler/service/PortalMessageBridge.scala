@@ -157,9 +157,9 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
       data match {
         case data: Instance.StartData =>
           import dit4c.common.KeyHelpers._
-          data.signingKey.foreach { key =>
+          data.keys.foreach { keys =>
               val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
-                pb.AllocatedInstanceKey(data.instanceId, key.armoredPgpPublicKeyBlock)))
+                pb.AllocatedInstanceKey(data.instanceId, keys.armoredPgpPublicKeyBlock)))
               outbound ! toBinaryMessage(msg.toByteArray)
           }
         case _ => // No need to do anything
