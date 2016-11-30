@@ -140,6 +140,8 @@ class RktNode(
           Props(classOf[RktInstanceWorker], runner),
           "instance-worker-"+Random.alphanumeric.take(20).mkString)
       stay replying WorkerCreated(worker)
+    case Event(ConfirmKeys, data: NodeConfig) =>
+      stay replying ConfirmKeysResponse(data)
   }
 
   whenUnhandled {

@@ -209,7 +209,7 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
         onSuccess(clusterAggregateManager ?
             ClusterCommand(clusterId, ConfirmRktNodeKeys(nodeId))) {
           case RktNode.DoesNotExist => complete(StatusCodes.NotFound)
-          case RktNode.Exists(node) => complete(node)
+          case RktNode.ConfirmKeysResponse(node) => complete(node)
         }
       }
     }
