@@ -26,6 +26,7 @@ libraryDependencies ++= Seq(
   "com.trueaccord.scalapb"    %% "scalapb-runtime"    % scalapbV % "protobuf",
   "org.specs2"                %%  "specs2-core"       % specs2V % "test",
   "org.specs2"                %%  "specs2-scalacheck" % specs2V % "test",
+  "com.typesafe.akka"         %%  "akka-agent"        % akkaV % "test",
   "com.typesafe.akka"         %%  "akka-testkit"      % akkaV % "test",
   "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.0" % "test"
 )

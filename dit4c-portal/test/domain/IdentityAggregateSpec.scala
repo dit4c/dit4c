@@ -1,4 +1,4 @@
-package dit4c.portal.domain
+package domain
 
 import com.softwaremill.tagging._
 import org.specs2.concurrent.ExecutionEnv
@@ -19,13 +19,12 @@ import scala.concurrent.Future
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import java.nio.file.Paths
-import domain.IdentityAggregate
 import services.UserSharder
 import akka.actor.Props
-import domain.UserAggregate
 import java.util.Base64
 import akka.testkit.TestActor
 import akka.actor.ActorRef
+import java.security.MessageDigest
 
 class IdentityAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -39,7 +38,7 @@ class IdentityAggregateSpec(implicit ee: ExecutionEnv)
   type UserId = String @@ UserIdTag
 
 
-  implicit val params = Parameters(minTestsOk = 20)
+  implicit val params = Parameters(minTestsOk = 20, workers = 20)
   val genNonEmptyStr = Gen.identifier.suchThat(!_.isEmpty)
 
   implicit val arbIdentityId: Arbitrary[IdentityId] = Arbitrary {
@@ -58,22 +57,34 @@ class IdentityAggregateSpec(implicit ee: ExecutionEnv)
     "GetUser" >> {
 
       "create user if unassociated" >> {
-        implicit val system =
-          ActorSystem(s"IdentityAggregate-GetUser-Unassociated")
-
-        prop({ (identityId: IdentityId, userId: UserId) =>
-          val probe = TestProbe()
-          val mockSharderProbe = TestProbe()
-          val mockSharder = mockSharderProbe.ref.taggedWith[UserSharder.type]
-          val identityAggregate =
-            probe.childActorOf(
-                Props(classOf[IdentityAggregate], mockSharder),
-                identityId)
-          probe.send(identityAggregate, IdentityAggregate.GetUser)
-          mockSharderProbe.expectMsgType[UserSharder.CreateNewUser.type]
-          mockSharderProbe.send(identityAggregate, UserAggregate.CreateResponse(userId))
-          probe.expectMsgType[IdentityAggregate.GetUserResponse] must {
-            be_==(IdentityAggregate.UserFound(userId))
+        prop({ (identityToUserMap: Map[IdentityId, UserId]) =>
+          val mapId: String =
+            MessageDigest.getInstance("SHA-1")
+              .digest(identityToUserMap.toString.getBytes)
+              .map("%02x".format(_)).mkString
+              .taggedWith[IdentityIdTag]
+          implicit val system =
+            ActorSystem(s"IdentityAggregate-GetUser-Unassociated-$mapId");
+          {
+            // Ensure identities are unused and unique
+            !identityToUserMap.isEmpty and
+            (identityToUserMap.values.toSet.size == identityToUserMap.keySet.size)
+          } ==> {
+            identityToUserMap.map { case (identityId, userId) =>
+              val probe = TestProbe()
+              val mockSharderProbe = TestProbe()
+              val mockSharder = mockSharderProbe.ref.taggedWith[UserSharder.type]
+              val identityAggregate =
+                probe.childActorOf(
+                    Props(classOf[IdentityAggregate], mockSharder),
+                    identityId)
+              probe.send(identityAggregate, IdentityAggregate.GetUser)
+              mockSharderProbe.expectMsgType[UserSharder.CreateNewUser.type]
+              mockSharderProbe.send(identityAggregate, UserAggregate.CreateResponse(userId))
+              probe.expectMsgType[IdentityAggregate.GetUserResponse] must {
+                be_==(IdentityAggregate.UserFound(userId))
+              }
+            }.reduce(_ and _)
           }
         })
       }
@@ -82,6 +93,9 @@ class IdentityAggregateSpec(implicit ee: ExecutionEnv)
       "return the same user ID once created" >> {
         implicit val system =
           ActorSystem(s"IdentityAggregate-GetUser-Associated")
+        import akka.agent.Agent
+
+        val identityToUserMap = Agent(Map.empty[IdentityId, UserId])
 
         prop({ (identityId: IdentityId, userId: UserId) =>
           val probe = TestProbe()
@@ -90,6 +104,7 @@ class IdentityAggregateSpec(implicit ee: ExecutionEnv)
             def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
               msg match {
                 case UserSharder.CreateNewUser =>
+                  identityToUserMap.alter(_  + (identityId -> userId))
                   sender ! UserAggregate.CreateResponse(userId)
                   TestActor.NoAutoPilot
                 case _ => TestActor.KeepRunning
@@ -100,11 +115,14 @@ class IdentityAggregateSpec(implicit ee: ExecutionEnv)
             probe.childActorOf(
                 Props(classOf[IdentityAggregate], mockSharder),
                 identityId)
-          val responses = Stream.fill(10) {
+          val responses = Stream.fill(3) {
             probe.send(identityAggregate, IdentityAggregate.GetUser)
             probe.expectMsgType[IdentityAggregate.GetUserResponse]
           }
-          responses must allOf(be_==(IdentityAggregate.UserFound(userId)))
+          identityToUserMap.future.map { m =>
+            val expectedUserId = m(identityId)
+            responses must allOf(be_==(IdentityAggregate.UserFound(expectedUserId)))
+          } awaitFor(10.seconds)
         })
       }
     }
