@@ -58,6 +58,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       kpg.generateKeyPair
     })
 
+  sequential
+
   "KeyHelpers" should {
 
     "produce OpenPGP armoured secret keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
