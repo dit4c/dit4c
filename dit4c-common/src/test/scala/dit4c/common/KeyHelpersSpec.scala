@@ -24,8 +24,11 @@ import java.io.InputStream
 import java.security.KeyPair
 import java.io.File
 import org.specs2.execute.Result
+import org.specs2.specification.Scope
+import org.specs2.mutable.Around
+import org.specs2.execute.AsResult
 
-class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations {
+class KeyHelpersSpec extends Specification with ScalaCheck {
 
   import KeyHelpers._
 
@@ -148,8 +151,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
       parsePkcs8PemPublicKey(pemStr) must_== Right(kp.getPublic)
     })
 
-    "produce OpenSSH keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits) =>
-         ifGpgAvailable {
+    "produce OpenSSH keys from PGP keys" >> new IfGpgAvailable {
+       prop({ (identity: PGPIdentity, bits: KeyBits) =>
         val tmpKeyring = File.createTempFile("keyring", ".kbx")
         tmpKeyring.deleteOnExit()
         val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
@@ -174,8 +177,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
           }
         }
         generatedString must beSome(gpgSshKey)
-      }
-    })
+      })
+    }
 
   }
 
@@ -198,12 +201,14 @@ class KeyHelpersSpec extends Specification with ScalaCheck with AllExpectations 
 
   }
 
-  def ifGpgAvailable(f: => Result): Result = {
-    import sys.process.{stringToProcess => asProc}
-    if (asProc("which gpg2").exitCodeOutErr._1 == 0 && asProc("gpg2 --version").lineStream.head.contains(" 2.1."))
-      f
-    else
-      skipped("No usable version of GPG available")
+  trait IfGpgAvailable extends Scope with Around {
+    override def around[T](t: ⇒ T)(implicit asR: AsResult[T]): Result = {
+      import sys.process.{stringToProcess => asProc}
+      if (asProc("which gpg2").exitCodeOutErr._1 == 0 && asProc("gpg2 --version").lineStream.head.contains(" 2.1."))
+        asR.asResult(t)
+      else
+        skipped("No usable version of GPG available")
+    }
   }
 
 
