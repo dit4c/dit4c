@@ -23,7 +23,7 @@ import akka.actor.Props
 import dit4c.scheduler.runner.RktRunner
 import akka.actor.Terminated
 import java.nio.file.Paths
-import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
 import dit4c.common.KeyHelpers.PGPKeyGenerators
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
@@ -110,7 +110,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-start")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPGPPublicKey
+        val resolvedPublicKey = randomPGPPublicKeyRing
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -119,7 +119,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[PGPPublicKey] =
+                  portalUri: String): Future[PGPPublicKeyRing] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
@@ -172,7 +172,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-restart")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPGPPublicKey
+        val resolvedPublicKey = randomPGPPublicKeyRing
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -181,7 +181,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[PGPPublicKey] =
+                  portalUri: String): Future[PGPPublicKeyRing] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
@@ -243,7 +243,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         implicit val system =
           ActorSystem(s"RktClusterManager-SaveInstance")
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPGPPublicKey
+        val resolvedPublicKey = randomPGPPublicKeyRing
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -252,7 +252,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[PGPPublicKey] =
+                  portalUri: String): Future[PGPPublicKeyRing] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
@@ -321,7 +321,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           ActorSystem(s"RktClusterManager-DiscardInstance")
         val log = system.log
         val resolvedImageId = "sha512-"+Stream.fill(64)("0").mkString
-        val resolvedPublicKey = randomPGPPublicKey
+        val resolvedPublicKey = randomPGPPublicKeyRing
         val runnerFactory =
           (_: RktNode.ServerConnectionDetails, _: String) =>
             new RktRunner {
@@ -330,7 +330,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def start(
                   instanceId: String,
                   image: String,
-                  portalUri: String): Future[PGPPublicKey] =
+                  portalUri: String): Future[PGPPublicKeyRing] =
                 Future.successful(resolvedPublicKey)
               override def stop(instanceId: String): Future[Unit] =
                 Future.successful(())
@@ -388,7 +388,10 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     kpg.genKeyPair.getPublic.asInstanceOf[RSAPublicKey]
   }
 
-  def randomPGPPublicKey: PGPPublicKey = PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).getPublicKey
+  def randomPGPPublicKeyRing: PGPPublicKeyRing = {
+    import dit4c.common.KeyHelpers._
+    PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).toPublicKeyRing
+  }
 
   def mockRktRunnerFactory(
       cd: RktNode.ServerConnectionDetails, dir: String): RktRunner =
@@ -397,7 +400,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       override def start(
           instanceId: String,
           image: String,
-          portalUri: String): Future[PGPPublicKey] = ???
+          portalUri: String): Future[PGPPublicKeyRing] = ???
       override def stop(instanceId: String): Future[Unit] = ???
       override def export(instanceId: String) = ???
       def uploadImage(instanceId: String,

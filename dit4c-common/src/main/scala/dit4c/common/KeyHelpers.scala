@@ -35,6 +35,8 @@ import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import java.security.Key
+import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRing
+import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRing
 
 object KeyHelpers {
 
@@ -43,7 +45,7 @@ object KeyHelpers {
       def apply(
           identity: String,
           bits: Int = 2048,
-          passphrase: Option[String] = None): PGPSecretKey = {
+          passphrase: Option[String] = None): PGPSecretKeyRing = {
         // Necessary because of the way BouncyCastle specifies message digests (even though algs are natively supported)
         Security.addProvider(new BouncyCastleProvider())
         val pair = {
@@ -82,17 +84,12 @@ object KeyHelpers {
                 keyPair.getPublicKey().getAlgorithm(),
                 HashAlgorithmTags.SHA256),
             secretKeyEncryptor)
-        secretKey
+        new BcPGPSecretKeyRing(secretKey.getEncoded)
       }
     }
   }
 
-  /**
-   * At the moment DIT4C assumes a single public key is used for all actions. This may at some point change though
-   * (most likely to support elliptic curve cryptography) so DIT4C uses key blocks that could later store a master key
-   * and sub-keys.
-   */
-  def parseArmoredPublicKey(s: String): Either[String, PGPPublicKey] = {
+  def parseArmoredPublicKeyRing(s: String): Either[String, PGPPublicKeyRing] = {
     import scala.collection.JavaConversions._
     val pgpPubKeyCol: Either[String, PGPPublicKeyRingCollection] = {
       val in = new ByteArrayInputStream(s.getBytes)
@@ -107,11 +104,11 @@ object KeyHelpers {
     }
     pgpPubKeyCol
       // Flatten key ring collection into list of keys
-      .right.map(_.getKeyRings.toList.flatMap(_.getPublicKeys.toList))
+      .right.map(_.getKeyRings.toList)
       .right.flatMap {
         case Nil => Left("No keys in specified data")
         case Seq(key) => Right(key)
-        case xs => Left(s"Data should have contained a single key, but contained ${xs.length}")
+        case xs => Left(s"Data should have contained a single master key, but contained ${xs.length}")
       }
   }
 
@@ -140,10 +137,16 @@ object KeyHelpers {
       }
   }
 
-  def checkPublicKeyIsSuitable(k: PGPPublicKey): Either[String, PGPPublicKey] = {
+  /**
+    * At the moment DIT4C assumes instances use a single public key for all actions. This may at some change though
+    * (most likely to support elliptic curve cryptography) so DIT4C uses key blocks that could later store a master key
+    * and sub-keys.
+    */
+  def checkInstancePublicKeyRingIsSuitable(kr: PGPPublicKeyRing): Either[String, PGPPublicKeyRing] = {
     import scala.collection.JavaConversions._
     import org.bouncycastle.openpgp.PGPKeyFlags._
     import org.bouncycastle.bcpg.PublicKeyAlgorithmTags._
+    val k = kr.getPublicKey()
     // Helpers
     val keyAlgUsableWithJWTs = Set(RSA_GENERAL, ECDH, ECDSA) // One key can't do both ECDH & ECDSA though
     val selfSignature = k.getSignaturesForKeyID(k.getKeyID).toList.head
@@ -158,7 +161,7 @@ object KeyHelpers {
         Left("Key is not usable for signing, which DIT4C requires")
       case k if !keyAlgUsableWithJWTs.contains(k.getAlgorithm) =>
         Left("Key is not convertible to a JSON Web Key, which DIT4C requires")
-      case k => Right(k) // It's all good!
+      case k => Right(kr) // It's all good!
     }
   }
 
@@ -244,7 +247,7 @@ object KeyHelpers {
   /**
    * Key where raw format is DER-encoded
    */
-  trait OpenPgpKey extends KeyFormat {
+  trait OpenPgpData extends KeyFormat {
     def binary: Array[Byte] = captureOutputStream(encodeToStream)
 
     def armored: String = new String(captureOutputStream { os =>
@@ -266,10 +269,10 @@ object KeyHelpers {
   }
 
   implicit class PGPSecretKeyHelper(secretKey: PGPSecretKey) {
-    def `private` = new OpenPgpKey {
+    def `private` = new OpenPgpData {
       override def encodeToStream(os: OutputStream) = secretKey.encode(os)
     }
-    def public = new OpenPgpKey {
+    def public = new OpenPgpData {
       override def encodeToStream(os: OutputStream) = secretKey.getPublicKey.encode(os)
     }
     def asRSAPrivateKey(passphrase: Option[String]): RSAPrivateKey = {
@@ -289,7 +292,21 @@ object KeyHelpers {
     }
   }
 
-  implicit class PGPPublicKeyHelper(publicKey: PGPPublicKey) extends OpenPgpKey {
+  implicit class PGPSecretKeyRingHelper(skr: PGPSecretKeyRing) {
+    def toPublicKeyRing: PGPPublicKeyRing = {
+      import scala.collection.JavaConversions._
+      val masterKeyRing: PGPPublicKeyRing = new BcPGPPublicKeyRing(skr.getPublicKey.binary)
+      skr.getPublicKeys.foldRight(masterKeyRing) { (k, kr) =>
+        PGPPublicKeyRing.insertPublicKey(kr, k)
+      }
+    }
+  }
+
+  implicit class PGPKeyRingHelper(kr: PGPKeyRing) extends OpenPgpData {
+    override def encodeToStream(os: OutputStream) = kr.encode(os)
+  }
+
+  implicit class PGPPublicKeyHelper(publicKey: PGPPublicKey) extends OpenPgpData {
     def asRSAPublicKey: RSAPublicKey = {
       val k = publicKey.getPublicKeyPacket.getKey.asInstanceOf[RSAPublicBCPGKey]
       KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(k.getModulus, k.getPublicExponent))

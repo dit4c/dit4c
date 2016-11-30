@@ -373,7 +373,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         val instanceId = Random.alphanumeric.take(40).mkString.toLowerCase
         // Start image
         try {
-          val instancePublicKey = Await.result(
+          val instancePublicKeyRing = Await.result(
               runner.start(instanceId, imageId, callbackUrl),
               5.minutes);
           {
@@ -409,7 +409,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
                   } ^^ { h: HttpHeader =>
                     val encodedJwt = h.value.split(" ").last
                     // Token must decode with public key
-                    JwtJson.decode(encodedJwt, instancePublicKey.asJavaPublicKey.get)
+                    JwtJson.decode(encodedJwt, instancePublicKeyRing.getPublicKey.asJavaPublicKey.get)
                   })
                 })
                 .entity(beLike[ResponseEntity] {

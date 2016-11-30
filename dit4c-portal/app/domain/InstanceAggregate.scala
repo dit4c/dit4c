@@ -159,14 +159,14 @@ class InstanceAggregate(
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(AssociatePGPPublicKey(kStr), InstanceData(_, possibleKey, _, _, _)) =>
       val requester = sender
-      parseArmoredPublicKey(kStr).right.flatMap(checkPublicKeyIsSuitable).fold({
+      parseArmoredPublicKeyRing(kStr).right.flatMap(checkInstancePublicKeyRingIsSuitable).fold({
         message =>
           log.error(message)
           stay
       }, {
-        newKey =>
+        newKeyRing =>
           possibleKey match {
-            case Some(existingKey) if newKey.getFingerprint == existingKey.getFingerprint =>
+            case Some(existingKeyRing) if newKeyRing.binary == existingKeyRing.binary =>
               stay // It's the same, so nothing to do
             case _ =>
               stay applying AssociatedPGPPublicKey(kStr) andThen { _ =>
@@ -282,7 +282,7 @@ class InstanceAggregate(
       }
       case AssociatedPGPPublicKey(keyData, _) => currentData match {
         case data: InstanceData =>
-          data.copy(key = Some(parseArmoredPublicKey(keyData).right.get))
+          data.copy(key = Some(parseArmoredPublicKeyRing(keyData).right.get.getPublicKey))
         case _ => unhandled
       }
       case AssociatedUri(uri, _) => currentData match {

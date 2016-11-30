@@ -8,7 +8,7 @@ import java.time.Instant
 import java.security.interfaces.{RSAPublicKey => JavaRSAPublicKey}
 import akka.actor.Props
 import akka.actor.ActorRef
-import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
 import com.google.protobuf.timestamp.Timestamp
 import dit4c.scheduler.domain.instance.DomainEvent
 import Instance.{State, Data}
@@ -26,12 +26,12 @@ object Instance {
 
   object SigningKey {
     import dit4c.common.KeyHelpers._
-    def apply(k: PGPPublicKey): SigningKey = SigningKey(k.armored)
+    def apply(k: PGPPublicKeyRing): SigningKey = SigningKey(k.armored)
   }
   case class SigningKey(armoredPgpPublicKeyBlock: String) {
     import dit4c.common.KeyHelpers._
-    def asPGPPublicKey: PGPPublicKey = {
-      parseArmoredPublicKey(armoredPgpPublicKeyBlock).right.get
+    def asPGPPublicKeyRing: PGPPublicKeyRing = {
+      parseArmoredPublicKeyRing(armoredPgpPublicKeyBlock).right.get
     }
   }
 

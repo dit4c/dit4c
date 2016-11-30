@@ -65,7 +65,7 @@ object ClusterRoutes {
 
   implicit val writesSigningKey: Writes[Instance.SigningKey] =
     Writes { key =>
-      Json.toJson(key.asPGPPublicKey.asRSAPublicKey)
+      Json.toJson(key.asPGPPublicKeyRing.getPublicKey.asRSAPublicKey)
     }
 
   implicit val writesInstanceStatusReport: OWrites[Instance.StatusReport] = (

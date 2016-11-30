@@ -61,8 +61,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
   "KeyHelpers" should {
 
     "produce OpenPGP armoured secret keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
-      val outputKey = pgpKey.`private`.armored
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
+      val outputKey = pgpKeyRing.armored
       val lines = outputKey.lines.toSeq;
       {
         lines must
@@ -78,7 +78,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
             case Some(passphrase) =>
               new BcPBESecretKeyDecryptorBuilder(new BcPGPDigestCalculatorProvider()).build(passphrase.toCharArray)
           })
-          (sk.getKeyID must be_==(pgpKey.getKeyID)) and
+          (sk.getKeyID must be_==(pgpKeyRing.getPublicKey.getKeyID)) and
           (sk.getUserIDs.next must be_==(identity)) and
           (sk.getPublicKey must beLike({ case pubKey =>
             val desiredFlags = {
@@ -91,7 +91,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
             ((sig.getHashedSubPackets.getKeyFlags & desiredFlags) must_==(desiredFlags))
           })) and
           ({
-            val expectedKey = pgpKey.extractPrivateKey(passphrase match {
+            val expectedKey = pgpKeyRing.getSecretKey.extractPrivateKey(passphrase match {
               case None => null
               case Some(passphrase) =>
                 new BcPBESecretKeyDecryptorBuilder(new BcPGPDigestCalculatorProvider()).build(passphrase.toCharArray)
@@ -103,18 +103,18 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
     })
 
     "parse armored public keys" >> prop({ (identity: PGPIdentity, bits: KeyBits) =>
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
-      val outputKey = pgpKey.`public`.armored
-      parseArmoredPublicKey(outputKey) must beRight(beLike[PGPPublicKey] {
-        case parsedKey =>
-          parsedKey.getFingerprint must_==(pgpKey.getPublicKey.getFingerprint)
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val outputKeyBlock = pgpKeyRing.toPublicKeyRing.armored
+      parseArmoredPublicKeyRing(outputKeyBlock) must beRight(beLike[PGPPublicKeyRing] {
+        case parsedKeyRing =>
+          parsedKeyRing.getPublicKey.getFingerprint must_==(pgpKeyRing.getPublicKey.getFingerprint)
       })
     })
 
     "produce PCKS#1 keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
       import sys.process._
-      val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
-      val is = new ByteArrayInputStream(pgpKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
+      val is = new ByteArrayInputStream(pgpKeyRing.getSecretKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
       val os = new ByteArrayOutputStream()
       def sendToOs(in: InputStream) = Iterator.continually(in.read).takeWhile(_>=0).foreach(os.write)
       val processIO = new ProcessIO(_ => (), sendToOs, sendToOs, true)
@@ -155,9 +155,9 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
        prop({ (identity: PGPIdentity, bits: KeyBits) =>
         val tmpKeyring = File.createTempFile("keyring", ".kbx")
         tmpKeyring.deleteOnExit()
-        val pgpKey = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
-        val generatedString = pgpKey.getPublicKey.asOpenSSH
-        val armoredPublicKey = pgpKey.`public`.armored;
+        val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+        val generatedString = pgpKeyRing.getPublicKey.asOpenSSH
+        val armoredPublicKey = pgpKeyRing.getSecretKey.`public`.armored;
         val gpgSshKey = {
           import sys.process._
           val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
