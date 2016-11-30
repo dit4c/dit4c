@@ -45,7 +45,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ScalaCheck with FileMatchers {
 
-  implicit val params = Parameters(minTestsOk = 1000, workers = 20)
+  implicit val params = Parameters(minTestsOk = 100, workers = 20)
 
   val keyPairs: Seq[KeyPair] = generateRsaKeyPairs(5)
   def publicKeys = keyPairs.map(_.getPublic)
@@ -136,6 +136,7 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
   val (server, hostPublicKey): (SshServer, PublicKey) = {
     val server = SshServer.setUpDefaultServer()
     server.setHost("127.42.7.5") // On loopback, but not localhost
+    server.setPort(0) // Random port
     val (keyPairProvider, publicKey) = generateKeyPairProvider
     server.setKeyPairProvider(keyPairProvider)
     server.setPublickeyAuthenticator(
