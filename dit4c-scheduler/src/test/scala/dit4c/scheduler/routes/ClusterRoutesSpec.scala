@@ -173,7 +173,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
           import RktClusterManager.ConfirmRktNodeKeys
           def receive = {
             case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(nodeId)) =>
-              sender ! RktNode.Exists(response)
+              sender ! RktNode.ConfirmKeysResponse(response)
           }
         }
         Put(path) ~> routes(testActor) ~> check {
@@ -198,7 +198,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
                       imageName,
                       None,
                       portalUri.toString,
-                      Some(Instance.SigningKey(instanceKey))))
+                      Some(Instance.InstanceKeys(instanceKey))))
           }
         }
         Get(path) ~> routes(testActor) ~> check {
