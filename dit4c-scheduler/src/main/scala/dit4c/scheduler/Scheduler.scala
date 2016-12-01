@@ -22,6 +22,7 @@ import akka.pattern.BackoffSupervisor
 import akka.pattern.Backoff
 import akka.event.LoggingReceive
 import dit4c.scheduler.domain.Instance
+import dit4c.scheduler.service.KeyManager
 
 object Scheduler {
 
@@ -65,13 +66,18 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
           childName = "portal-message-bridge",
           minBackoff = 500.milliseconds,
           maxBackoff = 15.seconds,
-          randomFactor = 0.1)
-      ),"pmb-supervisor")
+          randomFactor = 0.1)))
+    val keyManager = context.actorOf(
+        KeyManager.props(config.armoredPgpKeys.get), "key-manager")
     // TODO: remove need for this kludge
     context.system.eventStream.subscribe(self, classOf[Instance.StatusReport])
   }
 
   override def receive = LoggingReceive {
+    case msg: KeyManager.Command =>
+      context.child("key-manager").foreach { child =>
+        child.forward(msg)
+      }
     case msg if Some(sender) == context.child("cluster-aggregate-manager") =>
       context.child("pmb-supervisor").foreach { child =>
         child.forward(msg)

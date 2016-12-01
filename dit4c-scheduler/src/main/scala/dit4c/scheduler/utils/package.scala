@@ -3,6 +3,7 @@ package dit4c.scheduler
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import scopt.OptionParser
+import java.io.File
 
 package object utils {
 
@@ -29,6 +30,7 @@ package object utils {
 
   case class SchedulerConfig(
       val name: String,
+      val armoredPgpKeys: Option[String],
       val port: Int = 8080,
       val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",
@@ -37,11 +39,26 @@ package object utils {
   class SchedulerConfigParser(app: AppMetadata)
       extends OptionParser[SchedulerConfig](app.name) {
     def parse(args: Seq[String]): Option[SchedulerConfig] =
-      parse(args, SchedulerConfig(app.name))
+      parse(args, SchedulerConfig(app.name, None))
 
     head(app.name, app.version)
     help("help").text("prints this usage text")
     version("version").abbr("V").text("show version")
+
+    opt[File]('k', "keys")
+      .required
+      .action { (f, c) =>
+        import scala.sys.process._
+        c.copy(armoredPgpKeys = Some(getFileContents(f)))
+      }
+      .validate {
+        case f: File if f.exists() =>
+          import dit4c.common.KeyHelpers.parseArmoredSecretKeyRing
+          // Output error message from function, or else accept
+          parseArmoredSecretKeyRing(getFileContents(f))
+            .right.map(_ => ())
+      }
+      .text("OpenPGP secret keys used authentication")
 
     opt[Int]('p', "port")
       .action { (x, c) => c.copy(port = x) }
@@ -62,6 +79,11 @@ package object utils {
     opt[String]("listener-image")
       .action { (x, c) => c.copy(listenerImage = x) }
       .text("image to use as pod listener")
+
+    private def getFileContents(f: File) = {
+      import scala.sys.process._
+      f.cat.!!
+    }
   }
 
 }
