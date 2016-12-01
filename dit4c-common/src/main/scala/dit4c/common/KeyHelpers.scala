@@ -37,6 +37,9 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import java.security.Key
 import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRing
 import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRing
+import java.io.InputStream
+import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRingCollection
+import java.io.StringWriter
 
 object KeyHelpers {
 
@@ -89,28 +92,35 @@ object KeyHelpers {
     }
   }
 
-  def parseArmoredPublicKeyRing(s: String): Either[String, PGPPublicKeyRing] = {
+  def parseArmoredKeyRing[A <: PGPKeyRing](
+      gen: InputStream => List[A])(s: String): Either[String, A] = {
     import scala.collection.JavaConversions._
-    val pgpPubKeyCol: Either[String, PGPPublicKeyRingCollection] = {
-      val in = new ByteArrayInputStream(s.getBytes)
-      try {
-        val is = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(in)
-        Right(new JcaPGPPublicKeyRingCollection(is))
-      } catch {
-        case e: Throwable => Left("Unable to parse key")
-      } finally {
-        in.close
-      }
-    }
-    pgpPubKeyCol
-      // Flatten key ring collection into list of keys
-      .right.map(_.getKeyRings.toList)
-      .right.flatMap {
+    val in = new ByteArrayInputStream(s.getBytes)
+    try {
+      val is = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(in)
+      gen(is) match {
         case Nil => Left("No keys in specified data")
-        case Seq(key) => Right(key)
+        case key :: Nil => Right(key)
         case xs => Left(s"Data should have contained a single master key, but contained ${xs.length}")
       }
+    } catch {
+      case e: Throwable => Left(s"Unable to parse key: ${e.getMessage}")
+    } finally {
+      in.close
+    }
   }
+
+  def parseArmoredSecretKeyRing(s: String): Either[String, PGPSecretKeyRing] =
+    parseArmoredKeyRing[PGPSecretKeyRing]({ is: InputStream =>
+      import scala.collection.JavaConversions._
+      (new BcPGPSecretKeyRingCollection(is)).getKeyRings.toList
+    })(s)
+
+  def parseArmoredPublicKeyRing(s: String): Either[String, PGPPublicKeyRing] =
+    parseArmoredKeyRing[PGPPublicKeyRing]({ is: InputStream =>
+      import scala.collection.JavaConversions._
+      (new JcaPGPPublicKeyRingCollection(is)).getKeyRings.toList
+    })(s)
 
   def parsePkcs8PemPrivateKey(s: String): Either[String, PrivateKey] =
     parsePkcs8PemKey(s).right.flatMap {
@@ -328,6 +338,42 @@ object KeyHelpers {
 
     protected def base64Url(bi: BigInt): String =
       JwtBase64.encodeString(bi.toByteArray)
+  }
+
+  implicit class PGPSecretKeyOpenSSHHelper(secretKey: PGPSecretKey) {
+    def asOpenSSH: Option[String] = {
+      val sk = secretKey.extractPrivateKey(null).getPrivateKeyDataPacket
+      val pk = secretKey.getPublicKey.getPublicKeyPacket.getKey
+      Some((sk, pk))
+        .collect {
+          case (sk: RSASecretBCPGKey, pk: RSAPublicBCPGKey) =>
+            import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
+            import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+            import org.bouncycastle.asn1.pkcs.{ RSAPrivateKey => ASN1RSAPrivateKey }
+            import org.bouncycastle.asn1.x509.AlgorithmIdentifier
+            import org.bouncycastle.openssl.MiscPEMGenerator
+            import org.bouncycastle.openssl.jcajce.JcaPEMWriter
+            val asn1Key: ASN1RSAPrivateKey =
+              new ASN1RSAPrivateKey(
+                  sk.getModulus,
+                  pk.getPublicExponent,
+                  sk.getPrivateExponent,
+                  sk.getPrimeP,
+                  sk.getPrimeQ,
+                  sk.getPrimeExponentP,
+                  sk.getPrimeExponentQ,
+                  sk.getCrtCoefficient)
+            val keyInfo = new PrivateKeyInfo(
+              new AlgorithmIdentifier(PKCSObjectIdentifiers.rsaEncryption),
+              asn1Key)
+            val writer = new StringWriter()
+            val pemWriter = new JcaPEMWriter(writer)
+            pemWriter.writeObject(new MiscPEMGenerator(keyInfo))
+            pemWriter.close
+            writer.close
+            writer.toString
+        }
+    }
   }
 
   implicit class PGPPublicKeyOpenSSHHelper(publicKey: PGPPublicKey) {
