@@ -21,6 +21,7 @@ GET     /assets/*file                       controllers.Assets.versioned(path="/
 GET     /web-components/:name.html          controllers.WebComponentsController.component(name)
 
 # Websocket messaging
+POST    /messaging/scheduler                controllers.MessagingController.schedulerRegistration
 GET     /messaging/scheduler/:id            controllers.MessagingController.schedulerSocket(id)
 
 # As documented at:

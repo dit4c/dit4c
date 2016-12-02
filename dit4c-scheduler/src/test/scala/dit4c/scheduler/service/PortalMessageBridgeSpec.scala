@@ -21,6 +21,17 @@ import akka.http.scaladsl.model.Uri
 import org.specs2.scalacheck.Parameters
 import dit4c.scheduler.domain.Instance
 import dit4c.protobuf.scheduler.outbound.OutboundMessage
+import akka.http.scaladsl.model.StatusCodes
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import akka.http.scaladsl.model.headers.HttpCookiePair
+import akka.http.scaladsl.model.headers.HttpCookie
+import akka.http.scaladsl.server.directives.Credentials
+import pdi.jwt.JwtJson
+import pdi.jwt.algorithms.JwtAsymetricAlgorithm
+import scala.util.Try
+import java.security.interfaces.RSAPrivateKey
+import pdi.jwt.JwtAlgorithm
+import play.api.libs.json.Json
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -156,9 +167,19 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
   def randomInstanceId = Random.alphanumeric.take(20).mkString
 
   def newWithProbes[A](f: (WSProbe, TestProbe, ActorRef) => A): A = {
+    import dit4c.common.KeyHelpers._
     val parentProbe = TestProbe()
+    val keyManagerProbe = TestProbe()
     val wsProbe = WSProbe()
     val closePromise = Promise[Unit]()
+    val secretKeyRing =
+      parseArmoredSecretKeyRing({
+        import scala.sys.process._
+        this.getClass.getResource("unit_test_scheduler_keys.asc").cat.!!
+      }).right.get
+    val publicKeyInfo = KeyManager.PublicKeyInfo(
+        "28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94",
+        secretKeyRing.toPublicKeyRing.armored)
     val route = Route.seal {
       // Source which never emits an element, and terminates on closePromise success
       val closeSource = Source.maybe[Message]
@@ -166,15 +187,71 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
       import akka.http.scaladsl.server.Directives._
       logRequest("websocket-server") {
         path("ws") {
-          handleWebSocketMessages(wsProbe.flow.merge(closeSource, true))
+          post {
+            fileUpload("keys") {
+              case (metadata, byteSource) =>
+                val f = byteSource.runFold(ByteString.empty)(_ ++ _)
+                  .map(_.decodeString("utf8"))
+                  .map(parseArmoredPublicKeyRing)
+                onSuccess(f) {
+                  case Right(pkr: PGPPublicKeyRing) =>
+                    val fingerprint = pkr.getPublicKey.fingerprint
+                    val nonce = Random.alphanumeric.take(20).mkString
+                    val wrappedKeys = JwtJson.encode(
+                        Json.obj("keys" -> pkr.armored))
+                    val cookie = HttpCookie.fromPair(HttpCookiePair("keys", wrappedKeys))
+                    setCookie(cookie) {
+                      redirect(s"/ws/$fingerprint", StatusCodes.SeeOther)
+                    }
+                  case Left(msg) =>
+                    complete(StatusCodes.BadRequest, msg)
+                }
+            }
+          }
+        } ~
+        path("ws" / publicKeyInfo.keyFingerprint) {
+          cookie("keys") { cookiePair =>
+            authenticateOAuth2[String]("", {
+              case Credentials.Missing => None
+              case Credentials.Provided(token) =>
+                val claim = Json.parse(JwtJson.decode(cookiePair.value).get.content)
+                val keys = claim.\("keys").as[String]
+                val pkr = parseArmoredPublicKeyRing(keys).right.get
+                pkr.authenticationKeys.view
+                  .flatMap(k => k.asJavaPublicKey.map((k.fingerprint, _)))
+                  .flatMap { case (fingerprint, key) =>
+                    JwtJson.decode(token, key).toOption.map(_ => fingerprint)
+                  }
+                  .headOption
+            }) { authenticationKeyId =>
+              handleWebSocketMessages(wsProbe.flow.merge(closeSource, true))
+            }
+          }
         }
       }
     }
     val binding = Await.result(Http().bindAndHandle(Route.handlerFlow(route), "localhost", 0), 2.seconds)
     try {
-      val msgBridgeRef = parentProbe.childActorOf(Props(classOf[PortalMessageBridge],
-        s"ws://localhost:${binding.localAddress.getPort}/ws"),
-        "portal-message-bridge")
+      val msgBridgeRef = parentProbe.childActorOf(
+          Props(classOf[PortalMessageBridge],
+            keyManagerProbe.ref,
+            s"http://localhost:${binding.localAddress.getPort}/ws"),
+          "portal-message-bridge")
+      keyManagerProbe.expectMsg(KeyManager.GetPublicKeyInfo)
+      keyManagerProbe.reply(publicKeyInfo)
+      val claim = keyManagerProbe.expectMsgType[KeyManager.SignJwtClaim].claim
+      val tokens =
+        secretKeyRing.authenticationKeys
+          .flatMap { pk =>
+            Try(secretKeyRing.getSecretKey(pk.getFingerprint)).toOption
+          }
+          .flatMap(_.asJavaPrivateKey)
+          .map {
+            case k: RSAPrivateKey =>
+              JwtJson.encode(claim, k, JwtAlgorithm.RS512)
+          }
+      keyManagerProbe.reply(KeyManager.SignedJwtTokens(tokens))
+      // Run block
       f(wsProbe, parentProbe, msgBridgeRef)
     } finally {
       closePromise.success(()) // Close websocket server-side if still open

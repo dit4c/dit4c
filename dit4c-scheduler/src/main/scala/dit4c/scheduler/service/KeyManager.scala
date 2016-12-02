@@ -6,6 +6,12 @@ import org.bouncycastle.openpgp.PGPSecretKeyRing
 import dit4c.common.KeyHelpers._
 import dit4c.scheduler.domain.{BaseCommand, BaseResponse}
 import org.bouncycastle.openpgp.{PGPSecretKey, PGPPublicKey}
+import scala.util.Try
+import pdi.jwt.JwtClaim
+import java.security.PrivateKey
+import pdi.jwt.JwtJson
+import pdi.jwt.JwtAlgorithm
+import java.security.interfaces.RSAPrivateKey
 
 object KeyManager {
 
@@ -24,17 +30,19 @@ object KeyManager {
   trait Command extends BaseCommand
   case object GetPublicKeyInfo extends Command
   case object GetOpenSshKeyPairs extends Command
+  case class SignJwtClaim(claim: JwtClaim) extends Command
 
   trait Response extends BaseResponse
+
   trait GetPublicKeyInfoResponse extends Response
   case class PublicKeyInfo(
       keyFingerprint: String,
       armoredPgpPublicKeyBlock: String) extends GetPublicKeyInfoResponse
+  trait SignJwtClaimResponse extends Response
+  case class SignedJwtTokens(tokens: List[String]) extends SignJwtClaimResponse
   trait GetOpenSshKeyPairsResponse extends Response
   case class OpenSshKeyPairs(
       pairs: List[OpenSshKeyPair]) extends GetOpenSshKeyPairsResponse
-
-
 
 }
 
@@ -48,26 +56,31 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor {
     case cmd: Command => cmd match {
       case GetPublicKeyInfo =>
         sender ! PublicKeyInfo(
-            keyring.getPublicKey.getFingerprint.map(v => f"$v%02X").mkString,
+            keyring.getPublicKey.fingerprint,
             keyring.toPublicKeyRing.armored)
       case GetOpenSshKeyPairs =>
         sender ! OpenSshKeyPairs(openSshKeyPairs)
-
+      case SignJwtClaim(claim) =>
+        sender ! SignedJwtTokens(sign(claim))
     }
   }
 
-  def authenticationKeys: List[PGPSecretKey] =
-    keyring.getSecretKeys
-      .filter { sk =>
-        import org.bouncycastle.openpgp.PGPKeyFlags._
-        hasKeyFlags(sk.getPublicKey)(CAN_AUTHENTICATE)
+  def authenticationSecretKeys: List[PGPSecretKey] =
+    keyring.authenticationKeys
+      .flatMap { pk =>
+        Try(keyring.getSecretKey(pk.getFingerprint)).toOption
       }
-      .toList
-      .sortBy(_.getPublicKey.getCreationTime)
-      .reverse
+
+  def sign(claim: JwtClaim): List[String] =
+    authenticationSecretKeys
+      .flatMap(_.asJavaPrivateKey)
+      .map {
+        case k: RSAPrivateKey =>
+          JwtJson.encode(claim, k, JwtAlgorithm.RS512)
+      }
 
   def openSshKeyPairs: List[OpenSshKeyPair] =
-    authenticationKeys
+    authenticationSecretKeys
       .flatMap { sk =>
         for {
           priv <- sk.asOpenSSH

@@ -19,6 +19,25 @@ import dit4c.scheduler.domain.Instance
 import java.time.Instant
 import scala.util.Random
 import dit4c.common.KryoSerializable
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.HttpMethods
+import akka.http.scaladsl.model.Multipart
+import akka.http.scaladsl.model.ContentTypes
+import akka.http.scaladsl.model.ContentType
+import akka.http.scaladsl.model.MediaType
+import akka.http.scaladsl.model.HttpCharsets
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.RequestEntity
+import akka.http.scaladsl.marshalling.Marshal
+import akka.util.Timeout
+import scala.concurrent.duration._
+import akka.http.scaladsl.model.HttpResponse
+import pdi.jwt.JwtClaim
+import akka.http.scaladsl.model.headers.Authorization
+import akka.http.scaladsl.model.headers.Cookie
+import akka.http.scaladsl.model.headers.`Set-Cookie`
+import akka.http.scaladsl.model.headers.OAuth2BearerToken
+import akka.http.scaladsl.model.HttpHeader
 
 object PortalMessageBridge {
   case object BridgeClosed extends KryoSerializable
@@ -68,13 +87,13 @@ object PortalMessageBridge {
   }
 }
 
-class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging {
+class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
+    extends Actor with ActorLogging with Stash {
 
   implicit val materializer = ActorMaterializer()
   var outboundSource: Source[Message, ActorRef] = null
   var inboundSink: Sink[Message, NotUsed] = null
   var inbound: ActorRef = null
-  var outbound: ActorRef = null
 
   // Everything is so closely linked that a child failure means we should shut everything down
   override val supervisorStrategy = AllForOneStrategy() {
@@ -82,19 +101,81 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
   }
 
   override def preStart {
+    import context.dispatcher
+    import akka.pattern.ask
+    implicit val timeout = Timeout(5.seconds)
     inbound = context.watch(context.actorOf(Props[PortalMessageBridge.UnmarshallingActor], "unmarshaller"))
     inboundSink = Sink.actorRef(inbound, PortalMessageBridge.BridgeClosed)
 
     outboundSource = Source.actorRef(16, OverflowStrategy.fail)
     def outboundActorRefExtractor(nu: NotUsed, ref: ActorRef) = ref
-    outbound = Http()(context.system).singleWebSocketRequest(
-        WebSocketRequest.fromTargetUri(websocketUrl),
-        Flow.fromSinkAndSourceMat(
-            inboundSink, outboundSource)(outboundActorRefExtractor))._2
-    context.watch(outbound)
+    val setup = for {
+      armoredPgpPublicKeyRing <- (keyManager ? KeyManager.GetPublicKeyInfo).collect {
+        case KeyManager.PublicKeyInfo(fingerprint, keyBlock) =>
+          keyBlock
+      }
+      payload <- {
+        val formData = Multipart.FormData(Multipart.FormData.BodyPart.Strict(
+            "keys",
+            HttpEntity(
+                MediaType.applicationWithFixedCharset("pgp-keys", HttpCharsets.`UTF-8`).toContentType,
+                armoredPgpPublicKeyRing),
+            Map("filename" -> "keys.asc")))
+        Marshal(formData).to[RequestEntity]
+      }
+      (redirectUri, cookies) <- Http()(context.system).singleRequest(
+        HttpRequest(
+            method=HttpMethods.POST,
+            registrationUrl,
+            entity=payload)
+        )
+        .collect {
+          case r: HttpResponse if r.status.isRedirection => r
+        }
+        .map { r =>
+          (
+            Uri(r.getHeader("Location").get.value)
+              .resolvedAgainst(registrationUrl),
+            r.headers.toList.collect {
+              case `Set-Cookie`(cookie) => cookie
+            }
+          )
+        }
+      authClaim = JwtClaim(expiration=Some(Instant.now.getEpochSecond+120))
+      authToken <- (keyManager ? KeyManager.SignJwtClaim(authClaim)).collect {
+        case KeyManager.SignedJwtTokens(token :: others) => token
+      }
+      websocketUri = redirectUri.copy(scheme = redirectUri.scheme match {
+        case "http" => "ws"
+        case "https" => "wss"
+      })
+    } yield {
+      val outbound = Http()(context.system).singleWebSocketRequest(
+          WebSocketRequest.fromTargetUri(websocketUri)
+            .copy(extraHeaders=
+              Authorization(OAuth2BearerToken(authToken)) ::
+              cookies.map(c => Cookie(c.pair))
+            ),
+          Flow.fromSinkAndSourceMat(
+              inboundSink, outboundSource)(outboundActorRefExtractor))._2
+      self ! outbound
+    }
+    setup.recover({
+      case e =>
+        log.error(e, "Setup failed")
+        context.stop(self)
+    })
   }
 
-  val receive: Receive = LoggingReceive {
+  val receive: Receive = {
+    case outbound: ActorRef if sender == self =>
+      unstashAll()
+      context.become(running(outbound))
+      context.watch(outbound)
+    case msg => stash()
+  }
+
+  def running(outbound: ActorRef) = LoggingReceive {
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
@@ -198,12 +279,12 @@ class PortalMessageBridge(websocketUrl: String) extends Actor with ActorLogging 
     com.google.protobuf.timestamp.Timestamp(t.getEpochSecond, t.getNano)
 
   protected lazy val portalUri: String = {
-    val scheme = Uri(websocketUrl).scheme match {
+    val scheme = Uri(registrationUrl).scheme match {
       case "ws" => "http"
       case "wss" => "https"
       case other => other
     }
-    Uri(websocketUrl).copy(scheme = scheme, path = Uri.Path.Empty, rawQueryString = None, fragment = None).toString
+    Uri(registrationUrl).copy(scheme = scheme, path = Uri.Path.Empty, rawQueryString = None, fragment = None).toString
   }
 
 }

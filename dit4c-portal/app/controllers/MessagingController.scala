@@ -28,6 +28,9 @@ import akka.util.ByteString
 import java.time.Instant
 import akka.actor.Cancellable
 import akka.remote.Ack
+import play.api.mvc.Action
+import akka.http.scaladsl.model.StatusCodes.ServerError
+import domain.SchedulerAggregate.UpdateKeys
 
 class MessagingController(
     environment: Environment,
@@ -37,17 +40,55 @@ class MessagingController(
 
   implicit val timeout = Timeout(5.seconds)
 
+  def schedulerRegistration = Action.async(parse.multipartFormData) { request =>
+    request.body.file("keys") match {
+      case None =>
+        Future.successful(BadRequest("\"keys\" missing from form data"))
+      case Some(keys) if (keys.ref.file.length > (10L*1024*1024)) =>
+        Future.successful(InternalServerError(
+            "Key blocks larger than 10MiB are not supported"))
+      case Some(keys) =>
+        import dit4c.common.KeyHelpers._
+        import scala.sys.process._
+        val keyContent = keys.ref.file.cat.!!
+        parseArmoredPublicKeyRing(keyContent) match {
+          case Left(msg) =>
+            Future.successful(InternalServerError(msg))
+          case Right(pkr) =>
+            val id = pkr.getPublicKey.fingerprint
+            val cmd = SchedulerSharder.Envelope(
+                id, SchedulerAggregate.UpdateKeys(keyContent))
+            (schedulerSharder ? cmd).map {
+              case SchedulerAggregate.KeysUpdated =>
+                Redirect(routes.MessagingController.schedulerSocket(id))
+              case SchedulerAggregate.KeysRejected(msg) =>
+                Forbidden(msg)
+            }
+        }
+    }
+  }
+
   def schedulerSocket(schedulerId: String) = WebSocket { request: RequestHeader =>
     val wsSessionId = randomId
     val gateway = system.actorOf(
         Props(classOf[SchedulerGatewayActor], schedulerId, schedulerSharder),
         s"scheduler-gateway-$schedulerId-$wsSessionId")
-    (gateway ? SchedulerAggregate.VerifyJwt(dummyJwt)).flatMap {
-      case SchedulerAggregate.ValidJwt =>
-        (gateway ? SchedulerGatewayActor.Connect).map(v => Right(v.asInstanceOf[Flow[Message,Message,_]]))
-      case SchedulerAggregate.InvalidJwt(msg) =>
-        gateway ! SchedulerGatewayActor.Done
-        Future.successful(Left(Forbidden(msg)))
+    val authHeaderRegex = "^Bearer (.*)$".r
+    request.headers.get("Authorization").collectFirst {
+      case authHeaderRegex(token) => token
+    } match {
+      case Some(token) =>
+        (gateway ? SchedulerAggregate.VerifyJwt(token)).flatMap {
+          case SchedulerAggregate.ValidJwt =>
+            (gateway ? SchedulerGatewayActor.Connect).map { v =>
+              Right(v.asInstanceOf[Flow[Message,Message,_]])
+            }
+          case SchedulerAggregate.InvalidJwt(msg) =>
+            gateway ! SchedulerGatewayActor.Done
+            Future.successful(Left(Forbidden(msg)))
+        }
+      case None =>
+        Future.successful(Left(Forbidden("Missing auth token")))
     }
   }
 

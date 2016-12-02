@@ -36,7 +36,7 @@ object Scheduler {
 
     def apply(): Future[Unit] = {
       import system.dispatcher
-      system.actorOf(Props(classOf[Scheduler], config))
+      system.actorOf(Props(classOf[Scheduler], config), "scheduler")
       system.whenTerminated.map(_ => ())
     }
 
@@ -60,15 +60,17 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
       serverBinding = Some(sb)
       log.info(s"Listening on ${sb.localAddress}")
     }
+    val keyManager = context.actorOf(
+        KeyManager.props(config.armoredPgpKeys.get),
+        "key-manager")
     val pmbSupervisor = context.actorOf(BackoffSupervisor.props(
         Backoff.onStop(
-          Props(classOf[PortalMessageBridge], config.portalUri),
+          Props(classOf[PortalMessageBridge], keyManager, config.portalUri),
           childName = "portal-message-bridge",
           minBackoff = 500.milliseconds,
           maxBackoff = 15.seconds,
-          randomFactor = 0.1)))
-    val keyManager = context.actorOf(
-        KeyManager.props(config.armoredPgpKeys.get), "key-manager")
+          randomFactor = 0.1)),
+        "pmb-supervisor")
     // TODO: remove need for this kludge
     context.system.eventStream.subscribe(self, classOf[Instance.StatusReport])
   }

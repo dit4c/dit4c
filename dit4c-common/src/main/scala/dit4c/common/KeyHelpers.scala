@@ -312,6 +312,29 @@ object KeyHelpers {
     }
   }
 
+  implicit class PGPKeyRingSubKeyHelper(keyring: PGPKeyRing) {
+    import scala.collection.JavaConversions._
+    import org.bouncycastle.openpgp.PGPKeyFlags._
+
+    def authenticationKeys: List[PGPPublicKey] =
+      publicKeys
+        .filter(hasKeyFlags(CAN_AUTHENTICATE))
+        .sortBy(_.getCreationTime)
+        .reverse
+
+    def publicKeys: List[PGPPublicKey] =
+      keyring.getPublicKeys.collect {
+        case pk: PGPPublicKey => pk
+      }
+      .toList
+
+    protected def hasKeyFlags(flags: Int)(pk: PGPPublicKey): Boolean = {
+      val selfSignature = pk.getSignaturesForKeyID(
+          keyring.getPublicKey.getKeyID).toList.head
+      (selfSignature.getHashedSubPackets.getKeyFlags & flags) == flags
+    }
+  }
+
   implicit class PGPKeyRingHelper(kr: PGPKeyRing) extends OpenPgpData {
     override def encodeToStream(os: OutputStream) = kr.encode(os)
   }
@@ -340,19 +363,32 @@ object KeyHelpers {
       JwtBase64.encodeString(bi.toByteArray)
   }
 
-  implicit class PGPSecretKeyOpenSSHHelper(secretKey: PGPSecretKey) {
-    def asOpenSSH: Option[String] = {
+  implicit class PGPSecretKeyConversionHelper(secretKey: PGPSecretKey) {
+    def asOpenSSH: Option[String] =
+      toPrivateKeyInfo.map { keyInfo =>
+        import org.bouncycastle.openssl.MiscPEMGenerator
+        import org.bouncycastle.openssl.jcajce.JcaPEMWriter
+        val writer = new StringWriter()
+        val pemWriter = new JcaPEMWriter(writer)
+        pemWriter.writeObject(new MiscPEMGenerator(keyInfo))
+        pemWriter.close
+        writer.close
+        writer.toString
+      }
+
+    def asJavaPrivateKey: Option[PrivateKey] =
+      toPrivateKeyInfo.map(new JcaPEMKeyConverter().getPrivateKey(_))
+
+    protected def toPrivateKeyInfo: Option[PrivateKeyInfo] = {
       val sk = secretKey.extractPrivateKey(null).getPrivateKeyDataPacket
       val pk = secretKey.getPublicKey.getPublicKeyPacket.getKey
       Some((sk, pk))
-        .collect {
+        .collect[PrivateKeyInfo] {
           case (sk: RSASecretBCPGKey, pk: RSAPublicBCPGKey) =>
             import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
             import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
             import org.bouncycastle.asn1.pkcs.{ RSAPrivateKey => ASN1RSAPrivateKey }
             import org.bouncycastle.asn1.x509.AlgorithmIdentifier
-            import org.bouncycastle.openssl.MiscPEMGenerator
-            import org.bouncycastle.openssl.jcajce.JcaPEMWriter
             val asn1Key: ASN1RSAPrivateKey =
               new ASN1RSAPrivateKey(
                   sk.getModulus,
@@ -363,17 +399,16 @@ object KeyHelpers {
                   sk.getPrimeExponentP,
                   sk.getPrimeExponentQ,
                   sk.getCrtCoefficient)
-            val keyInfo = new PrivateKeyInfo(
+            new PrivateKeyInfo(
               new AlgorithmIdentifier(PKCSObjectIdentifiers.rsaEncryption),
               asn1Key)
-            val writer = new StringWriter()
-            val pemWriter = new JcaPEMWriter(writer)
-            pemWriter.writeObject(new MiscPEMGenerator(keyInfo))
-            pemWriter.close
-            writer.close
-            writer.toString
         }
     }
+
+  }
+
+  implicit class PGPPublicKeyFingerprintHelper(publicKey: PGPPublicKey) {
+    def fingerprint = publicKey.getFingerprint.map(v => f"$v%02X").mkString
   }
 
   implicit class PGPPublicKeyOpenSSHHelper(publicKey: PGPPublicKey) {
