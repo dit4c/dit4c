@@ -18,6 +18,8 @@ import domain.scheduler.DomainEvent
 import scala.util.Success
 import scala.util.Failure
 import java.security.PublicKey
+import akka.actor.Actor
+import akka.actor.Props
 
 object SchedulerAggregate {
 
@@ -32,6 +34,7 @@ object SchedulerAggregate {
   case class SchedulerInfo(keyBlock: Option[String]) extends Data
 
   sealed trait Command extends BaseCommand
+  case class ClusterEnvelope(clusterId: String, payload: Any) extends Command
   case object Create extends Command
   case class VerifyJwt(token: String) extends Command
   case class RegisterSocket(socketActor: ActorRef) extends Command
@@ -54,7 +57,8 @@ object SchedulerAggregate {
 
 }
 
-class SchedulerAggregate()
+class SchedulerAggregate(
+    imageServerConfig: ImageServerConfig)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -64,6 +68,11 @@ class SchedulerAggregate()
 
   lazy val schedulerId = self.path.name
   override lazy val persistenceId: String = "Scheduler-" + self.path.name
+
+  lazy val clusterManager: ActorRef =
+    context.actorOf(
+        Props(classOf[ClusterManager], imageServerConfig),
+        "clusters")
 
   var schedulerSocket: Option[ActorRef] = None
 
@@ -82,6 +91,9 @@ class SchedulerAggregate()
   }
 
   when(Active) {
+    case Event(msg: ClusterEnvelope, _) =>
+      clusterManager forward msg
+      stay
     case Event(UpdateKeys(keyBlock), SchedulerInfo(possibleKeyBlock)) =>
       import dit4c.common.KeyHelpers._
       parseArmoredPublicKeyRing(keyBlock) match {
@@ -180,5 +192,6 @@ class SchedulerAggregate()
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
+
 
 }

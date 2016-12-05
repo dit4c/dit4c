@@ -5,15 +5,25 @@ import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ClusterShardingSettings
 import domain.SchedulerAggregate
+import domain.ImageServerConfig
 
 object SchedulerSharder {
 
   final case class Envelope(id: String, payload: Any)
 
-  def apply()(implicit system: ActorSystem): ActorRef = {
+  object ClusterEnvelope {
+    def apply(joinedSchedulerClusterId: String, payload: Any) =
+      joinedSchedulerClusterId match {
+        case jsciRegex(schedulerId, clusterId) =>
+          Envelope(schedulerId, SchedulerAggregate.ClusterEnvelope(clusterId, payload))
+      }
+    protected val jsciRegex = """^(.*)\.(.*)$""".r
+  }
+
+  def apply(imageServerConfig: ImageServerConfig)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "SchedulerAggregate",
-        entityProps = Props[SchedulerAggregate],
+        entityProps = Props(classOf[SchedulerAggregate], imageServerConfig),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)

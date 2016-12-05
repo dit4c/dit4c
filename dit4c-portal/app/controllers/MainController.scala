@@ -366,7 +366,7 @@ class MainController(
   private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 
   private val clusterLookup = Map(
-    "Default" -> "default"
+    "Default" -> "28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94.default"
   )
 
   implicit private val readsInstanceRegistration: Reads[InstanceRegistrationRequest] =

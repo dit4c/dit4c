@@ -8,7 +8,7 @@ import domain.instance.DomainEvent
 import scala.concurrent.duration._
 import scala.reflect._
 import com.softwaremill.tagging._
-import services.ClusterSharder
+import services.SchedulerSharder
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes
 import akka.pattern.{ask, pipe}
@@ -87,7 +87,7 @@ object InstanceAggregate {
 }
 
 class InstanceAggregate(
-    clusterSharder: ActorRef @@ ClusterSharder.type)
+    schedulerSharder: ActorRef @@ SchedulerSharder.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -116,9 +116,9 @@ class InstanceAggregate(
       val requester = sender
       goto(Started).applying(StartedInstance(clusterId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
-        (clusterSharder ? ClusterSharder.Envelope(
+        (schedulerSharder ? SchedulerSharder.ClusterEnvelope(
               clusterId,
-              ClusterAggregate.StartInstance(instanceId, image))).map {
+              Cluster.StartInstance(instanceId, image))).map {
             case SchedulerAggregate.Ack =>
               Started(instanceId)
           }.pipeTo(requester)
@@ -133,7 +133,7 @@ class InstanceAggregate(
           "get-status-request-"+Random.alphanumeric.take(10).mkString)
       // Forward request to cluster
       context.system.eventStream.publish(
-          ClusterSharder.Envelope(clusterId, ClusterAggregate.GetInstanceStatus(instanceId)))
+          SchedulerSharder.ClusterEnvelope(clusterId, Cluster.GetInstanceStatus(instanceId)))
       stay
     case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(clusterId, _, uri, imageUrl, ts)) =>
       // Tell any listening actors
@@ -143,7 +143,7 @@ class InstanceAggregate(
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
-          clusterSharder ! ClusterSharder.Envelope(clusterId, ClusterAggregate.ConfirmInstanceUpload(instanceId))
+          schedulerSharder ! SchedulerSharder.ClusterEnvelope(clusterId, Cluster.ConfirmInstanceUpload(instanceId))
           stay
         case _ => stay
       }
@@ -189,10 +189,10 @@ class InstanceAggregate(
         requester ! Ack
       }
     case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
-      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.SaveInstance(instanceId))
+      schedulerSharder forward SchedulerSharder.ClusterEnvelope(clusterId, Cluster.SaveInstance(instanceId))
       stay
     case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
-      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.DiscardInstance(instanceId))
+      schedulerSharder forward SchedulerSharder.ClusterEnvelope(clusterId, Cluster.DiscardInstance(instanceId))
       stay
   }
 

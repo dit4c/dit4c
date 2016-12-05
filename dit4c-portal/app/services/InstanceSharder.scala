@@ -23,10 +23,10 @@ object InstanceSharder {
   case class VerifyJwt(token: String) extends Command
   case class Envelope(instanceId: String, msg: Any) extends Command
 
-  def apply(clusterSharder: ActorRef @@ ClusterSharder.type)(implicit system: ActorSystem): ActorRef = {
+  def apply(schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "InstanceAggregate",
-        entityProps = aggregateProps(clusterSharder),
+        entityProps = aggregateProps(schedulerSharder),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)
@@ -39,14 +39,14 @@ object InstanceSharder {
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
-    case StartInstance(clusterId, image) => "00" // All user creation will happen in one shard, but that's OK
+    case StartInstance(clusterId, image) => "00" // All instance creation will happen in one shard, but that's OK
     case Envelope(userId, _) => userId.reverse.take(2).reverse // Last two characters of aggregate ID (it'll do for now)
   }
 
   private def newInstanceId = IdUtils.timePrefix+IdUtils.randomId(16)
 
-  private def aggregateProps(clusterSharder: ActorRef @@ ClusterSharder.type): Props =
-    Props(classOf[InstanceAggregate], clusterSharder)
+  private def aggregateProps(schedulerSharder: ActorRef @@ SchedulerSharder.type): Props =
+    Props(classOf[InstanceAggregate], schedulerSharder)
 
   def resolveJwtInstanceId(token: String): Either[String, String] =
     JwtJson.decode(token, JwtOptions(signature=false))

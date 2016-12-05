@@ -94,14 +94,11 @@ class AppComponents(context: Context)
     }
   ).flatten))
 
-  // ClusterSharder/AggregateManager setup and eventbus subscription
-  val schedulerSharder = SchedulerSharder()(actorSystem)
+  // Sharder/AggregateManager setup and event-bus subscription
+  val schedulerSharder = SchedulerSharder(imageServerConfig)(actorSystem)
       .taggedWith[services.SchedulerSharder.type]
   system.eventStream.subscribe(schedulerSharder, classOf[SchedulerSharder.Envelope])
-  val clusterSharder = ClusterSharder(schedulerSharder, imageServerConfig)(actorSystem)
-      .taggedWith[services.ClusterSharder.type]
-  system.eventStream.subscribe(clusterSharder, classOf[ClusterSharder.Envelope])
-  val instanceAggregateManager = InstanceSharder(clusterSharder)(actorSystem)
+  val instanceAggregateManager = InstanceSharder(schedulerSharder)(actorSystem)
       .taggedWith[services.InstanceSharder.type]
   system.eventStream.subscribe(instanceAggregateManager, classOf[InstanceSharder.Envelope])
   val userAggregateManager = UserSharder(instanceAggregateManager)(actorSystem)
