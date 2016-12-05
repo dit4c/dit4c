@@ -1,0 +1,16 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+package dit4c.protobuf;
+
+option (scalapb.options) = {
+  single_file: true
+  preamble: "// $COVERAGE-OFF$Generated code"
+};
+
+message ClusterAccessPass {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
+  repeated string clusterIds = 1;
+  google.protobuf.Timestamp expires = 2;
+  string description = 3;
+}

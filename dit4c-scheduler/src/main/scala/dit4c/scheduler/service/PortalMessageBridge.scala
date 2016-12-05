@@ -182,7 +182,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.GetInstanceStatus(instanceId))
-    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl) =>
+    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl, _) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
