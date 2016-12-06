@@ -11,6 +11,5 @@ option (scalapb.options) = {
 message ClusterAccessPass {
   option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   repeated string clusterIds = 1;
-  google.protobuf.Timestamp expires = 2;
-  string description = 3;
+  string description = 2;
 }

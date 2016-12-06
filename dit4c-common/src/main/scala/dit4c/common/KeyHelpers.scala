@@ -40,6 +40,10 @@ import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRing
 import java.io.InputStream
 import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRingCollection
 import java.io.StringWriter
+import java.time.Instant
+import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
+import akka.util.ByteString
+import scala.util.Try
 
 object KeyHelpers {
 
@@ -322,6 +326,12 @@ object KeyHelpers {
         .sortBy(_.getCreationTime)
         .reverse
 
+    def signingKeys: List[PGPPublicKey] =
+      publicKeys
+        .filter(hasKeyFlags(CAN_ENCRYPT_COMMS | CAN_ENCRYPT_STORAGE))
+        .sortBy(_.getCreationTime)
+        .reverse
+
     def publicKeys: List[PGPPublicKey] =
       keyring.getPublicKeys.collect {
         case pk: PGPPublicKey => pk
@@ -346,6 +356,50 @@ object KeyHelpers {
         .asInstanceOf[RSAPublicKey]
     }
     override def encodeToStream(os: OutputStream) = publicKey.encode(os)
+  }
+
+
+  implicit class PGPPublicKeyValidationHelper(pk: PGPPublicKey) {
+    def verifyData(signedData: Array[Byte]): Either[String, (Array[Byte], Option[Instant])] =
+      Try({
+        import scala.collection.JavaConversions._
+        val in = PGPUtil.getDecoderStream(new ByteArrayInputStream(signedData))
+        // Structure of packets in signature
+        // CompressedData
+        //  - One-Pass Signature Header
+        //  - Literal Data
+        //  - Signature
+        val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
+        val objF = new JcaPGPObjectFactory(cData.getDataStream)
+        val ops = objF.nextObject.asInstanceOf[PGPOnePassSignatureList]
+          .find(_.getKeyID == pk.getKeyID)
+          .get
+        val lData = objF.nextObject.asInstanceOf[PGPLiteralData]
+        ops.init(new JcaPGPContentVerifierBuilderProvider(), pk)
+        val content = {
+          val bsb = ByteString.newBuilder
+          Stream.continually(lData.getInputStream.read)
+            .takeWhile(_ >= 0)
+            .map(_.toByte)
+            .foreach { b =>
+              ops.update(b)
+              bsb.putByte(b)
+            }
+          bsb.result.toArray
+        }
+        val pgpSig = objF.nextObject.asInstanceOf[PGPSignatureList]
+          .find(_.getKeyID == ops.getKeyID)
+          .get
+        val creationTime = pgpSig.getHashedSubPackets.getSignatureCreationTime.toInstant
+        val expiryTime = Some(pgpSig.getHashedSubPackets.getSignatureExpirationTime)
+          .filter(_ > 0)
+          .map(creationTime.plusSeconds)
+        if (!ops.verify(pgpSig))
+          throw new Exception("Verification failed")
+        (content, expiryTime)
+      }).map[Either[String, (Array[Byte], Option[Instant])]](Right(_))
+        .recover({ case e => Left(e.getMessage) })
+        .get
   }
 
   implicit class PGPPublicKeyJwkHelper(publicKey: PGPPublicKey) {
