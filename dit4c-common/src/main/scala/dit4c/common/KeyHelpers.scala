@@ -44,6 +44,7 @@ import java.time.Instant
 import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
 import akka.util.ByteString
 import scala.util.Try
+import java.nio.ByteBuffer
 
 object KeyHelpers {
 
@@ -150,6 +151,24 @@ object KeyHelpers {
         case _ => Left("Not a key")
       }
   }
+
+  def extractSignatureKeyIds(signedData: Array[Byte]): Either[String, List[Long]] =
+    Try({
+      import scala.collection.JavaConversions._
+      val in = PGPUtil.getDecoderStream(new ByteArrayInputStream(signedData))
+      // Structure of packets in signature
+      // CompressedData
+      //  - One-Pass Signature Header
+      //  - Literal Data
+      //  - Signature
+      val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
+      val objF = new JcaPGPObjectFactory(cData.getDataStream)
+      objF.nextObject.asInstanceOf[PGPOnePassSignatureList]
+        .map(_.getKeyID)
+        .toList
+    }).map[Either[String, List[Long]]](Right(_))
+      .recover({ case e => Left(e.getMessage) })
+      .get
 
   /**
     * At the moment DIT4C assumes instances use a single public key for all actions. This may at some change though
@@ -464,21 +483,24 @@ object KeyHelpers {
 
   object PGPFingerprint {
     class InvalidFingerprintException(msg: String) extends Exception
-    def apply(bytes: Array[Byte]): PGPFingerprint =
+    def apply(bytes: Array[Byte]): PGPFingerprint = apply(bytes.toList)
+    def apply(s: String): PGPFingerprint = apply(toBytes(s))
+    def apply(bytes: List[Byte]) =
       if (bytes.length == 20) new PGPFingerprint(bytes)
       else throw new InvalidFingerprintException(
           s"PGP fingerprints are 160-bit, not ${bytes.length * 8}")
-    def apply(s: String): PGPFingerprint = apply(toBytes(s))
-    def toBytes(s: String): Array[Byte] =
+    def toBytes(s: String): List[Byte] =
       s.toUpperCase
         .filter(c => c.isDigit || 'A'.to('F').contains(c))
         .grouped(2)
         .map(Integer.parseInt(_, 16).toByte)
-        .toArray
+        .toList
   }
 
-  class PGPFingerprint protected (val bytes: Array[Byte]) {
+  class PGPFingerprint protected (immutableBytes: Seq[Byte]) {
+    def bytes: Array[Byte] = immutableBytes.toArray
     def string = bytes.map(v => f"$v%02X").mkString
+    def keyId = ByteBuffer.wrap(bytes.takeRight(8)).getLong
     override def toString = string
     override def equals(obj: Any) = obj match {
       case other: PGPFingerprint => bytes.deep == other.bytes.deep

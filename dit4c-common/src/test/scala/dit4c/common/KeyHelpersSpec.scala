@@ -195,48 +195,24 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       generatedString must beSome(gpgSshKey)
     }
 
+    "extract signing key IDs from signed data" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: Array[Byte]) =>
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
+      val signedData: Array[Byte] = signData(pgpKeyRing, signingKey)(testData)
+      extractSignatureKeyIds(signedData) must beRight(be_==(List(signingKey.getKeyID)))
+    })
+
     "verify and unwrap PGP signatures" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: Array[Byte], lifetime: Option[Lifetime]) =>
-      import scala.collection.JavaConversions._
       val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
       val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
       val creationTime = Instant.now.truncatedTo(ChronoUnit.SECONDS)
-      val signedData: Array[Byte] = {
-        val selfSignature = signingKey.getSignaturesForKeyID(
-          pgpKeyRing.getPublicKey.getKeyID).toList.head
-        val keyAlg = signingKey.getAlgorithm
-        val hashAlg = selfSignature.getHashedSubPackets.getPreferredHashAlgorithms.head
-        val out = new ByteArrayOutputStream()
-        val compressedData = new PGPCompressedDataGenerator(
-            CompressionAlgorithmTags.ZIP)
-        val cOut = compressedData.open(out)
-        val signatureGenerator = new PGPSignatureGenerator(
-            new JcaPGPContentSignerBuilder(keyAlg, hashAlg))
-        signatureGenerator.init(PGPSignature.BINARY_DOCUMENT,
-            pgpKeyRing.getSecretKey(signingKey.getKeyID).extractPrivateKey(null))
-        // Write one-pass signature header
-        signatureGenerator.generateOnePassVersion(false).encode(cOut)
-        // Write literal data
-        val lOut = (new PGPLiteralDataGenerator()).open(
-            cOut, PGPLiteralData.BINARY, "", new Date(), new Array[Byte](1024))
-        lOut.write(testData)
-        lOut.close()
-        // Write signature
-        signatureGenerator.update(testData)
-        signatureGenerator.setHashedSubpackets({
-          val subGen = new PGPSignatureSubpacketGenerator()
-          subGen.setSignatureCreationTime(false, Date.from(creationTime))
-          lifetime.foreach(subGen.setSignatureExpirationTime(false, _))
-          subGen.generate
-        })
-        signatureGenerator.generate.encode(cOut)
-        cOut.flush
-        cOut.close
-        out.close
-        out.toByteArray
-      }
+      val signedData: Array[Byte] = signData(
+          pgpKeyRing, signingKey, creationTime, lifetime)(testData)
       val expected: (Array[Byte], Option[Instant]) = (testData, lifetime.map(creationTime.plusSeconds))
       signingKey.verifyData(signedData) must beRight(expected.zip(be_===, be_==))
     })
+
+
 
   }
 
@@ -267,6 +243,46 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       else
         skipped("No usable version of GPG available")
     }
+  }
+
+  def signData(
+      skr: PGPSecretKeyRing,
+      signingKey: PGPPublicKey,
+      creationTime: Instant = Instant.now,
+      lifetime: Option[Lifetime] = None)(data: Array[Byte]) = {
+    import scala.collection.JavaConversions._
+    val selfSignature = signingKey.getSignaturesForKeyID(
+      skr.getPublicKey.getKeyID).toList.head
+    val keyAlg = signingKey.getAlgorithm
+    val hashAlg = selfSignature.getHashedSubPackets.getPreferredHashAlgorithms.head
+    val out = new ByteArrayOutputStream()
+    val compressedData = new PGPCompressedDataGenerator(
+        CompressionAlgorithmTags.ZIP)
+    val cOut = compressedData.open(out)
+    val signatureGenerator = new PGPSignatureGenerator(
+        new JcaPGPContentSignerBuilder(keyAlg, hashAlg))
+    signatureGenerator.init(PGPSignature.BINARY_DOCUMENT,
+        skr.getSecretKey(signingKey.getKeyID).extractPrivateKey(null))
+    // Write one-pass signature header
+    signatureGenerator.generateOnePassVersion(false).encode(cOut)
+    // Write literal data
+    val lOut = (new PGPLiteralDataGenerator()).open(
+        cOut, PGPLiteralData.BINARY, "", new Date(), new Array[Byte](1024))
+    lOut.write(data)
+    lOut.close()
+    // Write signature
+    signatureGenerator.update(data)
+    signatureGenerator.setHashedSubpackets({
+      val subGen = new PGPSignatureSubpacketGenerator()
+      subGen.setSignatureCreationTime(false, Date.from(creationTime))
+      lifetime.foreach(subGen.setSignatureExpirationTime(false, _))
+      subGen.generate
+    })
+    signatureGenerator.generate.encode(cOut)
+    cOut.flush
+    cOut.close
+    out.close
+    out.toByteArray
   }
 
 
