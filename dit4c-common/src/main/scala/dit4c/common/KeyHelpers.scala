@@ -152,10 +152,10 @@ object KeyHelpers {
       }
   }
 
-  def extractSignatureKeyIds(signedData: Array[Byte]): Either[String, List[Long]] =
+  def extractSignatureKeyIds(signedData: ByteString): Either[String, List[Long]] =
     Try({
       import scala.collection.JavaConversions._
-      val in = PGPUtil.getDecoderStream(new ByteArrayInputStream(signedData))
+      val in = PGPUtil.getDecoderStream(signedData.toInputStream)
       // Structure of packets in signature
       // CompressedData
       //  - One-Pass Signature Header
@@ -167,6 +167,63 @@ object KeyHelpers {
         .map(_.getKeyID)
         .toList
     }).map[Either[String, List[Long]]](Right(_))
+      .recover({ case e => Left(e.getMessage) })
+      .get
+
+  /**
+   * Verify a signature with a series of candidate public keys.
+   * @return data and a map of keys to signature expiry times
+   */
+  def verifyData(signedData: ByteString, pks: Seq[PGPPublicKey]):
+      Either[String, (ByteString, Map[PGPPublicKey, Option[Instant]])] =
+    Try({
+      import scala.collection.JavaConversions._
+      val in = PGPUtil.getDecoderStream(signedData.toInputStream)
+      // Structure of packets in signature
+      // CompressedData
+      //  - One-Pass Signature Header
+      //  - Literal Data
+      //  - Signature
+      val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
+      val objF = new JcaPGPObjectFactory(cData.getDataStream)
+      val pkOpsMap: Map[PGPPublicKey, PGPOnePassSignature] =
+        objF.nextObject.asInstanceOf[PGPOnePassSignatureList].toSeq
+          .flatMap { ops =>
+            pks.find(ops.getKeyID == _.getKeyID).map(pk => (pk, ops))
+          }
+          .toMap
+      pkOpsMap.foreach {
+        case (pk, ops) =>
+          ops.init(new JcaPGPContentVerifierBuilderProvider(), pk)
+      }
+      val lData = objF.nextObject.asInstanceOf[PGPLiteralData]
+      val content = {
+        val bsb = ByteString.newBuilder
+        Stream.continually(lData.getInputStream.read)
+          .takeWhile(_ >= 0)
+          .map(_.toByte)
+          .foreach { b =>
+            bsb.putByte(b)
+            pkOpsMap.values.foreach { ops =>
+              ops.update(b)
+            }
+          }
+        bsb.result
+      }
+      val expiryTimes: Map[PGPPublicKey, Option[Instant]] =
+        (for {
+          sig <- objF.nextObject.asInstanceOf[PGPSignatureList]
+          pk <- pkOpsMap.keys.find(_.getKeyID == sig.getKeyID)
+          ops <- pkOpsMap.get(pk) if ops.verify(sig)
+        } yield {
+          val creationTime = sig.getHashedSubPackets.getSignatureCreationTime.toInstant
+          val expiryTime = Some(sig.getHashedSubPackets.getSignatureExpirationTime)
+            .filter(_ > 0)
+            .map(creationTime.plusSeconds)
+          (pk -> expiryTime)
+        }).toMap
+      (content, expiryTimes)
+    }).map[Either[String, (ByteString, Map[PGPPublicKey, Option[Instant]])]](Right(_))
       .recover({ case e => Left(e.getMessage) })
       .get
 
@@ -378,48 +435,6 @@ object KeyHelpers {
   }
 
 
-  implicit class PGPPublicKeyValidationHelper(pk: PGPPublicKey) {
-    def verifyData(signedData: Array[Byte]): Either[String, (Array[Byte], Option[Instant])] =
-      Try({
-        import scala.collection.JavaConversions._
-        val in = PGPUtil.getDecoderStream(new ByteArrayInputStream(signedData))
-        // Structure of packets in signature
-        // CompressedData
-        //  - One-Pass Signature Header
-        //  - Literal Data
-        //  - Signature
-        val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
-        val objF = new JcaPGPObjectFactory(cData.getDataStream)
-        val ops = objF.nextObject.asInstanceOf[PGPOnePassSignatureList]
-          .find(_.getKeyID == pk.getKeyID)
-          .get
-        val lData = objF.nextObject.asInstanceOf[PGPLiteralData]
-        ops.init(new JcaPGPContentVerifierBuilderProvider(), pk)
-        val content = {
-          val bsb = ByteString.newBuilder
-          Stream.continually(lData.getInputStream.read)
-            .takeWhile(_ >= 0)
-            .map(_.toByte)
-            .foreach { b =>
-              ops.update(b)
-              bsb.putByte(b)
-            }
-          bsb.result.toArray
-        }
-        val pgpSig = objF.nextObject.asInstanceOf[PGPSignatureList]
-          .find(_.getKeyID == ops.getKeyID)
-          .get
-        val creationTime = pgpSig.getHashedSubPackets.getSignatureCreationTime.toInstant
-        val expiryTime = Some(pgpSig.getHashedSubPackets.getSignatureExpirationTime)
-          .filter(_ > 0)
-          .map(creationTime.plusSeconds)
-        if (!ops.verify(pgpSig))
-          throw new Exception("Verification failed")
-        (content, expiryTime)
-      }).map[Either[String, (Array[Byte], Option[Instant])]](Right(_))
-        .recover({ case e => Left(e.getMessage) })
-        .get
-  }
 
   implicit class PGPPublicKeyJwkHelper(publicKey: PGPPublicKey) {
     def asJWK: Option[JsObject] =
@@ -480,24 +495,24 @@ object KeyHelpers {
 
   }
 
-
   object PGPFingerprint {
     class InvalidFingerprintException(msg: String) extends Exception
-    def apply(bytes: Array[Byte]): PGPFingerprint = apply(bytes.toList)
-    def apply(s: String): PGPFingerprint = apply(toBytes(s))
-    def apply(bytes: List[Byte]) =
+    def apply(bytes: Array[Byte]): PGPFingerprint = apply(ByteString(bytes))
+    def apply(s: String): PGPFingerprint = apply(toByteString(s))
+    def apply(bytes: ByteString) =
       if (bytes.length == 20) new PGPFingerprint(bytes)
       else throw new InvalidFingerprintException(
           s"PGP fingerprints are 160-bit, not ${bytes.length * 8}")
-    def toBytes(s: String): List[Byte] =
-      s.toUpperCase
-        .filter(c => c.isDigit || 'A'.to('F').contains(c))
-        .grouped(2)
-        .map(Integer.parseInt(_, 16).toByte)
-        .toList
+    def toByteString(s: String): ByteString =
+      ByteString(
+        s.toUpperCase
+          .filter(c => c.isDigit || 'A'.to('F').contains(c))
+          .grouped(2)
+          .map(Integer.parseInt(_, 16).toByte)
+          .toSeq : _*)
   }
 
-  class PGPFingerprint protected (immutableBytes: Seq[Byte]) {
+  class PGPFingerprint protected (immutableBytes: ByteString) {
     def bytes: Array[Byte] = immutableBytes.toArray
     def string = bytes.map(v => f"$v%02X").mkString
     def keyId = ByteBuffer.wrap(bytes.takeRight(8)).getLong
@@ -530,4 +545,16 @@ object KeyHelpers {
 
   protected def sha256DigestCalculator =
     new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build().get(HashAlgorithmTags.SHA256)
+
+  // Based heavily on akka-http2-support's ByteStringInputStream
+  implicit class ByteStringInputStreamHelper(bs: ByteString) {
+    def toInputStream: InputStream = bs match {
+      case cs: ByteString.ByteString1C => new ByteArrayInputStream(bs.toArray)
+      case _ => bs.compact.toInputStream
+    }
+    def base64: String = bs.toArray.base64
+    def digest(alg: String) = bs.toArray.digest(alg)
+  }
+
+
 }

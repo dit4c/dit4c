@@ -42,6 +42,7 @@ object SchedulerAggregate {
   case class ReceiveSchedulerMessage(msg: dit4c.protobuf.scheduler.outbound.OutboundMessage) extends Command
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
   case class UpdateKeys(armoredPgpPublicKeyBlock: String) extends Command
+  case object GetKeys extends Command
 
   sealed trait Response extends BaseResponse
   case object Ack extends Response
@@ -54,6 +55,11 @@ object SchedulerAggregate {
   sealed trait UpdateKeysResponse extends Response
   case object KeysUpdated extends Response
   case class KeysRejected(reason: String) extends Response
+  sealed trait GetKeysResponse extends Response
+  case class CurrentKeys(
+      primaryKeyBlock: String,
+      additionalKeyBlocks: List[String] = Nil) extends GetKeysResponse
+  case object NoKeysAvailable extends GetKeysResponse
 
 }
 
@@ -84,6 +90,8 @@ class SchedulerAggregate(
       goto(Active).applying(Created(now)).andThen { _ =>
         requester ! Ack
       }
+    case Event(GetKeys, _) =>
+      stay replying NoKeysAvailable
     case Event(VerifyJwt(_), _) =>
       stay replying InvalidJwt("Unknown scheduler")
     case Event(UpdateKeys(_), _) =>
@@ -108,6 +116,10 @@ class SchedulerAggregate(
           // TODO: make this more secure
           stay applying UpdatedKeys(keyBlock, now) replying KeysUpdated
       }
+    case Event(GetKeys, SchedulerInfo(None)) =>
+      stay replying NoKeysAvailable
+    case Event(GetKeys, SchedulerInfo(Some(keyBlock))) =>
+      stay replying CurrentKeys(keyBlock)
     case Event(VerifyJwt(token), SchedulerInfo(None)) =>
       stay replying InvalidJwt("No keys available to validate")
     case Event(VerifyJwt(token), SchedulerInfo(Some(keyBlock))) =>

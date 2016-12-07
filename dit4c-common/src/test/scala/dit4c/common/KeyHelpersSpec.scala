@@ -70,6 +70,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       kpg.initialize(bits)
       kpg.generateKeyPair
     })
+  implicit val arbByteString =
+    Arbitrary(Arbitrary.arbitrary[Array[Byte]].map(ByteString.apply))
 
   sequential
 
@@ -195,24 +197,24 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       generatedString must beSome(gpgSshKey)
     }
 
-    "extract signing key IDs from signed data" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: Array[Byte]) =>
+    "extract signing key IDs from signed data" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: ByteString) =>
       val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
       val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
-      val signedData: Array[Byte] = signData(pgpKeyRing, signingKey)(testData)
+      val signedData: ByteString = signData(pgpKeyRing, signingKey)(testData)
       extractSignatureKeyIds(signedData) must beRight(be_==(List(signingKey.getKeyID)))
     })
 
-    "verify and unwrap PGP signatures" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: Array[Byte], lifetime: Option[Lifetime]) =>
+    "verify and unwrap PGP signatures" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: ByteString, lifetime: Option[Lifetime]) =>
       val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
       val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
       val creationTime = Instant.now.truncatedTo(ChronoUnit.SECONDS)
-      val signedData: Array[Byte] = signData(
+      val signedData: ByteString = signData(
           pgpKeyRing, signingKey, creationTime, lifetime)(testData)
-      val expected: (Array[Byte], Option[Instant]) = (testData, lifetime.map(creationTime.plusSeconds))
-      signingKey.verifyData(signedData) must beRight(expected.zip(be_===, be_==))
+      (verifyData(signedData, Nil) must beRight((testData, Map.empty))) and
+      (verifyData(signedData, Seq(signingKey)) must beRight(
+        (testData, Map(signingKey -> lifetime.map(creationTime.plusSeconds)))
+      ))
     })
-
-
 
   }
 
@@ -249,7 +251,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       skr: PGPSecretKeyRing,
       signingKey: PGPPublicKey,
       creationTime: Instant = Instant.now,
-      lifetime: Option[Lifetime] = None)(data: Array[Byte]) = {
+      lifetime: Option[Lifetime] = None)(data: ByteString): ByteString = {
     import scala.collection.JavaConversions._
     val selfSignature = signingKey.getSignaturesForKeyID(
       skr.getPublicKey.getKeyID).toList.head
@@ -268,10 +270,10 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
     // Write literal data
     val lOut = (new PGPLiteralDataGenerator()).open(
         cOut, PGPLiteralData.BINARY, "", new Date(), new Array[Byte](1024))
-    lOut.write(data)
+    lOut.write(data.toArray)
     lOut.close()
     // Write signature
-    signatureGenerator.update(data)
+    signatureGenerator.update(data.toArray)
     signatureGenerator.setHashedSubpackets({
       val subGen = new PGPSignatureSubpacketGenerator()
       subGen.setSignatureCreationTime(false, Date.from(creationTime))
@@ -282,7 +284,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
     cOut.flush
     cOut.close
     out.close
-    out.toByteArray
+    ByteString(out.toByteArray)
   }
 
 
