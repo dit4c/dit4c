@@ -461,8 +461,33 @@ object KeyHelpers {
 
   }
 
+
+  object PGPFingerprint {
+    class InvalidFingerprintException(msg: String) extends Exception
+    def apply(bytes: Array[Byte]): PGPFingerprint =
+      if (bytes.length == 20) new PGPFingerprint(bytes)
+      else throw new InvalidFingerprintException(
+          s"PGP fingerprints are 160-bit, not ${bytes.length * 8}")
+    def apply(s: String): PGPFingerprint = apply(toBytes(s))
+    def toBytes(s: String): Array[Byte] =
+      s.toUpperCase
+        .filter(c => c.isDigit || 'A'.to('F').contains(c))
+        .grouped(2)
+        .map(Integer.parseInt(_, 16).toByte)
+        .toArray
+  }
+
+  class PGPFingerprint protected (val bytes: Array[Byte]) {
+    def string = bytes.map(v => f"$v%02X").mkString
+    override def toString = string
+    override def equals(obj: Any) = obj match {
+      case other: PGPFingerprint => bytes.deep == other.bytes.deep
+      case _ => false
+    }
+  }
+
   implicit class PGPPublicKeyFingerprintHelper(publicKey: PGPPublicKey) {
-    def fingerprint = publicKey.getFingerprint.map(v => f"$v%02X").mkString
+    def fingerprint = PGPFingerprint(publicKey.getFingerprint)
   }
 
   implicit class PGPPublicKeyOpenSSHHelper(publicKey: PGPPublicKey) {

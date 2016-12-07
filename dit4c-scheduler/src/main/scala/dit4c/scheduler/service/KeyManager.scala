@@ -36,7 +36,7 @@ object KeyManager {
 
   trait GetPublicKeyInfoResponse extends Response
   case class PublicKeyInfo(
-      keyFingerprint: String,
+      keyFingerprint: PGPFingerprint,
       armoredPgpPublicKeyBlock: String) extends GetPublicKeyInfoResponse
   trait SignJwtClaimResponse extends Response
   case class SignedJwtTokens(tokens: List[String]) extends SignJwtClaimResponse

@@ -39,11 +39,10 @@ class KeyManagerSpec(implicit ee: ExecutionEnv)
       val response = probe.expectMsgType[GetPublicKeyInfoResponse](1.minute)
       response must beLike[GetPublicKeyInfoResponse] {
         case PublicKeyInfo(fingerprint, keyBlock) =>
-          fingerprint must_== "28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94"
+          fingerprint must_== PGPFingerprint("28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94")
           parseArmoredPublicKeyRing(keyBlock) match {
             case Right(pkr) =>
-              pkr.getPublicKey.getFingerprint must_==
-                fingerprint.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray
+              pkr.getPublicKey.getFingerprint must_=== fingerprint.bytes
             case Left(msg) =>
               ko(msg)
           }

@@ -120,7 +120,7 @@ class SchedulerAggregate(
               stay replying InvalidJwt("No keys available to validate")
             case keys =>
               keys
-                .map { case (fingerprint: String, key: PublicKey) =>
+                .map { case (fingerprint, key) =>
                   JwtJson.decode(token, key) match {
                     case Success(_) => ValidJwt
                     case Failure(e) => InvalidJwt(s"$fingerprint: ${e.getMessage}")
