@@ -9,22 +9,28 @@ import java.security.MessageDigest
 import akka.util.ByteString
 import scala.util.Success
 import org.bouncycastle.openpgp.PGPPublicKeyRing
+import org.apache.commons.lang3.CharUtils
+import java.util.Base64
 
 object AccessPassManager {
 
   sealed trait Command extends BaseCommand
-  case class AddClusterAccessPass(signedData: ByteString) extends Command
-  protected case class AddVerifiedClusterAccessPass(
+  case class RegisterAccessPass(signedData: ByteString) extends Command
+  protected case class RegisterVerifiedAccessPass(
       id: String,
       signedData: ByteString) extends Command
 
 
   sealed trait Response extends BaseResponse
+  trait RegisterAccessPassResponse extends Response
+  case class AcceptedAccessPass(id: String) extends RegisterAccessPassResponse
+  case class RejectedAccessPass(reason: String) extends RegisterAccessPassResponse
 
-
-
-  class AddWorker(requester: ActorRef, scheduler: ActorRef, signedData: ByteString) extends Actor {
+  class AddWorker(requester: ActorRef, scheduler: ActorRef, signedData: ByteString)
+      extends Actor with ActorLogging {
     import dit4c.common.KeyHelpers._
+
+    def schedulerId = scheduler.path.name
 
     override def preStart = {
       scheduler ! SchedulerAggregate.GetKeys
@@ -34,21 +40,24 @@ object AccessPassManager {
       case SchedulerAggregate.CurrentKeys(primaryKeyBlock, _) =>
         verify(primaryKeyBlock) match {
           case Right((clusters, _)) if clusters.isEmpty =>
-            // TODO: Fail because there were no clusters indicated
-            context.stop(self)
+            log.error(s"Cluster access pass contained no clusters!\n$dataForLog")
+            sender ! RejectedAccessPass(s"No clusters in pass")
           case Right((_, expiries)) if expiries.isEmpty =>
-            // TODO: Fail because there were no valid signatures
-            context.stop(self)
+            log.error(s"Cluster access pass has no valid signature.!\n$dataForLog")
+            sender ! RejectedAccessPass(s"No valid signatures")
           case Right((clusterIds, expiries)) =>
-            context.parent ! AddVerifiedClusterAccessPass(
+            val id = accessPassId(signedData)
+            log.info(s"$id {$scheduler $clusterIds} decoded with valid signatures.")
+            context.parent ! RegisterVerifiedAccessPass(
                 accessPassId(signedData),
                 signedData)
+            sender ! AcceptedAccessPass(id)
           case Left(msg) =>
-            // TODO: notify of failure
-            context.stop(self)
+            sender ! RejectedAccessPass(s"Verification failed: $msg")
         }
+        context.stop(self)
       case SchedulerAggregate.NoKeysAvailable =>
-        // TODO: notify of failure
+        sender ! RejectedAccessPass("No keys are available to do validation")
         context.stop(self)
     }
 
@@ -68,6 +77,7 @@ object AccessPassManager {
           case keys =>
             verifyData(signedData, keys)
               .right.flatMap { case (data: ByteString, expiries) =>
+                // Extract token data
                 Try(ClusterAccessPass.parseFrom(data.toArray))
                   .transform[Either[String, Set[String]]](
                     { cap => Success(Right(cap.clusterIds.toSet)) },
@@ -77,12 +87,21 @@ object AccessPassManager {
                   .right.map((_, expiries))
               }
         }
+
+    /**
+     * Get a safe form of the signed data for logging.
+     */
+    protected lazy val dataForLog: String =
+      Try(signedData.decodeString("UTF-8"))
+        .filter(_.forall(CharUtils.isAsciiPrintable))
+        .getOrElse(Base64.getEncoder.encodeToString(signedData.toArray))
   }
 
   def accessPassId(signedData: ByteString) = {
     import dit4c.common.KeyHelpers._
     signedData.digest("SHA-512").map(b => f"$b%02x").mkString
   }
+
 
 
 }
@@ -95,10 +114,10 @@ class AccessPassManager extends Actor with ActorLogging {
 
   val receive: Receive = {
     case cmd: Command => cmd match {
-      case AddClusterAccessPass(signedData: ByteString) =>
+      case RegisterAccessPass(signedData: ByteString) =>
         context.actorOf(
             Props(classOf[AddWorker], sender, context.parent, signedData))
-      case _ : AddVerifiedClusterAccessPass =>
+      case _ : RegisterVerifiedAccessPass =>
         // TODO: Implement
     }
   }
