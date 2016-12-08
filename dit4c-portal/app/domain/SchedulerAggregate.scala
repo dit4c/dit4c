@@ -185,6 +185,9 @@ class SchedulerAggregate(
       else {
         stay replying response
       }
+    case Event(cmd: AccessPassManager.Command, _) =>
+      accessPassManagerRef ! cmd
+      stay
   }
 
   override def applyEvent(
@@ -205,5 +208,12 @@ class SchedulerAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
+
+  def accessPassManagerRef: ActorRef = {
+    val name = "access-passes"
+    context.child(name).getOrElse {
+      context.actorOf(Props(classOf[AccessPassManager]), name)
+    }
+  }
 
 }
