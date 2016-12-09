@@ -38,6 +38,7 @@ import akka.http.scaladsl.model.headers.Cookie
 import akka.http.scaladsl.model.headers.`Set-Cookie`
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import akka.http.scaladsl.model.HttpHeader
+import java.util.Base64
 
 object PortalMessageBridge {
   case object BridgeClosed extends KryoSerializable
@@ -182,9 +183,11 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
       import dit4c.scheduler.service._
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.GetInstanceStatus(instanceId))
-    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl, _) =>
+    case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl, clusterAccessPasses) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.service._
+      log.info(s"Instance $instanceId requested on $clusterId using $imageUrl, with access passes:\n"+
+          clusterAccessPasses.map(_.toByteArray).map(Base64.getEncoder.encodeToString).mkString("\n"))
       context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, imageUrl, portalUri))
     case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
