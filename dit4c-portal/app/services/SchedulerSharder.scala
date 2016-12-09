@@ -11,15 +11,6 @@ object SchedulerSharder {
 
   final case class Envelope(id: String, payload: Any)
 
-  object ClusterEnvelope {
-    def apply(joinedSchedulerClusterId: String, payload: Any) =
-      joinedSchedulerClusterId match {
-        case jsciRegex(schedulerId, clusterId) =>
-          Envelope(schedulerId, SchedulerAggregate.ClusterEnvelope(clusterId, payload))
-      }
-    protected val jsciRegex = """^(.*)\.(.*)$""".r
-  }
-
   def apply(imageServerConfig: ImageServerConfig)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "SchedulerAggregate",

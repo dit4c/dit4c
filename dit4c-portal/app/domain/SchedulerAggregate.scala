@@ -20,6 +20,8 @@ import scala.util.Failure
 import java.security.PublicKey
 import akka.actor.Actor
 import akka.actor.Props
+import akka.util.Timeout
+import scala.concurrent.duration._
 
 object SchedulerAggregate {
 
@@ -43,6 +45,8 @@ object SchedulerAggregate {
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
   case class UpdateKeys(armoredPgpPublicKeyBlock: String) extends Command
   case object GetKeys extends Command
+  case class GetAvailableClusters(
+      accessTokenIds: Set[String]) extends Command
 
   sealed trait Response extends BaseResponse
   case object Ack extends Response
@@ -60,6 +64,9 @@ object SchedulerAggregate {
       primaryKeyBlock: String,
       additionalKeyBlocks: List[String] = Nil) extends GetKeysResponse
   case object NoKeysAvailable extends GetKeysResponse
+  trait GetAvailableClustersResponse extends Response
+  case class AvailableClusters(
+      clusters: List[UserAggregate.AvailableCluster]) extends GetAvailableClustersResponse
 
 }
 
@@ -187,6 +194,52 @@ class SchedulerAggregate(
       }
     case Event(cmd: AccessPassManager.Command, _) =>
       accessPassManagerRef forward cmd
+      stay
+    case Event(GetAvailableClusters(accessPassIds), _) =>
+      import akka.pattern.{ask, pipe}
+      import context.dispatcher
+      implicit val timeout = Timeout(10.seconds)
+      accessPassIds
+        // Get all the valid passes
+        .map { accessPassId =>
+          import AccessPass._
+          val cmd = AccessPassManager.Envelope(accessPassId, GetDecodedPass)
+          (accessPassManagerRef ? cmd)
+            .map[List[ValidPass]] {
+              case vp: ValidPass => List(vp)
+              case _ => Nil
+            }
+            .recover[List[ValidPass]] {
+              case e =>
+                log.error(e,
+                    s"Scheduler $schedulerId failed to get "+
+                    s"access pass details for $accessPassId")
+                Nil
+            }
+        }
+        // Collapse to single future
+        .reduce { (aF, bF) =>
+          for (a <- aF; b <- bF) yield a ++ b
+        }
+        .map { validPasses =>
+          // Collect clusters out of passes, and calculate effective expiry
+          validPasses
+            .foldRight(Map.empty[String, List[AccessPass.ValidPass]]) { (vp, m) =>
+              m ++ vp.pass.clusterIds.map { id =>
+                // Append ValidPass to the list for this clusterId
+                (id, m.getOrElse(id, Nil) :+ vp)
+              }
+            }.toList.map { case (clusterId, passes) =>
+              val longestPass =
+                passes.maxBy(_.expires.getOrElse(Instant.MAX))
+              UserAggregate.AvailableCluster(
+                  schedulerId,
+                  clusterId,
+                  longestPass.expires)
+            }
+        }
+        .map(AvailableClusters(_))
+        .pipeTo(sender)
       stay
   }
 

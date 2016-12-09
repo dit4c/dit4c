@@ -1,44 +1,23 @@
 package controllers
 
-import play.api.mvc._
-import play.api.data._
-import play.api.data.Forms._
-import play.api.i18n._
-import com.softwaremill.tagging._
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import akka.pattern.ask
-import akka.actor._
-import services._
-import domain._
-import akka.util.Timeout
-import scala.concurrent.ExecutionContext
-import akka.http.scaladsl.model.StatusCodes.ServerError
-import akka.http.scaladsl.model.Uri
-import com.mohiva.play.silhouette.api.LoginInfo
-import com.mohiva.play.silhouette.api.Silhouette
-import utils.auth.DefaultEnv
-import com.mohiva.play.silhouette.api.LoginEvent
-import com.mohiva.play.silhouette.impl.providers.SocialProviderRegistry
-import com.mohiva.play.silhouette.impl.providers.SocialProvider
-import com.mohiva.play.silhouette.impl.providers.CommonSocialProfileBuilder
-import com.mohiva.play.silhouette.api.exceptions.ProviderException
-import play.api.Environment
-import play.api.Mode
-import com.mohiva.play.silhouette.api.HandlerResult
-import com.mohiva.play.silhouette.api.actions.SecuredRequest
-import play.api.libs.streams.ActorFlow
-import play.api.http.websocket.TextMessage
-import akka.stream.Materializer
-import play.api.libs.ws.WSClient
-import play.api.libs.ws.StreamedResponse
-import utils.oauth.AuthorizationCodeGenerator
-import java.time.Instant
-import scala.util._
-import play.api.http.websocket.CloseMessage
-import play.twirl.api.Html
 import java.util.Base64
+
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+
+import com.mohiva.play.silhouette.api.Silhouette
+import com.softwaremill.tagging.@@
+
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.pattern.ask
+import akka.stream.Materializer
 import akka.util.ByteString
+import akka.util.Timeout
+import domain.UserAggregate
+import play.api.mvc.Controller
+import services.UserSharder
+import utils.auth.DefaultEnv
 
 class AccessPassController(
     val userSharder: ActorRef @@ UserSharder.type,
@@ -61,6 +40,4 @@ class AccessPassController(
           InternalServerError(reason)
       }
     }
-
-
 }

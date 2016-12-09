@@ -23,18 +23,29 @@ object UserAggregate {
 
   type SchedulerAccessPassPair = (String, String)
 
+  case class AvailableCluster(
+      schedulerId: String,
+      clusterId: String,
+      until: Option[Instant])
+
   case class Data(
       instances: SortedSet[String] = SortedSet.empty,
       accessPasses: SortedSet[SchedulerAccessPassPair] = SortedSet.empty)
 
   sealed trait Command extends BaseCommand
   case object Create extends Command
-  case class StartInstance(clusterId: String, image: String) extends Command {
+  case class StartInstance(
+      schedulerId: String,
+      clusterId: String,
+      image: String) extends Command {
     def toIAMCommand: InstanceSharder.Command =
       (InstanceSharder.StartInstance.apply _)
         .tupled(StartInstance.unapply(this).get)
   }
-  case class StartInstanceFromInstance(clusterId: String, sourceInstance: String) extends Command
+  case class StartInstanceFromInstance(
+      schedulerId: String,
+      clusterId: String,
+      sourceInstance: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
   case class GetInstanceImageUrl(instanceId: String) extends Command
@@ -55,6 +66,9 @@ object UserAggregate {
   case object AccessPassAdded extends AddAccessPassResponse
   case class AccessPassRejected(reason: String) extends AddAccessPassResponse
   trait GetAvailableClustersResponse extends Response
+  case class AvailableClusters(
+      clusters: List[AvailableCluster]) extends GetAvailableClustersResponse
+
 
 }
 
@@ -82,19 +96,19 @@ class UserAggregate(
   def receiveCommand: PartialFunction[Any,Unit] = {
     case Create =>
       sender ! CreateResponse(userId)
-    case msg @ StartInstance(clusterId, image) =>
+    case msg @ StartInstance(schedulerId, clusterId, image) =>
       val op = (instanceSharder ? msg.toIAMCommand)
       op.onSuccess {
         case InstanceAggregate.Started(instanceId) =>
           self ! InstanceCreationConfirmation(instanceId)
       }
       op pipeTo sender
-    case StartInstanceFromInstance(clusterId, sourceInstance) =>
+    case StartInstanceFromInstance(schedulerId, clusterId, sourceInstance) =>
       if (data.instances.contains(sourceInstance)) {
         (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
           case InstanceAggregate.InstanceImage(image) =>
             val op = (instanceSharder ?
-                InstanceSharder.StartInstance(clusterId, image))
+                InstanceSharder.StartInstance(schedulerId, clusterId, image))
             op.onSuccess {
               case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)
@@ -161,6 +175,33 @@ class UserAggregate(
           sender ! AccessPassAdded
         }
       }
+    case GetAvailableClusters =>
+      // Collect available clusters from each scheduler 
+      data.accessPasses
+        .groupBy(_._1) // Group by scheduler
+        .mapValues(_.map(_._2)) // key is scheduler, value is a set of access IDs
+        .map { case (schedulerId, accessPassIds) =>
+          val queryMsg = SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.GetAvailableClusters(accessPassIds))
+          // Get cluster list from scheduler, or fall-back to empty
+          (schedulerSharder ? queryMsg)
+            .collect[List[AvailableCluster]] {
+              case SchedulerAggregate.AvailableClusters(clusters) =>
+                clusters
+            }
+            .recover[List[AvailableCluster]] {
+              case e =>
+                log.error(e, s"Unable to get clusters for scheduler $schedulerId")
+                Nil
+            }
+        }
+        .reduce { (aF, bF) =>
+          for (a <- aF; b <- bF) yield a ++ b
+        }
+        .map(AvailableClusters(_))
+        .pipeTo(sender)
+
   }
 
   def receiveRecover: PartialFunction[Any,Unit] = sealedReceive[DomainEvent] {

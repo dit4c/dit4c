@@ -5,6 +5,7 @@ GET     /login/oauth/authorize              controllers.OAuthServerController.au
 POST    /login/oauth/access_token           controllers.OAuthServerController.accessToken
 GET     /authenticate/:provider             controllers.MainController.authenticate(provider)
 POST    /authenticate/:provider             controllers.MainController.authenticate(provider)
+GET     /clusters                           controllers.MainController.getAvailableClusters
 GET     /instances/                         controllers.MainController.getInstances
 POST    /instances/                         controllers.MainController.newInstance
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)

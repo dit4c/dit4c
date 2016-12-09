@@ -19,7 +19,7 @@ import akka.cluster.sharding.ClusterShardingSettings
 object InstanceSharder {
 
   sealed trait Command
-  case class StartInstance(clusterId: String, image: String) extends Command
+  case class StartInstance(schedulerId: String, clusterId: String, image: String) extends Command
   case class VerifyJwt(token: String) extends Command
   case class Envelope(instanceId: String, msg: Any) extends Command
 
@@ -34,12 +34,13 @@ object InstanceSharder {
 
   // Because identity can be any valid string, we need the ID to be encoded
   def extractEntityId(implicit system: ActorSystem): ShardRegion.ExtractEntityId = {
-    case StartInstance(clusterId, image) => (newInstanceId, Start(clusterId, image))
+    case StartInstance(schedulerId, clusterId, image) =>
+      (newInstanceId, Start(schedulerId, clusterId, image))
     case Envelope(instanceId, msg) => (instanceId, msg)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
-    case StartInstance(clusterId, image) => "00" // All instance creation will happen in one shard, but that's OK
+    case StartInstance(_, _, _) => "00" // All instance creation will happen in one shard, but that's OK
     case Envelope(userId, _) => userId.reverse.take(2).reverse // Last two characters of aggregate ID (it'll do for now)
   }
 

@@ -19,7 +19,6 @@ import utils.IdUtils
 object Cluster {
 
   sealed trait Command extends BaseResponse
-  case class Create(schedulerId: String) extends Command
   case class StartInstance(instanceId: String, image: String) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class SaveInstance(instanceId: String) extends Command

@@ -91,10 +91,14 @@ class MainController(
         },
         userData => {
           implicit val timeout = Timeout(1.minute)
-          val cluster = clusterLookup(userData.cluster)
+          val (schedulerId, clusterId) = resolveSchedulerAndCluster(
+              userData.cluster)
           val uaOp = imageLookup.get(userData.image) match {
-            case Some(image) => UserAggregate.StartInstance(cluster, image)
-            case None => UserAggregate.StartInstanceFromInstance(cluster, userData.image)
+            case Some(image) =>
+              UserAggregate.StartInstance(schedulerId, clusterId, image)
+            case None =>
+              UserAggregate.StartInstanceFromInstance(
+                  schedulerId, clusterId, userData.image)
           }
           (userSharder ? UserSharder.Envelope(request.identity.id, uaOp)).map {
             case InstanceAggregate.Started(id) => Ok(id)
@@ -148,6 +152,16 @@ class MainController(
         Future.successful(NotFound)
       case UserAggregate.InstanceNotOwnedByUser =>
         Future.successful(Forbidden)
+    }
+  }
+
+  def getAvailableClusters = silhouette.SecuredAction.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    val queryMsg = UserSharder.Envelope(
+        request.identity.id, UserAggregate.GetAvailableClusters)
+    (userSharder ? queryMsg).map {
+      case clusters: UserAggregate.AvailableClusters =>
+        Ok(Json.toJson(clusters))
     }
   }
 
@@ -339,13 +353,20 @@ class MainController(
     )(LoginData.apply)(LoginData.unapply)
   )
 
+  def resolveSchedulerAndCluster(
+      joinedSchedulerClusterId: String): (String, String) = {
+    val jsciRegex = """^(.*)\.(.*)$""".r
+    joinedSchedulerClusterId match {
+      case jsciRegex(schedulerId, clusterId) =>
+        (schedulerId, clusterId)
+    }
+  }
+
   def newInstanceForm(userId: String) = Form(
     mapping(
         "image" -> nonEmptyText,
         "cluster" -> nonEmptyText
-    )(NewInstanceRequest.apply)(NewInstanceRequest.unapply).verifying(r =>
-        clusterLookup.contains(r.cluster)
-    )
+    )(NewInstanceRequest.apply)(NewInstanceRequest.unapply)
   )
 
   case class NewInstanceRequest(image: String, cluster: String)
@@ -363,11 +384,21 @@ class MainController(
       (__ \ 'expires).write[Instant]
   )((isl: InstanceSharingLink) => (isl.url, isl.expires))
 
-  private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
+  implicit val writesAvailableCluster: OWrites[UserAggregate.AvailableCluster] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'display).write[String]
+  ) { (c: UserAggregate.AvailableCluster) =>
+    val joinedId = s"${c.schedulerId}.${c.clusterId}"
+    val display = s"${c.schedulerId.takeRight(8)} - ${c.clusterId}" +
+      c.until.map(t => s"(until $t)").getOrElse("")
+    (joinedId, display)
+  }
 
-  private val clusterLookup = Map(
-    "Default" -> "28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94.default"
-  )
+  implicit val writesAvailableClusters: OWrites[UserAggregate.AvailableClusters] =
+      (__ \ 'clusters).write[List[UserAggregate.AvailableCluster]]
+        .contramap[UserAggregate.AvailableClusters](_.clusters)
+
+  private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 
   implicit private val readsInstanceRegistration: Reads[InstanceRegistrationRequest] =
     (__ \ 'uri).read[String].map(InstanceRegistrationRequest(_))

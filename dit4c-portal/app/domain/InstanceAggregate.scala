@@ -44,6 +44,7 @@ object InstanceAggregate {
   sealed trait Data
   case object NoData extends Data
   case class InstanceData(
+      schedulerId: String,
       clusterId: String,
       key: Option[PGPPublicKey] = None,
       uri: Option[String] = None,
@@ -60,7 +61,10 @@ object InstanceAggregate {
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
   case object Discard extends Command
-  case class Start(clusterId: String, image: String) extends Command
+  case class Start(
+      schedulerId: String,
+      clusterId: String,
+      image: String) extends Command
   case class AssociatePGPPublicKey(armoredKey: String) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
@@ -112,13 +116,15 @@ class InstanceAggregate(
       stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
-    case Event(Start(clusterId, image), _) =>
+    case Event(Start(schedulerId, clusterId, image), _) =>
       val requester = sender
-      goto(Started).applying(StartedInstance(clusterId, now)).andThen { _ =>
+      goto(Started).applying(StartedInstance(schedulerId, clusterId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
-        (schedulerSharder ? SchedulerSharder.ClusterEnvelope(
-              clusterId,
-              Cluster.StartInstance(instanceId, image))).map {
+        (schedulerSharder ? SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.StartInstance(instanceId, image)))).map {
             case SchedulerAggregate.Ack =>
               Started(instanceId)
           }.pipeTo(requester)
@@ -126,16 +132,20 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       // Start actor listening
       context.actorOf(
           Props(classOf[GetStatusRequestActor], sender),
           "get-status-request-"+Random.alphanumeric.take(10).mkString)
       // Forward request to cluster
       context.system.eventStream.publish(
-          SchedulerSharder.ClusterEnvelope(clusterId, Cluster.GetInstanceStatus(instanceId)))
+          SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(clusterId, _, uri, imageUrl, ts)) =>
+    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
       // Tell any listening actors
       context.actorSelection("get-status-request-*") ! CurrentStatus(state.toString, uri, ts)
       state match {
@@ -143,21 +153,25 @@ class InstanceAggregate(
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
-          schedulerSharder ! SchedulerSharder.ClusterEnvelope(clusterId, Cluster.ConfirmInstanceUpload(instanceId))
+          schedulerSharder ! SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.ConfirmInstanceUpload(instanceId)))
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
       stay replying key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
       stay replying {
         validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociatePGPPublicKey(kStr), InstanceData(_, possibleKey, _, _, _)) =>
+    case Event(AssociatePGPPublicKey(kStr), InstanceData(_, _, possibleKey, _, _, _)) =>
       val requester = sender
       parseArmoredPublicKeyRing(kStr).right.flatMap(checkInstancePublicKeyRingIsSuitable).fold({
         message =>
@@ -174,7 +188,7 @@ class InstanceAggregate(
               }
           }
       })
-    case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri), _, _)) if currentUri == newUri =>
+    case Event(AssociateUri(newUri), InstanceData(_, _, _, Some(currentUri), _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
     case Event(AssociateUri(uri), _: InstanceData) =>
@@ -188,29 +202,37 @@ class InstanceAggregate(
         // TODO: Notify scheduler
         requester ! Ack
       }
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
-      schedulerSharder forward SchedulerSharder.ClusterEnvelope(clusterId, Cluster.SaveInstance(instanceId))
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+      schedulerSharder forward SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.SaveInstance(instanceId)))
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
-      schedulerSharder forward SchedulerSharder.ClusterEnvelope(clusterId, Cluster.DiscardInstance(instanceId))
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+      schedulerSharder forward SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.DiscardInstance(instanceId)))
       stay
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
       stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
       stay replying getJwkResponse(key)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
       stay replying {
         validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
       }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -221,18 +243,18 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(GetImage, InstanceData(_, _, _, Some(imageUrl), _)) =>
+    case Event(GetImage, InstanceData(_, _, _, _, Some(imageUrl), _)) =>
       stay replying InstanceImage(imageUrl)
-    case Event(GetImage, InstanceData(_, _, _, None, _)) =>
+    case Event(GetImage, InstanceData(_, _, _, _, None, _)) =>
       stay replying NoImageExists
   }
 
   when(Discarded) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
       stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -250,9 +272,9 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
   }
 
@@ -271,18 +293,22 @@ class InstanceAggregate(
         throw new Exception(s"Unknown state/data combination: ($domainEvent, $currentData)")
       }
     domainEvent match {
-      case StartedInstance(clusterId, ts) => InstanceData(clusterId, timestamps = EventTimestamps(ts) )
+      case StartedInstance(schedulerId, clusterId, ts) =>
+        InstanceData(schedulerId, clusterId, timestamps = EventTimestamps(ts) )
       case PreservedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
+        case data: InstanceData =>
+          data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
       case DiscardedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
+        case data: InstanceData =>
+          data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
       case AssociatedPGPPublicKey(keyData, _) => currentData match {
         case data: InstanceData =>
-          data.copy(key = Some(parseArmoredPublicKeyRing(keyData).right.get.getPublicKey))
+          data.copy(key = Some(
+              parseArmoredPublicKeyRing(keyData).right.get.getPublicKey))
         case _ => unhandled
       }
       case AssociatedUri(uri, _) => currentData match {
@@ -299,7 +325,8 @@ class InstanceAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
-  private def getJwkResponse(key: PGPPublicKey): GetJwkResponse = key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
+  private def getJwkResponse(key: PGPPublicKey): GetJwkResponse =
+    key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
 
   private def validateJwk(key: PGPPublicKey)(token: String) =
     key.asJavaPublicKey.map { publicKey =>
@@ -309,7 +336,8 @@ class InstanceAggregate(
            if (claim.isValid) Right(())
            else Left("Claim is not valid at this time")
          }
-    }.getOrElse(Left("Unable to convert key to one capable of validating JWTs"))
+    }.getOrElse(Left(
+        "Unable to convert key to one capable of validating JWTs"))
 
 
 }
