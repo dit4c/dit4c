@@ -14,6 +14,7 @@ POST    /instances/:instanceId/share        controllers.MainController.createSha
 PUT     /instances/                         controllers.MainController.instanceRegistration
 PUT     /images/                            controllers.MainController.imageRegistration
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
+GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.redeemAccessPass(schedulerId, data)
 
 # Assets
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)

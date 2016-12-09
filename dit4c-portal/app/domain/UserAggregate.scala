@@ -14,13 +14,18 @@ import akka.util.Timeout
 import java.time.Instant
 import domain.{InstanceAggregate => IA }
 import scala.collection.immutable.SortedSet
-import services.InstanceSharder
+import services._
+import utils.akka.ActorHelpers
 
 object UserAggregate {
 
   type Id = String
 
-  case class Data(instances: SortedSet[String] = SortedSet.empty)
+  type SchedulerAccessPassPair = (String, String)
+
+  case class Data(
+      instances: SortedSet[String] = SortedSet.empty,
+      accessPasses: SortedSet[SchedulerAccessPassPair] = SortedSet.empty)
 
   sealed trait Command extends BaseCommand
   case object Create extends Command
@@ -35,6 +40,10 @@ object UserAggregate {
   case class GetInstanceImageUrl(instanceId: String) extends Command
   case object GetAllInstanceIds extends Command
   case class ReceiveSharedInstance(sourceUserId: String, instanceId: String) extends Command
+  case class AddAccessPass(schedulerId: String, signedData: ByteString) extends Command
+  protected case class AddAccessPassById(
+      schedulerId: String, accessPassId: String) extends Command
+  case object GetAvailableClusters extends Command
 
   sealed trait Response extends BaseResponse
   case class CreateResponse(userId: UserAggregate.Id) extends Response
@@ -42,11 +51,17 @@ object UserAggregate {
   case object InstanceNotOwnedByUser extends Response
   case class UserInstances(instanceIds: Set[String]) extends Response
   case object InstanceReceived extends Response
+  trait AddAccessPassResponse extends Response
+  case object AccessPassAdded extends AddAccessPassResponse
+  case class AccessPassRejected(reason: String) extends AddAccessPassResponse
+  trait GetAvailableClustersResponse extends Response
 
 }
 
 class UserAggregate(
-    instanceSharder: ActorRef @@ InstanceSharder.type) extends PersistentActor with ActorLogging {
+    instanceSharder: ActorRef @@ InstanceSharder.type,
+    schedulerSharder: ActorRef @@ SchedulerSharder.type)
+    extends PersistentActor with ActorLogging with ActorHelpers {
   import domain.BaseDomainEvent.now
   import domain.user._
   import UserAggregate._
@@ -123,9 +138,32 @@ class UserAggregate(
           sender ! InstanceReceived
         }
       }
+    case AddAccessPass(schedulerId, signedData) =>
+      val requester = sender
+      val queryMsg = SchedulerSharder.Envelope(schedulerId,
+            AccessPassManager.RegisterAccessPass(signedData))
+      (schedulerSharder ? queryMsg).foreach {
+        case AccessPass.RegistrationSucceeded(accessPassId) =>
+          context.self.tell(
+              AddAccessPassById(schedulerId, accessPassId),
+              requester)
+        case AccessPass.RegistrationFailed(reason) =>
+          log.warning(s"$userId failed to add access pass for scheduler $schedulerId: $reason")
+          requester ! AccessPassRejected(reason)
+      }
+    case AddAccessPassById(schedulerId, accessPassId) =>
+      if (data.accessPasses.contains((schedulerId, accessPassId))) {
+        sender ! AccessPassAdded
+      } else {
+        persist(AddedAccessPass(schedulerId, accessPassId, now)) { evt =>
+          updateData(evt)
+          log.info(s"$userId added access pass $accessPassId for scheduler $schedulerId")
+          sender ! AccessPassAdded
+        }
+      }
   }
 
-  def receiveRecover: PartialFunction[Any,Unit] = {
+  def receiveRecover: PartialFunction[Any,Unit] = sealedReceive[DomainEvent] {
     case e: DomainEvent => updateData(e)
   }
 
@@ -133,7 +171,11 @@ class UserAggregate(
     case CreatedInstance(instanceId, _) =>
       data = data.copy(instances = data.instances + instanceId)
     case ReceivedSharedInstance(_, instanceId, _) =>
-      data = data.copy(instances = data.instances + instanceId)
+      data = data.copy(
+          instances = data.instances + instanceId)
+    case AddedAccessPass(schedulerId, accessPassId, _) =>
+      data = data.copy(
+          accessPasses = data.accessPasses + ((schedulerId, accessPassId)))
   }
 
   implicit class UriPathHelper(path: Uri.Path) {

@@ -9,6 +9,7 @@ import utils.akka.ActorHelpers
 import dit4c.protobuf.tokens.ClusterAccessPass
 import java.time.Instant
 import domain.accesspass.PassVerificationWorker
+import dit4c.common.KeyHelpers.PGPFingerprint
 
 object AccessPass {
 
@@ -22,18 +23,20 @@ object AccessPass {
 
   sealed trait Response extends BaseResponse
   trait RegisterResponse extends Response
-  case object RegistrationSucceeded extends RegisterResponse
+  case class RegistrationSucceeded(id: String) extends RegisterResponse
   case class RegistrationFailed(reason: String) extends RegisterResponse
   trait GetDecodedPassResponse extends Response
-  case class DecodedPass(
+  case class ValidPass(
       pass: ClusterAccessPass,
-      expires: Option[Instant]) extends GetDecodedPassResponse
+      expires: Option[Instant],
+      signedBy: PGPFingerprint) extends GetDecodedPassResponse
+  case class ExpiredPass(
+      pass: ClusterAccessPass) extends GetDecodedPassResponse
+  case class UnverifiablePass(
+      reason: String) extends GetDecodedPassResponse
   trait GetSignedPassResponse extends Response
   case class SignedPass(
       signedData: ByteString) extends GetSignedPassResponse
-
-
-
 
   def calculateId(signedData: ByteString) = {
     import dit4c.common.KeyHelpers._
@@ -72,7 +75,7 @@ class AccessPass(scheduler: ActorRef @@ SchedulerAggregate) extends PersistentAc
     case r: PassVerificationWorker.Result => r match {
       case _: PassVerificationWorker.ValidPass =>
         persist(Registered(signedData, now))(updateState _)
-        dataProvider ! RegistrationSucceeded
+        dataProvider ! RegistrationSucceeded(accessPassId)
         unstashAll
         context.become(active(signedData))
       case _: PassVerificationWorker.ExpiredPass =>
@@ -86,13 +89,37 @@ class AccessPass(scheduler: ActorRef @@ SchedulerAggregate) extends PersistentAc
     }
   }
 
-  def active(signedData: ByteString) = sealedReceive[Command] {
-    case _: Register =>
-      sender ! RegistrationFailed("Have data already")
-    case GetDecodedPass =>
-      // TODO: Implement
-    case GetSignedPass =>
-      sender ! SignedPass(signedData)
+  def active(
+      signedData: ByteString,
+      pendingDecode: List[ActorRef] = Nil): Receive = {
+    sealedReceive[Command] {
+      case _: Register =>
+        sender ! RegistrationFailed("Have data already")
+      case GetDecodedPass =>
+        context.actorOf(
+            Props(classOf[PassVerificationWorker],
+                scheduler, signedData))
+        context.become(active(signedData, pendingDecode :+ sender))
+      case GetSignedPass =>
+        sender ! SignedPass(signedData)
+    } orElse
+    sealedReceive[PassVerificationWorker.Result] {
+      case PassVerificationWorker.ValidPass(cap, expiry, signedBy) =>
+        pendingDecode.foreach { waitingRef =>
+          waitingRef ! ValidPass(cap, expiry, signedBy)
+        }
+        context.become(active(signedData))
+      case PassVerificationWorker.ExpiredPass(cap) =>
+        pendingDecode.foreach { waitingRef =>
+          waitingRef ! ExpiredPass(cap)
+        }
+        context.become(active(signedData))
+      case PassVerificationWorker.UnverifiablePass(reason) =>
+        pendingDecode.foreach { waitingRef =>
+          waitingRef ! UnverifiablePass(reason)
+        }
+        context.become(active(signedData))
+    }
   }
 
   override val receiveRecover = sealedReceive[DomainEvent](updateState _)

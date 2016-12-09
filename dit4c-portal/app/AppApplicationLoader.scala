@@ -98,13 +98,13 @@ class AppComponents(context: Context)
   val schedulerSharder = SchedulerSharder(imageServerConfig)(actorSystem)
       .taggedWith[services.SchedulerSharder.type]
   system.eventStream.subscribe(schedulerSharder, classOf[SchedulerSharder.Envelope])
-  val instanceAggregateManager = InstanceSharder(schedulerSharder)(actorSystem)
+  val instanceSharder = InstanceSharder(schedulerSharder)(actorSystem)
       .taggedWith[services.InstanceSharder.type]
-  system.eventStream.subscribe(instanceAggregateManager, classOf[InstanceSharder.Envelope])
-  val userAggregateManager = UserSharder(instanceAggregateManager)(actorSystem)
+  system.eventStream.subscribe(instanceSharder, classOf[InstanceSharder.Envelope])
+  val userSharder = UserSharder(instanceSharder, schedulerSharder)(actorSystem)
       .taggedWith[services.UserSharder.type]
-  system.eventStream.subscribe(userAggregateManager, classOf[UserSharder.Envelope])
-  val identitySharder = IdentitySharder(userAggregateManager)(actorSystem)
+  system.eventStream.subscribe(userSharder, classOf[UserSharder.Envelope])
+  val identitySharder = IdentitySharder(userSharder)(actorSystem)
       .taggedWith[services.IdentitySharder.type]
   system.eventStream.subscribe(identitySharder, classOf[IdentitySharder.Envelope])
 
@@ -153,6 +153,7 @@ class AppComponents(context: Context)
   lazy val oauthServerController = wire[OAuthServerController]
   lazy val messagingController = wire[MessagingController]
   lazy val webComponentsController = wire[WebComponentsController]
+  lazy val accessPassController = wire[AccessPassController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
   // SSH admin server

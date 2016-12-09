@@ -107,7 +107,7 @@ class SchedulerAggregate(
       parseArmoredPublicKeyRing(keyBlock) match {
         case Left(msg) =>
           stay replying KeysRejected(msg)
-        case Right(kr) if kr.getPublicKey.fingerprint != schedulerId =>
+        case Right(kr) if kr.getPublicKey.fingerprint.string != schedulerId =>
           stay replying KeysRejected(
               "Master key fingerprint does not match scheduler ID")
         case Right(kr) if Some(keyBlock) == possibleKeyBlock =>
@@ -186,7 +186,7 @@ class SchedulerAggregate(
         stay replying response
       }
     case Event(cmd: AccessPassManager.Command, _) =>
-      accessPassManagerRef ! cmd
+      accessPassManagerRef forward cmd
       stay
   }
 
