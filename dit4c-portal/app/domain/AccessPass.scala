@@ -94,7 +94,7 @@ class AccessPass(scheduler: ActorRef @@ SchedulerAggregate) extends PersistentAc
       pendingDecode: List[ActorRef] = Nil): Receive = {
     sealedReceive[Command] {
       case _: Register =>
-        sender ! RegistrationFailed("Have data already")
+        sender ! RegistrationSucceeded(accessPassId)
       case GetDecodedPass =>
         context.actorOf(
             Props(classOf[PassVerificationWorker],
