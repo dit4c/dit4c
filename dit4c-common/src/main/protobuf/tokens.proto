@@ -1,5 +1,4 @@
 syntax = "proto3";
-import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 package dit4c.protobuf;
 
