@@ -37,11 +37,7 @@ object UserAggregate {
   case class StartInstance(
       schedulerId: String,
       clusterId: String,
-      image: String) extends Command {
-    def toIAMCommand: InstanceSharder.Command =
-      (InstanceSharder.StartInstance.apply _)
-        .tupled(StartInstance.unapply(this).get)
-  }
+      image: String) extends Command
   case class StartInstanceFromInstance(
       schedulerId: String,
       clusterId: String,
@@ -97,7 +93,8 @@ class UserAggregate(
     case Create =>
       sender ! CreateResponse(userId)
     case msg @ StartInstance(schedulerId, clusterId, image) =>
-      val op = (instanceSharder ? msg.toIAMCommand)
+      val op = (instanceSharder ? InstanceSharder.StartInstance(
+          schedulerId, clusterId, accessPassIds(schedulerId), image))
       op.onSuccess {
         case InstanceAggregate.Started(instanceId) =>
           self ! InstanceCreationConfirmation(instanceId)
@@ -108,7 +105,7 @@ class UserAggregate(
         (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
           case InstanceAggregate.InstanceImage(image) =>
             val op = (instanceSharder ?
-                InstanceSharder.StartInstance(schedulerId, clusterId, image))
+                InstanceSharder.StartInstance(schedulerId, clusterId, accessPassIds(schedulerId), image))
             op.onSuccess {
               case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)
@@ -176,7 +173,7 @@ class UserAggregate(
         }
       }
     case GetAvailableClusters =>
-      // Collect available clusters from each scheduler 
+      // Collect available clusters from each scheduler
       data.accessPasses
         .groupBy(_._1) // Group by scheduler
         .mapValues(_.map(_._2)) // key is scheduler, value is a set of access IDs
@@ -224,5 +221,10 @@ class UserAggregate(
   }
 
   private case class InstanceCreationConfirmation(instanceId: String)
+
+  private def accessPassIds(schedulerId: String): List[String] =
+    data.accessPasses
+      .collect { case (`schedulerId`, accessPassId) => accessPassId }
+      .toList
 
 }

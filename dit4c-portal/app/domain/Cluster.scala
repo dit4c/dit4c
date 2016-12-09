@@ -1,25 +1,17 @@
 package domain
 
+import scala.concurrent.duration._
+
 import akka.actor._
-import com.softwaremill.tagging._
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import scala.concurrent.Future
-import akka.util.ByteString
-import akka.stream.ActorMaterializer
-import akka.stream.Materializer
-import services.SchedulerSharder
-import akka.persistence.fsm._
-import Cluster._
-import java.time.Instant
-import scala.reflect._
-import scala.util.Random
+import akka.stream._
+import akka.util.Timeout
 import utils.IdUtils
+import akka.util.ByteString
 
 object Cluster {
 
   sealed trait Command extends BaseResponse
-  case class StartInstance(instanceId: String, image: String) extends Command
+  case class StartInstance(instanceId: String, image: String, accessTokenIds: List[String]) extends Command
   case class GetInstanceStatus(instanceId: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
@@ -34,18 +26,31 @@ class Cluster(
     imageServerConfig: ImageServerConfig)
     extends Actor
     with ActorLogging {
-  import BaseDomainEvent._
   import Cluster._
-  import play.api.libs.json._
 
   lazy val clusterId = self.path.name
 
   implicit val m: Materializer = ActorMaterializer()
-  import context.dispatcher
 
   val receive: Receive = {
-    case StartInstance(instanceId, image) =>
-      context.parent forward SchedulerMessage.startInstance(instanceId, image)
+    case StartInstance(instanceId, image, accessTokenIds) =>
+      import akka.pattern.{ask, pipe}
+      import context.dispatcher
+      implicit val timeout = Timeout(10.seconds)
+      accessTokenIds
+        .map { accessTokenId =>
+          (context.parent ? AccessPassManager.Envelope(accessTokenId, AccessPass.GetSignedPass))
+            .map {
+              case AccessPass.SignedPass(signedData) => List(signedData)
+              case _ => Nil
+            }
+        }
+        // Collapse to single future
+        .reduce { (aF, bF) =>
+          for (a <- aF; b <- bF) yield a ++ b
+        }
+        .map(SchedulerMessage.startInstance(instanceId, image, _))
+        .pipeTo(context.parent)(sender)
     case GetInstanceStatus(instanceId) =>
       context.parent forward SchedulerMessage.getInstanceStatus(instanceId)
     case SaveInstance(instanceId) =>
@@ -58,10 +63,12 @@ class Cluster(
 
   case object SchedulerMessage {
 
-    def startInstance(instanceId: String, image: String): SchedulerAggregate.SendSchedulerMessage = wrapForScheduler {
+    def startInstance(instanceId: String, image: String, signedClusterAccessPasses: List[ByteString]): SchedulerAggregate.SendSchedulerMessage = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
+      import com.google.protobuf.ByteString
       InboundMessage(randomMsgId, InboundMessage.Payload.StartInstance(
-        StartInstance(instanceId, clusterId, image)
+        StartInstance(instanceId, clusterId, image,
+            signedClusterAccessPasses.map(bs => ByteString.copyFrom(bs.toArray)))
       ))
     }
 

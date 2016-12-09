@@ -64,6 +64,7 @@ object InstanceAggregate {
   case class Start(
       schedulerId: String,
       clusterId: String,
+      accessPassIds: List[String],
       image: String) extends Command
   case class AssociatePGPPublicKey(armoredKey: String) extends Command
   case class AssociateUri(uri: String) extends Command
@@ -116,7 +117,7 @@ class InstanceAggregate(
       stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
-    case Event(Start(schedulerId, clusterId, image), _) =>
+    case Event(Start(schedulerId, clusterId, image, accessPassIds), _) =>
       val requester = sender
       goto(Started).applying(StartedInstance(schedulerId, clusterId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
@@ -124,7 +125,7 @@ class InstanceAggregate(
               schedulerId,
               SchedulerAggregate.ClusterEnvelope(
                 clusterId,
-                Cluster.StartInstance(instanceId, image)))).map {
+                Cluster.StartInstance(instanceId, accessPassIds, image)))).map {
             case SchedulerAggregate.Ack =>
               Started(instanceId)
           }.pipeTo(requester)
