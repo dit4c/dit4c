@@ -39,6 +39,7 @@ libraryDependencies ++= {
     __ %  "github-com-Polymer-polymer"                              % "1.7.0",
     __ %  "github-com-web-animations-web-animations-js"             % "2.2.1",
     __ %  "github-com-PolymerLabs-promise-polyfill"                 % "1.0.0",
+    __ %  "github-com-PolymerElements-iron-a11y-announcer"          % "1.0.5",
     __ %  "github-com-PolymerElements-iron-flex-layout"             % "1.3.1",
     __ %  "github-com-PolymerElements-iron-form"                    % "1.0.16",
     __ %  "github-com-PolymerElements-iron-iconset-svg"             % "1.0.9",
@@ -65,6 +66,7 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-paper-progress"               % "1.0.9"
       exclude(__, "github-com-polymerelements-iron-range-behavior"),
     __ %  "github-com-PolymerElements-paper-ripple"                 % "1.0.5",
+    __ %  "github-com-PolymerElements-paper-toast"                  % "1.3.0",
     __ %  "github-com-PolymerElements-app-layout"                   % "0.9.1"
       exclude(__, "github-com-polymerelements-iron-media-query")
       exclude(__, "github-com-polymerelements-iron-scroll-target-behavior"),

@@ -1,4 +1,4 @@
-@(imageNames: Seq[String], trackingScript: Html, pageTitle: String = "App Instances")(implicit request: RequestHeader)
+@(imageNames: Seq[String], trackingScript: Html, pageTitle: String = "App Instances")(implicit flash: Flash, request: RequestHeader)
 
 <!DOCTYPE html>
 <html>
@@ -14,6 +14,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-fab/paper-fab.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-toast/paper-toast.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/app-layout/app-layout.html")">
 <link rel="import" href="@routes.WebComponentsController.component("instances-container")">
 <link rel="import" href="@routes.WebComponentsController.component("new-instance-dialog")">
@@ -85,8 +86,8 @@ paper-dropdown-menu {
     </div>
   </div>
 </app-header-layout>
-<script type="text/javascript">
-
-</script>
+@for(msg <- flash.get("success")) {
+  <paper-toast text="@msg" opened></paper-toast>
+}
 </body>
 </html>

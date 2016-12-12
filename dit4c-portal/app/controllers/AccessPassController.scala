@@ -38,6 +38,7 @@ class AccessPassController(
           } yield queryResponse match {
             case UserAggregate.AccessPassAdded =>
               Redirect(routes.MainController.index())
+                .flashing("success" -> "Successfully added access pass")
             case UserAggregate.AccessPassRejected(reason) =>
               InternalServerError(reason)
           }
