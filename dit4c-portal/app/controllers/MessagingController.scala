@@ -92,8 +92,6 @@ class MessagingController(
     }
   }
 
-  private val dummyJwt = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.e30."
-
   private def randomId = Random.alphanumeric.take(8).mkString
 
 }
