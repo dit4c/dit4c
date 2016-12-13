@@ -4,6 +4,8 @@ import akka.persistence.PersistentActor
 import akka.actor.ActorLogging
 import utils.akka.ActorHelpers
 import domain.SchedulerAggregate.GetKeysResponse
+import java.security.MessageDigest
+import akka.util.ByteString
 
 object KeyRingAggregate {
   
@@ -15,7 +17,7 @@ object KeyRingAggregate {
   
   trait Response extends BaseResponse
   trait ReceiveKeySubmissionResponse extends Response
-  case class KeySubmissionAccepted(currentState: String) extends Response
+  case class KeySubmissionAccepted(currentKeyBlock: String) extends Response
   case class KeySubmissionRejected(reason: String) extends Response
   trait GetKeysResponse extends Response
   case object NoKeysAvailable extends GetKeysResponse
@@ -36,17 +38,22 @@ class KeyRingAggregate extends PersistentActor
   override lazy val persistenceId: String = "KeyRing-" + self.path.name
   
   var currentKeyBlock: Option[String] = None
+  var seenKeyBlocks = Set.empty[ByteString]
 
-  override val receiveCommand =  sealedReceive[Command] {
+  override val receiveCommand = sealedReceive[Command] {
     case GetKeys =>
       sender ! currentKeyBlock.map(CurrentKeyBlock(_)).getOrElse(NoKeysAvailable)
+    case ReceiveKeySubmission(pgpPublicKeyBlock) if alreadyReceived(pgpPublicKeyBlock) =>
+      sender ! KeySubmissionAccepted(currentKeyBlock.get)
     case ReceiveKeySubmission(pgpPublicKeyBlock) =>
       combineWithCurrent(pgpPublicKeyBlock) match {
         case Left(reason) =>
           sender ! KeySubmissionRejected(reason)
         case Right(updatedKeyBlock) =>
-          persist(AcceptedKeyBlockSubmission(pgpPublicKeyBlock, now))(updateState _)
-          sender ! KeySubmissionAccepted(currentKeyBlock.get)
+          persist(AcceptedKeyBlockSubmission(pgpPublicKeyBlock, now)) { evt =>
+            updateState(evt)
+            sender ! KeySubmissionAccepted(currentKeyBlock.get)
+          }
       }
   }
 
@@ -57,6 +64,7 @@ class KeyRingAggregate extends PersistentActor
       // Update key block, skipping blocks that merge with errors
       combineWithCurrent(keyBlock).right.foreach { kb =>
         currentKeyBlock = Some(kb)
+        recordReceived(kb)
       }
   }
   
@@ -71,5 +79,17 @@ class KeyRingAggregate extends PersistentActor
         // TODO: do proper merge
         Right(newKeyBlock)
     }
+  
+  def recordReceived(kb: String): Unit = {
+    seenKeyBlocks += keyBlockDigest(kb)
+  }
+  
+  def alreadyReceived(kb: String): Boolean =
+    seenKeyBlocks.contains(keyBlockDigest(kb))
+    
 
+  def keyBlockDigest(keyBlock: String): ByteString =
+    ByteString(MessageDigest.getInstance("SHA-512").digest(keyBlock.getBytes))
+  
+  
 }

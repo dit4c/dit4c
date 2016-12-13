@@ -27,10 +27,13 @@ object InstanceSharder {
   case class VerifyJwt(token: String) extends Command
   case class Envelope(instanceId: String, msg: Any) extends Command
 
-  def apply(schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
+  def apply(
+      keyringSharder: ActorRef @@ KeyRingSharder.type,
+      schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "InstanceAggregate",
-        entityProps = aggregateProps(schedulerSharder),
+        entityProps = Props(
+            classOf[InstanceAggregate], keyringSharder, schedulerSharder),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)
@@ -49,9 +52,6 @@ object InstanceSharder {
   }
 
   private def newInstanceId = IdUtils.timePrefix+IdUtils.randomId(16)
-
-  private def aggregateProps(schedulerSharder: ActorRef @@ SchedulerSharder.type): Props =
-    Props(classOf[InstanceAggregate], schedulerSharder)
 
   def resolveJwtInstanceId(token: String): Either[String, String] =
     JwtJson.decode(token, JwtOptions(signature=false))

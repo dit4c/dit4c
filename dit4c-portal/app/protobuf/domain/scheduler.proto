@@ -16,9 +16,3 @@ message Created {
   option (scalapb.message).extends = "domain.scheduler.DomainEvent";
   google.protobuf.Timestamp timestamp = 100;
 }
-
-message UpdatedKeys {
-  option (scalapb.message).extends = "domain.scheduler.DomainEvent";
-  string pgpPublicKeyBlock = 1;
-  google.protobuf.Timestamp timestamp = 100;
-}

@@ -66,6 +66,7 @@ import akka.util.ByteString
 import pdi.jwt.JwtBase64
 import play.api.libs.json.JsObject
 import play.api.libs.json.Json
+import scala.util.hashing.MurmurHash3
 
 object KeyHelpers {
 
@@ -547,6 +548,7 @@ object KeyHelpers {
     def keyId = ByteBuffer.wrap(bytes.takeRight(8)).getLong
     def keyIdAsString = immutableBytes.takeRight(8).map(byteToHex).mkString
     override def toString = string
+    override lazy val hashCode = MurmurHash3.bytesHash(bytes)
     override def equals(obj: Any) = obj match {
       case other: PGPFingerprint => bytes.deep == other.bytes.deep
       case _ => false

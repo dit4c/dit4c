@@ -27,7 +27,10 @@ import java.security.spec.RSAPublicKeySpec
 import java.security.KeyFactory
 import scala.util.Random
 import dit4c.protobuf.scheduler.outbound.InstanceStateUpdate
-import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import services.KeyRingSharder
+import dit4c.common.KeyHelpers.PGPFingerprint
+import scala.util._
 
 object InstanceAggregate {
 
@@ -46,7 +49,7 @@ object InstanceAggregate {
   case class InstanceData(
       schedulerId: String,
       clusterId: String,
-      key: Option[PGPPublicKey] = None,
+      keyFingerprint: Option[PGPFingerprint] = None,
       uri: Option[String] = None,
       imageUrl: Option[String] = None,
       timestamps: EventTimestamps = EventTimestamps()) extends Data
@@ -55,7 +58,7 @@ object InstanceAggregate {
       created: Option[Instant] = None,
       completed: Option[Instant] = None)
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object GetStatus extends Command
   case object GetJwk extends Command
   case class VerifyJwt(token: String) extends Command
@@ -66,13 +69,15 @@ object InstanceAggregate {
       clusterId: String,
       accessPassIds: List[String],
       image: String) extends Command
-  case class AssociatePGPPublicKey(armoredKey: String) extends Command
+  case class AssociatePGPPublicKey(keyBlock: String) extends Command
+  protected case class AssociatePGPPublicKeyFingerprint(
+      keyFingerprint: PGPFingerprint) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
   case object GetImage extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case class Started(instanceId: String) extends Response
   case object Ack extends Response
   sealed trait StatusResponse extends Response
@@ -92,6 +97,7 @@ object InstanceAggregate {
 }
 
 class InstanceAggregate(
+    keyringSharder: ActorRef @@ KeyRingSharder.type,
     schedulerSharder: ActorRef @@ SchedulerSharder.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
@@ -162,33 +168,51 @@ class InstanceAggregate(
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
-      stay replying key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      getJwkResponse(keyFingerprint).pipeTo(sender)
+      stay
     case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
-      stay replying {
-        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
-      }
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      validateJwt(keyFingerprint)(token).pipeTo(sender)
+      stay
     case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociatePGPPublicKey(kStr), InstanceData(_, _, possibleKey, _, _, _)) =>
-      val requester = sender
-      parseArmoredPublicKeyRing(kStr).right.flatMap(checkInstancePublicKeyRingIsSuitable).fold({
-        message =>
-          log.error(message)
-          stay
-      }, {
-        newKeyRing =>
-          possibleKey match {
-            case Some(existingKeyRing) if newKeyRing.binary == existingKeyRing.binary =>
-              stay // It's the same, so nothing to do
-            case _ =>
-              stay applying AssociatedPGPPublicKey(kStr) andThen { _ =>
-                requester ! Ack
-              }
+    case Event(AssociatePGPPublicKey(keyBlock), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+      import dit4c.common.KeyHelpers._
+      // This is a one-way command, so no response necessary
+      KeyRingSharder.Envelope.forKeySubmission(keyBlock) match {
+        case Left(msg) =>
+          log.error(msg)
+          // Ignore key
+        case Right(envelope) if possibleKeyFingerprint.exists(_ != envelope.fingerprint) =>
+          log.error(
+              s"Instance $instanceId to re-associate key with different fingerprint: "+
+              s"${envelope.fingerprint} != ${possibleKeyFingerprint.get}")
+          // Ignore key
+        case Right(envelope) =>
+          import akka.pattern.{ask, pipe}
+          import context.dispatcher
+          implicit val timeout = Timeout(1.minute)
+          import KeyRingAggregate._
+          (keyringSharder ? envelope).foreach {
+            case KeySubmissionAccepted(_) =>
+              self ! AssociatePGPPublicKeyFingerprint(envelope.fingerprint)
+            case KeySubmissionRejected(r) =>
+              log.error(r)
           }
-      })
+      }
+      stay
+    case Event(AssociatePGPPublicKeyFingerprint(fingerprint), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+      possibleKeyFingerprint match {
+        case Some(f) if f != fingerprint =>
+          log.error(
+              s"Instance $instanceId to re-associate key with different fingerprint: "+
+              s"${f} != ${fingerprint}")
+          stay
+        case _ =>
+          stay applying AssociatedPGPPublicKey(fingerprint.string)
+      }
     case Event(AssociateUri(newUri), InstanceData(_, _, _, Some(currentUri), _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
@@ -229,10 +253,9 @@ class InstanceAggregate(
       stay replying getJwkResponse(key)
     case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
-      stay replying {
-        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
-      }
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      validateJwt(keyFingerprint)(token).pipeTo(sender)
+      stay
     case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(_: AssociatePGPPublicKey, _) =>
@@ -306,10 +329,9 @@ class InstanceAggregate(
           data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
-      case AssociatedPGPPublicKey(keyData, _) => currentData match {
+      case AssociatedPGPPublicKey(fingerprintStr, _) => currentData match {
         case data: InstanceData =>
-          data.copy(key = Some(
-              parseArmoredPublicKeyRing(keyData).right.get.getPublicKey))
+          data.copy(keyFingerprint = Some(PGPFingerprint(fingerprintStr)))
         case _ => unhandled
       }
       case AssociatedUri(uri, _) => currentData match {
@@ -326,20 +348,58 @@ class InstanceAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
-  private def getJwkResponse(key: PGPPublicKey): GetJwkResponse =
-    key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
+  private def getJwkResponse(fingerprint: PGPFingerprint): Future[GetJwkResponse] = {
+    import dit4c.common.KeyHelpers._
+    implicit val timeout = Timeout(1.minute)
+    val msg = KeyRingSharder.Envelope(
+        fingerprint,
+        KeyRingAggregate.GetKeys)
+    (keyringSharder ? msg)
+      .collect {
+        case KeyRingAggregate.NoKeysAvailable => NoJwkExists
+        case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
+          parseArmoredPublicKeyRing(keyBlock).right.get
+            .authenticationKeys
+            .flatMap(k => k.asJWK) match {
+              case Nil => NoJwkExists
+              case jwk :: _ => InstanceJwk(jwk)
+            }
+      }
+  }
 
-  private def validateJwk(key: PGPPublicKey)(token: String) =
-    key.asJavaPublicKey.map { publicKey =>
-       JwtJson.decode(token, publicKey)
-         .toOption.toRight("Failed to verify JWT with key")
-         .right.flatMap { claim =>
-           if (claim.isValid) Right(())
-           else Left("Claim is not valid at this time")
-         }
-    }.getOrElse(Left(
-        "Unable to convert key to one capable of validating JWTs"))
-
+  private def validateJwt(
+      fingerprint: PGPFingerprint)(token: String): Future[VerifyJwtResponse] = {
+    import dit4c.common.KeyHelpers._
+    implicit val timeout = Timeout(1.minute)
+    val msg = KeyRingSharder.Envelope(
+        fingerprint,
+        KeyRingAggregate.GetKeys)
+    (keyringSharder ? msg)
+      .collect {
+        case KeyRingAggregate.NoKeysAvailable =>
+          InvalidJwt("No keys available to validate")
+        case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
+          parseArmoredPublicKeyRing(keyBlock).right.get
+            .authenticationKeys
+            .flatMap(k => k.asJavaPublicKey.map((k.fingerprint, _))) match {
+              case Nil =>
+                InvalidJwt("No keys available to validate")
+              case keys =>
+                keys
+                  .map { case (fingerprint, key) =>
+                    JwtJson.decode(token, key) match {
+                      case Success(_) => ValidJwt(instanceId)
+                      case Failure(e) => InvalidJwt(s"$fingerprint: ${e.getMessage}")
+                    }
+                  }
+                  .reduce[VerifyJwtResponse] {
+                    case (InvalidJwt(a), InvalidJwt(b)) =>
+                      InvalidJwt(s"$a\n$b")
+                    case _ => ValidJwt(instanceId)
+                  }
+            }
+      }
+  }
 
 }
 
