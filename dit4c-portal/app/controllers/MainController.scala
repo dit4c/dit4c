@@ -38,12 +38,14 @@ import scala.util.Failure
 import scala.util.Success
 import play.api.http.websocket.CloseMessage
 import play.twirl.api.Html
+import org.bouncycastle.openpgp.PGPSignature
 
 class MainController(
     val environment: Environment,
     val messagesApi: MessagesApi,
     val trackingScripts: TrackingScripts,
     val instanceSharder: ActorRef @@ InstanceSharder.type,
+    val schedulerSharder: ActorRef @@ SchedulerSharder.type,
     val userSharder: ActorRef @@ UserSharder.type,
     val silhouette: Silhouette[DefaultEnv],
     val identityService: IdentityService,
@@ -159,9 +161,44 @@ class MainController(
     implicit val timeout = Timeout(1.minute)
     val queryMsg = UserSharder.Envelope(
         request.identity.id, UserAggregate.GetAvailableClusters)
-    (userSharder ? queryMsg).map {
-      case clusters: UserAggregate.AvailableClusters =>
-        Ok(Json.toJson(clusters))
+    (userSharder ? queryMsg).flatMap {
+      case UserAggregate.AvailableClusters(clusters) =>
+        // Get friendly names for the schedulers
+        clusters.map(_.schedulerId)
+          .distinct
+          .map { schedulerId =>
+            // Extract the user ID from the OpenPGP key
+            import dit4c.common.KeyHelpers._
+            (schedulerSharder ? SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.GetKeys))
+              .collect {
+                case SchedulerAggregate.CurrentKeys(kb, _) =>
+                  import scala.collection.JavaConversions._
+                  val kr = parseArmoredPublicKeyRing(kb).right.get
+                  val k = kr.getPublicKey
+                  // This is wrong, because it doesn't check for revocations, but
+                  // it will do for now.
+                  val userId = k.getUserIDs.toSeq.head.toString
+                  Map(schedulerId -> userId)
+              }
+              .recover { case e => Map.empty[String, String] }
+          }
+          // Collapse to single future
+          .reduce { (aF, bF) =>
+            for (a <- aF; b <- bF) yield a ++ b
+          }
+          .map { (schedulerNames: Map[String, String]) =>
+            val clusterOptions = ClusterOptions(clusters.map { c =>
+              val joinedId = s"${c.schedulerId}.${c.clusterId}"
+              val schedulerName = 
+                schedulerNames.get(c.schedulerId)
+                  .map(_.split("<(".toCharArray).head)
+                  .getOrElse(c.schedulerId.takeRight(8))
+              val display = s"${schedulerName} - ${c.clusterId} " +
+                c.until.map(t => s"(until $t)").getOrElse("")
+              ClusterOption(joinedId, display)
+            })
+            Ok(Json.toJson(clusterOptions))
+          }
     }
   }
 
@@ -373,6 +410,8 @@ class MainController(
   case class InstanceRegistrationRequest(uri: String)
   case class InstanceSharingAuthorization(userId: String, instanceId: String)
   case class InstanceSharingLink(url: String, expires: Instant)
+  case class ClusterOption(joinedId: String, displayName: String)
+  case class ClusterOptions(options: List[ClusterOption])
 
   implicit val formatInstanceSharingAuthorization: OFormat[InstanceSharingAuthorization] = (
       (__ \ 'user).format[String] and
@@ -384,19 +423,14 @@ class MainController(
       (__ \ 'expires).write[Instant]
   )((isl: InstanceSharingLink) => (isl.url, isl.expires))
 
-  implicit val writesAvailableCluster: OWrites[UserAggregate.AvailableCluster] = (
+  implicit val writesClusterOption: OWrites[ClusterOption] = (
       (__ \ 'id).write[String] and
       (__ \ 'display).write[String]
-  ) { (c: UserAggregate.AvailableCluster) =>
-    val joinedId = s"${c.schedulerId}.${c.clusterId}"
-    val display = s"${c.schedulerId.takeRight(8)} - ${c.clusterId}" +
-      c.until.map(t => s"(until $t)").getOrElse("")
-    (joinedId, display)
-  }
+  )(unlift(ClusterOption.unapply))
 
-  implicit val writesAvailableClusters: OWrites[UserAggregate.AvailableClusters] =
-      (__ \ 'clusters).write[List[UserAggregate.AvailableCluster]]
-        .contramap[UserAggregate.AvailableClusters](_.clusters)
+  implicit val writesClusterOptions: OWrites[ClusterOptions] =
+      (__ \ 'clusters).write[List[ClusterOption]]
+        .contramap(_.options)
 
   private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
 
