@@ -1,45 +1,72 @@
 package dit4c.common
 
-import java.security.interfaces._
-import java.util.Base64
-import java.security.KeyPairGenerator
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-import java.security.MessageDigest
-import java.security.PublicKey
-import java.security.PrivateKey
-import org.bouncycastle.bcpg._
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.openpgp._
-import org.bouncycastle.openpgp.operator.jcajce._
-import java.security.KeyPair
-import java.io.OutputStream
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.util.Date
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.StringReader
+import java.io.StringWriter
+import java.nio.ByteBuffer
+import java.security.Key
+import java.security.KeyFactory
+import java.security.MessageDigest
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.SecureRandom
 import java.security.Security
+import java.security.interfaces.RSAPrivateKey
+import java.security.interfaces.RSAPublicKey
+import java.security.spec.RSAPrivateCrtKeySpec
+import java.security.spec.RSAPublicKeySpec
+import java.time.Instant
+import java.util.Base64
+import java.util.Date
+
+import scala.util.Try
+
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.bouncycastle.bcpg.ArmoredOutputStream
+import org.bouncycastle.bcpg.HashAlgorithmTags
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
+import org.bouncycastle.bcpg.RSAPublicBCPGKey
+import org.bouncycastle.bcpg.RSASecretBCPGKey
+import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags
 import org.bouncycastle.crypto.generators.RSAKeyPairGenerator
 import org.bouncycastle.crypto.params.RSAKeyGenerationParameters
-import java.security.SecureRandom
-import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair
-import java.security.spec.KeySpec
-import java.security.spec.RSAPrivateKeySpec
-import java.security.KeyFactory
-import java.security.spec.RSAPublicKeySpec
-import play.api.libs.json._
-import pdi.jwt.JwtBase64
-import java.io.ByteArrayInputStream
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.openpgp.PGPCompressedData
+import org.bouncycastle.openpgp.PGPKeyRing
+import org.bouncycastle.openpgp.PGPLiteralData
+import org.bouncycastle.openpgp.PGPOnePassSignature
+import org.bouncycastle.openpgp.PGPOnePassSignatureList
+import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import org.bouncycastle.openpgp.PGPSecretKey
+import org.bouncycastle.openpgp.PGPSecretKeyRing
+import org.bouncycastle.openpgp.PGPSignature
+import org.bouncycastle.openpgp.PGPSignatureList
+import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
+import org.bouncycastle.openpgp.PGPUtil
+import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRing
+import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRing
+import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRingCollection
+import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
 import org.bouncycastle.openpgp.jcajce.JcaPGPPublicKeyRingCollection
-import org.bouncycastle.bcpg.sig.KeyFlags
-import java.security.spec.RSAPrivateCrtKeySpec
-import java.io.StringReader
+import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
+import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair
+import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentSignerBuilder
+import org.bouncycastle.openpgp.operator.jcajce.JcaPGPDigestCalculatorProviderBuilder
+import org.bouncycastle.openpgp.operator.jcajce.JcePBESecretKeyDecryptorBuilder
+import org.bouncycastle.openpgp.operator.jcajce.JcePBESecretKeyEncryptorBuilder
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
-import java.security.Key
-import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRing
-import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRing
-import java.io.InputStream
-import org.bouncycastle.openpgp.bc.BcPGPSecretKeyRingCollection
-import java.io.StringWriter
+
+import akka.util.ByteString
+import pdi.jwt.JwtBase64
+import play.api.libs.json.JsObject
+import play.api.libs.json.Json
+import scala.util.hashing.MurmurHash3
 
 object KeyHelpers {
 
@@ -94,7 +121,6 @@ object KeyHelpers {
 
   def parseArmoredKeyRing[A <: PGPKeyRing](
       gen: InputStream => List[A])(s: String): Either[String, A] = {
-    import scala.collection.JavaConversions._
     val in = new ByteArrayInputStream(s.getBytes)
     try {
       val is = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(in)
@@ -135,7 +161,6 @@ object KeyHelpers {
     }
 
   protected def parsePkcs8PemKey(s: String): Either[String, Key] = {
-    import scala.util.Try
     val converter = new JcaPEMKeyConverter().setProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
     Try((new PEMParser(new StringReader(s))).readObject)
       .map(Right.apply)
@@ -147,15 +172,96 @@ object KeyHelpers {
       }
   }
 
+  def extractSignatureKeyIds(signedData: ByteString): Either[String, List[Long]] =
+    Try({
+      import scala.collection.JavaConversions._
+      val in = PGPUtil.getDecoderStream(signedData.toInputStream)
+      // Structure of packets in signature
+      // CompressedData
+      //  - One-Pass Signature Header
+      //  - Literal Data
+      //  - Signature
+      val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
+      val objF = new JcaPGPObjectFactory(cData.getDataStream)
+      objF.nextObject.asInstanceOf[PGPOnePassSignatureList]
+        .map(_.getKeyID)
+        .toList
+    }).map[Either[String, List[Long]]](Right(_))
+      .recover({ case e => Left(e.getMessage) })
+      .get
+
+  /**
+   * Verify a signature with a series of candidate public keys.
+   * @return data and a map of keys to signature expiry times
+   */
+  def verifyData(signedData: ByteString, pks: Seq[PGPPublicKey]):
+      Either[String, (ByteString, Map[PGPPublicKey, Option[Instant]])] =
+    Try({
+      import scala.collection.JavaConversions._
+      val in = PGPUtil.getDecoderStream(signedData.toInputStream)
+      // Structure of packets in signature
+      // CompressedData
+      //  - One-Pass Signature Header
+      //  - Literal Data
+      //  - Signature
+      val cData = (new JcaPGPObjectFactory(in)).nextObject.asInstanceOf[PGPCompressedData]
+      val objF = new JcaPGPObjectFactory(cData.getDataStream)
+      val pkOpsMap: Map[PGPPublicKey, PGPOnePassSignature] =
+        objF.nextObject.asInstanceOf[PGPOnePassSignatureList].toSeq
+          .flatMap { ops =>
+            pks.find(ops.getKeyID == _.getKeyID).map(pk => (pk, ops))
+          }
+          .toMap
+      pkOpsMap.foreach {
+        case (pk, ops) =>
+          ops.init(new BcPGPContentVerifierBuilderProvider(), pk)
+      }
+      val lData = objF.nextObject.asInstanceOf[PGPLiteralData]
+      val content = {
+        val bsb = ByteString.newBuilder
+        Stream.continually(lData.getInputStream.read)
+          .takeWhile(_ >= 0)
+          .map(_.toByte)
+          .foreach { b =>
+            bsb.putByte(b)
+            pkOpsMap.values.foreach { ops =>
+              ops.update(b)
+            }
+          }
+        bsb.result
+      }
+      val expiryTimes: Map[PGPPublicKey, Option[Instant]] =
+        (for {
+          sig <- objF.nextObject.asInstanceOf[PGPSignatureList]
+          pk <- pkOpsMap.keys.find(_.getKeyID == sig.getKeyID)
+          ops <- pkOpsMap.get(pk) if ops.verify(sig)
+        } yield {
+          val creationTime = sig.getHashedSubPackets.getSignatureCreationTime.toInstant
+          val expiryTime = Some(sig.getHashedSubPackets.getSignatureExpirationTime)
+            .filter(_ > 0)
+            .map(creationTime.plusSeconds)
+          (pk -> expiryTime)
+        }).toMap
+      (content, expiryTimes)
+    }).map[Either[String, (ByteString, Map[PGPPublicKey, Option[Instant]])]](Right(_))
+      .recover {
+        case e =>
+          def msgs(e: Throwable): List[String] =
+            Option(e.getMessage).getOrElse(e.getClass.getCanonicalName) ::
+            Option(e.getCause).map(msgs).getOrElse(Nil)
+          Left(msgs(e).mkString(" ← "))
+      }
+      .get
+
   /**
     * At the moment DIT4C assumes instances use a single public key for all actions. This may at some change though
     * (most likely to support elliptic curve cryptography) so DIT4C uses key blocks that could later store a master key
     * and sub-keys.
     */
   def checkInstancePublicKeyRingIsSuitable(kr: PGPPublicKeyRing): Either[String, PGPPublicKeyRing] = {
-    import scala.collection.JavaConversions._
-    import org.bouncycastle.openpgp.PGPKeyFlags._
     import org.bouncycastle.bcpg.PublicKeyAlgorithmTags._
+    import org.bouncycastle.openpgp.PGPKeyFlags._
+    import scala.collection.JavaConversions._
     val k = kr.getPublicKey()
     // Helpers
     val keyAlgUsableWithJWTs = Set(RSA_GENERAL, ECDH, ECDSA) // One key can't do both ECDH & ECDSA though
@@ -228,7 +334,6 @@ object KeyHelpers {
 
   implicit class RSAPublicKeyHelper(key: RSAPublicKey) extends PublicKeyHelper(key) {
     def ssh = {
-      import java.nio.ByteBuffer
       // As per RFC4251, string/mpint are represented by uint32 length then bytes
       def lengthThenBytes(bs: Array[Byte]): Array[Byte] =
         ByteBuffer.allocate(4).putInt(bs.length).array() ++ bs
@@ -313,12 +418,24 @@ object KeyHelpers {
   }
 
   implicit class PGPKeyRingSubKeyHelper(keyring: PGPKeyRing) {
-    import scala.collection.JavaConversions._
     import org.bouncycastle.openpgp.PGPKeyFlags._
+    import scala.collection.JavaConversions._
 
     def authenticationKeys: List[PGPPublicKey] =
       publicKeys
         .filter(hasKeyFlags(CAN_AUTHENTICATE))
+        .sortBy(_.getCreationTime)
+        .reverse
+
+    def encryptionKeys: List[PGPPublicKey] =
+      publicKeys
+        .filter(hasKeyFlags(CAN_ENCRYPT_COMMS | CAN_ENCRYPT_STORAGE))
+        .sortBy(_.getCreationTime)
+        .reverse
+
+    def signingKeys: List[PGPPublicKey] =
+      publicKeys
+        .filter(hasKeyFlags(CAN_SIGN))
         .sortBy(_.getCreationTime)
         .reverse
 
@@ -347,6 +464,8 @@ object KeyHelpers {
     }
     override def encodeToStream(os: OutputStream) = publicKey.encode(os)
   }
+
+
 
   implicit class PGPPublicKeyJwkHelper(publicKey: PGPPublicKey) {
     def asJWK: Option[JsObject] =
@@ -386,7 +505,6 @@ object KeyHelpers {
         .collect[PrivateKeyInfo] {
           case (sk: RSASecretBCPGKey, pk: RSAPublicBCPGKey) =>
             import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
-            import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
             import org.bouncycastle.asn1.pkcs.{ RSAPrivateKey => ASN1RSAPrivateKey }
             import org.bouncycastle.asn1.x509.AlgorithmIdentifier
             val asn1Key: ASN1RSAPrivateKey =
@@ -407,8 +525,39 @@ object KeyHelpers {
 
   }
 
+  object PGPFingerprint {
+    class InvalidFingerprintException(msg: String) extends Exception
+    def apply(bytes: Array[Byte]): PGPFingerprint = apply(ByteString(bytes))
+    def apply(s: String): PGPFingerprint = apply(toByteString(s))
+    def apply(bytes: ByteString) =
+      if (bytes.length == 20) new PGPFingerprint(bytes)
+      else throw new InvalidFingerprintException(
+          s"PGP fingerprints are 160-bit, not ${bytes.length * 8}")
+    def toByteString(s: String): ByteString =
+      ByteString(
+        s.toUpperCase
+          .filter(c => c.isDigit || 'A'.to('F').contains(c))
+          .grouped(2)
+          .map(Integer.parseInt(_, 16).toByte)
+          .toSeq : _*)
+  }
+
+  class PGPFingerprint protected (immutableBytes: ByteString) {
+    def bytes: Array[Byte] = immutableBytes.toArray
+    def string = immutableBytes.map(byteToHex).mkString
+    def keyId = ByteBuffer.wrap(bytes.takeRight(8)).getLong
+    def keyIdAsString = immutableBytes.takeRight(8).map(byteToHex).mkString
+    override def toString = string
+    override lazy val hashCode = MurmurHash3.bytesHash(bytes)
+    override def equals(obj: Any) = obj match {
+      case other: PGPFingerprint => bytes.deep == other.bytes.deep
+      case _ => false
+    }
+    protected def byteToHex(b: Byte): String = f"$b%02X"
+  }
+
   implicit class PGPPublicKeyFingerprintHelper(publicKey: PGPPublicKey) {
-    def fingerprint = publicKey.getFingerprint.map(v => f"$v%02X").mkString
+    def fingerprint = PGPFingerprint(publicKey.getFingerprint)
   }
 
   implicit class PGPPublicKeyOpenSSHHelper(publicKey: PGPPublicKey) {
@@ -429,4 +578,16 @@ object KeyHelpers {
 
   protected def sha256DigestCalculator =
     new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build().get(HashAlgorithmTags.SHA256)
+
+  // Based heavily on akka-http2-support's ByteStringInputStream
+  implicit class ByteStringInputStreamHelper(bs: ByteString) {
+    def toInputStream: InputStream = bs match {
+      case cs: ByteString.ByteString1C => new ByteArrayInputStream(bs.toArray)
+      case _ => bs.compact.toInputStream
+    }
+    def base64: String = bs.toArray.base64
+    def digest(alg: String) = bs.toArray.digest(alg)
+  }
+
+
 }

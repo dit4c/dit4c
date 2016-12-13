@@ -8,7 +8,7 @@ import domain.instance.DomainEvent
 import scala.concurrent.duration._
 import scala.reflect._
 import com.softwaremill.tagging._
-import services.ClusterSharder
+import services.SchedulerSharder
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes
 import akka.pattern.{ask, pipe}
@@ -27,7 +27,10 @@ import java.security.spec.RSAPublicKeySpec
 import java.security.KeyFactory
 import scala.util.Random
 import dit4c.protobuf.scheduler.outbound.InstanceStateUpdate
-import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import services.KeyRingSharder
+import dit4c.common.KeyHelpers.PGPFingerprint
+import scala.util._
 
 object InstanceAggregate {
 
@@ -44,8 +47,9 @@ object InstanceAggregate {
   sealed trait Data
   case object NoData extends Data
   case class InstanceData(
+      schedulerId: String,
       clusterId: String,
-      key: Option[PGPPublicKey] = None,
+      keyFingerprint: Option[PGPFingerprint] = None,
       uri: Option[String] = None,
       imageUrl: Option[String] = None,
       timestamps: EventTimestamps = EventTimestamps()) extends Data
@@ -54,20 +58,26 @@ object InstanceAggregate {
       created: Option[Instant] = None,
       completed: Option[Instant] = None)
 
-  sealed trait Command
+  sealed trait Command extends BaseCommand
   case object GetStatus extends Command
   case object GetJwk extends Command
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
   case object Discard extends Command
-  case class Start(clusterId: String, image: String) extends Command
-  case class AssociatePGPPublicKey(armoredKey: String) extends Command
+  case class Start(
+      schedulerId: String,
+      clusterId: String,
+      accessPassIds: List[String],
+      image: String) extends Command
+  case class AssociatePGPPublicKey(keyBlock: String) extends Command
+  protected case class AssociatePGPPublicKeyFingerprint(
+      keyFingerprint: PGPFingerprint) extends Command
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
   case object GetImage extends Command
 
-  sealed trait Response
+  sealed trait Response extends BaseResponse
   case class Started(instanceId: String) extends Response
   case object Ack extends Response
   sealed trait StatusResponse extends Response
@@ -87,7 +97,8 @@ object InstanceAggregate {
 }
 
 class InstanceAggregate(
-    clusterSharder: ActorRef @@ ClusterSharder.type)
+    keyringSharder: ActorRef @@ KeyRingSharder.type,
+    schedulerSharder: ActorRef @@ SchedulerSharder.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -112,13 +123,15 @@ class InstanceAggregate(
       stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
-    case Event(Start(clusterId, image), _) =>
+    case Event(Start(schedulerId, clusterId, image, accessPassIds), _) =>
       val requester = sender
-      goto(Started).applying(StartedInstance(clusterId, now)).andThen { _ =>
+      goto(Started).applying(StartedInstance(schedulerId, clusterId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
-        (clusterSharder ? ClusterSharder.Envelope(
-              clusterId,
-              ClusterAggregate.StartInstance(instanceId, image))).map {
+        (schedulerSharder ? SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.StartInstance(instanceId, accessPassIds, image)))).map {
             case SchedulerAggregate.Ack =>
               Started(instanceId)
           }.pipeTo(requester)
@@ -126,16 +139,20 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       // Start actor listening
       context.actorOf(
           Props(classOf[GetStatusRequestActor], sender),
           "get-status-request-"+Random.alphanumeric.take(10).mkString)
       // Forward request to cluster
       context.system.eventStream.publish(
-          ClusterSharder.Envelope(clusterId, ClusterAggregate.GetInstanceStatus(instanceId)))
+          SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(clusterId, _, uri, imageUrl, ts)) =>
+    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
       // Tell any listening actors
       context.actorSelection("get-status-request-*") ! CurrentStatus(state.toString, uri, ts)
       state match {
@@ -143,38 +160,60 @@ class InstanceAggregate(
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
-          clusterSharder ! ClusterSharder.Envelope(clusterId, ClusterAggregate.ConfirmInstanceUpload(instanceId))
+          schedulerSharder ! SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.ConfirmInstanceUpload(instanceId)))
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
-      stay replying key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      getJwkResponse(keyFingerprint).pipeTo(sender)
+      stay
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
-      stay replying {
-        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
-      }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      validateJwt(keyFingerprint)(token).pipeTo(sender)
+      stay
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociatePGPPublicKey(kStr), InstanceData(_, possibleKey, _, _, _)) =>
-      val requester = sender
-      parseArmoredPublicKeyRing(kStr).right.flatMap(checkInstancePublicKeyRingIsSuitable).fold({
-        message =>
-          log.error(message)
-          stay
-      }, {
-        newKeyRing =>
-          possibleKey match {
-            case Some(existingKeyRing) if newKeyRing.binary == existingKeyRing.binary =>
-              stay // It's the same, so nothing to do
-            case _ =>
-              stay applying AssociatedPGPPublicKey(kStr) andThen { _ =>
-                requester ! Ack
-              }
+    case Event(AssociatePGPPublicKey(keyBlock), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+      import dit4c.common.KeyHelpers._
+      // This is a one-way command, so no response necessary
+      KeyRingSharder.Envelope.forKeySubmission(keyBlock) match {
+        case Left(msg) =>
+          log.error(msg)
+          // Ignore key
+        case Right(envelope) if possibleKeyFingerprint.exists(_ != envelope.fingerprint) =>
+          log.error(
+              s"Instance $instanceId to re-associate key with different fingerprint: "+
+              s"${envelope.fingerprint} != ${possibleKeyFingerprint.get}")
+          // Ignore key
+        case Right(envelope) =>
+          import akka.pattern.{ask, pipe}
+          import context.dispatcher
+          implicit val timeout = Timeout(1.minute)
+          import KeyRingAggregate._
+          (keyringSharder ? envelope).foreach {
+            case KeySubmissionAccepted(_) =>
+              self ! AssociatePGPPublicKeyFingerprint(envelope.fingerprint)
+            case KeySubmissionRejected(r) =>
+              log.error(r)
           }
-      })
-    case Event(AssociateUri(newUri), InstanceData(_, _, Some(currentUri), _, _)) if currentUri == newUri =>
+      }
+      stay
+    case Event(AssociatePGPPublicKeyFingerprint(fingerprint), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+      possibleKeyFingerprint match {
+        case Some(f) if f != fingerprint =>
+          log.error(
+              s"Instance $instanceId to re-associate key with different fingerprint: "+
+              s"${f} != ${fingerprint}")
+          stay
+        case _ =>
+          stay applying AssociatedPGPPublicKey(fingerprint.string)
+      }
+    case Event(AssociateUri(newUri), InstanceData(_, _, _, Some(currentUri), _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
     case Event(AssociateUri(uri), _: InstanceData) =>
@@ -188,29 +227,36 @@ class InstanceAggregate(
         // TODO: Notify scheduler
         requester ! Ack
       }
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
-      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.SaveInstance(instanceId))
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+      schedulerSharder forward SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.SaveInstance(instanceId)))
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
-      clusterSharder forward ClusterSharder.Envelope(clusterId, ClusterAggregate.DiscardInstance(instanceId))
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+      schedulerSharder forward SchedulerSharder.Envelope(
+              schedulerId,
+              SchedulerAggregate.ClusterEnvelope(
+                clusterId,
+                Cluster.DiscardInstance(instanceId)))
       stay
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
       stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, InstanceData(clusterId, Some(key), _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
       stay replying getJwkResponse(key)
-    case Event(GetJwk, InstanceData(clusterId, None, _, _, _)) =>
+    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying NoJwkExists
-    case Event(VerifyJwt(token), InstanceData(clusterId, Some(key), _, _, _)) =>
-      stay replying {
-        validateJwk(key)(token).fold(InvalidJwt(_), _ => ValidJwt(instanceId))
-      }
-    case Event(VerifyJwt(token), InstanceData(clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+      validateJwt(keyFingerprint)(token).pipeTo(sender)
+      stay
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -221,18 +267,18 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(GetImage, InstanceData(_, _, _, Some(imageUrl), _)) =>
+    case Event(GetImage, InstanceData(_, _, _, _, Some(imageUrl), _)) =>
       stay replying InstanceImage(imageUrl)
-    case Event(GetImage, InstanceData(_, _, _, None, _)) =>
+    case Event(GetImage, InstanceData(_, _, _, _, None, _)) =>
       stay replying NoImageExists
   }
 
   when(Discarded) {
-    case Event(GetStatus, InstanceData(clusterId, _, _, _, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
       stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -250,9 +296,9 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       stay
   }
 
@@ -271,18 +317,21 @@ class InstanceAggregate(
         throw new Exception(s"Unknown state/data combination: ($domainEvent, $currentData)")
       }
     domainEvent match {
-      case StartedInstance(clusterId, ts) => InstanceData(clusterId, timestamps = EventTimestamps(ts) )
+      case StartedInstance(schedulerId, clusterId, ts) =>
+        InstanceData(schedulerId, clusterId, timestamps = EventTimestamps(ts) )
       case PreservedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
+        case data: InstanceData =>
+          data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
       case DiscardedInstance(ts) => currentData match {
-        case data: InstanceData => data.copy(timestamps = data.timestamps.copy(completed = ts))
+        case data: InstanceData =>
+          data.copy(timestamps = data.timestamps.copy(completed = ts))
         case _ => unhandled
       }
-      case AssociatedPGPPublicKey(keyData, _) => currentData match {
+      case AssociatedPGPPublicKey(fingerprintStr, _) => currentData match {
         case data: InstanceData =>
-          data.copy(key = Some(parseArmoredPublicKeyRing(keyData).right.get.getPublicKey))
+          data.copy(keyFingerprint = Some(PGPFingerprint(fingerprintStr)))
         case _ => unhandled
       }
       case AssociatedUri(uri, _) => currentData match {
@@ -299,18 +348,58 @@ class InstanceAggregate(
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
 
-  private def getJwkResponse(key: PGPPublicKey): GetJwkResponse = key.asJWK.map(InstanceJwk(_)).getOrElse(NoJwkExists)
+  private def getJwkResponse(fingerprint: PGPFingerprint): Future[GetJwkResponse] = {
+    import dit4c.common.KeyHelpers._
+    implicit val timeout = Timeout(1.minute)
+    val msg = KeyRingSharder.Envelope(
+        fingerprint,
+        KeyRingAggregate.GetKeys)
+    (keyringSharder ? msg)
+      .collect {
+        case KeyRingAggregate.NoKeysAvailable => NoJwkExists
+        case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
+          parseArmoredPublicKeyRing(keyBlock).right.get
+            .authenticationKeys
+            .flatMap(k => k.asJWK) match {
+              case Nil => NoJwkExists
+              case jwk :: _ => InstanceJwk(jwk)
+            }
+      }
+  }
 
-  private def validateJwk(key: PGPPublicKey)(token: String) =
-    key.asJavaPublicKey.map { publicKey =>
-       JwtJson.decode(token, publicKey)
-         .toOption.toRight("Failed to verify JWT with key")
-         .right.flatMap { claim =>
-           if (claim.isValid) Right(())
-           else Left("Claim is not valid at this time")
-         }
-    }.getOrElse(Left("Unable to convert key to one capable of validating JWTs"))
-
+  private def validateJwt(
+      fingerprint: PGPFingerprint)(token: String): Future[VerifyJwtResponse] = {
+    import dit4c.common.KeyHelpers._
+    implicit val timeout = Timeout(1.minute)
+    val msg = KeyRingSharder.Envelope(
+        fingerprint,
+        KeyRingAggregate.GetKeys)
+    (keyringSharder ? msg)
+      .collect {
+        case KeyRingAggregate.NoKeysAvailable =>
+          InvalidJwt("No keys available to validate")
+        case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
+          parseArmoredPublicKeyRing(keyBlock).right.get
+            .authenticationKeys
+            .flatMap(k => k.asJavaPublicKey.map((k.fingerprint, _))) match {
+              case Nil =>
+                InvalidJwt("No keys available to validate")
+              case keys =>
+                keys
+                  .map { case (fingerprint, key) =>
+                    JwtJson.decode(token, key) match {
+                      case Success(_) => ValidJwt(instanceId)
+                      case Failure(e) => InvalidJwt(s"$fingerprint: ${e.getMessage}")
+                    }
+                  }
+                  .reduce[VerifyJwtResponse] {
+                    case (InvalidJwt(a), InvalidJwt(b)) =>
+                      InvalidJwt(s"$a\n$b")
+                    case _ => ValidJwt(instanceId)
+                  }
+            }
+      }
+  }
 
 }
 

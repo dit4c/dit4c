@@ -2,9 +2,8 @@ package domain
 
 import scala.reflect._
 
+import com.softwaremill.tagging._
 import akka.actor.ActorLogging
-import akka.persistence.fsm.LoggingPersistentFSM
-import akka.persistence.fsm.PersistentFSM
 import akka.stream.ActorMaterializer
 import akka.stream.Materializer
 import domain.SchedulerAggregate._
@@ -18,20 +17,19 @@ import domain.scheduler.DomainEvent
 import scala.util.Success
 import scala.util.Failure
 import java.security.PublicKey
+import akka.actor.Actor
+import akka.actor.Props
+import akka.util.Timeout
+import scala.concurrent.duration._
+import services.KeyRingSharder
+import akka.persistence.PersistentActor
+import utils.akka.ActorHelpers
+import dit4c.common.KeyHelpers.PGPFingerprint
 
 object SchedulerAggregate {
 
-  sealed trait State extends PersistentFSM.FSMState {
-    override def identifier = this.getClass.getSimpleName.stripSuffix("$")
-  }
-  case object Uninitialized extends State
-  case object Active extends State
-
-  sealed trait Data
-  case object NoData extends Data
-  case class SchedulerInfo(keyBlock: Option[String]) extends Data
-
   sealed trait Command extends BaseCommand
+  case class ClusterEnvelope(clusterId: String, payload: Any) extends Command
   case object Create extends Command
   case class VerifyJwt(token: String) extends Command
   case class RegisterSocket(socketActor: ActorRef) extends Command
@@ -39,6 +37,9 @@ object SchedulerAggregate {
   case class ReceiveSchedulerMessage(msg: dit4c.protobuf.scheduler.outbound.OutboundMessage) extends Command
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
   case class UpdateKeys(armoredPgpPublicKeyBlock: String) extends Command
+  case object GetKeys extends Command
+  case class GetAvailableClusters(
+      accessTokenIds: Set[String]) extends Command
 
   sealed trait Response extends BaseResponse
   case object Ack extends Response
@@ -51,90 +52,137 @@ object SchedulerAggregate {
   sealed trait UpdateKeysResponse extends Response
   case object KeysUpdated extends Response
   case class KeysRejected(reason: String) extends Response
+  sealed trait GetKeysResponse extends Response
+  case class CurrentKeys(
+      primaryKeyBlock: String,
+      additionalKeyBlocks: List[String] = Nil) extends GetKeysResponse
+  case object NoKeysAvailable extends GetKeysResponse
+  trait GetAvailableClustersResponse extends Response
+  case class AvailableClusters(
+      clusters: List[UserAggregate.AvailableCluster]) extends GetAvailableClustersResponse
 
 }
 
-class SchedulerAggregate()
-    extends PersistentFSM[State, Data, DomainEvent]
-    with LoggingPersistentFSM[State, Data, DomainEvent]
-    with ActorLogging {
+class SchedulerAggregate(
+    imageServerConfig: ImageServerConfig,
+    keyringSharder: ActorRef @@ KeyRingSharder.type)
+    extends PersistentActor
+    with ActorLogging
+    with ActorHelpers {
   import BaseDomainEvent.now
   import domain.scheduler._
-  implicit val m: Materializer = ActorMaterializer()
+  import akka.pattern.{ask, pipe}
+  import context.dispatcher
+  implicit val timeout = Timeout(1.minute)
 
   lazy val schedulerId = self.path.name
   override lazy val persistenceId: String = "Scheduler-" + self.path.name
 
+  lazy val clusterManager: ActorRef =
+    context.actorOf(
+        Props(classOf[ClusterManager], imageServerConfig),
+        "clusters")
+
   var schedulerSocket: Option[ActorRef] = None
 
-  startWith(Uninitialized, NoData)
-
-  when(Uninitialized) {
-    case Event(Create, _) =>
+  override val receiveCommand: Receive = doesNotExist
+  
+  def doesNotExist: Receive = sealedReceive[Command] {
+    case Create =>
       val requester = sender
-      goto(Active).applying(Created(now)).andThen { _ =>
-        requester ! Ack
-      }
-    case Event(VerifyJwt(_), _) =>
-      stay replying InvalidJwt("Unknown scheduler")
-    case Event(UpdateKeys(_), _) =>
-      stay replying KeysRejected("Unknown scheduler")
+      persist(Created(now))(updateState)
+      sender ! Ack
+    case GetKeys =>
+      sender ! NoKeysAvailable
+    case VerifyJwt(_) =>
+      sender ! InvalidJwt("Unknown scheduler")
+    case UpdateKeys(_) =>
+      sender ! KeysRejected("Unknown scheduler")
+    case _ =>
+      // Ignore all other messages
   }
 
-  when(Active) {
-    case Event(UpdateKeys(keyBlock), SchedulerInfo(possibleKeyBlock)) =>
+  def active: Receive = sealedReceive[Command] {
+    case Create =>
+      log.warning("Attempted to create existing scheduler")
+    case msg: ClusterEnvelope =>
+      clusterManager forward msg
+    case UpdateKeys(keyBlock) =>
       import dit4c.common.KeyHelpers._
-      parseArmoredPublicKeyRing(keyBlock) match {
+      KeyRingSharder.Envelope.forKeySubmission(keyBlock) match {
         case Left(msg) =>
-          stay replying KeysRejected(msg)
-        case Right(kr) if kr.getPublicKey.fingerprint != schedulerId =>
-          stay replying KeysRejected(
+          sender ! KeysRejected(msg)
+        case Right(envelope) if envelope.fingerprint.string != schedulerId =>
+          sender ! KeysRejected(
               "Master key fingerprint does not match scheduler ID")
-        case Right(kr) if Some(keyBlock) == possibleKeyBlock =>
-          stay replying KeysUpdated
-        case Right(kr) =>
-          // TODO: make this more secure
-          stay applying UpdatedKeys(keyBlock, now) replying KeysUpdated
+        case Right(envelope) =>
+          import akka.pattern.{ask, pipe}
+          import context.dispatcher
+          implicit val timeout = Timeout(1.minute)
+          import KeyRingAggregate._
+          (keyringSharder ? envelope)
+            .collect {
+              case KeySubmissionAccepted(_) => KeysUpdated
+              case KeySubmissionRejected(r) => KeysRejected(r)
+            }
+            .pipeTo(sender)
       }
-    case Event(VerifyJwt(token), SchedulerInfo(None)) =>
-      stay replying InvalidJwt("No keys available to validate")
-    case Event(VerifyJwt(token), SchedulerInfo(Some(keyBlock))) =>
+    case GetKeys =>
+      import akka.pattern.{ask, pipe}
+      import context.dispatcher
+      implicit val timeout = Timeout(1.minute)
+      val msg = KeyRingSharder.Envelope(
+          PGPFingerprint(schedulerId),
+          KeyRingAggregate.GetKeys)
+      (keyringSharder ? msg)
+        .collect {
+          case KeyRingAggregate.NoKeysAvailable => NoKeysAvailable 
+          case KeyRingAggregate.CurrentKeyBlock(s) => CurrentKeys(s)
+        }
+        .pipeTo(sender)
+    case VerifyJwt(token) =>
       import dit4c.common.KeyHelpers._
-      stay replying {
-        parseArmoredPublicKeyRing(keyBlock).right.get
-          .authenticationKeys
-          .flatMap(k => k.asJavaPublicKey.map((k.fingerprint, _))) match {
-            case Nil =>
-              stay replying InvalidJwt("No keys available to validate")
-            case keys =>
-              keys
-                .map { case (fingerprint: String, key: PublicKey) =>
-                  JwtJson.decode(token, key) match {
-                    case Success(_) => ValidJwt
-                    case Failure(e) => InvalidJwt(s"$fingerprint: ${e.getMessage}")
-                  }
-                }
-                .reduce[VerifyJwtResponse] {
-                  case (InvalidJwt(a), InvalidJwt(b)) =>
-                    InvalidJwt("a\nb")
-                  case _ => ValidJwt
-                }
-          }
-      }
-    case Event(RegisterSocket(ref), _) =>
+      val msg = KeyRingSharder.Envelope(
+          PGPFingerprint(schedulerId),
+          KeyRingAggregate.GetKeys)
+      (keyringSharder ? msg)
+        .collect {
+          case KeyRingAggregate.NoKeysAvailable =>
+            InvalidJwt("No keys available to validate")
+          case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
+            parseArmoredPublicKeyRing(keyBlock).right.get
+              .authenticationKeys
+              .flatMap(k => k.asJavaPublicKey.map((k.fingerprint, _))) match {
+                case Nil =>
+                  InvalidJwt("No keys available to validate")
+                case keys =>
+                  keys
+                    .map { case (fingerprint, key) =>
+                      JwtJson.decode(token, key) match {
+                        case Success(_) => ValidJwt
+                        case Failure(e) => InvalidJwt(s"$fingerprint: ${e.getMessage}")
+                      }
+                    }
+                    .reduce[VerifyJwtResponse] {
+                      case (InvalidJwt(a), InvalidJwt(b)) =>
+                        InvalidJwt(s"$a\n$b")
+                      case _ => ValidJwt
+                    }
+              }
+        }
+        .pipeTo(sender)
+    case RegisterSocket(ref) =>
       schedulerSocket = Some(ref)
       log.info(sender.toString)
       log.info(s"Registered socket: ${ref.path.toString}")
-      stay
-    case Event(DeregisterSocket(ref), _) =>
+    case DeregisterSocket(ref) =>
       if (Some(ref) == schedulerSocket) {
         schedulerSocket = None
         log.info(s"Deregistered socket: ${ref.path.toString}")
       } else {
         log.debug(s"Ignored deregister: ${ref.path.toString}")
       }
-      stay
-    case Event(ReceiveSchedulerMessage(msg), _) =>
+    case ReceiveSchedulerMessage(msg) =>
       import dit4c.protobuf.scheduler.outbound.OutboundMessage.Payload
       import services.InstanceSharder
       import domain.InstanceAggregate.AssociatePGPPublicKey
@@ -147,8 +195,7 @@ class SchedulerAggregate()
           val envelope = InstanceSharder.Envelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
           context.system.eventStream.publish(envelope)
       }
-      stay
-    case Event(SendSchedulerMessage(msg), _) =>
+    case SendSchedulerMessage(msg) =>
       val response: Response = schedulerSocket match {
         case Some(ref) =>
           ref ! msg
@@ -157,28 +204,70 @@ class SchedulerAggregate()
           log.warning(s"Unable to send: $msg")
           SchedulerAggregate.UnableToSendMessage
       }
-      if (sender == context.system.deadLetters) stay
-      else {
-        stay replying response
+      if (sender != context.system.deadLetters) {
+        sender ! response
       }
+    case GetAvailableClusters(accessPassIds) =>
+      import akka.pattern.{ask, pipe}
+      import context.dispatcher
+      implicit val timeout = Timeout(10.seconds)
+      accessPassIds
+        // Get all the valid passes
+        .map { accessPassId =>
+          import AccessPass._
+          val cmd = AccessPassManager.Envelope(accessPassId, GetDecodedPass)
+          (accessPassManagerRef ? cmd)
+            .map[List[ValidPass]] {
+              case vp: ValidPass => List(vp)
+              case _ => Nil
+            }
+            .recover[List[ValidPass]] {
+              case e =>
+                log.error(e,
+                    s"Scheduler $schedulerId failed to get "+
+                    s"access pass details for $accessPassId")
+                Nil
+            }
+        }
+        // Collapse to single future
+        .reduce { (aF, bF) =>
+          for (a <- aF; b <- bF) yield a ++ b
+        }
+        .map { validPasses =>
+          // Collect clusters out of passes, and calculate effective expiry
+          validPasses
+            .foldRight(Map.empty[String, List[AccessPass.ValidPass]]) { (vp, m) =>
+              m ++ vp.pass.clusterIds.map { id =>
+                // Append ValidPass to the list for this clusterId
+                (id, m.getOrElse(id, Nil) :+ vp)
+              }
+            }.toList.map { case (clusterId, passes) =>
+              val longestPass =
+                passes.maxBy(_.expires.getOrElse(Instant.MAX))
+              UserAggregate.AvailableCluster(
+                  schedulerId,
+                  clusterId,
+                  longestPass.expires)
+            }
+        }
+        .map(AvailableClusters(_))
+        .pipeTo(sender)
+  } orElse sealedReceive[AccessPassManager.Command] {
+    case cmd: AccessPassManager.Command =>
+      accessPassManagerRef forward cmd
+  }
+  
+  override val receiveRecover = sealedReceive[DomainEvent](updateState _)
+
+  def updateState(e: DomainEvent): Unit = e match {
+    case Created(_) => context.become(active)
   }
 
-  override def applyEvent(
-      domainEvent: DomainEvent,
-      currentData: Data): Data = domainEvent match {
-    case Created(_) =>
-      SchedulerInfo(None)
-    case UpdatedKeys(keyBlock, _) => currentData match {
-      case info: SchedulerInfo =>
-        info.copy(Some(keyBlock))
-      case data => unknownStateDataCombo(domainEvent, data)
+  def accessPassManagerRef: ActorRef = {
+    val name = "access-passes"
+    context.child(name).getOrElse {
+      context.actorOf(Props(classOf[AccessPassManager]), name)
     }
   }
-
-  private def unknownStateDataCombo(e: DomainEvent, d: Data) =
-    throw new Exception(s"Unknown event/data combination: $e / $d")
-
-  override def domainEventClassTag: ClassTag[DomainEvent] =
-    classTag[DomainEvent]
 
 }

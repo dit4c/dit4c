@@ -1,0 +1,14 @@
+syntax = "proto3";
+import "scalapb/scalapb.proto";
+package dit4c.protobuf;
+
+option (scalapb.options) = {
+  single_file: true
+  preamble: "// $COVERAGE-OFF$Generated code"
+};
+
+message ClusterAccessPass {
+  option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
+  repeated string clusterIds = 1;
+  string description = 2;
+}

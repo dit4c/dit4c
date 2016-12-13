@@ -27,6 +27,12 @@ import org.specs2.execute.Result
 import org.specs2.specification.Scope
 import org.specs2.mutable.Around
 import org.specs2.execute.AsResult
+import scala.util.Random
+import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
+import akka.util.ByteString
+import scala.util.Try
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 class KeyHelpersSpec extends Specification with ScalaCheck {
 
@@ -43,6 +49,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
   trait PassphraseTag
   type Passphrase = String @@ PassphraseTag
 
+  trait LifetimeTag
+  type Lifetime = Long @@ LifetimeTag
 
   implicit val arbKeyBits: Arbitrary[KeyBits] =
     Arbitrary(Gen.frequency(10 -> 1024, 1 -> 2048).map(_.taggedWith[KeyBitsTag]))
@@ -51,12 +59,19 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       .suchThat(!_.isEmpty)
   implicit val arbPGPIdentity = Arbitrary(genNonEmptyString.map(_.taggedWith[PGPIdentityTag]))
   implicit val arbPassphrase = Arbitrary(genNonEmptyString.map(_.taggedWith[PassphraseTag]))
+  // PGP stores expiry dates as uint32, so max lifetime reflects that
+  implicit val arbLifetime: Arbitrary[Lifetime] =
+    Arbitrary(
+      Gen.chooseNum(1, 2L * Int.MaxValue - Instant.now.getEpochSecond - 3600)
+        .map(_.taggedWith[LifetimeTag]))
   implicit val arbKeyPair =
     Arbitrary(arbKeyBits.arbitrary.map { bits: KeyBits =>
       val kpg = KeyPairGenerator.getInstance("RSA")
       kpg.initialize(bits)
       kpg.generateKeyPair
     })
+  implicit val arbByteString =
+    Arbitrary(Arbitrary.arbitrary[Array[Byte]].map(ByteString.apply))
 
   sequential
 
@@ -154,33 +169,52 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
     })
 
     "produce OpenSSH keys from PGP keys" >> new IfGpgAvailable {
-       prop({ (identity: PGPIdentity, bits: KeyBits) =>
-        val tmpKeyring = File.createTempFile("keyring", ".kbx")
-        tmpKeyring.deleteOnExit()
-        val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
-        val generatedString = pgpKeyRing.getPublicKey.asOpenSSH
-        val armoredPublicKey = pgpKeyRing.getSecretKey.`public`.armored;
-        val gpgSshKey = {
-          import sys.process._
-          val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
-          val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath} --keyid-format 0xlong"
-          val keyIdPattern = """key (\w+):""".r.unanchored
-          s"$gpgCmd --import".#<(is).exitCodeOutErr match {
-            case (0, _, err @ keyIdPattern(keyId)) =>
-              // Exporting a master key with --export-ssh-key requires a "!" suffix
-              stringToProcess(s"$gpgCmd --trusted-key $keyId --export-ssh-key $keyId!").exitCodeOutErr match {
-                case (0, out, _) =>
-                  // format: <alg_header> <key_data> <comment>
-                  // Get key without the comment
-                  out.split(" ").init.mkString(" ")
-                case t => throw new Exception(s"gpg ssh export failed: $t")
-              }
-            case t => throw new Exception(s"gpg import failed: $t")
-          }
+      val identity = "Test Identity"
+      val bits = 2048
+      val tmpKeyring = File.createTempFile("keyring", ".kbx")
+      tmpKeyring.deleteOnExit()
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val generatedString = pgpKeyRing.getPublicKey.asOpenSSH
+      val armoredPublicKey = pgpKeyRing.getSecretKey.`public`.armored;
+      val gpgSshKey = {
+        import sys.process._
+        val is = new ByteArrayInputStream(armoredPublicKey.getBytes)
+        val gpgCmd = s"gpg2 --no-default-keyring --keyring ${tmpKeyring.getAbsolutePath} --keyid-format 0xlong"
+        val keyIdPattern = """key (\w+):""".r.unanchored
+        s"$gpgCmd --import".#<(is).exitCodeOutErr match {
+          case (0, _, err @ keyIdPattern(keyId)) =>
+            // Exporting a master key with --export-ssh-key requires a "!" suffix
+            stringToProcess(s"$gpgCmd --trusted-key $keyId --export-ssh-key $keyId!").exitCodeOutErr match {
+              case (0, out, _) =>
+                // format: <alg_header> <key_data> <comment>
+                // Get key without the comment
+                out.split(" ").init.mkString(" ")
+              case t => throw new Exception(s"gpg ssh export failed: $t")
+            }
+          case t => throw new Exception(s"gpg import failed: $t")
         }
-        generatedString must beSome(gpgSshKey)
-      })
+      }
+      generatedString must beSome(gpgSshKey)
     }
+
+    "extract signing key IDs from signed data" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: ByteString) =>
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
+      val signedData: ByteString = signData(pgpKeyRing, signingKey)(testData)
+      extractSignatureKeyIds(signedData) must beRight(be_==(List(signingKey.getKeyID)))
+    })
+
+    "verify and unwrap PGP signatures" >> prop({ (identity: PGPIdentity, bits: KeyBits, testData: ByteString, lifetime: Option[Lifetime]) =>
+      val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, None)
+      val signingKey: PGPPublicKey = Random.shuffle(pgpKeyRing.signingKeys).head
+      val creationTime = Instant.now.truncatedTo(ChronoUnit.SECONDS)
+      val signedData: ByteString = signData(
+          pgpKeyRing, signingKey, creationTime, lifetime)(testData)
+      (verifyData(signedData, Nil) must beRight((testData, Map.empty))) and
+      (verifyData(signedData, Seq(signingKey)) must beRight(
+        (testData, Map(signingKey -> lifetime.map(creationTime.plusSeconds)))
+      ))
+    })
 
   }
 
@@ -211,6 +245,46 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
       else
         skipped("No usable version of GPG available")
     }
+  }
+
+  def signData(
+      skr: PGPSecretKeyRing,
+      signingKey: PGPPublicKey,
+      creationTime: Instant = Instant.now,
+      lifetime: Option[Lifetime] = None)(data: ByteString): ByteString = {
+    import scala.collection.JavaConversions._
+    val selfSignature = signingKey.getSignaturesForKeyID(
+      skr.getPublicKey.getKeyID).toList.head
+    val keyAlg = signingKey.getAlgorithm
+    val hashAlg = selfSignature.getHashedSubPackets.getPreferredHashAlgorithms.head
+    val out = new ByteArrayOutputStream()
+    val compressedData = new PGPCompressedDataGenerator(
+        CompressionAlgorithmTags.ZIP)
+    val cOut = compressedData.open(out)
+    val signatureGenerator = new PGPSignatureGenerator(
+        new JcaPGPContentSignerBuilder(keyAlg, hashAlg))
+    signatureGenerator.init(PGPSignature.BINARY_DOCUMENT,
+        skr.getSecretKey(signingKey.getKeyID).extractPrivateKey(null))
+    // Write one-pass signature header
+    signatureGenerator.generateOnePassVersion(false).encode(cOut)
+    // Write literal data
+    val lOut = (new PGPLiteralDataGenerator()).open(
+        cOut, PGPLiteralData.BINARY, "", new Date(), new Array[Byte](1024))
+    lOut.write(data.toArray)
+    lOut.close()
+    // Write signature
+    signatureGenerator.update(data.toArray)
+    signatureGenerator.setHashedSubpackets({
+      val subGen = new PGPSignatureSubpacketGenerator()
+      subGen.setSignatureCreationTime(false, Date.from(creationTime))
+      lifetime.foreach(subGen.setSignatureExpirationTime(false, _))
+      subGen.generate
+    })
+    signatureGenerator.generate.encode(cOut)
+    cOut.flush
+    cOut.close
+    out.close
+    ByteString(out.toByteArray)
   }
 
 

@@ -20,10 +20,16 @@ object UserSharder {
   case object CreateNewUser extends Command
   case class Envelope(userId: UserAggregate.Id, msg: Any) extends Command
 
-  def apply(instanceSharder: ActorRef @@ InstanceSharder.type)(implicit system: ActorSystem): ActorRef = {
+  def apply(
+      instanceSharder: ActorRef @@ InstanceSharder.type,
+      schedulerSharder: ActorRef @@ SchedulerSharder.type
+      )(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "UserAggregate",
-        entityProps = aggregateProps(instanceSharder),
+        entityProps = Props(
+            classOf[UserAggregate],
+            instanceSharder,
+            schedulerSharder),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)
@@ -39,9 +45,6 @@ object UserSharder {
     case CreateNewUser => "00" // All user creation will happen in one shard, but that's OK
     case Envelope(userId, _) => userId.reverse.take(2).reverse // Last two characters of aggregate ID (it'll do for now)
   }
-
-  private def aggregateProps(instanceSharder: ActorRef @@ InstanceSharder.type): Props =
-    Props(classOf[UserAggregate], instanceSharder)
 
   private def newUserId: String = f"${BigInt.apply(128, scala.util.Random)}%032x"
 }

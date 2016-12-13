@@ -178,7 +178,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
         this.getClass.getResource("unit_test_scheduler_keys.asc").cat.!!
       }).right.get
     val publicKeyInfo = KeyManager.PublicKeyInfo(
-        "28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94",
+        PGPFingerprint("28D6BE5749FA9CD2972E3F8BAD0C695EF46AFF94"),
         secretKeyRing.toPublicKeyRing.armored)
     val route = Route.seal {
       // Source which never emits an element, and terminates on closePromise success
@@ -209,7 +209,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
             }
           }
         } ~
-        path("ws" / publicKeyInfo.keyFingerprint) {
+        path("ws" / publicKeyInfo.keyFingerprint.string) {
           cookie("keys") { cookiePair =>
             authenticateOAuth2[String]("", {
               case Credentials.Missing => None
@@ -223,6 +223,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
                     JwtJson.decode(token, key).toOption.map(_ => fingerprint)
                   }
                   .headOption
+                  .map(_.string)
             }) { authenticationKeyId =>
               handleWebSocketMessages(wsProbe.flow.merge(closeSource, true))
             }

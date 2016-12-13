@@ -24,3 +24,10 @@ message ReceivedSharedInstance {
   string instanceId = 2;
   google.protobuf.Timestamp timestamp = 100;
 }
+
+message AddedAccessPass {
+  option (scalapb.message).extends = "domain.user.DomainEvent";
+  string schedulerId = 1;
+  string accessPassId = 2;
+  google.protobuf.Timestamp timestamp = 100;
+}

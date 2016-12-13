@@ -1,19 +1,23 @@
 package services
 
+import com.softwaremill.tagging._
 import akka.actor._
 import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ClusterShardingSettings
 import domain.SchedulerAggregate
+import domain.ImageServerConfig
 
 object SchedulerSharder {
 
   final case class Envelope(id: String, payload: Any)
 
-  def apply()(implicit system: ActorSystem): ActorRef = {
+  def apply(
+      imageServerConfig: ImageServerConfig,
+      keyringSharder: ActorRef @@ KeyRingSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "SchedulerAggregate",
-        entityProps = Props[SchedulerAggregate],
+        entityProps = Props(classOf[SchedulerAggregate], imageServerConfig, keyringSharder),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)

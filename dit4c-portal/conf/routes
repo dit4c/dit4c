@@ -5,6 +5,7 @@ GET     /login/oauth/authorize              controllers.OAuthServerController.au
 POST    /login/oauth/access_token           controllers.OAuthServerController.accessToken
 GET     /authenticate/:provider             controllers.MainController.authenticate(provider)
 POST    /authenticate/:provider             controllers.MainController.authenticate(provider)
+GET     /clusters                           controllers.MainController.getAvailableClusters
 GET     /instances/                         controllers.MainController.getInstances
 POST    /instances/                         controllers.MainController.newInstance
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
@@ -14,6 +15,7 @@ POST    /instances/:instanceId/share        controllers.MainController.createSha
 PUT     /instances/                         controllers.MainController.instanceRegistration
 PUT     /images/                            controllers.MainController.imageRegistration
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
+GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.redeemAccessPass(schedulerId, data)
 
 # Assets
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)

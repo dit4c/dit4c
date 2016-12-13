@@ -19,14 +19,21 @@ import akka.cluster.sharding.ClusterShardingSettings
 object InstanceSharder {
 
   sealed trait Command
-  case class StartInstance(clusterId: String, image: String) extends Command
+  case class StartInstance(
+      schedulerId: String,
+      clusterId: String,
+      accessPassIds: List[String],
+      image: String) extends Command
   case class VerifyJwt(token: String) extends Command
   case class Envelope(instanceId: String, msg: Any) extends Command
 
-  def apply(clusterSharder: ActorRef @@ ClusterSharder.type)(implicit system: ActorSystem): ActorRef = {
+  def apply(
+      keyringSharder: ActorRef @@ KeyRingSharder.type,
+      schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "InstanceAggregate",
-        entityProps = aggregateProps(clusterSharder),
+        entityProps = Props(
+            classOf[InstanceAggregate], keyringSharder, schedulerSharder),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)
@@ -34,19 +41,17 @@ object InstanceSharder {
 
   // Because identity can be any valid string, we need the ID to be encoded
   def extractEntityId(implicit system: ActorSystem): ShardRegion.ExtractEntityId = {
-    case StartInstance(clusterId, image) => (newInstanceId, Start(clusterId, image))
+    case StartInstance(schedulerId, clusterId, accessPassIds, image) =>
+      (newInstanceId, Start(schedulerId, clusterId, accessPassIds, image))
     case Envelope(instanceId, msg) => (instanceId, msg)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
-    case StartInstance(clusterId, image) => "00" // All user creation will happen in one shard, but that's OK
+    case StartInstance(_, _, _, _) => "00" // All instance creation will happen in one shard, but that's OK
     case Envelope(userId, _) => userId.reverse.take(2).reverse // Last two characters of aggregate ID (it'll do for now)
   }
 
   private def newInstanceId = IdUtils.timePrefix+IdUtils.randomId(16)
-
-  private def aggregateProps(clusterSharder: ActorRef @@ ClusterSharder.type): Props =
-    Props(classOf[InstanceAggregate], clusterSharder)
 
   def resolveJwtInstanceId(token: String): Either[String, String] =
     JwtJson.decode(token, JwtOptions(signature=false))

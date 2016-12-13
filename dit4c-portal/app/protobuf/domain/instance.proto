@@ -14,7 +14,8 @@ option (scalapb.options) = {
 
 message StartedInstance {
   option (scalapb.message).extends = "domain.instance.DomainEvent";
-  string clusterId = 1;
+  string schedulerId = 1;
+  string clusterId = 2;
   google.protobuf.Timestamp timestamp = 100;
 }
 
@@ -30,7 +31,7 @@ message PreservedInstance {
 
 message AssociatedPGPPublicKey {
   option (scalapb.message).extends = "domain.instance.DomainEvent";
-  string pgpPublicKeyBlock = 1;
+  string keyFingerprint = 1;
   google.protobuf.Timestamp timestamp = 100;
 }
 

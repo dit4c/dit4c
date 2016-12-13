@@ -55,7 +55,7 @@ class MessagingController(
           case Left(msg) =>
             Future.successful(InternalServerError(msg))
           case Right(pkr) =>
-            val id = pkr.getPublicKey.fingerprint
+            val id = pkr.getPublicKey.fingerprint.string
             val cmd = SchedulerSharder.Envelope(
                 id, SchedulerAggregate.UpdateKeys(keyContent))
             (schedulerSharder ? cmd).map {
