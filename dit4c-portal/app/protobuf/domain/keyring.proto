@@ -1,0 +1,20 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+package domain;
+
+option (scalapb.options) = {
+  flat_package: false
+  single_file: true
+  import: "domain.BaseDomainEvent"
+  preamble: "// $COVERAGE-OFF$Generated code"
+  preamble: "sealed trait DomainEvent extends BaseDomainEvent"
+};
+
+// This the submission - merged data is generated state
+message AcceptedKeyBlockSubmission {
+  option (scalapb.message).extends = "domain.keyring.DomainEvent";
+  string pgpPublicKeyBlock = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}

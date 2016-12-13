@@ -22,6 +22,7 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.util.Timeout
 import scala.concurrent.duration._
+import services.KeyRingSharder
 
 object SchedulerAggregate {
 
@@ -111,10 +112,10 @@ class SchedulerAggregate(
       stay
     case Event(UpdateKeys(keyBlock), SchedulerInfo(possibleKeyBlock)) =>
       import dit4c.common.KeyHelpers._
-      parseArmoredPublicKeyRing(keyBlock) match {
+      KeyRingSharder.Envelope.forKeySubmission(keyBlock) match {
         case Left(msg) =>
           stay replying KeysRejected(msg)
-        case Right(kr) if kr.getPublicKey.fingerprint.string != schedulerId =>
+        case Right(envelope) if envelope.fingerprint.string != schedulerId =>
           stay replying KeysRejected(
               "Master key fingerprint does not match scheduler ID")
         case Right(kr) if Some(keyBlock) == possibleKeyBlock =>

@@ -543,13 +543,15 @@ object KeyHelpers {
 
   class PGPFingerprint protected (immutableBytes: ByteString) {
     def bytes: Array[Byte] = immutableBytes.toArray
-    def string = bytes.map(v => f"$v%02X").mkString
+    def string = immutableBytes.map(byteToHex).mkString
     def keyId = ByteBuffer.wrap(bytes.takeRight(8)).getLong
+    def keyIdAsString = immutableBytes.takeRight(8).map(byteToHex).mkString
     override def toString = string
     override def equals(obj: Any) = obj match {
       case other: PGPFingerprint => bytes.deep == other.bytes.deep
       case _ => false
     }
+    protected def byteToHex(b: Byte): String = f"$b%02X"
   }
 
   implicit class PGPPublicKeyFingerprintHelper(publicKey: PGPPublicKey) {

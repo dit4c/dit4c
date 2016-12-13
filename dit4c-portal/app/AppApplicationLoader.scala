@@ -95,16 +95,18 @@ class AppComponents(context: Context)
   ).flatten))
 
   // Sharder/AggregateManager setup and event-bus subscription
-  val schedulerSharder = SchedulerSharder(imageServerConfig)(actorSystem)
+  val keyringSharder = KeyRingSharder()
+      .taggedWith[services.KeyRingSharder.type]
+  val schedulerSharder = SchedulerSharder(imageServerConfig)
       .taggedWith[services.SchedulerSharder.type]
   system.eventStream.subscribe(schedulerSharder, classOf[SchedulerSharder.Envelope])
-  val instanceSharder = InstanceSharder(schedulerSharder)(actorSystem)
+  val instanceSharder = InstanceSharder(schedulerSharder)
       .taggedWith[services.InstanceSharder.type]
   system.eventStream.subscribe(instanceSharder, classOf[InstanceSharder.Envelope])
-  val userSharder = UserSharder(instanceSharder, schedulerSharder)(actorSystem)
+  val userSharder = UserSharder(instanceSharder, schedulerSharder)
       .taggedWith[services.UserSharder.type]
   system.eventStream.subscribe(userSharder, classOf[UserSharder.Envelope])
-  val identitySharder = IdentitySharder(userSharder)(actorSystem)
+  val identitySharder = IdentitySharder(userSharder)
       .taggedWith[services.IdentitySharder.type]
   system.eventStream.subscribe(identitySharder, classOf[IdentitySharder.Envelope])
 
