@@ -25,8 +25,3 @@ GET     /web-components/:name.html          controllers.WebComponentsController.
 # Websocket messaging
 POST    /messaging/scheduler                controllers.MessagingController.schedulerRegistration
 GET     /messaging/scheduler/:id            controllers.MessagingController.schedulerSocket(id)
-
-# As documented at:
-# https://github.com/coreos/jwtproxy/blob/master/jwt/keyserver/keyregistry/README.md
-GET     /services/:service/keys             controllers.KeyServerController.serviceKeys(service)
-GET     /services/:service/keys/:kid        controllers.KeyServerController.serviceKey(service, kid)

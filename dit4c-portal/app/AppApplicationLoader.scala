@@ -151,7 +151,6 @@ class AppComponents(context: Context)
     new AuthorizationCodeGenerator(configuration.underlying.as[String]("play.crypto.secret"))
   lazy val instanceOAuthDataHandler: InstanceOAuthDataHandler = wire[InstanceOAuthDataHandler]
   // Controllers
-  lazy val keyServerController = wire[KeyServerController]
   lazy val oauthServerController = wire[OAuthServerController]
   lazy val messagingController = wire[MessagingController]
   lazy val webComponentsController = wire[WebComponentsController]

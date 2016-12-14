@@ -60,7 +60,6 @@ object InstanceAggregate {
 
   sealed trait Command extends BaseCommand
   case object GetStatus extends Command
-  case object GetJwk extends Command
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
   case object Discard extends Command
@@ -84,9 +83,6 @@ object InstanceAggregate {
   case object DoesNotExist extends StatusResponse
   case class CurrentStatus(
       state: String, uri: Option[String], timestamps: EventTimestamps) extends StatusResponse
-  sealed trait GetJwkResponse extends Response
-  case class InstanceJwk(jwk: JsObject) extends GetJwkResponse
-  case object NoJwkExists extends GetJwkResponse
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
@@ -119,8 +115,6 @@ class InstanceAggregate(
   when(Uninitialized) {
     case Event(GetStatus, _) =>
       stay replying DoesNotExist
-    case Event(GetJwk, _) =>
-      stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
     case Event(Start(schedulerId, clusterId, image, accessPassIds), _) =>
@@ -168,11 +162,6 @@ class InstanceAggregate(
           stay
         case _ => stay
       }
-    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
-      getJwkResponse(keyFingerprint).pipeTo(sender)
-      stay
-    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
-      stay replying NoJwkExists
     case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
       validateJwt(keyFingerprint)(token).pipeTo(sender)
       stay
@@ -249,10 +238,6 @@ class InstanceAggregate(
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, InstanceData(schedulerId, clusterId, Some(key), _, _, _)) =>
-      stay replying getJwkResponse(key)
-    case Event(GetJwk, InstanceData(schedulerId, clusterId, None, _, _, _)) =>
-      stay replying NoJwkExists
     case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
       validateJwt(keyFingerprint)(token).pipeTo(sender)
       stay
@@ -283,8 +268,6 @@ class InstanceAggregate(
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(GetJwk, _) =>
-      stay replying NoJwkExists
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt("Instance has been discarded")
     case Event(_: AssociatePGPPublicKey, _) =>
@@ -347,25 +330,6 @@ class InstanceAggregate(
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
-
-  private def getJwkResponse(fingerprint: PGPFingerprint): Future[GetJwkResponse] = {
-    import dit4c.common.KeyHelpers._
-    implicit val timeout = Timeout(1.minute)
-    val msg = KeyRingSharder.Envelope(
-        fingerprint,
-        KeyRingAggregate.GetKeys)
-    (keyringSharder ? msg)
-      .collect {
-        case KeyRingAggregate.NoKeysAvailable => NoJwkExists
-        case KeyRingAggregate.CurrentKeyBlock(keyBlock) =>
-          parseArmoredPublicKeyRing(keyBlock).right.get
-            .authenticationKeys
-            .flatMap(k => k.asJWK) match {
-              case Nil => NoJwkExists
-              case jwk :: _ => InstanceJwk(jwk)
-            }
-      }
-  }
 
   private def validateJwt(
       fingerprint: PGPFingerprint)(token: String): Future[VerifyJwtResponse] = {

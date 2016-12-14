@@ -477,6 +477,10 @@ object KeyHelpers {
                 "e" -> base64Url(k.getPublicExponent),
                 "n" -> base64Url(k.getModulus))
         }
+        .map {
+          _ ++ Json.obj(
+              "kid" -> publicKey.fingerprint.string)
+        }
 
     protected def base64Url(bi: BigInt): String =
       JwtBase64.encodeString(bi.toByteArray)
