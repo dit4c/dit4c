@@ -12,10 +12,14 @@ PUT     /instances/:instanceId/save         controllers.MainController.saveInsta
 PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 GET     /instances/:instanceId/export       controllers.MainController.exportImage(instanceId)
 POST    /instances/:instanceId/share        controllers.MainController.createSharingLink(instanceId)
-PUT     /instances/                         controllers.MainController.instanceRegistration
-PUT     /images/                            controllers.MainController.imageRegistration
+PUT     /instances/                         controllers.InstanceController.instanceRegistration
+PUT     /images/                            controllers.InstanceController.imageRegistration
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
 GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.redeemAccessPass(schedulerId, data)
+
+# Image server auth
+GET		/services/image-server/auth-http-request/:httpVerb/	          controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId="")
+GET		/services/image-server/auth-http-request/:httpVerb/:bucketId	controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId: String)
 
 # Assets
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)

@@ -154,7 +154,7 @@ class RktRunnerImpl(
       instanceKeysInternalPath = "/dit4c/instance/pki"
       helperEnvVars = Map[String,String](
         "DIT4C_IMAGE" -> s"/dit4c/image/${podAppName(instanceId)}.aci",
-        "DIT4C_IMAGE_ID" -> instanceId,
+        "DIT4C_IMAGE_ID" -> s"instance-$instanceId",
         "DIT4C_IMAGE_SERVER" -> imageServer,
         "DIT4C_IMAGE_UPLOAD_NOTIFICATION_URL" -> Uri(portalUri).withPath(Uri.Path("/images/")).toString,
         "DIT4C_INSTANCE_PRIVATE_KEY_PKCS1" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",
@@ -297,7 +297,7 @@ class RktRunnerImpl(
           "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP" -> s"${instanceKeysInternalPath}/instance-key.openpgp.asc",
           "DIT4C_INSTANCE_PRIVATE_KEY_OPENPGP_PASSPHRASE" -> secretKeyPassphrase,
           "DIT4C_INSTANCE_JWT_ISS" -> s"instance-$instanceId",
-          "DIT4C_INSTANCE_JWT_KID" -> instanceId,
+          "DIT4C_INSTANCE_JWT_KID" -> secretKeyRing.authenticationKeys.head.fingerprint.string,
           "DIT4C_INSTANCE_HELPER_AUTH_HOST" -> "127.68.73.84",
           "DIT4C_INSTANCE_HELPER_AUTH_PORT" -> "5267",
           "DIT4C_INSTANCE_HTTP_PORT" -> servicePort.toString,
