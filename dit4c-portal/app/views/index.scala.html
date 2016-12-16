@@ -21,13 +21,19 @@
 
 <style is="custom-style" include="iron-flex iron-flex-reverse iron-flex-alignment iron-positioning"></style>
 <style is="custom-style">
+:root {
+  --primary-color: var(--paper-teal-500);
+  --dark-primary-color: var(--paper-teal-800);
+  --light-primary-color: var(--paper-teal-200);
+  --accent-color: var(--paper-amber-500);
+}
 body {
-  background-color: var(--paper-grey-100);
+  background-color: var(--paper-grey-50);
 }
 app-header {
   height: 64px;
   color: white;
-  background-color: var(--paper-blue-500);
+  background-color: var(--primary-color);
 }
 #page-title {
   @@apply(--paper-font-headline);
@@ -49,7 +55,7 @@ paper-dropdown-menu {
   width: 200px;
 }
 #new-instance-form paper-button:not([disabled]) {
-  background: var(--paper-light-blue-500);
+  background: var(--primary-color);
   color: white;
 }
 .section-heading {

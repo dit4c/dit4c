@@ -3,11 +3,16 @@
 @import _root_.utils.WordLists
 @import _root_.play.api.libs.json._
 
+<link rel="import" href="@routes.Assets.versioned("lib/paper-tooltip/paper-tooltip.html")">
+
 <dom-module id="friendly-name">
   <template>
-    <span title="Automatically generated from {{value}}">
+    <span id="name">
     {{friendlyName(value)}}
     </span>
+  	<paper-tooltip for="name" position="right">
+  	  Automatically generated from {{value}}
+  	</paper-tooltip>
   </template>
   <script>
   Polymer({

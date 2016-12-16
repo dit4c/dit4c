@@ -1,12 +1,14 @@
 @(request: RequestHeader, messagesApi: MessagesApi)
 
 <link rel="import" href="@routes.Assets.versioned("lib/polymer/polymer.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-collapse/iron-collapse.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-card/paper-card.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-progress/paper-progress.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-toggle-button/paper-toggle-button.html")">
 <link rel="import" href="@routes.WebComponentsController.component("friendly-name")">
 <link rel="import" href="@routes.WebComponentsController.component("instance-create-button")">
 <link rel="import" href="@routes.WebComponentsController.component("instance-discard-button")">
@@ -19,8 +21,19 @@
 <dom-module id="instances-container">
   <style>
   .section-heading {
+    @@apply(--layout-horizontal);
     @@apply(--paper-font-subhead);
-  }  
+  }
+  .section-heading .heading-text {
+    @@apply(--layout-flex);
+  }
+  .section-heading .heading-actions {
+    @@apply(--layout-horizontal);
+  }
+  .section-heading .heading-actions > * {
+    margin-left: 5px;
+    margin-right: 5px;
+  }
   .card-container {
     min-height: 200px;
     padding-top: 20px;
@@ -31,16 +44,31 @@
     margin-right: 10px;
     margin-bottom: 10px;
   }
+  paper-card .card-header {
+  	padding: 16px;
+  	color: white;
+  	background-color: var(--primary-color);
+  	@@apply(--layout-horizontal);
+  	@@apply(--paper-card-header);
+  }
+  paper-card .card-header .card-header-text {
+    @@apply(--layout-flex);
+  	@@apply(--paper-card-header-text);
+  }
+  paper-card .card-header .card-header-action {
+    @@apply(--layout-self-center);
+  	@@apply(--paper-card-header-text);
+  }
   paper-card paper-progress {
     width: 100%;
   }
   paper-card.running-instance paper-progress {
-    --paper-progress-container-color: var(--paper-grey-300);
-    --paper-progress-active-color: var(--paper-light-blue-300);
+    --paper-progress-container-color: white;
+    --paper-progress-active-color: var(--accent-color);
   }
   paper-card.previous-instance paper-progress {
-    --paper-progress-container-color: var(--paper-light-blue-300);
-    --paper-progress-active-color: var(--paper-grey-300);
+    --paper-progress-container-color: var(--accent-color);
+    --paper-progress-active-color: white;
   }
   paper-card .card-actions {
     @@apply(--layout-horizontal-reverse);
@@ -53,6 +81,8 @@
     font-size: 75%;
   }
   .instance-state {
+  	text-transform: lowercase;
+  	font-variant: small-caps;
     @@apply(--paper-font-body1);
   }
   .instance-time {
@@ -68,27 +98,47 @@
   </style>
   <template>
     <div class="layout vertical" style="width: 100%">
-      <div class="section-heading">Running Instances</div>
+      <div class="section-heading">
+      	<div class="heading-text">
+      	  Running Instances
+      	</div>
+      	<div class="heading-actions">
+          <template is="dom-if" if="{{showmoreinfo}}">
+      	    <div>Less info</div>
+      	  </template>
+          <template is="dom-if" if="{{!showmoreinfo}}">
+      	    <div>More info</div>
+      	  </template>
+      	  <paper-toggle-button active="{{showmoreinfo}}"></paper-toggle-button>
+      	</div>
+      </div>
       <div class="card-container">
         <template id="running-instances" is="dom-repeat" items="[[instances]]" filter="isRunning" sort="reverseOrderById" observe="state">
           <paper-card class="running-instance">
-            <div class="card-content">
-              <div class="instance-name">
+            <div class="card-header">
+              <div class="card-header-text">
+		          <div class="instance-state">{{item.state}}</div>
+		          <div class="instance-name"><friendly-name value="{{item.id}}"></friendly-name></div>
+		      </div>
+		      <div class="card-header-action">
                 <template is="dom-if" if="{{item.url}}">
-                  <a href="{{item.url}}"><friendly-name value="{{item.id}}"></friendly-name></a>
+          	      <paper-icon-button icon="icons:open-in-new"
+          	      	on-click="openUrl" data-url="{{item.url}}"></paper-icon-button>
                 </template>
-                <template is="dom-if" if="{{!item.url}}"><friendly-name value="{{item.id}}"></friendly-name></template>
-              </div>
-              <div class="instance-state">{{item.state}}</div>
-              <div class="instance-id" title="Instance ID">{{item.id}}</div>
-              <div class="instance-time">
-	              <local-time instant="{{item.timestamps.created}}">
-	                <span class="label prefix">Created</span>
-	              </local-time>
-	            </div>
+	          </div>
             </div>
             <paper-progress
               value="{{stateProgress(item)}}"></paper-progress>
+			<iron-collapse opened="[[showmoreinfo]]">
+              <div class="card-content">
+                <div class="instance-id" title="Instance ID">{{item.id}}</div>
+                <div class="instance-time">
+	                <local-time instant="{{item.timestamps.created}}">
+	                  <span class="label prefix">Created</span>
+	                </local-time>
+	              </div>
+              </div>
+            </iron-collapse>
             <div class="card-actions layout horizontal-reverse">
               <instance-save-button instance-id="{{item.id}}"></instance-save-button>
               <instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
@@ -96,28 +146,38 @@
           </paper-card>
         </template>
       </div>
-      <div class="section-heading">Previous Instances</div>
+      <div class="section-heading">
+      	<div class="heading-text">
+      	  Previous Instances
+      	</div>
+      </div>
       <div class="card-container">
         <template is="dom-repeat" items="[[instances]]" filter="isPrevious" observe="state" sort="reverseOrderById">
           <paper-card class="previous-instance">
-            <div class="card-content">
-              <div class="instance-name"><friendly-name value="{{item.id}}"></friendly-name></div>
-              <div class="instance-state">{{item.state}}</div>
-              <div class="instance-id" title="Instance ID">{{item.id}}</div>
-              <div class="instance-time">
-                <local-time instant="{{item.timestamps.created}}">
-                  <span class="label prefix">Created</span>
-                </local-time>
-              </div>
-              <div class="instance-time">
-                <local-time instant="{{item.timestamps.completed}}">
-                  <span class="label prefix">Completed</span>
-                  <span class="or-else">&nbsp;</span>
-                </local-time>
-              </div>
+            <div class="card-header">
+              <div class="card-header-text">
+	            <div class="instance-state">{{item.state}}</div>
+	            <div class="instance-name"><friendly-name value="{{item.id}}"></friendly-name></div>
+	          </div>
             </div>
             <paper-progress
               value="{{stateProgress(item)}}"></paper-progress>
+			<iron-collapse opened="[[showmoreinfo]]">
+              <div class="card-content">
+	            <div class="instance-id" title="Instance ID">{{item.id}}</div>
+	            <div class="instance-time">
+	              <local-time instant="{{item.timestamps.created}}">
+	                <span class="label prefix">Created</span>
+	              </local-time>
+	            </div>
+	            <div class="instance-time">
+	              <local-time instant="{{item.timestamps.completed}}">
+	                <span class="label prefix">Completed</span>
+	                <span class="or-else">&nbsp;</span>
+	              </local-time>
+	            </div>
+              </div>
+            </iron-collapse>
             <div class="card-actions">
               <template is="dom-if" if="{{hasImage(item)}}">
                 <instance-share-button instance-id="{{item.id}}"></instance-share-button>
@@ -140,6 +200,9 @@
       instances: {
         type: Array,
         value: []
+      },
+      showmoreinfo: {
+    	type: Boolean
       },
       url: {
         type: String
@@ -224,6 +287,11 @@
       if (a.id < b.id) return 1;
       if (a.id > b.id) return -1;
       return 0;
+    },
+    openUrl: function(evt) {
+      console.log(evt.model);
+      var url = evt.model.get('item.url')
+      window.open(url, '_blank');
     }
   });
   </script>

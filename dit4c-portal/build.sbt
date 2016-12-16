@@ -67,6 +67,8 @@ libraryDependencies ++= {
       exclude(__, "github-com-polymerelements-iron-range-behavior"),
     __ %  "github-com-PolymerElements-paper-ripple"                 % "1.0.5",
     __ %  "github-com-PolymerElements-paper-toast"                  % "1.3.0",
+    __ %  "github-com-PolymerElements-paper-tooltip"		        % "1.1.3",
+    __ %  "github-com-PolymerElements-paper-toggle-button"          % "1.2.0",
     __ %  "github-com-PolymerElements-app-layout"                   % "0.9.1"
       exclude(__, "github-com-polymerelements-iron-media-query")
       exclude(__, "github-com-polymerelements-iron-scroll-target-behavior"),
