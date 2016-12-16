@@ -9,6 +9,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-toggle-button/paper-toggle-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-tooltip/paper-tooltip.html")">
 <link rel="import" href="@routes.WebComponentsController.component("friendly-name")">
 <link rel="import" href="@routes.WebComponentsController.component("instance-create-button")">
 <link rel="import" href="@routes.WebComponentsController.component("instance-discard-button")">
@@ -103,13 +104,17 @@
       	  Running Instances
       	</div>
       	<div class="heading-actions">
-          <template is="dom-if" if="{{showmoreinfo}}">
-      	    <div>Less info</div>
+          <template is="dom-if" if="{{detailedinfo}}">
+      	    <div>Detailed info</div>
       	  </template>
-          <template is="dom-if" if="{{!showmoreinfo}}">
-      	    <div>More info</div>
+          <template is="dom-if" if="{{!detailedinfo}}">
+      	    <div>Basic info</div>
       	  </template>
-      	  <paper-toggle-button active="{{showmoreinfo}}"></paper-toggle-button>
+      	  <paper-toggle-button id="detail-toggle"
+      	  	active="{{detailedinfo}}"></paper-toggle-button>
+	  	  <paper-tooltip for="detail-toggle" position="top">
+	  	    Toggle info detail
+	  	  </paper-tooltip>
       	</div>
       </div>
       <div class="card-container">
@@ -129,7 +134,7 @@
             </div>
             <paper-progress
               value="{{stateProgress(item)}}"></paper-progress>
-			<iron-collapse opened="[[showmoreinfo]]">
+			<iron-collapse opened="[[detailedinfo]]">
               <div class="card-content">
                 <div class="instance-id" title="Instance ID">{{item.id}}</div>
                 <div class="instance-time">
@@ -162,7 +167,7 @@
             </div>
             <paper-progress
               value="{{stateProgress(item)}}"></paper-progress>
-			<iron-collapse opened="[[showmoreinfo]]">
+			<iron-collapse opened="[[detailedinfo]]">
               <div class="card-content">
 	            <div class="instance-id" title="Instance ID">{{item.id}}</div>
 	            <div class="instance-time">
@@ -201,7 +206,7 @@
         type: Array,
         value: []
       },
-      showmoreinfo: {
+      detailedinfo: {
     	type: Boolean
       },
       url: {
