@@ -23,7 +23,7 @@ object RktClusterManager {
   type RktRunnerFactory =
     (RktNode.ServerConnectionDetails, String) => RktRunner
 
-  def props(config: RktRunner.Config)(implicit ec: ExecutionContext): Props = {
+  def props(clusterId: String, config: RktRunner.Config)(implicit ec: ExecutionContext): Props = {
     def rktRunnerFactory(
         connectionDetails: RktNode.ServerConnectionDetails,
         rktDir: String) = {
@@ -37,13 +37,14 @@ object RktClusterManager {
               connectionDetails.serverKey.public),
           config)
     }
-    props(rktRunnerFactory, RemoteShell.getHostKey)
+    props(clusterId, rktRunnerFactory, RemoteShell.getHostKey)
   }
 
   def props(
+      clusterId: String,
       rktRunnerFactory: RktRunnerFactory,
       hostKeyChecker: HostKeyChecker): Props =
-    Props(classOf[RktClusterManager], rktRunnerFactory, hostKeyChecker)
+    Props(classOf[RktClusterManager], clusterId, rktRunnerFactory, hostKeyChecker)
 
   case class ClusterInfo(
       instanceNodeMappings: Map[InstanceId, RktNodeId] = Map.empty,
@@ -74,6 +75,7 @@ object RktClusterManager {
 }
 
 class RktClusterManager(
+    clusterId: String,
     rktRunnerFactory: RktClusterManager.RktRunnerFactory,
     hostKeyChecker: RktClusterManager.HostKeyChecker)
     extends PersistentActor
@@ -84,7 +86,7 @@ class RktClusterManager(
   import RktClusterManager._
   import akka.pattern.{ask, pipe}
 
-  lazy val persistenceId = self.path.name
+  lazy val persistenceId = s"RktClusterManager-$clusterId"
 
   protected var state = ClusterInfo()
 

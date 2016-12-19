@@ -6,8 +6,8 @@ import dit4c.scheduler.routes._
 import scala.concurrent.Future
 import akka.http.scaladsl.Http.ServerBinding
 import akka.actor.Props
-import dit4c.scheduler.service.ClusterAggregateManager
-import dit4c.scheduler.domain.DefaultConfigProvider
+import dit4c.scheduler.service.ClusterManager
+import dit4c.scheduler.domain.ConfigProvider
 import dit4c.scheduler.runner.RktRunner
 import java.nio.file.Paths
 import akka.actor.Actor
@@ -53,7 +53,7 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     import context.dispatcher
     implicit val materializer = ActorMaterializer()(context.system)
     val clusterAggregateManager = context.actorOf(
-        Props(classOf[ClusterAggregateManager], defaultConfigProvider),
+        ClusterManager.props(defaultConfigProvider, config.knownClusters),
         "cluster-aggregate-manager")
     val httpHandler = (new ClusterRoutes(clusterAggregateManager)).routes
     Http(context.system).bindAndHandle(httpHandler, "localhost", config.port).foreach { sb =>
@@ -61,7 +61,7 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
       log.info(s"Listening on ${sb.localAddress}")
     }
     val keyManager = context.actorOf(
-        KeyManager.props(config.armoredPgpKeys.get),
+        KeyManager.props(config.armoredPgpKeyring.get),
         "key-manager")
     val pmbSupervisor = context.actorOf(BackoffSupervisor.props(
         Backoff.onStop(
@@ -103,7 +103,7 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     super.postStop()
   }
 
-  private val defaultConfigProvider: DefaultConfigProvider = new DefaultConfigProvider {
+  private val defaultConfigProvider: ConfigProvider = new ConfigProvider {
     override def rktRunnerConfig =
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),

@@ -40,11 +40,23 @@ message InstanceStateUpdate {
   string additionalInfo = 4;
 }
 
+message ClusterStateUpdate {
+  string clusterId = 1;
+  enum ClusterState {
+    ACTIVE = 0;
+    INACTIVE = 1;
+  }
+  ClusterState state = 2;
+  string displayName = 3;
+  bool supportsSave = 4;
+}
+
 message OutboundMessage {
   option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string messageId = 1;
   oneof payload {
     InstanceStateUpdate instanceStateUpdate = 2;
     AllocatedInstanceKey allocatedInstanceKey = 3;
+    ClusterStateUpdate clusterStateUpdate = 4;
   }
 }

@@ -86,7 +86,7 @@ class SchedulerAggregate(
   var schedulerSocket: Option[ActorRef] = None
 
   override val receiveCommand: Receive = doesNotExist
-  
+
   def doesNotExist: Receive = sealedReceive[Command] {
     case Create =>
       val requester = sender
@@ -136,7 +136,7 @@ class SchedulerAggregate(
           KeyRingAggregate.GetKeys)
       (keyringSharder ? msg)
         .collect {
-          case KeyRingAggregate.NoKeysAvailable => NoKeysAvailable 
+          case KeyRingAggregate.NoKeysAvailable => NoKeysAvailable
           case KeyRingAggregate.CurrentKeyBlock(s) => CurrentKeys(s)
         }
         .pipeTo(sender)
@@ -194,6 +194,9 @@ class SchedulerAggregate(
         case Payload.AllocatedInstanceKey(msg) =>
           val envelope = InstanceSharder.Envelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
           context.system.eventStream.publish(envelope)
+        case Payload.ClusterStateUpdate(msg) =>
+          // TODO: process message
+          log.info(msg.toString)
       }
     case SendSchedulerMessage(msg) =>
       val response: Response = schedulerSocket match {
@@ -256,7 +259,7 @@ class SchedulerAggregate(
     case cmd: AccessPassManager.Command =>
       accessPassManagerRef forward cmd
   }
-  
+
   override val receiveRecover = sealedReceive[DomainEvent](updateState _)
 
   def updateState(e: DomainEvent): Unit = e match {

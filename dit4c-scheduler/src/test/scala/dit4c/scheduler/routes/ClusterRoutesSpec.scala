@@ -6,7 +6,7 @@ import org.specs2.execute.Result
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import org.specs2.matcher.JsonType
-import dit4c.scheduler.service.ClusterAggregateManager
+import dit4c.scheduler.service.ClusterManager
 import org.specs2.ScalaCheck
 import akka.http.scaladsl.model.StatusCodes
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -16,7 +16,7 @@ import org.scalacheck.Gen
 import org.specs2.scalacheck.Parameters
 import akka.testkit.TestActorRef
 import akka.actor.Actor
-import dit4c.scheduler.domain.ClusterAggregate
+import dit4c.scheduler.domain.Cluster
 import dit4c.scheduler.domain.RktClusterManager
 import dit4c.scheduler.domain.Instance
 import org.scalacheck.ArbitraryLowPriority
@@ -33,7 +33,6 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing
 class ClusterRoutesSpec extends Specs2RouteTest
     with JsonMatchers with PlayJsonSupport
     with ScalaCheck with ScalaCheckHelpers {
-  import dit4c.scheduler.domain.clusteraggregate.ClusterType
 
   val basePath: Uri.Path = Uri.Path / "clusters"
   implicit def path2uri(path: Uri.Path) = Uri(path=path)
@@ -50,27 +49,27 @@ class ClusterRoutesSpec extends Specs2RouteTest
 
       "exists" >> prop { id: String =>
         def testActor = new Actor {
-          import ClusterAggregateManager.GetCluster
-          import ClusterAggregate.ClusterOfType
+          import ClusterManager.GetCluster
+          import Cluster.Active
           def receive = {
-            case GetCluster(`id`) => sender ! ClusterOfType(ClusterType.Rkt)
+            case GetCluster(`id`) => sender ! Active(id, true)
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
           (status must beSuccess) and
           (Json.prettyPrint(entityAs[JsValue]) must {
-            /("id" -> id)
-            /("type" -> ClusterType.Rkt.toString)
+            /("displayName" -> id)
+            /("supportsSave" -> true)
           })
         }
       }
 
       "does not exist" >> prop { id: String =>
         def testActor = new Actor {
-          import ClusterAggregateManager.GetCluster
-          import ClusterAggregate.UninitializedCluster
+          import ClusterManager.GetCluster
+          import Cluster.Uninitialized
           def receive = {
-            case GetCluster(`id`) => sender ! UninitializedCluster
+            case GetCluster(`id`) => sender ! Uninitialized
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
@@ -90,7 +89,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
             "port" -> nodeConfig.connectionDetails.port,
             "username" -> nodeConfig.connectionDetails.username)
         def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
+          import ClusterManager.ClusterCommand
           import RktClusterManager.{AddRktNode, RktNodeAdded, GetRktNodeState}
           import RktNode.Exists
           def receive = {
@@ -133,7 +132,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
         val clientPubKey = response.connectionDetails.clientKey.public
         val serverPubKey = response.connectionDetails.serverKey.public
         def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
+          import ClusterManager.ClusterCommand
           import RktClusterManager.GetRktNodeState
           def receive = {
             case ClusterCommand(`clusterId`, GetRktNodeState(nodeId)) =>
@@ -169,7 +168,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       (clusterId: String, nodeId: String, response: RktNode.NodeConfig)  =>
         val path = basePath / clusterId / "nodes" / nodeId / "confirm-keys"
         def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
+          import ClusterManager.ClusterCommand
           import RktClusterManager.ConfirmRktNodeKeys
           def receive = {
             case ClusterCommand(`clusterId`, ConfirmRktNodeKeys(nodeId)) =>
@@ -186,7 +185,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
       (clusterId: String, instanceId: String, imageName: String, portalUri: Uri, instanceKey: PGPPublicKeyRing) =>
         val path = basePath / clusterId / "instances" / instanceId
         def testActor = new Actor {
-          import ClusterAggregateManager.ClusterCommand
+          import ClusterManager.ClusterCommand
           import RktClusterManager.GetInstanceStatus
           import Instance.{StatusReport, WaitingForImage, StartData}
           def receive = {

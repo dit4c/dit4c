@@ -90,6 +90,7 @@ object PortalMessageBridge {
 
 class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     extends Actor with ActorLogging with Stash {
+  import dit4c.scheduler.service
 
   implicit val materializer = ActorMaterializer()
   var outboundSource: Source[Message, ActorRef] = null
@@ -180,34 +181,29 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.GetInstanceStatus(instanceId))
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl, clusterAccessPasses) =>
       import dit4c.scheduler.domain._
-      import dit4c.scheduler.service._
       log.info(s"Instance $instanceId requested on $clusterId using $imageUrl, with access passes:\n"+
           clusterAccessPasses.map(_.toByteArray).map(Base64.getEncoder.encodeToString).mkString("\n"))
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, imageUrl, portalUri))
     case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId,
               Instance.Save(saveHelperImageUrl, imageServer)))
     case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
     case dit4c.protobuf.scheduler.inbound.ConfirmInstanceUpload(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
     // Outbound
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>

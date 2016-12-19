@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import scopt.OptionParser
 import java.io.File
+import dit4c.scheduler.domain.ClusterInfo
 
 package object utils {
 
@@ -30,7 +31,11 @@ package object utils {
 
   case class SchedulerConfig(
       val name: String,
-      val armoredPgpKeys: Option[String],
+      val armoredPgpKeyring: Option[String],
+      val knownClusters: Map[String, ClusterInfo] = Map(
+          "default" -> ClusterInfo(
+              "Default Cluster",
+              true, true)),
       val port: Int = 8080,
       val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",
@@ -49,7 +54,7 @@ package object utils {
       .required
       .action { (f, c) =>
         import scala.sys.process._
-        c.copy(armoredPgpKeys = Some(getFileContents(f)))
+        c.copy(armoredPgpKeyring = Some(getFileContents(f)))
       }
       .validate {
         case f: File if f.exists() =>

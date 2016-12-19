@@ -70,7 +70,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
       "StartInstance" >> prop({ (msgId: String, instanceId: String, clusterId: String, imageUrl: Uri) =>
         import dit4c.protobuf.scheduler.{inbound => pb}
-        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.service.{ClusterManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
         val msg = pb.InboundMessage(randomMsgId,
             pb.InboundMessage.Payload.StartInstance(
@@ -87,7 +87,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
       "DiscardInstance" >> prop({ (msgId: String, instanceId: String, clusterId: String) =>
         import dit4c.protobuf.scheduler.{inbound => pb}
-        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.service.{ClusterManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
         import dit4c.scheduler.domain.{instance => i}
         val msg = pb.InboundMessage(randomMsgId,
@@ -109,7 +109,7 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
 
       "InstanceStateUpdate" >> prop({ (msgId: String, instanceId: String, imageUrl: Uri, portalUri: Uri) =>
         import dit4c.protobuf.scheduler.{outbound => pb}
-        import dit4c.scheduler.service.{ClusterAggregateManager => cam}
+        import dit4c.scheduler.service.{ClusterManager => cam}
         import dit4c.scheduler.domain.{RktClusterManager => ram}
         val dummyLocalImageId = "sha512-"+Stream.fill(64)("0").mkString
         val msgs: List[Instance.StatusReport] =
