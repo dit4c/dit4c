@@ -32,6 +32,7 @@ import scala.util.Try
 import java.security.interfaces.RSAPrivateKey
 import pdi.jwt.JwtAlgorithm
 import play.api.libs.json.Json
+import dit4c.scheduler.domain.Cluster
 
 class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -252,6 +253,9 @@ class PortalMessageBridgeSpec(implicit ee: ExecutionEnv)
               JwtJson.encode(claim, k, JwtAlgorithm.RS512)
           }
       keyManagerProbe.reply(KeyManager.SignedJwtTokens(tokens))
+      parentProbe.expectMsg(ClusterManager.GetClusters)
+      parentProbe.reply(Cluster.Active("default", "Default Cluster", true))
+      wsProbe.expectMessage // Expect cluster state update
       // Run block
       f(wsProbe, parentProbe, msgBridgeRef)
     } finally {

@@ -39,6 +39,7 @@ import akka.http.scaladsl.model.headers.`Set-Cookie`
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import akka.http.scaladsl.model.HttpHeader
 import java.util.Base64
+import dit4c.scheduler.domain.Cluster
 
 object PortalMessageBridge {
   case object BridgeClosed extends KryoSerializable
@@ -161,6 +162,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           Flow.fromSinkAndSourceMat(
               inboundSink, outboundSource)(outboundActorRefExtractor))._2
       self ! outbound
+      context.parent ! ClusterManager.GetClusters
     }
     setup.recover({
       case e =>
@@ -244,6 +246,30 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           }
         case _ => // No need to do anything
       }
+    case msg: Cluster.GetStateResponse =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      Some(msg)
+        .collect {
+          case Cluster.Active(clusterId, displayName, supportsSave) =>
+            pb.ClusterStateUpdate(
+                clusterId,
+                pb.ClusterStateUpdate.ClusterState.ACTIVE,
+                displayName,
+                supportsSave)
+          case Cluster.Inactive(clusterId, displayName) =>
+            pb.ClusterStateUpdate(
+                clusterId,
+                pb.ClusterStateUpdate.ClusterState.INACTIVE,
+                displayName,
+                false)
+        }
+        .map { msg =>
+          pb.OutboundMessage(newMsgId,
+              pb.OutboundMessage.Payload.ClusterStateUpdate(msg))
+        }
+        .foreach { msg =>
+          outbound ! toBinaryMessage(msg.toByteArray)
+        }
     case RktClusterManager.UnknownInstance(instanceId) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(

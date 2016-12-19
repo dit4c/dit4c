@@ -14,8 +14,10 @@ object Cluster {
   trait GetStateResponse extends Response
   case object Uninitialized extends GetStateResponse
   case class Inactive(
+      id: String,
       displayName: String) extends GetStateResponse
   case class Active(
+      id: String,
       displayName: String,
       supportsSave: Boolean) extends GetStateResponse
 
@@ -37,12 +39,16 @@ class Cluster(
       }
     case Some(info) if !info.active =>
       {
-        case GetState => sender ! Inactive(info.displayName)
+        case GetState =>
+          sender ! Inactive(
+            clusterId,
+            info.displayName)
       }
     case Some(info) =>
       {
         case GetState =>
           sender ! Active(
+            clusterId,
             info.displayName,
             info.supportsSave)
         case msg =>

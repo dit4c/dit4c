@@ -54,9 +54,11 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
         probe.send(clusterAggregateManager, GetCluster("default"))
         probe.expectMsgType[GetStateResponse] must {
           be_==(Cluster.Active(
+              "default",
               clusters("default").displayName,
               clusters("default").supportsSave))
         }
+        done
       }
 
       "can receive wrapped messages" >> {
@@ -65,9 +67,11 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
             ClusterCommand("default", Cluster.GetState))
         probe.expectMsgType[GetStateResponse] must {
           be_==(Cluster.Active(
+              "default",
               clusters("default").displayName,
               clusters("default").supportsSave))
         }
+        done
       }
     }
 
@@ -77,7 +81,21 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
       probe.expectMsgType[GetStateResponse] must {
         be_==(Cluster.Uninitialized)
       }
+      done
     }).setGen(genNonEmptyString)
+
+    "broadcasts request for cluster info" >> {
+      val probe = TestProbe()
+      probe.send(clusterAggregateManager, GetClusters)
+      probe.expectMsgType[GetStateResponse] must {
+        be_==(Cluster.Active(
+            "default",
+            clusters("default").displayName,
+            clusters("default").supportsSave))
+      }
+      done
+    }
+
   }
 
   private def longerThanAkkaTimeout(implicit timeout: Timeout): FiniteDuration =

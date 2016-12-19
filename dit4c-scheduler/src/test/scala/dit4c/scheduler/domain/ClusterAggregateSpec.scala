@@ -61,36 +61,40 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
       }
 
       "returns Active if marked active" >> prop(
-        (displayName: String, supportsSave: Boolean, system: ActorSystem) => {
+        (id: String, displayName: String, supportsSave: Boolean, system: ActorSystem) => {
           import scala.language.experimental.macros
           implicit val _ = system
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(Cluster.props(
-                Some(ClusterInfo(displayName, true, supportsSave)),
-                defaultConfigProvider));
+            system.actorOf(
+                Cluster.props(
+                  Some(ClusterInfo(displayName, true, supportsSave)),
+                  defaultConfigProvider),
+                id)
           probe.send(clusterAggregate, GetState)
           probe.expectMsgType[GetStateResponse] must {
-            be_==(Active(displayName, supportsSave))
+            be_==(Active(id, displayName, supportsSave))
           }
         }
-       )
+      ).setGen1(Gen.identifier)
 
       "returns Inactive if not marked active" >> prop(
-        (displayName: String, supportsSave: Boolean, system: ActorSystem) => {
+        (id: String, displayName: String, supportsSave: Boolean, system: ActorSystem) => {
           import scala.language.experimental.macros
           implicit val _ = system
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(Cluster.props(
-                Some(ClusterInfo(displayName, false, supportsSave)),
-                defaultConfigProvider));
+            system.actorOf(
+                Cluster.props(
+                  Some(ClusterInfo(displayName, false, supportsSave)),
+                  defaultConfigProvider),
+                id)
           probe.send(clusterAggregate, GetState)
           probe.expectMsgType[GetStateResponse] must {
-            be_==(Inactive(displayName))
+            be_==(Inactive(id, displayName))
           }
         }
-       )
+      ).setGen1(Gen.identifier)
     }
   }
 }

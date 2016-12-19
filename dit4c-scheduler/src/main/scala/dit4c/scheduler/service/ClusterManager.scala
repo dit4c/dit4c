@@ -17,6 +17,7 @@ object ClusterManager {
     Props(classOf[ClusterManager], defaultConfigProvider, knownClusters)
 
   sealed trait Command extends BaseCommand
+  case object GetClusters extends Command
   case class GetCluster(id: String) extends Command
   case class ClusterCommand(
       clusterId: String, cmd: Any) extends Command
@@ -36,6 +37,10 @@ class ClusterManager(
     case GetCluster(id) if !isValidClusterId(id) =>
       // Invalid IDs will forever be uninitialized clusters
       sender ! Cluster.Uninitialized
+    case GetClusters =>
+      knownClusters.keys.foreach { id =>
+        cluster(id) forward Cluster.GetState
+      }
     case GetCluster(id) =>
       cluster(id) forward Cluster.GetState
     case ClusterCommand(id, msg) =>

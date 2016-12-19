@@ -59,6 +59,7 @@ object ClusterRoutes {
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
   implicit val writesClusterActive: OWrites[Cluster.Active] = (
+      (__ \ 'id).write[String] and
       (__ \ 'displayName).write[String] and
       (__ \ 'supportsSave).write[Boolean]
   )(unlift(Cluster.Active.unapply))

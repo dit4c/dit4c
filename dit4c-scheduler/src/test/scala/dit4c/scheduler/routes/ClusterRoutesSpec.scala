@@ -47,12 +47,13 @@ class ClusterRoutesSpec extends Specs2RouteTest
       // We never want an empty string for these checks
       implicit val arbString = Arbitrary(genNonEmptyString)
 
-      "exists" >> prop { id: String =>
+      "exists" >> prop { (id: String, displayName: String) =>
         def testActor = new Actor {
           import ClusterManager.GetCluster
           import Cluster.Active
           def receive = {
-            case GetCluster(`id`) => sender ! Active(id, true)
+            case GetCluster(`id`) =>
+              sender ! Active(id, displayName, true)
           }
         }
         Get(basePath / id) ~> routes(testActor) ~> check {
