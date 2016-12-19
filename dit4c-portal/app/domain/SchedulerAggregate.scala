@@ -195,8 +195,23 @@ class SchedulerAggregate(
           val envelope = InstanceSharder.Envelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
           context.system.eventStream.publish(envelope)
         case Payload.ClusterStateUpdate(msg) =>
-          // TODO: process message
-          log.info(msg.toString)
+          import dit4c.protobuf.scheduler.outbound.ClusterStateUpdate.ClusterState._
+          val timestamp = msg.timestamp match {
+            case None => Instant.now
+            case Some(ts) =>
+              Instant.ofEpochSecond(ts.seconds, ts.nanos.toLong)
+          }
+          val update =
+            Cluster.UpdateInfo(
+              msg.state match {
+                case ACTIVE => Cluster.Active(msg.displayName, msg.supportsSave)
+                case INACTIVE => Cluster.Inactive(msg.displayName)
+                case Unrecognized(v) =>
+                  log.error(s"Unknown cluster state! Converting $v to inactive.")
+                  Cluster.Inactive(msg.displayName)
+              },
+              timestamp)
+          clusterManager ! ClusterEnvelope(msg.clusterId, update)
       }
     case SendSchedulerMessage(msg) =>
       val response: Response = schedulerSocket match {

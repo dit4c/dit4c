@@ -146,7 +146,7 @@ class InstanceAggregate(
                 clusterId,
                 Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
+    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
       // Tell any listening actors
       context.actorSelection("get-status-request-*") ! CurrentStatus(state.toString, uri, ts)
       state match {
