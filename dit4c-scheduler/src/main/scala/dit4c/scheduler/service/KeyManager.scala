@@ -12,6 +12,7 @@ import java.security.PrivateKey
 import pdi.jwt.JwtJson
 import pdi.jwt.JwtAlgorithm
 import java.security.interfaces.RSAPrivateKey
+import dit4c.scheduler.ssh.RemoteShell
 
 object KeyManager {
 
@@ -24,8 +25,6 @@ object KeyManager {
       case Right(kr) => kr
       case Left(msg) => throw new Exception(msg)
     }
-
-  case class OpenSshKeyPair(`private`: String, `public`: String)
 
   trait Command extends BaseCommand
   case object GetPublicKeyInfo extends Command
@@ -42,7 +41,7 @@ object KeyManager {
   case class SignedJwtTokens(tokens: List[String]) extends SignJwtClaimResponse
   trait GetOpenSshKeyPairsResponse extends Response
   case class OpenSshKeyPairs(
-      pairs: List[OpenSshKeyPair]) extends GetOpenSshKeyPairsResponse
+      pairs: List[RemoteShell.OpenSshKeyPair]) extends GetOpenSshKeyPairsResponse
 
 }
 
@@ -79,13 +78,13 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor {
           JwtJson.encode(claim, k, JwtAlgorithm.RS512)
       }
 
-  def openSshKeyPairs: List[OpenSshKeyPair] =
+  def openSshKeyPairs: List[RemoteShell.OpenSshKeyPair] =
     authenticationSecretKeys
       .flatMap { sk =>
         for {
           priv <- sk.asOpenSSH
           pub <- sk.getPublicKey.asOpenSSH
-        } yield OpenSshKeyPair(priv, pub)
+        } yield RemoteShell.OpenSshKeyPair(priv, pub)
       }
 
   def hasKeyFlags(pk: PGPPublicKey)(flags: Int): Boolean = {

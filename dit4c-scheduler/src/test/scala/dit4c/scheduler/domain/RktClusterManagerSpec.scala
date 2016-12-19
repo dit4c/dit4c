@@ -35,12 +35,13 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
 
   implicit val params = Parameters(minTestsOk = 20)
   implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
-  implicit val rktRunnerConfig =
+  val rktRunnerConfig =
     RktRunner.Config(
         Paths.get("/var/lib/dit4c-rkt"),
         "dit4c-instance-",
           "" /* Not used */,
           "" /* Not used */)
+  val configProvider = mockConfigProvider(rktRunnerConfig)
 
   "ClusterAggregate" >> {
 
@@ -53,7 +54,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           val probe = TestProbe()
           val manager =
             probe.childActorOf(
-                RktClusterManager.props(clusterId, rktRunnerConfig))
+                RktClusterManager.props(clusterId, configProvider))
           probe.send(manager, GetRktNodeState(rktNodeId))
           probe.expectMsgType[RktNode.GetStateResponse](1.minute) must {
             be(RktNode.DoesNotExist)
@@ -396,6 +397,11 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
   def randomPGPPublicKeyRing: PGPPublicKeyRing = {
     import dit4c.common.KeyHelpers._
     PGPKeyGenerators.RSA(Random.alphanumeric.take(20).mkString).toPublicKeyRing
+  }
+
+  def mockConfigProvider(rrc: RktRunner.Config) = new ConfigProvider {
+    override def rktRunnerConfig = rrc
+    override def sshKeys = Future.successful(Nil)
   }
 
   def mockRktRunnerFactory(

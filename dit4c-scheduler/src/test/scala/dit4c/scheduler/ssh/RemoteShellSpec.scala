@@ -53,14 +53,16 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
 
   object withCommandExecutor extends Fixture[CommandExecutor] {
     override def apply[R: AsResult](f: CommandExecutor => R) = {
+      import dit4c.common.KeyHelpers._
       val kp = Random.shuffle(keyPairs).head
       val username = Random.alphanumeric.take(8).mkString
       val ce: CommandExecutor = RemoteShell(server.getHost,
         server.getPort,
         username,
         Future.successful(
-          (kp.getPrivate.asInstanceOf[RSAPrivateKey],
-           kp.getPublic.asInstanceOf[RSAPublicKey]) :: Nil),
+          RemoteShell.OpenSshKeyPair(
+              kp.getPrivate.asInstanceOf[RSAPrivateKey].pkcs8.pem,
+              kp.getPublic.asInstanceOf[RSAPublicKey].ssh.authorizedKeys) :: Nil),
         Future.successful(
           hostPublicKey.asInstanceOf[RSAPublicKey]))
       AsResult(f(ce))

@@ -108,13 +108,11 @@ object ClusterRoutes {
       (__ \ 'host).write[String] and
       (__ \ 'port).write[Int] and
       (__ \ 'username).write[String] and
-      (__ \ "client-key").write[RSAPublicKey] and
       (__ \ "host-key").write[RSAPublicKey]
   )(rktNode => (
       rktNode.connectionDetails.host,
       rktNode.connectionDetails.port,
       rktNode.connectionDetails.username,
-      rktNode.connectionDetails.clientKey.public,
       rktNode.connectionDetails.serverKey.public))
 }
 
@@ -179,13 +177,10 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
               case RktNode.Exists(node) =>
                 extractUri { thisUri => extractLog { log =>
                   val nodeUri = Uri(thisUri.path / nodeId toString)
-                  val clientPublicKey = node.connectionDetails.clientKey.public.ssh.authorizedKeys
                   log.info("Created new node " +
                       node.connectionDetails.username + "@" +
                       node.connectionDetails.host + ":" +
-                      node.connectionDetails.port +
-                      " for access with RSA public key: " +
-                      clientPublicKey)
+                      node.connectionDetails.port)
                   complete((
                       StatusCodes.Created,
                       Location(nodeUri) :: Nil,

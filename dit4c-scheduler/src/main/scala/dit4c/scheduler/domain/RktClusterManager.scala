@@ -23,7 +23,7 @@ object RktClusterManager {
   type RktRunnerFactory =
     (RktNode.ServerConnectionDetails, String) => RktRunner
 
-  def props(clusterId: String, config: RktRunner.Config)(implicit ec: ExecutionContext): Props = {
+  def props(clusterId: String, config: ConfigProvider)(implicit ec: ExecutionContext): Props = {
     def rktRunnerFactory(
         connectionDetails: RktNode.ServerConnectionDetails,
         rktDir: String) = {
@@ -32,12 +32,10 @@ object RktClusterManager {
               connectionDetails.host,
               connectionDetails.port,
               connectionDetails.username,
-              Future.successful(
-                (connectionDetails.clientKey.`private`,
-                 connectionDetails.clientKey.public) :: Nil),
+              config.sshKeys,
               Future.successful(
                   connectionDetails.serverKey.public)),
-          config)
+          config.rktRunnerConfig)
     }
     props(clusterId, rktRunnerFactory, RemoteShell.getHostKey)
   }

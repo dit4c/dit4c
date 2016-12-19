@@ -34,6 +34,7 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
           "dit4c-instance-",
           "" /* Not used */,
           "" /* Not used */)
+    override def sshKeys = ???
   }
   val clusters: Map[String, ClusterInfo] = Map(
       "default" -> ClusterInfo("Default Cluster", true, true))

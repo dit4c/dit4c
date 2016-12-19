@@ -25,7 +25,7 @@ object Cluster {
 
 class Cluster(
     clusterInfo: Option[ClusterInfo],
-    defaultConfigProvider: ConfigProvider)
+    configProvider: ConfigProvider)
     extends Actor
     with ActorLogging {
   import Cluster._
@@ -72,6 +72,6 @@ class Cluster(
 
   private val managerProps =
     RktClusterManager.props(
-        clusterId, defaultConfigProvider.rktRunnerConfig)(context.dispatcher)
+        clusterId, configProvider)(context.dispatcher)
 
 }

@@ -83,7 +83,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
     "add rkt node" >> prop({
       (clusterId: String, nodeId: String, nodeConfig: RktNode.NodeConfig) =>
         val path = basePath / clusterId / "nodes"
-        val clientPubKey = nodeConfig.connectionDetails.clientKey.public
         val serverPubKey = nodeConfig.connectionDetails.serverKey.public
         val postJson = Json.obj(
             "host" -> nodeConfig.connectionDetails.host,
@@ -108,13 +107,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("host" -> nodeConfig.connectionDetails.host) and
             /("port" -> nodeConfig.connectionDetails.port) and
             /("username" -> nodeConfig.connectionDetails.username) and
-            /("client-key") /("jwk") /("kty" -> "RSA") and
-            /("client-key") /("jwk") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
-            /("client-key") /("jwk") /("n" -> toBase64url(clientPubKey.getModulus)) and
-            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("MD5")) and
-            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("SHA-256")) and
-            /("client-key") /("ssh") /("openssh" -> clientPubKey.ssh.authorizedKeys) and
-            /("client-key") /("ssh") /("ssh2" -> clientPubKey.ssh.pem) and
             /("host-key") /("jwk") /("kty" -> "RSA") and
             /("host-key") /("jwk") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
             /("host-key") /("jwk") /("n" -> toBase64url(serverPubKey.getModulus)) and
@@ -130,7 +122,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
     "get rkt node" >> prop({
       (clusterId: String, nodeId: String, response: RktNode.NodeConfig) =>
         val path = basePath / clusterId / "nodes" / nodeId
-        val clientPubKey = response.connectionDetails.clientKey.public
         val serverPubKey = response.connectionDetails.serverKey.public
         def testActor = new Actor {
           import ClusterManager.ClusterCommand
@@ -146,13 +137,6 @@ class ClusterRoutesSpec extends Specs2RouteTest
             /("host" -> response.connectionDetails.host) and
             /("port" -> response.connectionDetails.port) and
             /("username" -> response.connectionDetails.username) and
-            /("client-key") /("jwk") /("kty" -> "RSA") and
-            /("client-key") /("jwk") /("e" -> toBase64url(clientPubKey.getPublicExponent)) and
-            /("client-key") /("jwk") /("n" -> toBase64url(clientPubKey.getModulus)) and
-            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("MD5")) and
-            /("client-key") /("ssh") /("fingerprints") /(clientPubKey.ssh.fingerprint("SHA-256")) and
-            /("client-key") /("ssh") /("openssh" -> clientPubKey.ssh.authorizedKeys) and
-            /("client-key") /("ssh") /("ssh2" -> clientPubKey.ssh.pem) and
             /("host-key") /("jwk") /("kty" -> "RSA") and
             /("host-key") /("jwk") /("e" -> toBase64url(serverPubKey.getPublicExponent)) and
             /("host-key") /("jwk") /("n" -> toBase64url(serverPubKey.getModulus)) and
@@ -237,7 +221,7 @@ class ClusterRoutesSpec extends Specs2RouteTest
         RktNode.ServerPublicKey(publicKey)
       }
     } yield RktNode.NodeConfig(
-      RktNode.ServerConnectionDetails(host, port, username, ckp, spk),
+      RktNode.ServerConnectionDetails(host, port, username, spk),
       "/var/lib/dit4c-rkt",
       false)
 
