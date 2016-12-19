@@ -32,9 +32,11 @@ object RktClusterManager {
               connectionDetails.host,
               connectionDetails.port,
               connectionDetails.username,
-              connectionDetails.clientKey.`private`,
-              connectionDetails.clientKey.public,
-              connectionDetails.serverKey.public),
+              Future.successful(
+                (connectionDetails.clientKey.`private`,
+                 connectionDetails.clientKey.public) :: Nil),
+              Future.successful(
+                  connectionDetails.serverKey.public)),
           config)
     }
     props(clusterId, rktRunnerFactory, RemoteShell.getHostKey)

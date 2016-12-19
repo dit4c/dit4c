@@ -36,28 +36,33 @@ object RemoteShell {
       host: String,
       port: Int,
       username: String,
-      userPrivateKey: RSAPrivateKey,
-      userPublicKey: RSAPublicKey,
-      hostPublicKey: RSAPublicKey): CommandExecutor = {
+      fetchUserKeyPairs: => Future[List[(RSAPrivateKey, RSAPublicKey)]],
+      fetchHostPublicKey: => Future[RSAPublicKey]): CommandExecutor = {
     import dit4c.common.KeyHelpers._
-    val jsch = new JSch
-    jsch.addIdentity("id",
-        toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,
-        userPublicKey.ssh.raw,
-        null)
-    jsch.getHostKeyRepository.add(
-        new HostKey(host, hostPublicKey.ssh.raw),
-        null);
     var lastSession: Option[Session] = None
     ce {
       if (lastSession.isDefined && lastSession.get.isConnected)
         Future.successful(lastSession.get)
-      else Future {
-        val session = jsch.getSession(username, host, port)
-        session.connect()
-        lastSession = Some(session)
-        session
-      }
+      else
+        for {
+          userKeyPairs <- fetchUserKeyPairs
+          hostPublicKey <- fetchHostPublicKey
+        } yield {
+          val jsch = new JSch
+          userKeyPairs.foreach { case (userPrivateKey, userPublicKey) =>
+            jsch.addIdentity("id",
+                toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,
+                userPublicKey.ssh.raw,
+                null)
+          }
+          jsch.getHostKeyRepository.add(
+              new HostKey(host, hostPublicKey.ssh.raw),
+              null);
+          val session = jsch.getSession(username, host, port)
+          session.connect()
+          lastSession = Some(session)
+          session
+        }
     }
   }
 

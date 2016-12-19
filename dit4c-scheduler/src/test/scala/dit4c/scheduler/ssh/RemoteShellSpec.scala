@@ -41,6 +41,7 @@ import dit4c.scheduler.runner.CommandExecutorHelper
 import org.apache.sshd.common.keyprovider.MappedKeyPairProvider
 import java.security.spec.ECGenParameterSpec
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import scala.concurrent.Future
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ScalaCheck with FileMatchers {
@@ -57,9 +58,11 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
       val ce: CommandExecutor = RemoteShell(server.getHost,
         server.getPort,
         username,
-        kp.getPrivate.asInstanceOf[RSAPrivateKey],
-        kp.getPublic.asInstanceOf[RSAPublicKey],
-        hostPublicKey.asInstanceOf[RSAPublicKey])
+        Future.successful(
+          (kp.getPrivate.asInstanceOf[RSAPrivateKey],
+           kp.getPublic.asInstanceOf[RSAPublicKey]) :: Nil),
+        Future.successful(
+          hostPublicKey.asInstanceOf[RSAPublicKey]))
       AsResult(f(ce))
     }
   }
