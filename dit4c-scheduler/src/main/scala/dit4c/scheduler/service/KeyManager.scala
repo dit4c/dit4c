@@ -13,6 +13,7 @@ import pdi.jwt.JwtJson
 import pdi.jwt.JwtAlgorithm
 import java.security.interfaces.RSAPrivateKey
 import dit4c.scheduler.ssh.RemoteShell
+import akka.actor.ActorLogging
 
 object KeyManager {
 
@@ -45,11 +46,22 @@ object KeyManager {
 
 }
 
-class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor {
+class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLogging {
   import KeyManager._
   import scala.collection.JavaConversions._
 
   val keyring = parseKeyBlock(armoredPgpSecretKeyBlock)
+
+  override def preStart = {
+    openSshKeyPairs match {
+      case Nil =>
+        log.warning("Key manager started without any valid SSH keys!")
+      case keys =>
+        log.info(
+            s"Key manager started with ${keys.length} SSH keys:\n"+
+            keys.map(_.`public`).mkString("\n"))
+    }
+  }
 
   val receive: Receive = {
     case cmd: Command => cmd match {
