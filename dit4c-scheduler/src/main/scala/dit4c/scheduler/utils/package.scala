@@ -35,7 +35,7 @@ package object utils {
       val knownClusters: Map[String, ClusterInfo] = Map(
           "default" -> ClusterInfo(
               "Default Cluster",
-              true, true)),
+              true, false)),
       val port: Int = 8080,
       val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",

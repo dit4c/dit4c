@@ -145,8 +145,14 @@
               </div>
             </iron-collapse>
             <div class="card-actions layout horizontal-reverse">
-              <instance-save-button instance-id="{{item.id}}"></instance-save-button>
-              <instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
+              <template is="dom-if" if="{{hasAction(item, 'save')}}">
+              	<instance-save-button instance-id="{{item.id}}"></instance-save-button>
+              </template>
+              <template is="dom-if" if="{{hasAction(item, 'discard')}}">
+              	<instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
+              </template>
+              <!-- Kludgy spacer -->
+              <paper-icon-button icon="" disabled></paper-icon-button>
             </div>
           </paper-card>
         </template>
@@ -184,9 +190,13 @@
               </div>
             </iron-collapse>
             <div class="card-actions">
-              <template is="dom-if" if="{{hasImage(item)}}">
+              <template is="dom-if" if="{{hasAction(item, 'share')}}">
                 <instance-share-button instance-id="{{item.id}}"></instance-share-button>
+              </template>
+              <template is="dom-if" if="{{hasAction(item, 'export')}}">
                 <instance-export-button instance-id="{{item.id}}"></instance-export-button>
+              </template>
+              <template is="dom-if" if="{{hasAction(item, 'createderived')}}">
                 <instance-create-button instance-id="{{item.id}}"></instance-create-button>
               </template>
               <!-- Kludgy spacer -->
@@ -254,13 +264,8 @@
         default:                    return 100;
       }
     },
-    hasImage: function(item) {
-      switch (item.state) {
-        case "Uploaded":
-          return true;
-        default:
-          return false;
-      }   
+    hasAction: function(item, action) {
+      return item.actions.indexOf(action) >= 0 
     },
     ready: function() {
       this.connect();

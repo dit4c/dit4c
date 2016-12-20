@@ -440,11 +440,16 @@ class GetInstancesActor(out: ActorRef,
               .collect { case msg: InstanceAggregate.CurrentStatus =>
                 val url: Option[String] =
                   msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(id, effectiveState(msg.state, url), url, msg.timestamps)
+                InstanceResponse(
+                    id,
+                    effectiveState(msg.state, url),
+                    url,
+                    msg.timestamps,
+                    msg.availableActions.toSeq.sortBy(_.toString))
               }
               .recover { case e =>
                 log.error(e, s"Failed to get instance status for $id")
-                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps())
+                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps(), Nil)
               }
               .pipeTo(self)
           }
@@ -467,18 +472,26 @@ class GetInstancesActor(out: ActorRef,
   }
 
   case class InstanceResponse(
-      id: String, state: String, url: Option[String], timestamps: InstanceAggregate.EventTimestamps)
+      id: String,
+      state: String,
+      url: Option[String],
+      timestamps: InstanceAggregate.EventTimestamps,
+      availableActions: Seq[InstanceAggregate.InstanceAction])
 
   implicit private val writesEventTimestamps: Writes[InstanceAggregate.EventTimestamps] = (
       (__ \ 'created).writeNullable[Instant] and
       (__ \ 'completed).writeNullable[Instant]
     )(unlift(InstanceAggregate.EventTimestamps.unapply))
 
+  implicit private val writesInstanceAction: Writes[InstanceAggregate.InstanceAction] =
+    Writes { action => JsString(action.toString.toLowerCase) }
+
   implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
       (__ \ 'id).write[String] and
       (__ \ 'state).write[String] and
       (__ \ 'url).writeNullable[String] and
-      (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps]
+      (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps] and
+      (__ \ 'actions).write[Seq[InstanceAggregate.InstanceAction]]
     )(unlift(InstanceResponse.unapply))
 
   private def effectiveState(state: String, url: Option[String]) = state match {
