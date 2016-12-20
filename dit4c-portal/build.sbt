@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "com.pauldijou"             %%  "jwt-play-json"         % "0.7.1",
   "com.mohiva"                %%  "play-silhouette"       % "4.0.0-RC1",
   "com.mohiva"                %%  "play-silhouette-crypto-jca" % "4.0.0-RC1",
-  "com.iheart"                %%  "ficus"                 % "1.2.3",
+  "com.iheart"                %%  "ficus"                 % ficusV,
   "com.nulab-inc"             %%  "play2-oauth2-provider" % "0.17.2",
   "com.lihaoyi"               %   "ammonite-sshd"         % "0.8.0" cross CrossVersion.full,
   ws,

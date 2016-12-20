@@ -24,6 +24,7 @@ libraryDependencies ++= {
     "de.heikoseeberger"   %%  "akka-http-play-json"   % "1.7.0",
     "org.iq80.leveldb"            % "leveldb"         % "0.7",
     "org.fusesource.leveldbjni"   % "leveldbjni-all"  % "1.8",
+  	"com.iheart"          %%  "ficus"                 % ficusV,
     "org.specs2"          %%  "specs2-core"           % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",
