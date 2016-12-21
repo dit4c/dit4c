@@ -208,14 +208,14 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
       context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
     // Outbound
-    case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
+    case Instance.StatusReport(instanceId, Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(data.instanceId, pb.InstanceStateUpdate.InstanceState.ERRORED,
+        pb.InstanceStateUpdate(instanceId, pb.InstanceStateUpdate.InstanceState.ERRORED,
             data.errors.mkString("\n\n"), Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
-    case Instance.StatusReport(state, data: Instance.SomeData) =>
+    case Instance.StatusReport(instanceId, state, data: Instance.SomeData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val pbState = state match {
         case Instance.JustCreated => pb.InstanceStateUpdate.InstanceState.CREATED
@@ -233,7 +233,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
         case Instance.Errored => pb.InstanceStateUpdate.InstanceState.ERRORED
       }
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(data.instanceId, pbState, "", Some(pbTimestamp(Instant.now)))
+        pb.InstanceStateUpdate(instanceId, pbState, "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
       data match {
@@ -241,7 +241,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           import dit4c.common.KeyHelpers._
           data.keys.foreach { keys =>
               val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.AllocatedInstanceKey(
-                pb.AllocatedInstanceKey(data.instanceId, keys.armoredPgpPublicKeyBlock)))
+                pb.AllocatedInstanceKey(instanceId, keys.armoredPgpPublicKeyBlock)))
               outbound ! toBinaryMessage(msg.toByteArray)
           }
         case _ => // No need to do anything

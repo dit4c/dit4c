@@ -75,7 +75,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     mockRktRunnerFactory,
-                    mockFetchSshHostKey(hostPublicKey)))
+                    mockFetchSshHostKey(hostPublicKey)),
+                clusterId)
         probe.send(manager, AddRktNode(
             "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
         val response = probe.expectMsgType[RktNodeAdded](1.minute)
@@ -96,7 +97,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     mockRktRunnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(randomRSAPublicKey)),
+                clusterId)
         probe.send(manager, AddRktNode(
             "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
         val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
@@ -136,7 +138,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(randomRSAPublicKey)),
+                clusterId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
@@ -200,7 +203,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(randomRSAPublicKey)),
+                clusterId)
         val manager = createManager
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
@@ -272,7 +276,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(randomRSAPublicKey)),
+                clusterId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
@@ -351,7 +356,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(randomRSAPublicKey)),
+                clusterId)
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()

@@ -4,18 +4,18 @@ import dit4c.scheduler.runner.RktRunner
 import akka.actor._
 import scala.util._
 import org.bouncycastle.openpgp.PGPPublicKeyRing
+import dit4c.common.ActorHelpers
 
-class RktInstanceWorker(runner: RktRunner) extends Actor
-    with ActorLogging with InstanceWorker {
+class RktInstanceWorker(runner: RktRunner)
+    extends Actor
+    with ActorLogging
+    with InstanceWorker
+    with ActorHelpers {
   import InstanceWorker._
 
   import context.dispatcher
 
-  override val receive: Receive = {
-    case command: Command => receiveCmd(command)
-  }
-
-  protected def receiveCmd(command: Command): Unit = command match {
+  override val receive: Receive = sealedReceive[Command] {
     case Fetch(imageName: String) =>
       val instance = sender
       runner.fetch(imageName).andThen {

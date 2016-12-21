@@ -7,72 +7,102 @@ import scala.util.Random
 import akka.actor.ActorLogging
 import akka.actor.TypedActor.PostStop
 import akka.actor.Cancellable
+import akka.actor.Props
 
 object RktInstanceScheduler {
 
+  def props(
+      instanceId: String,
+      nodes: Set[ActorRef],
+      completeWithin: FiniteDuration) =
+    Props(classOf[RktInstanceScheduler],
+        instanceId,
+        nodes,
+        completeWithin)
+
+  sealed trait Command extends BaseCommand
+  protected case object TimedOut extends Command
+
   sealed trait Response extends BaseResponse
-  case class WorkerFound(nodeId: String, worker: ActorRef) extends Response
+  case class WorkerFound(worker: ActorRef) extends Response
   case object NoWorkersAvailable extends Response
 
 }
 
 class RktInstanceScheduler(
-    nodes: Map[String, ActorRef],
-    completeWithin: FiniteDuration,
-    requireWorker: Boolean) extends Actor with ActorLogging {
+    instanceId: String,
+    nodes: Set[ActorRef],
+    completeWithin: FiniteDuration) extends Actor with ActorLogging {
 
   import RktInstanceScheduler._
-  private object TimedOut
 
   var cancelTimeout: Option[Cancellable] = None
 
   override def preStart = {
     implicit val ec = context.dispatcher
-    sequentiallyCheckNodes(Random.shuffle(nodes.keys.toList))
     cancelTimeout = Some(context.system.scheduler.scheduleOnce(completeWithin, self, TimedOut))
+    queryAllForExisting
   }
 
   override def postStop = {
     cancelTimeout.foreach(_.cancel)
   }
 
-  override val receive: Receive = {
-    case _ => // Never uses this handler - always set by check
+  // Never used
+  override val receive: Receive = PartialFunction.empty
+
+  private def queryAllForExisting: Unit = {
+    nodes.foreach { node => node ! RktNode.GetWorkerForExistingInstance(instanceId) }
+    waitForExisting(nodes)
   }
 
-  def sequentiallyCheckNodes(remainingNodesToTry: List[String]) {
+  private def waitForExisting(remainingNodes: Set[ActorRef]): Unit =
+    if (remainingNodes.isEmpty) {
+      sequentiallyCheckNodes(Random.shuffle(nodes.toList))
+    } else {
+      context.become({
+        case RktNode.WorkerCreated(worker) =>
+          val node = sender
+          context.parent ! WorkerFound(worker)
+          log.info(s"Instance worker provided by $node")
+          context.stop(self)
+        case TimedOut =>
+          log.warning(
+              s"Unable to assign instance worker within $completeWithin")
+          giveUpAndStop
+        case RktNode.UnableToProvideWorker(msg) =>
+          waitForExisting(remainingNodes - sender)
+      })
+    }
+
+  private def sequentiallyCheckNodes(remainingNodesToTry: List[ActorRef]): Unit =
     remainingNodesToTry match {
-      case nodeId :: rest =>
+      case node :: rest =>
         // Ready to receive response
         context.become({
           case RktNode.WorkerCreated(worker) =>
-            context.parent ! WorkerFound(nodeId, worker)
-            log.info(s"Instance worker provided by $nodeId")
+            context.parent ! WorkerFound(worker)
+            log.info(s"Instance worker provided by $node")
             context.stop(self)
           case TimedOut =>
             log.warning(
                 s"Unable to assign instance worker within $completeWithin")
             giveUpAndStop
           case RktNode.UnableToProvideWorker(msg) =>
+            log.info(msg)
             sequentiallyCheckNodes(rest)
         })
         // Query next Node
-        log.info(s"Requesting instance worker from node $nodeId")
-        nodes(nodeId) ! nodeRequest
+        log.info(s"Requesting instance worker from node $node")
+        node ! RktNode.GetWorkerForNewInstance(instanceId)
       case Nil =>
         log.warning(
             s"All nodes refused to provide an instance worker")
         giveUpAndStop
     }
-  }
 
-  def giveUpAndStop {
+  private def giveUpAndStop {
     context.parent ! NoWorkersAvailable
     context.stop(self)
   }
-
-  private val nodeRequest =
-    if (this.requireWorker) RktNode.RequireInstanceWorker
-    else RktNode.RequestInstanceWorker
-
 }

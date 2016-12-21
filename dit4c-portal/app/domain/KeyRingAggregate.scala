@@ -2,7 +2,7 @@ package domain
 
 import akka.persistence.PersistentActor
 import akka.actor.ActorLogging
-import utils.akka.ActorHelpers
+import dit4c.common.ActorHelpers
 import domain.SchedulerAggregate.GetKeysResponse
 import java.security.MessageDigest
 import akka.util.ByteString

@@ -223,7 +223,8 @@ class ClusterRoutesSpec extends Specs2RouteTest
     } yield RktNode.NodeConfig(
       RktNode.ServerConnectionDetails(host, port, username, spk),
       "/var/lib/dit4c-rkt",
-      false)
+      false,
+      Set.empty)
 
   def toBase64url(bi: java.math.BigInteger): String =
     JwtBase64.encodeString(bi.toByteArray)

@@ -15,7 +15,7 @@ import java.time.Instant
 import domain.{InstanceAggregate => IA }
 import scala.collection.immutable.SortedSet
 import services._
-import utils.akka.ActorHelpers
+import dit4c.common.ActorHelpers
 
 object UserAggregate {
 

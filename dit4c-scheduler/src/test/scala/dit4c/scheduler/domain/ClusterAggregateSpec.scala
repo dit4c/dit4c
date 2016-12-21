@@ -53,7 +53,9 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         prop({ aggregateId: String =>
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(Cluster.props(None, defaultConfigProvider))
+            probe.childActorOf(
+                Cluster.props(None, defaultConfigProvider),
+                aggregateId)
           probe.send(clusterAggregate, GetState)
           probe.expectMsgType[Cluster.GetStateResponse] must {
             be(Cluster.Uninitialized)
@@ -67,7 +69,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           implicit val _ = system
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(
+            probe.childActorOf(
                 Cluster.props(
                   Some(ClusterInfo(displayName, true, supportsSave)),
                   defaultConfigProvider),
@@ -85,7 +87,7 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
           implicit val _ = system
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(
+            probe.childActorOf(
                 Cluster.props(
                   Some(ClusterInfo(displayName, false, supportsSave)),
                   defaultConfigProvider),

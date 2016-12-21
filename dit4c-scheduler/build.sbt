@@ -12,6 +12,8 @@ scalacOptions := Seq(
 
 libraryDependencies ++= {
   Seq(
+    "com.softwaremill.macwire"  %%  "macros"  % macwireV    % "provided",
+    "com.softwaremill.macwire"  %%  "util"    % macwireV,
     "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbV % "protobuf",
     "ch.qos.logback"      %   "logback-classic"       % logbackV,
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,

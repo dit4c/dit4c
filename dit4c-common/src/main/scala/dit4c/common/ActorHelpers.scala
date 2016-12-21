@@ -1,4 +1,4 @@
-package utils.akka
+package dit4c.common
 
 import akka.actor._
 

@@ -2,10 +2,10 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 
-package dit4c.scheduler.domain;
+package dit4c.scheduler.domain.rktnode;
 
 option (scalapb.options) = {
-  flat_package: false
+  flat_package: true
   single_file: true
   import: "dit4c.scheduler.domain.BaseDomainEvent"
   preamble: "// $COVERAGE-OFF$Generated code"
@@ -24,5 +24,11 @@ message Initialized {
 
 message KeysConfirmed {
   option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AcceptedInstance {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
+  string instanceId = 1;
   google.protobuf.Timestamp timestamp = 100;
 }

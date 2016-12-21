@@ -23,7 +23,7 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import services.KeyRingSharder
 import akka.persistence.PersistentActor
-import utils.akka.ActorHelpers
+import dit4c.common.ActorHelpers
 import dit4c.common.KeyHelpers.PGPFingerprint
 
 object SchedulerAggregate {

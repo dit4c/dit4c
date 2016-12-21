@@ -5,7 +5,7 @@ import akka.actor._
 import akka.persistence.PersistentActor
 import akka.util.ByteString
 import com.google.protobuf.{ByteString => PBByteString}
-import utils.akka.ActorHelpers
+import dit4c.common.ActorHelpers
 import dit4c.protobuf.tokens.ClusterAccessPass
 import java.time.Instant
 import domain.accesspass.PassVerificationWorker

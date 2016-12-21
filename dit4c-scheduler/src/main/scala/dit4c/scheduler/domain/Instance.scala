@@ -14,6 +14,7 @@ import dit4c.scheduler.domain.instance.DomainEvent
 import Instance.{State, Data}
 
 object Instance {
+
   type Id = String
   type ImageName = String
   type ImageId = String
@@ -21,8 +22,8 @@ object Instance {
   type LocalImage = String
   type KeyData = String
 
-  def props(worker: ActorRef): Props =
-    Props(classOf[Instance], worker)
+  def props(id: Id, worker: ActorRef): Props =
+    Props(classOf[Instance], id, worker)
 
   object InstanceKeys {
     import dit4c.common.KeyHelpers._
@@ -52,28 +53,23 @@ object Instance {
 
   sealed trait Data
   case object NoData extends Data
-  sealed trait SomeData extends Data {
-    def instanceId: String
-  }
+  sealed trait SomeData extends Data
   case class StartData(
-      instanceId: String,
       providedImage: String,
       resolvedImage: Option[String],
       portalUri: String,
       keys: Option[InstanceKeys]) extends SomeData
   case class SaveData(
-      instanceId: String,
       keys: InstanceKeys,
       uploadHelperImage: String,
       imageServer: String,
       portalUri: String) extends SomeData
-  case class DiscardData(instanceId: String) extends SomeData
-  case class ErrorData(instanceId: String, errors: List[String]) extends SomeData
+  case object DiscardData extends SomeData
+  case class ErrorData(errors: List[String]) extends SomeData
 
   trait Command extends BaseCommand
   case object GetStatus extends Command
   case class Initiate(
-      instanceId: String,
       image: NamedImage,
       portalUri: String) extends Command
   case class ReceiveImage(id: LocalImage) extends Command
@@ -94,25 +90,26 @@ object Instance {
 
   sealed trait Response extends BaseResponse
   case class StatusReport(
+      instanceId: Id,
       state: Instance.State,
       data: Instance.Data) extends Response
   case object Ack extends Response
 }
 
-class Instance(worker: ActorRef)
+class Instance(instanceId: String, worker: ActorRef)
     extends PersistentFSM[State, Data, DomainEvent] {
   import dit4c.scheduler.domain.instance._
   import Instance._
   import BaseDomainEvent.now
   import dit4c.common.KeyHelpers._
 
-  lazy val persistenceId = self.path.name
+  lazy val persistenceId = "Instance-$instanceId"
 
   startWith(JustCreated, NoData)
 
   when(JustCreated) {
-    case Event(Initiate(id, imageName, callback), _) =>
-      val domainEvent = Initiated(id, imageName, callback)
+    case Event(Initiate(imageName, portalUri), _) =>
+      val domainEvent = Initiated(imageName, portalUri)
       val requester = sender
       goto(WaitingForImage).applying(domainEvent).andThen {
         case data =>
@@ -123,11 +120,11 @@ class Instance(worker: ActorRef)
   }
 
   when(WaitingForImage) {
-    case Event(ReceiveImage(localImage), StartData(id, _, _, callback, _)) =>
+    case Event(ReceiveImage(localImage), StartData(_, _, portalUri, _)) =>
       goto(Starting).applying(FetchedImage(localImage)).andThen {
         case data =>
           log.info(s"Starting with: $localImage")
-          worker ! InstanceWorker.Start(id, localImage, callback)
+          worker ! InstanceWorker.Start(instanceId, localImage, portalUri)
       }
   }
 
@@ -141,16 +138,16 @@ class Instance(worker: ActorRef)
   }
 
   when(Running) {
-    case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
+    case Event(Save(helperImage, imageServer), StartData(_, _, portalUri, _) ) =>
       val requester = sender
       goto(Stopping).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
-        worker ! InstanceWorker.Stop(id)
+        worker ! InstanceWorker.Stop(instanceId)
         requester ! Ack
       }
-    case Event(Discard, StartData(id, _, _, _, _)) =>
+    case Event(Discard, StartData(_, _, _, _)) =>
       val requester = sender
       goto(Stopping).applying(RequestedDiscard(now)).andThen { _ =>
-        worker ! InstanceWorker.Stop(id)
+        worker ! InstanceWorker.Stop(instanceId)
         requester ! Ack
       }
   }
@@ -161,10 +158,10 @@ class Instance(worker: ActorRef)
   }
 
   when(Exited) {
-    case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
+    case Event(Save(helperImage, imageServer), StartData(_, _, portalUri, _) ) =>
       val requester = sender
       goto(Saving).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
-        worker ! InstanceWorker.Save(id)
+        worker ! InstanceWorker.Save(instanceId)
         requester ! Ack
       }
     case Event(Discard, _) =>
@@ -173,11 +170,11 @@ class Instance(worker: ActorRef)
         worker ! InstanceWorker.Discard
         requester ! Ack
       }
-    case Event(ContinueSave, SaveData(id, _, _, _, _) ) =>
-      worker ! InstanceWorker.Save(id)
+    case Event(ContinueSave, SaveData(_, _, _, _) ) =>
+      worker ! InstanceWorker.Save(instanceId)
       goto(Saving)
-    case Event(ContinueDiscard, DiscardData(id)) =>
-      worker ! InstanceWorker.Discard(id)
+    case Event(ContinueDiscard, DiscardData) =>
+      worker ! InstanceWorker.Discard(instanceId)
       goto(Discarding)
 
   }
@@ -188,10 +185,10 @@ class Instance(worker: ActorRef)
   }
 
   when(Saved) {
-    case Event(Upload, SaveData(id, _, helperImage, imageServer, portalUri)) =>
+    case Event(Upload, SaveData(_, helperImage, imageServer, portalUri)) =>
       val requester = sender
       goto(Uploading).applying(CommencedUpload(now)).andThen { _ =>
-        worker ! InstanceWorker.Upload(id, helperImage, imageServer, portalUri)
+        worker ! InstanceWorker.Upload(instanceId, helperImage, imageServer, portalUri)
       }
   }
 
@@ -224,7 +221,7 @@ class Instance(worker: ActorRef)
 
   whenUnhandled {
     case Event(GetStatus, data) =>
-      stay replying StatusReport(stateName, data)
+      stay replying StatusReport(instanceId, stateName, data)
     case Event(Error(msg), _) =>
       goto(Errored).applying(ErrorOccurred(msg, now))
   }
@@ -232,7 +229,7 @@ class Instance(worker: ActorRef)
   onTransition {
     case (from, to) =>
       Option(stateData).collect {
-        case data: SomeData => log.info(s"Instance ${data.instanceId}: $from → $to")
+        case data: SomeData => log.info(s"Instance ${instanceId}: $from → $to")
       }
       emitStatusReportToEventStream(to)(stateData)
   }
@@ -241,7 +238,7 @@ class Instance(worker: ActorRef)
     case (_, Exited) if stateData.isInstanceOf[SaveData] =>
       log.info("continuing save")
       self ! ContinueSave
-    case (_, Exited) if stateData.isInstanceOf[DiscardData] =>
+    case (_, Exited) if stateData == DiscardData =>
       log.info("continuing discard")
       self ! ContinueDiscard
     case (_, Saved) => self ! Upload
@@ -257,8 +254,8 @@ class Instance(worker: ActorRef)
       currentData
     }
     domainEvent match {
-      case Initiated(id, imageName, portalUri, _) => currentData match {
-        case NoData => StartData(id, imageName, None, portalUri, None)
+      case Initiated(imageName, portalUri, _) => currentData match {
+        case NoData => StartData(imageName, None, portalUri, None)
         case other => unhandled("Cannot initiate twice")
       }
       case FetchedImage(imageId, _) => currentData match {
@@ -270,8 +267,8 @@ class Instance(worker: ActorRef)
         case other => unhandled()
       }
       case RequestedSave(helperImage, imageServer, _) => currentData match {
-        case StartData(id, _, _, portalUri, Some(signingKey)) =>
-          SaveData(id, signingKey, helperImage, imageServer, portalUri)
+        case StartData(_, _, portalUri, Some(signingKey)) =>
+          SaveData(signingKey, helperImage, imageServer, portalUri)
         case data: SaveData =>
           // TODO: Get rid of this once we know how it happens
           log.warning("Two requested saves really shouldn't happen!")
@@ -279,12 +276,12 @@ class Instance(worker: ActorRef)
         case other => unhandled()
       }
       case RequestedDiscard(_) => currentData match {
-        case StartData(id, _, _, _, _) => DiscardData(id)
+        case StartData(_, _, _, _) => DiscardData
         case other => unhandled()
       }
       case ErrorOccurred(msg, _) => currentData match {
         case errorData: ErrorData => errorData.copy(errors = errorData.errors :+ msg)
-        case data: SomeData => ErrorData(data.instanceId, List(msg))
+        case data: SomeData => ErrorData(List(msg))
         case NoData => unhandled()
       }
       case ConfirmedDiscard(_) => currentData
@@ -300,7 +297,7 @@ class Instance(worker: ActorRef)
     classTag[DomainEvent]
 
   protected def emitStatusReportToEventStream(state: Instance.State)(data: Instance.Data): Unit =
-    context.system.eventStream.publish(StatusReport(state, data))
+    context.system.eventStream.publish(StatusReport(instanceId, state, data))
 
 
 }

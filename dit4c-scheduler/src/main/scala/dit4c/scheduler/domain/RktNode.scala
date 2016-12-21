@@ -28,9 +28,16 @@ object RktNode {
   def newId = Seq.fill(4)(Random.nextInt(255)).map(i => f"$i%x").mkString
 
   def props(
+      clusterId: String,
+      nodeId: String,
       rktRunnerFactory: RktClusterManager.RktRunnerFactory,
       fetchSshHostKey: RktClusterManager.HostKeyChecker): Props =
-        Props(classOf[RktNode], rktRunnerFactory, fetchSshHostKey)
+    Props(
+        classOf[RktNode],
+        clusterId,
+        nodeId,
+        rktRunnerFactory,
+        fetchSshHostKey)
 
   case class ClientKeyPair(public: RSAPublicKey, `private`: RSAPrivateKey)
   case class ServerPublicKey(public: RSAPublicKey)
@@ -57,12 +64,14 @@ object RktNode {
   case class NodeConfig(
       connectionDetails: ServerConnectionDetails,
       rktDir: String,
-      readyToConnect: Boolean) extends Data
+      readyToConnect: Boolean,
+      managedInstances: Set[String]) extends Data
 
   trait Command extends BaseCommand
   case object GetState extends Command
-  case object RequestInstanceWorker extends Command
-  case object RequireInstanceWorker extends Command
+  trait GetWorkerCommand extends Command
+  case class GetWorkerForExistingInstance(instanceId: String) extends GetWorkerCommand
+  case class GetWorkerForNewInstance(instanceId: String) extends GetWorkerCommand
   case class Initialize(
       host: String,
       port: Int,
@@ -86,13 +95,15 @@ object RktNode {
 }
 
 class RktNode(
+    clusterId: String,
+    nodeId: String,
     createRunner: RktClusterManager.RktRunnerFactory,
     fetchSshHostKey: RktClusterManager.HostKeyChecker)
     extends PersistentFSM[State, Data, DomainEvent] {
   import dit4c.scheduler.domain.rktnode._
   import RktNode._
 
-  lazy val persistenceId = self.path.name
+  lazy val persistenceId = s"RktNode-$clusterId-$nodeId"
 
   startWith(JustCreated, NoConfig)
 
@@ -115,7 +126,7 @@ class RktNode(
             init.rktDir))
         .andThen {
           case data =>
-            context.parent ! RktClusterManager.RegisterRktNode(replyTo)
+            context.parent.tell(RktClusterManager.RegisterRktNode(nodeId), replyTo)
         }
   }
 
@@ -129,13 +140,25 @@ class RktNode(
 
   when(Active) {
     case Event(
-        RequestInstanceWorker | RequireInstanceWorker,
-        NodeConfig(connectionDetails, rktDir, _)) =>
+        GetWorkerForNewInstance(instanceId),
+        NodeConfig(connectionDetails, rktDir, _, _)) =>
+      val runner = createRunner(connectionDetails, rktDir)
+      val worker = context.actorOf(
+          Props(classOf[RktInstanceWorker], runner),
+          "instance-worker-"+Random.alphanumeric.take(20).mkString)
+      stay applying(AcceptedInstance(instanceId)) replying WorkerCreated(worker)
+    case Event(
+        GetWorkerForExistingInstance(instanceId),
+        NodeConfig(connectionDetails, rktDir, _, instances)) if instances.contains(instanceId) =>
       val runner = createRunner(connectionDetails, rktDir)
       val worker = context.actorOf(
           Props(classOf[RktInstanceWorker], runner),
           "instance-worker-"+Random.alphanumeric.take(20).mkString)
       stay replying WorkerCreated(worker)
+    case Event(
+        GetWorkerForExistingInstance(instanceId),
+        NodeConfig(connectionDetails, rktDir, _, instances)) =>
+      stay replying UnableToProvideWorker("Instance is currently unknown")
     case Event(ConfirmKeys, data: NodeConfig) =>
       stay replying ConfirmKeysResponse(data)
   }
@@ -145,7 +168,7 @@ class RktNode(
       stay replying DoesNotExist
     case Event(GetState, c: NodeConfig) =>
       stay replying Exists(c)
-    case Event(RequestInstanceWorker, _) =>
+    case Event(_: GetWorkerCommand, _) =>
       stay replying UnableToProvideWorker("Node is not currently active")
   }
 
@@ -163,13 +186,21 @@ class RktNode(
               parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
                 .right.get.asInstanceOf[RSAPublicKey])
           ),
-          rktDir, false)
+          rktDir,
+          false,
+          Set.empty)
       case KeysConfirmed(_) =>
         dataBeforeEvent match {
           case c: NodeConfig => c.copy(readyToConnect = true)
           case other => other
         }
-    }
+      case AcceptedInstance(instanceId, _) =>
+        dataBeforeEvent match {
+          case c: NodeConfig =>
+            c.copy(managedInstances = c.managedInstances + instanceId)
+          case other => other
+        }
+      }
   }
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
