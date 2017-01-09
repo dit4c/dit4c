@@ -179,7 +179,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     case msg => stash()
   }
 
-  def running(outbound: ActorRef) = LoggingReceive {
+  def running(outbound: ActorRef): Receive = LoggingReceive {
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
