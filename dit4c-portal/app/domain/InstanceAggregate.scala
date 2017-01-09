@@ -58,6 +58,16 @@ object InstanceAggregate {
       created: Option[Instant] = None,
       completed: Option[Instant] = None)
 
+
+  sealed trait InstanceAction
+  object InstanceAction {
+    case object Save extends InstanceAction
+    case object Discard extends InstanceAction
+    case object Share extends InstanceAction
+    case object Export extends InstanceAction
+    case object CreateDerived extends InstanceAction
+  }
+
   sealed trait Command extends BaseCommand
   case object GetStatus extends Command
   case class VerifyJwt(token: String) extends Command
@@ -82,7 +92,10 @@ object InstanceAggregate {
   sealed trait StatusResponse extends Response
   case object DoesNotExist extends StatusResponse
   case class CurrentStatus(
-      state: String, uri: Option[String], timestamps: EventTimestamps) extends StatusResponse
+      state: String,
+      uri: Option[String],
+      timestamps: EventTimestamps,
+      availableActions: Set[InstanceAction]) extends StatusResponse
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
@@ -135,9 +148,7 @@ class InstanceAggregate(
   when(Started) {
     case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       // Start actor listening
-      context.actorOf(
-          Props(classOf[GetStatusRequestActor], sender),
-          "get-status-request-"+Random.alphanumeric.take(10).mkString)
+      statusRequestQueuer(schedulerId, clusterId) ! sender
       // Forward request to cluster
       context.system.eventStream.publish(
           SchedulerSharder.Envelope(
@@ -146,9 +157,9 @@ class InstanceAggregate(
                 clusterId,
                 Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, timestamp, state, info), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
-      // Tell any listening actors
-      context.actorSelection("get-status-request-*") ! CurrentStatus(state.toString, uri, ts)
+    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
+      // Fill waiting requests
+      statusRequestQueuer(schedulerId, clusterId) ! CurrentStatus(state.toString, uri, ts, Set.empty)
       state match {
         case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
@@ -233,8 +244,13 @@ class InstanceAggregate(
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts)
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, maybeUrl, ts)) =>
+      val availableActions: Set[InstanceAction] =
+        if (maybeUrl.isDefined) {
+          import InstanceAction._
+          Set(CreateDerived, Export, Share)
+        } else Set.empty
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts, availableActions)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -264,7 +280,8 @@ class InstanceAggregate(
 
   when(Discarded) {
     case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts)
+      val availableActions: Set[InstanceAction] = Set.empty
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts, availableActions)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -365,12 +382,17 @@ class InstanceAggregate(
       }
   }
 
-}
+  private def statusRequestQueuer(schedulerId: String, clusterId: String) =
+    context.child("status-request-queuer").getOrElse {
+      context.actorOf(
+          Props(
+            classOf[StatusRequestQueuer],
+            instanceId,
+            clusterId,
+            schedulerId,
+            schedulerSharder),
+          "status-request-queuer")
+    }
 
-class GetStatusRequestActor(requester: ActorRef) extends Actor {
-  override def receive = {
-    case msg =>
-      requester.tell(msg, context.parent)
-      context.stop(self)
-  }
+
 }

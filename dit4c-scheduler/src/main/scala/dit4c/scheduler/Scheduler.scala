@@ -6,8 +6,8 @@ import dit4c.scheduler.routes._
 import scala.concurrent.Future
 import akka.http.scaladsl.Http.ServerBinding
 import akka.actor.Props
-import dit4c.scheduler.service.ClusterAggregateManager
-import dit4c.scheduler.domain.DefaultConfigProvider
+import dit4c.scheduler.service.ClusterManager
+import dit4c.scheduler.domain.ConfigProvider
 import dit4c.scheduler.runner.RktRunner
 import java.nio.file.Paths
 import akka.actor.Actor
@@ -23,6 +23,8 @@ import akka.pattern.Backoff
 import akka.event.LoggingReceive
 import dit4c.scheduler.domain.Instance
 import dit4c.scheduler.service.KeyManager
+import akka.util.Timeout
+import scala.concurrent.ExecutionContext
 
 object Scheduler {
 
@@ -52,17 +54,17 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
   override def preStart {
     import context.dispatcher
     implicit val materializer = ActorMaterializer()(context.system)
+    val keyManager = context.actorOf(
+        KeyManager.props(config.armoredPgpKeyring.get),
+        "key-manager")
     val clusterAggregateManager = context.actorOf(
-        Props(classOf[ClusterAggregateManager], defaultConfigProvider),
+        ClusterManager.props(configProvider(keyManager), config.knownClusters),
         "cluster-aggregate-manager")
     val httpHandler = (new ClusterRoutes(clusterAggregateManager)).routes
     Http(context.system).bindAndHandle(httpHandler, "localhost", config.port).foreach { sb =>
       serverBinding = Some(sb)
       log.info(s"Listening on ${sb.localAddress}")
     }
-    val keyManager = context.actorOf(
-        KeyManager.props(config.armoredPgpKeys.get),
-        "key-manager")
     val pmbSupervisor = context.actorOf(BackoffSupervisor.props(
         Backoff.onStop(
           Props(classOf[PortalMessageBridge], keyManager, config.portalUri),
@@ -103,13 +105,24 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     super.postStop()
   }
 
-  private val defaultConfigProvider: DefaultConfigProvider = new DefaultConfigProvider {
+  private def configProvider(
+      keyManager: ActorRef)(implicit ec: ExecutionContext): ConfigProvider = new ConfigProvider {
     override def rktRunnerConfig =
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance",
           config.authImage,
           config.listenerImage)
+    override def sshKeys = {
+      import akka.pattern.ask
+      implicit val timeout = Timeout(1.minute)
+      (keyManager ? KeyManager.GetOpenSshKeyPairs)
+        .collect {
+          case KeyManager.OpenSshKeyPairs(pairs) =>
+            pairs
+        }
+    }
+
   }
 }
 

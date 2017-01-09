@@ -5,16 +5,17 @@ import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import org.specs2.matcher.MatcherMacros
 import scala.concurrent.duration._
-import dit4c.scheduler.domain.ClusterAggregate
+import dit4c.scheduler.domain.Cluster
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary
 import org.specs2.concurrent.ExecutionEnv
 import akka.util.Timeout
 import dit4c.scheduler.ScalaCheckHelpers
 import akka.testkit.TestProbe
-import dit4c.scheduler.domain.DefaultConfigProvider
+import dit4c.scheduler.domain.ConfigProvider
 import dit4c.scheduler.runner.RktRunner
 import java.nio.file.Paths
+import dit4c.scheduler.domain.ClusterInfo
 
 class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -22,20 +23,28 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
 
   implicit val system = ActorSystem("ClusterAggregateManagerSpec")
 
-  import dit4c.scheduler.domain.clusteraggregate.ClusterType
   import ScalaCheckHelpers._
-  import dit4c.scheduler.domain.ClusterAggregate._
-  import ClusterAggregateManager._
+  import dit4c.scheduler.domain.Cluster._
+  import ClusterManager._
 
-  val defaultConfigProvider = new DefaultConfigProvider {
+  val defaultConfigProvider = new ConfigProvider {
     override def rktRunnerConfig =
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance-",
           "" /* Not used */,
           "" /* Not used */)
+    override def sshKeys = ???
   }
-  val clusterAggregateManager = system.actorOf(Props(classOf[ClusterAggregateManager], defaultConfigProvider))
+  val clusters: Map[String, ClusterInfo] = Map(
+      "default" -> ClusterInfo("Default Cluster", true, true))
+  val clusterAggregateManager = system.actorOf(
+      Props(
+          classOf[ClusterManager],
+          defaultConfigProvider,
+          clusters
+      )
+    )
 
   "ClusterAggregateManager" >> {
 
@@ -45,17 +54,25 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
         val probe = TestProbe()
         probe.send(clusterAggregateManager, GetCluster("default"))
         probe.expectMsgType[GetStateResponse] must {
-          be_==(ClusterOfType(ClusterType.Rkt))
+          be_==(Cluster.Active(
+              "default",
+              clusters("default").displayName,
+              clusters("default").supportsSave))
         }
+        done
       }
 
       "can receive wrapped messages" >> {
         val probe = TestProbe()
         probe.send(clusterAggregateManager,
-            ClusterCommand("default", ClusterAggregate.GetState))
+            ClusterCommand("default", Cluster.GetState))
         probe.expectMsgType[GetStateResponse] must {
-          be_==(ClusterOfType(ClusterType.Rkt))
+          be_==(Cluster.Active(
+              "default",
+              clusters("default").displayName,
+              clusters("default").supportsSave))
         }
+        done
       }
     }
 
@@ -63,9 +80,23 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
       val probe = TestProbe()
       probe.send(clusterAggregateManager, GetCluster(id))
       probe.expectMsgType[GetStateResponse] must {
-        be_==(UninitializedCluster)
+        be_==(Cluster.Uninitialized)
       }
+      done
     }).setGen(genNonEmptyString)
+
+    "broadcasts request for cluster info" >> {
+      val probe = TestProbe()
+      probe.send(clusterAggregateManager, GetClusters)
+      probe.expectMsgType[GetStateResponse] must {
+        be_==(Cluster.Active(
+            "default",
+            clusters("default").displayName,
+            clusters("default").supportsSave))
+      }
+      done
+    }
+
   }
 
   private def longerThanAkkaTimeout(implicit timeout: Timeout): FiniteDuration =

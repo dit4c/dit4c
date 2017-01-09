@@ -12,6 +12,8 @@ import java.security.PrivateKey
 import pdi.jwt.JwtJson
 import pdi.jwt.JwtAlgorithm
 import java.security.interfaces.RSAPrivateKey
+import dit4c.scheduler.ssh.RemoteShell
+import akka.actor.ActorLogging
 
 object KeyManager {
 
@@ -24,8 +26,6 @@ object KeyManager {
       case Right(kr) => kr
       case Left(msg) => throw new Exception(msg)
     }
-
-  case class OpenSshKeyPair(`private`: String, `public`: String)
 
   trait Command extends BaseCommand
   case object GetPublicKeyInfo extends Command
@@ -42,15 +42,26 @@ object KeyManager {
   case class SignedJwtTokens(tokens: List[String]) extends SignJwtClaimResponse
   trait GetOpenSshKeyPairsResponse extends Response
   case class OpenSshKeyPairs(
-      pairs: List[OpenSshKeyPair]) extends GetOpenSshKeyPairsResponse
+      pairs: List[RemoteShell.OpenSshKeyPair]) extends GetOpenSshKeyPairsResponse
 
 }
 
-class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor {
+class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLogging {
   import KeyManager._
   import scala.collection.JavaConversions._
 
   val keyring = parseKeyBlock(armoredPgpSecretKeyBlock)
+
+  override def preStart = {
+    openSshKeyPairs match {
+      case Nil =>
+        log.warning("Key manager started without any valid SSH keys!")
+      case keys =>
+        log.info(
+            s"Key manager started with ${keys.length} SSH keys:\n"+
+            keys.map(_.`public`).mkString("\n"))
+    }
+  }
 
   val receive: Receive = {
     case cmd: Command => cmd match {
@@ -79,13 +90,13 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor {
           JwtJson.encode(claim, k, JwtAlgorithm.RS512)
       }
 
-  def openSshKeyPairs: List[OpenSshKeyPair] =
+  def openSshKeyPairs: List[RemoteShell.OpenSshKeyPair] =
     authenticationSecretKeys
       .flatMap { sk =>
         for {
           priv <- sk.asOpenSSH
           pub <- sk.getPublicKey.asOpenSSH
-        } yield OpenSshKeyPair(priv, pub)
+        } yield RemoteShell.OpenSshKeyPair(priv, pub)
       }
 
   def hasKeyFlags(pk: PGPPublicKey)(flags: Int): Boolean = {

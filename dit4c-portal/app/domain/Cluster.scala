@@ -7,18 +7,45 @@ import akka.stream._
 import akka.util.Timeout
 import utils.IdUtils
 import akka.util.ByteString
+import java.time.Instant
 
 object Cluster {
 
+  sealed trait ClusterInfo {
+    def displayName: String
+  }
+  case class Active(
+      displayName: String,
+      supportsSave: Boolean) extends ClusterInfo
+  case class Inactive(
+      displayName: String) extends ClusterInfo
+
   sealed trait Command extends BaseResponse
-  case class StartInstance(instanceId: String, image: String, accessTokenIds: List[String]) extends Command
-  case class GetInstanceStatus(instanceId: String) extends Command
-  case class SaveInstance(instanceId: String) extends Command
-  case class DiscardInstance(instanceId: String) extends Command
-  case class ConfirmInstanceUpload(instanceId: String) extends Command
+  trait InstanceRelatedCommand extends Command
+  case class StartInstance(
+      instanceId: String,
+      image: String,
+      accessTokenIds: List[String]) extends InstanceRelatedCommand
+  case class GetInstanceStatus(
+      instanceId: String) extends InstanceRelatedCommand
+  case class SaveInstance(
+      instanceId: String) extends InstanceRelatedCommand
+  case class DiscardInstance(
+      instanceId: String) extends InstanceRelatedCommand
+  case class ConfirmInstanceUpload(
+      instanceId: String) extends InstanceRelatedCommand
+  trait InfoCommand extends Command
+  case class UpdateInfo(
+      info: ClusterInfo,
+      timestamp: Instant) extends InfoCommand
+  case object GetInfo extends InfoCommand
 
   sealed trait Response extends BaseResponse
   case object Ack extends Response
+  trait GetInfoResponse extends Response
+  case class CurrentInfo(
+      info: ClusterInfo,
+      lastUpdated: Instant) extends Response
 
 }
 
@@ -31,6 +58,8 @@ class Cluster(
   lazy val clusterId = self.path.name
 
   implicit val m: Materializer = ActorMaterializer()
+
+  var info: Option[(ClusterInfo, Instant)] = None
 
   val receive: Receive = {
     case StartInstance(instanceId, image, accessTokenIds) =>
@@ -59,7 +88,16 @@ class Cluster(
       context.parent forward SchedulerMessage.discardInstance(instanceId)
     case ConfirmInstanceUpload(instanceId) =>
       context.parent forward SchedulerMessage.confirmUploadedInstance(instanceId)
+    case UpdateInfo(newInfo, timestamp) =>
+      log.info(s"${self.path} updating info: $newInfo")
+      info = Some((newInfo, timestamp))
+    case GetInfo =>
+      sender ! currentInfo
   }
+
+  private def currentInfo: CurrentInfo =
+    info.map(CurrentInfo.tupled)
+        .getOrElse(CurrentInfo(Inactive(clusterId), Instant.EPOCH))
 
   case object SchedulerMessage {
 

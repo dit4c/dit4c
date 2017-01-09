@@ -86,7 +86,7 @@ class SchedulerAggregate(
   var schedulerSocket: Option[ActorRef] = None
 
   override val receiveCommand: Receive = doesNotExist
-  
+
   def doesNotExist: Receive = sealedReceive[Command] {
     case Create =>
       val requester = sender
@@ -136,7 +136,7 @@ class SchedulerAggregate(
           KeyRingAggregate.GetKeys)
       (keyringSharder ? msg)
         .collect {
-          case KeyRingAggregate.NoKeysAvailable => NoKeysAvailable 
+          case KeyRingAggregate.NoKeysAvailable => NoKeysAvailable
           case KeyRingAggregate.CurrentKeyBlock(s) => CurrentKeys(s)
         }
         .pipeTo(sender)
@@ -194,6 +194,24 @@ class SchedulerAggregate(
         case Payload.AllocatedInstanceKey(msg) =>
           val envelope = InstanceSharder.Envelope(msg.instanceId, AssociatePGPPublicKey(msg.pgpPublicKeyBlock))
           context.system.eventStream.publish(envelope)
+        case Payload.ClusterStateUpdate(msg) =>
+          import dit4c.protobuf.scheduler.outbound.ClusterStateUpdate.ClusterState._
+          val timestamp = msg.timestamp match {
+            case None => Instant.now
+            case Some(ts) =>
+              Instant.ofEpochSecond(ts.seconds, ts.nanos.toLong)
+          }
+          val update =
+            Cluster.UpdateInfo(
+              msg.state match {
+                case ACTIVE => Cluster.Active(msg.displayName, msg.supportsSave)
+                case INACTIVE => Cluster.Inactive(msg.displayName)
+                case Unrecognized(v) =>
+                  log.error(s"Unknown cluster state! Converting $v to inactive.")
+                  Cluster.Inactive(msg.displayName)
+              },
+              timestamp)
+          clusterManager ! ClusterEnvelope(msg.clusterId, update)
       }
     case SendSchedulerMessage(msg) =>
       val response: Response = schedulerSocket match {
@@ -256,7 +274,7 @@ class SchedulerAggregate(
     case cmd: AccessPassManager.Command =>
       accessPassManagerRef forward cmd
   }
-  
+
   override val receiveRecover = sealedReceive[DomainEvent](updateState _)
 
   def updateState(e: DomainEvent): Unit = e match {

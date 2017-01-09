@@ -21,31 +21,31 @@ import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import dit4c.scheduler.runner.RktRunner
 import java.nio.file.Paths
-import dit4c.scheduler.domain.clusteraggregate._
 
 class ClusterAggregateSpec(implicit ee: ExecutionEnv)
     extends Specification
     with ScalaCheck with MatcherMacros {
 
   import ScalaCheckHelpers._
-  import ClusterAggregate._
+  import Cluster._
 
   implicit val params = Parameters(minTestsOk = 20)
   implicit val arbSystem = Arbitrary(genSystem("ClusterAggregate"))
-  val defaultConfigProvider = new DefaultConfigProvider {
+  val defaultConfigProvider = new ConfigProvider {
     override def rktRunnerConfig =
       RktRunner.Config(
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance-",
           "" /* Not used */,
           "" /* Not used */)
+    override def sshKeys = ???
   }
 
   "ClusterAggregate" >> {
 
     "GetState" >> {
 
-      "initially returns Uninitialized" >> {
+      "returns Uninitialized if no info provided" >> {
         // No state change between tests
         implicit val system =
           ActorSystem(s"ClusterAggregate-GetState-Uninitialized")
@@ -53,55 +53,49 @@ class ClusterAggregateSpec(implicit ee: ExecutionEnv)
         prop({ aggregateId: String =>
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider))
+            system.actorOf(Cluster.props(None, defaultConfigProvider))
           probe.send(clusterAggregate, GetState)
-          probe.expectMsgType[ClusterAggregate.GetStateResponse] must {
-            be(ClusterAggregate.UninitializedCluster)
+          probe.expectMsgType[Cluster.GetStateResponse] must {
+            be(Cluster.Uninitialized)
           }
         }).setGen(genAggregateId)
       }
 
-      "returns type after being initialized" >> prop(
-        (id: String, t: ClusterType, system: ActorSystem) => {
+      "returns Active if marked active" >> prop(
+        (id: String, displayName: String, supportsSave: Boolean, system: ActorSystem) => {
+          import scala.language.experimental.macros
           implicit val _ = system
-          val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider));
-          {
-            probe.send(clusterAggregate, Initialize(t))
-            probe.receiveOne(1.second)
-            probe.sender must be(clusterAggregate)
-          } and
-          {
-            import scala.language.experimental.macros
-            probe.send(clusterAggregate, GetState)
-            probe.expectMsgType[ClusterOfType] must {
-              be_==(ClusterOfType(t))
-            }
+            system.actorOf(
+                Cluster.props(
+                  Some(ClusterInfo(displayName, true, supportsSave)),
+                  defaultConfigProvider),
+                id)
+          probe.send(clusterAggregate, GetState)
+          probe.expectMsgType[GetStateResponse] must {
+            be_==(Active(id, displayName, supportsSave))
           }
         }
-       ).setGen1(genAggregateId)
-    }
+      ).setGen1(Gen.identifier)
 
-    "Initialize" >> {
-
-      "becomes initialized" >> prop(
-        (id: String, t: ClusterType, system: ActorSystem) => {
+      "returns Inactive if not marked active" >> prop(
+        (id: String, displayName: String, supportsSave: Boolean, system: ActorSystem) => {
+          import scala.language.experimental.macros
           implicit val _ = system
-          val aggregateId = s"somePrefix-$id"
           val probe = TestProbe()
           val clusterAggregate =
-            system.actorOf(ClusterAggregate.props(aggregateId, defaultConfigProvider))
-          // Get returned state after initialization and from GetState
-          probe.send(clusterAggregate, Initialize(t))
-          val response = probe.expectMsgType[InitializeResponse]
+            system.actorOf(
+                Cluster.props(
+                  Some(ClusterInfo(displayName, false, supportsSave)),
+                  defaultConfigProvider),
+                id)
           probe.send(clusterAggregate, GetState)
-          val clusterType = probe.expectMsgType[ClusterOfType].`type`
-          (response must_== ClusterInitialized) and
-          (clusterType must_== t)
+          probe.expectMsgType[GetStateResponse] must {
+            be_==(Inactive(id, displayName))
+          }
         }
-      ).setGen1(genAggregateId)
+      ).setGen1(Gen.identifier)
     }
   }
 }

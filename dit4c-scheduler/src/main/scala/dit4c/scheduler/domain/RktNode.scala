@@ -39,7 +39,6 @@ object RktNode {
       host: String,
       port: Int,
       username: String,
-      clientKey: ClientKeyPair,
       serverKey: ServerPublicKey)
 
   trait State extends FSMState
@@ -109,12 +108,9 @@ class RktNode(
       stay
     case Event(FinishInitializing(init, serverPublicKey, replyTo), _) =>
       import dit4c.common.KeyHelpers._
-      val clientKeyPair: ClientKeyPair = createKeyPair
       goto(PendingKeyConfirmation)
         .applying(Initialized(
             init.host, init.port, init.username,
-            clientKeyPair.`private`.pkcs8.pem,
-            clientKeyPair.public.pkcs8.pem,
             serverPublicKey.public.pkcs8.pem,
             init.rktDir))
         .andThen {
@@ -158,16 +154,11 @@ class RktNode(
       domainEvent: DomainEvent,
       dataBeforeEvent: Data): RktNode.Data = {
     domainEvent match {
-      case Initialized(host, port, username, clientPrivateKeyPKCS8PEM, clientPublicKeyPKCS8PEM, serverPublicKeyPKCS8PEM, rktDir, _) =>
+      case Initialized(host, port, username, serverPublicKeyPKCS8PEM, rktDir, _) =>
         import dit4c.common.KeyHelpers._
         NodeConfig(
           ServerConnectionDetails(
             host, port, username,
-            ClientKeyPair(
-              parsePkcs8PemPublicKey(clientPublicKeyPKCS8PEM)
-                .right.get.asInstanceOf[RSAPublicKey],
-              parsePkcs8PemPrivateKey(clientPrivateKeyPKCS8PEM)
-                .right.get.asInstanceOf[RSAPrivateKey]),
             ServerPublicKey(
               parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
                 .right.get.asInstanceOf[RSAPublicKey])
@@ -183,14 +174,4 @@ class RktNode(
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
-
-  private def createKeyPair: ClientKeyPair = {
-    val kpg = KeyPairGenerator.getInstance("RSA")
-    kpg.initialize(2048)
-    val kp = kpg.generateKeyPair
-    ClientKeyPair(
-        kp.getPublic.asInstanceOf[RSAPublicKey],
-        kp.getPrivate.asInstanceOf[RSAPrivateKey])
-  }
-
 }

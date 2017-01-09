@@ -29,6 +29,12 @@ import com.jcraft.jsch.JSchException
 
 object RemoteShell {
 
+  /**
+   * @param private    PEM-encoded PKCS#8 private key
+   * @param public     OpenSSH public key
+   */
+  case class OpenSshKeyPair(`private`: String, `public`: String)
+
   implicit val executionContext = ExecutionContext.fromExecutorService(
       Executors.newCachedThreadPool())
 
@@ -36,31 +42,35 @@ object RemoteShell {
       host: String,
       port: Int,
       username: String,
-      userPrivateKey: RSAPrivateKey,
-      userPublicKey: RSAPublicKey,
-      hostPublicKey: RSAPublicKey): CommandExecutor = {
+      fetchUserKeyPairs: => Future[List[OpenSshKeyPair]],
+      fetchHostPublicKey: => Future[RSAPublicKey]): CommandExecutor = {
     import dit4c.common.KeyHelpers._
-    val jsch = new JSch
-    jsch.addIdentity("id",
-        toOpenSshPrivateKey(userPrivateKey, userPublicKey).getBytes,
-        userPublicKey.ssh.raw,
-        null)
-    jsch.getHostKeyRepository.add(
-        new HostKey(host, hostPublicKey.ssh.raw),
-        null);
     var lastSession: Option[Session] = None
     ce {
       if (lastSession.isDefined && lastSession.get.isConnected)
         Future.successful(lastSession.get)
-      else Future {
-        val session = jsch.getSession(username, host, port)
-        session.connect()
-        lastSession = Some(session)
-        session
-      }
+      else
+        for {
+          userKeyPairs <- fetchUserKeyPairs
+          hostPublicKey <- fetchHostPublicKey
+        } yield {
+          val jsch = new JSch
+          userKeyPairs.foreach { kp =>
+            jsch.addIdentity("id",
+                kp.`private`.getBytes,
+                kp.`public`.getBytes,
+                null)
+          }
+          jsch.getHostKeyRepository.add(
+              new HostKey(host, hostPublicKey.ssh.raw),
+              null);
+          val session = jsch.getSession(username, host, port)
+          session.connect()
+          lastSession = Some(session)
+          session
+        }
     }
   }
-
 
   def getHostKey(host: String, port: Int): Future[RSAPublicKey] = {
     val jsch = new JSch
@@ -121,31 +131,6 @@ object RemoteShell {
   protected def escape(c: Char): Seq[Char] = c match {
     case c if c <= '\u001f' || c == '\u001f' => Seq.empty
     case c => Seq('\\', c)
-  }
-
-  def toOpenSshPrivateKey(priv: RSAPrivateKey, pub: RSAPublicKey): String = {
-    import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
-    import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-    import org.bouncycastle.asn1.pkcs.{ RSAPrivateKey => ASN1RSAPrivateKey }
-    import org.bouncycastle.asn1.x509.AlgorithmIdentifier
-    import org.bouncycastle.openssl.MiscPEMGenerator
-    import org.bouncycastle.openssl.jcajce.JcaPEMWriter
-    val asn1Key: ASN1RSAPrivateKey = {
-      import scala.language.implicitConversions
-      implicit def bigIntToBigInteger(bi: BigInt) = bi.bigInteger
-      val v = RsaFactorizer(
-        pub.getModulus, pub.getPublicExponent, priv.getPrivateExponent)
-      new ASN1RSAPrivateKey(v._1, v._2, v._3, v._4, v._5, v._6, v._7, v._8)
-    }
-    val keyInfo = new PrivateKeyInfo(
-      new AlgorithmIdentifier(PKCSObjectIdentifiers.rsaEncryption),
-      asn1Key)
-    val writer = new StringWriter()
-    val pemWriter = new JcaPEMWriter(writer)
-    pemWriter.writeObject(new MiscPEMGenerator(keyInfo))
-    pemWriter.close
-    writer.close
-    writer.toString
   }
 
   def fromOpenSshPublicKey(bytes: Array[Byte]): PublicKey = {

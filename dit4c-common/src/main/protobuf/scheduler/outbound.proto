@@ -19,7 +19,6 @@ message AllocatedInstanceKey {
 message InstanceStateUpdate {
   option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string instanceId = 1;
-  google.protobuf.Timestamp timestamp = 2;
   enum InstanceState {
     CREATED = 0;
     STARTING = 1;
@@ -36,8 +35,21 @@ message InstanceStateUpdate {
     ERRORED = 99;
     UNKNOWN = 100;
   }
-  InstanceState state = 3;
-  string additionalInfo = 4;
+  InstanceState state = 2;
+  string additionalInfo = 3;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message ClusterStateUpdate {
+  string clusterId = 1;
+  enum ClusterState {
+    ACTIVE = 0;
+    INACTIVE = 1;
+  }
+  ClusterState state = 2;
+  string displayName = 3;
+  bool supportsSave = 4;
+  google.protobuf.Timestamp timestamp = 100;
 }
 
 message OutboundMessage {
@@ -46,5 +58,6 @@ message OutboundMessage {
   oneof payload {
     InstanceStateUpdate instanceStateUpdate = 2;
     AllocatedInstanceKey allocatedInstanceKey = 3;
+    ClusterStateUpdate clusterStateUpdate = 4;
   }
 }

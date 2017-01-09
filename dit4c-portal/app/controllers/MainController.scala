@@ -163,42 +163,31 @@ class MainController(
         request.identity.id, UserAggregate.GetAvailableClusters)
     (userSharder ? queryMsg).flatMap {
       case UserAggregate.AvailableClusters(clusters) =>
-        // Get friendly names for the schedulers
-        clusters.map(_.schedulerId)
-          .distinct
-          .map { schedulerId =>
-            // Extract the user ID from the OpenPGP key
-            import dit4c.common.KeyHelpers._
-            (schedulerSharder ? SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.GetKeys))
-              .collect {
-                case SchedulerAggregate.CurrentKeys(kb, _) =>
-                  import scala.collection.JavaConversions._
-                  val kr = parseArmoredPublicKeyRing(kb).right.get
-                  val k = kr.getPublicKey
-                  // This is wrong, because it doesn't check for revocations, but
-                  // it will do for now.
-                  val userId = k.getUserIDs.toSeq.head.toString
-                  Map(schedulerId -> userId)
-              }
-              .recover { case e => Map.empty[String, String] }
-          }
-          // Collapse to single future
-          .reduce { (aF, bF) =>
-            for (a <- aF; b <- bF) yield a ++ b
-          }
-          .map { (schedulerNames: Map[String, String]) =>
-            val clusterOptions = ClusterOptions(clusters.map { c =>
-              val joinedId = s"${c.schedulerId}.${c.clusterId}"
-              val schedulerName = 
-                schedulerNames.get(c.schedulerId)
-                  .map(_.split("<(".toCharArray).head)
-                  .getOrElse(c.schedulerId.takeRight(8))
-              val display = s"${schedulerName} - ${c.clusterId} " +
-                c.until.map(t => s"(until $t)").getOrElse("")
-              ClusterOption(joinedId, display)
-            })
-            Ok(Json.toJson(clusterOptions))
-          }
+        for {
+          // Get friendly names for the schedulers
+          schedulerNames <- schedulerNames(clusters.map(_.schedulerId).toSet)
+          // Get info (including names) for the clusters
+          clusterInfo <- clusterInfo(clusters.map(v => (v.schedulerId, v.clusterId)).toSet)
+        } yield {
+          val clusterOptions = ClusterOptions(clusters.flatMap { c =>
+            val joinedId = s"${c.schedulerId}.${c.clusterId}"
+            val schedulerName =
+              schedulerNames.get(c.schedulerId)
+                .getOrElse(c.schedulerId.takeRight(8))
+            clusterInfo.get((c.schedulerId, c.clusterId)) match {
+              case Some(Cluster.Active(clusterName, supportsSave)) =>
+                val display = s"${schedulerName} - ${clusterName}" +
+                  c.until.map(t => s" (until $t)").getOrElse("") +
+                  (if (supportsSave) "" else " (no saving)")
+                Some(ClusterOption(joinedId, display))
+              case _ =>
+                None
+            }
+
+
+          })
+          Ok(Json.toJson(clusterOptions))
+        }
     }
   }
 
@@ -382,6 +371,50 @@ class MainController(
       case None => Redirect(routes.MainController.index)
     }
 
+  protected def schedulerNames(schedulerIds: Set[String]): Future[Map[String, String]] =
+    schedulerIds
+      .map { schedulerId =>
+        implicit val timeout = Timeout(10.seconds)
+        // Extract the user ID from the OpenPGP key
+        import dit4c.common.KeyHelpers._
+        (schedulerSharder ? SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.GetKeys))
+          .collect {
+            case SchedulerAggregate.CurrentKeys(kb, _) =>
+              import scala.collection.JavaConversions._
+              val kr = parseArmoredPublicKeyRing(kb).right.get
+              val k = kr.getPublicKey
+              // This is wrong, because it doesn't check for revocations, but
+              // it will do for now.
+              val userId = k.getUserIDs.toSeq.head.toString
+              val schedulerName = userId.split("<(".toCharArray).head
+              Map(schedulerId -> schedulerName)
+          }
+          .recover { case e => Map.empty[String, String] }
+      }
+      // Collapse to single future
+      .reduce { (aF, bF) =>
+        for (a <- aF; b <- bF) yield a ++ b
+      }
+
+  protected def clusterInfo(
+      ids: Set[(String, String)]): Future[Map[(String, String), Cluster.ClusterInfo]] =
+    ids
+      .map { case (schedulerId, clusterId) =>
+        implicit val timeout = Timeout(10.seconds)
+        // Extract the user ID from the OpenPGP key
+        import dit4c.common.KeyHelpers._
+        (schedulerSharder ? SchedulerSharder.Envelope(schedulerId,
+            SchedulerAggregate.ClusterEnvelope(clusterId, Cluster.GetInfo)))
+          .collect {
+            case Cluster.CurrentInfo(info, _) =>
+              Map((schedulerId, clusterId) -> info)
+          }
+          .recover { case e => Map.empty[(String, String), Cluster.ClusterInfo] }
+      }
+      // Collapse to single future
+      .reduce { (aF, bF) =>
+        for (a <- aF; b <- bF) yield a ++ b
+      }
 }
 
 class GetInstancesActor(out: ActorRef,
@@ -407,11 +440,16 @@ class GetInstancesActor(out: ActorRef,
               .collect { case msg: InstanceAggregate.CurrentStatus =>
                 val url: Option[String] =
                   msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(id, effectiveState(msg.state, url), url, msg.timestamps)
+                InstanceResponse(
+                    id,
+                    effectiveState(msg.state, url),
+                    url,
+                    msg.timestamps,
+                    msg.availableActions.toSeq.sortBy(_.toString))
               }
               .recover { case e =>
                 log.error(e, s"Failed to get instance status for $id")
-                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps())
+                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps(), Nil)
               }
               .pipeTo(self)
           }
@@ -434,18 +472,26 @@ class GetInstancesActor(out: ActorRef,
   }
 
   case class InstanceResponse(
-      id: String, state: String, url: Option[String], timestamps: InstanceAggregate.EventTimestamps)
+      id: String,
+      state: String,
+      url: Option[String],
+      timestamps: InstanceAggregate.EventTimestamps,
+      availableActions: Seq[InstanceAggregate.InstanceAction])
 
   implicit private val writesEventTimestamps: Writes[InstanceAggregate.EventTimestamps] = (
       (__ \ 'created).writeNullable[Instant] and
       (__ \ 'completed).writeNullable[Instant]
     )(unlift(InstanceAggregate.EventTimestamps.unapply))
 
+  implicit private val writesInstanceAction: Writes[InstanceAggregate.InstanceAction] =
+    Writes { action => JsString(action.toString.toLowerCase) }
+
   implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
       (__ \ 'id).write[String] and
       (__ \ 'state).write[String] and
       (__ \ 'url).writeNullable[String] and
-      (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps]
+      (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps] and
+      (__ \ 'actions).write[Seq[InstanceAggregate.InstanceAction]]
     )(unlift(InstanceResponse.unapply))
 
   private def effectiveState(state: String, url: Option[String]) = state match {

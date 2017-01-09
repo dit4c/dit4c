@@ -39,6 +39,7 @@ import akka.http.scaladsl.model.headers.`Set-Cookie`
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import akka.http.scaladsl.model.HttpHeader
 import java.util.Base64
+import dit4c.scheduler.domain.Cluster
 
 object PortalMessageBridge {
   case object BridgeClosed extends KryoSerializable
@@ -90,6 +91,7 @@ object PortalMessageBridge {
 
 class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     extends Actor with ActorLogging with Stash {
+  import dit4c.scheduler.service
 
   implicit val materializer = ActorMaterializer()
   var outboundSource: Source[Message, ActorRef] = null
@@ -160,6 +162,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           Flow.fromSinkAndSourceMat(
               inboundSink, outboundSource)(outboundActorRefExtractor))._2
       self ! outbound
+      context.parent ! ClusterManager.GetClusters
     }
     setup.recover({
       case e =>
@@ -180,41 +183,36 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     // Inbound
     case dit4c.protobuf.scheduler.inbound.RequestInstanceStateUpdate(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.GetInstanceStatus(instanceId))
     case dit4c.protobuf.scheduler.inbound.StartInstance(instanceId, clusterId, imageUrl, clusterAccessPasses) =>
       import dit4c.scheduler.domain._
-      import dit4c.scheduler.service._
       log.info(s"Instance $instanceId requested on $clusterId using $imageUrl, with access passes:\n"+
           clusterAccessPasses.map(_.toByteArray).map(Base64.getEncoder.encodeToString).mkString("\n"))
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, imageUrl, portalUri))
     case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId,
               Instance.Save(saveHelperImageUrl, imageServer)))
     case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.Discard))
     case dit4c.protobuf.scheduler.inbound.ConfirmInstanceUpload(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
-      import dit4c.scheduler.service._
-      context.parent ! ClusterAggregateManager.ClusterCommand(clusterId,
+      context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
     // Outbound
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)),
-            pb.InstanceStateUpdate.InstanceState.ERRORED, data.errors.mkString("\n\n"))
+        pb.InstanceStateUpdate(data.instanceId, pb.InstanceStateUpdate.InstanceState.ERRORED,
+            data.errors.mkString("\n\n"), Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
     case Instance.StatusReport(state, data: Instance.SomeData) =>
@@ -235,7 +233,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
         case Instance.Errored => pb.InstanceStateUpdate.InstanceState.ERRORED
       }
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(data.instanceId, Some(pbTimestamp(Instant.now)), pbState, "")
+        pb.InstanceStateUpdate(data.instanceId, pbState, "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
       data match {
@@ -248,11 +246,37 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           }
         case _ => // No need to do anything
       }
+    case msg: Cluster.GetStateResponse =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      Some(msg)
+        .collect {
+          case Cluster.Active(clusterId, displayName, supportsSave) =>
+            pb.ClusterStateUpdate(
+                clusterId,
+                pb.ClusterStateUpdate.ClusterState.ACTIVE,
+                displayName,
+                supportsSave,
+                Some(pbTimestamp(Instant.now)))
+          case Cluster.Inactive(clusterId, displayName) =>
+            pb.ClusterStateUpdate(
+                clusterId,
+                pb.ClusterStateUpdate.ClusterState.INACTIVE,
+                displayName,
+                false,
+                Some(pbTimestamp(Instant.now)))
+        }
+        .map { msg =>
+          pb.OutboundMessage(newMsgId,
+              pb.OutboundMessage.Payload.ClusterStateUpdate(msg))
+        }
+        .foreach { msg =>
+          outbound ! toBinaryMessage(msg.toByteArray)
+        }
     case RktClusterManager.UnknownInstance(instanceId) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
-        pb.InstanceStateUpdate(instanceId, Some(pbTimestamp(Instant.now)),
-            pb.InstanceStateUpdate.InstanceState.UNKNOWN, "")
+        pb.InstanceStateUpdate(instanceId, pb.InstanceStateUpdate.InstanceState.UNKNOWN,
+            "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
     case PortalMessageBridge.BridgeClosed =>

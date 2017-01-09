@@ -17,8 +17,6 @@ message Initialized {
   string host = 1;
   uint32 port = 2;
   string username = 3;
-  string clientPrivateKeyPKCS8PEM = 4;
-  string clientPublicKeyPKCS8PEM = 5;
   string serverPublicKeyPKCS8PEM = 6;
   string rktDir = 7;
   google.protobuf.Timestamp timestamp = 100;

@@ -2,12 +2,11 @@ package dit4c.scheduler.routes
 
 import akka.http.scaladsl.server.Directives
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import dit4c.scheduler.service.ClusterAggregateManager
+import dit4c.scheduler.service.ClusterManager
 import dit4c.scheduler.domain.RktClusterManager
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
-import dit4c.scheduler.domain.ClusterAggregate
-import dit4c.scheduler.domain.clusteraggregate.ClusterType
+import dit4c.scheduler.domain.Cluster
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
@@ -59,9 +58,11 @@ object ClusterRoutes {
   )((host: String, port: Int, username: String) =>
     RktClusterManager.AddRktNode(host, port, username, "/var/lib/dit4c-rkt"))
 
-  implicit val writesClusterType: OWrites[ClusterType] = (
-      (__ \ 'type).write[String]
-  ).contramap { (t: ClusterType) => t.toString }
+  implicit val writesClusterActive: OWrites[Cluster.Active] = (
+      (__ \ 'id).write[String] and
+      (__ \ 'displayName).write[String] and
+      (__ \ 'supportsSave).write[Boolean]
+  )(unlift(Cluster.Active.unapply))
 
   implicit val writesSigningKey: Writes[Instance.InstanceKeys] =
     Writes { key =>
@@ -107,13 +108,11 @@ object ClusterRoutes {
       (__ \ 'host).write[String] and
       (__ \ 'port).write[Int] and
       (__ \ 'username).write[String] and
-      (__ \ "client-key").write[RSAPublicKey] and
       (__ \ "host-key").write[RSAPublicKey]
   )(rktNode => (
       rktNode.connectionDetails.host,
       rktNode.connectionDetails.port,
       rktNode.connectionDetails.username,
-      rktNode.connectionDetails.clientKey.public,
       rktNode.connectionDetails.serverKey.public))
 }
 
@@ -123,8 +122,8 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
   implicit val timeout = Timeout(1.minute)
   import akka.pattern.ask
   import ClusterRoutes._
-  import ClusterAggregateManager._
-  import ClusterAggregate._
+  import ClusterManager._
+  import Cluster._
 
   def routes = clusterInstanceRoutes
 
@@ -134,9 +133,11 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
   def clusterRoutes(clusterId: String): Route = {
     pathEndOrSingleSlash {
       get {
+        import Cluster._
         onSuccess(clusterAggregateManager ? GetCluster(clusterId)) {
-          case UninitializedCluster => complete(StatusCodes.NotFound)
-          case ClusterOfType(t) => complete(t)
+          case Uninitialized => complete(StatusCodes.NotFound)
+          case _: Inactive => complete(StatusCodes.NotFound)
+          case s: Active => complete(s)
         }
       }
     } ~
@@ -176,13 +177,10 @@ class ClusterRoutes(clusterAggregateManager: ActorRef) extends Directives
               case RktNode.Exists(node) =>
                 extractUri { thisUri => extractLog { log =>
                   val nodeUri = Uri(thisUri.path / nodeId toString)
-                  val clientPublicKey = node.connectionDetails.clientKey.public.ssh.authorizedKeys
                   log.info("Created new node " +
                       node.connectionDetails.username + "@" +
                       node.connectionDetails.host + ":" +
-                      node.connectionDetails.port +
-                      " for access with RSA public key: " +
-                      clientPublicKey)
+                      node.connectionDetails.port)
                   complete((
                       StatusCodes.Created,
                       Location(nodeUri) :: Nil,

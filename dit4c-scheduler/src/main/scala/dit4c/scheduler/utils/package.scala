@@ -4,6 +4,9 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import scopt.OptionParser
 import java.io.File
+import dit4c.scheduler.domain.ClusterInfo
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
 
 package object utils {
 
@@ -30,7 +33,11 @@ package object utils {
 
   case class SchedulerConfig(
       val name: String,
-      val armoredPgpKeys: Option[String],
+      val armoredPgpKeyring: Option[String],
+      val knownClusters: Map[String, ClusterInfo] = Map(
+          "default" -> ClusterInfo(
+              "Default Cluster",
+              true, true)),
       val port: Int = 8080,
       val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/0.0.4/dit4c-helper-auth-portal.linux.amd64.aci",
@@ -45,11 +52,27 @@ package object utils {
     help("help").text("prints this usage text")
     version("version").abbr("V").text("show version")
 
+    opt[File]('c', "config")
+      .action { (f, c) =>
+        import net.ceedubs.ficus.Ficus._
+        val config: Config = ConfigFactory.parseFile(f)
+        val clusterConfig: Map[String, Config] =
+          config.as[Map[String, Config]]("clusters")
+        val newClusters = clusterConfig.map { case (clusterId, config) =>
+          val active = config.as[Option[Boolean]]("active").getOrElse(true)
+          val displayName = config.as[Option[String]]("displayName").getOrElse(clusterId)
+          val supportsSave = config.as[Option[Boolean]]("supportsSave").getOrElse(true)
+          (clusterId -> ClusterInfo(displayName, active, supportsSave))
+        }
+        c.copy(knownClusters = c.knownClusters ++ newClusters)
+      }
+      .text("HOCON-format config file to get settings from")
+
     opt[File]('k', "keys")
       .required
       .action { (f, c) =>
         import scala.sys.process._
-        c.copy(armoredPgpKeys = Some(getFileContents(f)))
+        c.copy(armoredPgpKeyring = Some(getFileContents(f)))
       }
       .validate {
         case f: File if f.exists() =>

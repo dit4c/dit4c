@@ -41,6 +41,7 @@ import dit4c.scheduler.runner.CommandExecutorHelper
 import org.apache.sshd.common.keyprovider.MappedKeyPairProvider
 import java.security.spec.ECGenParameterSpec
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import scala.concurrent.Future
 
 class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
     with ScalaCheck with FileMatchers {
@@ -52,14 +53,18 @@ class RemoteShellSpec(implicit ee: ExecutionEnv) extends Specification
 
   object withCommandExecutor extends Fixture[CommandExecutor] {
     override def apply[R: AsResult](f: CommandExecutor => R) = {
+      import dit4c.common.KeyHelpers._
       val kp = Random.shuffle(keyPairs).head
       val username = Random.alphanumeric.take(8).mkString
       val ce: CommandExecutor = RemoteShell(server.getHost,
         server.getPort,
         username,
-        kp.getPrivate.asInstanceOf[RSAPrivateKey],
-        kp.getPublic.asInstanceOf[RSAPublicKey],
-        hostPublicKey.asInstanceOf[RSAPublicKey])
+        Future.successful(
+          RemoteShell.OpenSshKeyPair(
+              kp.getPrivate.asInstanceOf[RSAPrivateKey].pkcs8.pem,
+              kp.getPublic.asInstanceOf[RSAPublicKey].ssh.authorizedKeys) :: Nil),
+        Future.successful(
+          hostPublicKey.asInstanceOf[RSAPublicKey]))
       AsResult(f(ce))
     }
   }
