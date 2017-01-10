@@ -166,7 +166,10 @@ class SchedulerMessagingActor(in: ActorRef, out: ActorRef)
       in ! SchedulerAggregate.ReceiveSchedulerMessage(parsedMsg)
     // From portal
     case KeepAlive =>
-      self ! Instant.now.toString
+      import dit4c.protobuf.scheduler.inbound._
+      log.debug("Sending keep-alive")
+      val keepAlive = InboundMessage("keep-alive", InboundMessage.Payload.Empty)
+      out ! BinaryMessage(ByteString(keepAlive.toByteArray))
     case msg: String =>
       log.info(s"Sending text to client: $msg")
       out ! TextMessage(msg)

@@ -60,9 +60,12 @@ object PortalMessageBridge {
             case Payload.SaveInstance(value) => Some(value)
             case Payload.ConfirmInstanceUpload(value) => Some(value)
           }
-          parsedMsg.foreach { msg =>
-            log.debug(s"portal sent message: $msg")
-            sendToParent(msg)
+          parsedMsg match {
+            case None =>
+              log.debug(s"portal sent empty keep-alive message")
+            case Some(msg) =>
+              log.debug(s"portal sent message: $msg")
+              sendToParent(msg)
           }
         }
       case msg: TextMessage =>

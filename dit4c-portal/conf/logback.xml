@@ -12,8 +12,9 @@
     <appender-ref ref="STDOUT" />
   </appender>
 
-  <logger name="akka.stream.impl" level="INFO" />
+  <logger name="akka.actor.EmptyLocalActorRef" level="WARN" />
   <logger name="akka.event.slf4j" level="WARN" />
+  <logger name="akka.stream.impl" level="INFO" />
 
   <root level="INFO">
     <appender-ref ref="ASYNCSTDOUT" />
