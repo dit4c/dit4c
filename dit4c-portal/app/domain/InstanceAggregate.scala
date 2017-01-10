@@ -148,7 +148,7 @@ class InstanceAggregate(
   when(Started) {
     case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
       // Start actor listening
-      statusRequestQueuer(schedulerId, clusterId) ! sender
+      currentStatusRequestQueuer(schedulerId, clusterId) ! sender
       // Forward request to cluster
       context.system.eventStream.publish(
           SchedulerSharder.Envelope(
@@ -159,7 +159,9 @@ class InstanceAggregate(
       stay
     case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
       // Fill waiting requests
-      statusRequestQueuer(schedulerId, clusterId) ! CurrentStatus(state.toString, uri, ts, Set.empty)
+      allStatusRequestQueuers ! CurrentStatus(state.toString, uri, ts, Set.empty)
+      // New requests go to a new queuer
+      clearStatusRequestQueuer
       state match {
         case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance())
         case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
@@ -382,17 +384,29 @@ class InstanceAggregate(
       }
   }
 
-  private def statusRequestQueuer(schedulerId: String, clusterId: String) =
-    context.child("status-request-queuer").getOrElse {
-      context.actorOf(
+  // Status request queuing
+
+  private var currentStqIndex = 0L
+  private var currentStx: Option[ActorRef] = None
+
+  private def currentStatusRequestQueuer(schedulerId: String, clusterId: String) =
+    currentStx.getOrElse {
+      currentStqIndex += 1
+      currentStx = Some(context.actorOf(
           Props(
             classOf[StatusRequestQueuer],
             instanceId,
             clusterId,
             schedulerId,
             schedulerSharder),
-          "status-request-queuer")
+          f"status-request-queuer-$currentStqIndex%016x"))
+      currentStx.get
     }
+
+  private def allStatusRequestQueuers: ActorSelection =
+    context.actorSelection("status-request-queuer-*")
+
+  private def clearStatusRequestQueuer: Unit = { currentStx = None }
 
 
 }

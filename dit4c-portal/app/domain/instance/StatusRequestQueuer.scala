@@ -71,7 +71,7 @@ class StatusRequestQueuer(
       val response = cs.copy(availableActions = cs.availableActions ++ actions)
       receivers.foreach(_ ! response)
       context.setReceiveTimeout(Duration.Undefined)
-      context.become(receive)
+      context.stop(self)
     }
 
 }
