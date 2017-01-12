@@ -13,7 +13,7 @@ object SchedulerSharder {
   final case class Envelope(id: String, payload: Any)
 
   def apply(
-      imageServerConfig: ImageServerConfig,
+      imageServerConfig: Option[ImageServerConfig],
       keyringSharder: ActorRef @@ KeyRingSharder.type)(implicit system: ActorSystem): ActorRef = {
     ClusterSharding(system).start(
         typeName = "SchedulerAggregate",

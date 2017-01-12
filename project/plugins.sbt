@@ -31,9 +31,6 @@ libraryDependencies ++= Seq(
 // Release management
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.3")
 
-// Gather dependencies without squashing to single JAR
-addSbtPlugin("org.xerial.sbt" % "sbt-pack" % "0.8.0")
-
 // Coverage tools
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.4.0")
 

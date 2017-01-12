@@ -2,7 +2,9 @@ package domain
 
 import akka.actor._
 
-class ClusterManager(imageServerConfig: ImageServerConfig) extends Actor with ActorLogging {
+class ClusterManager(imageServerConfig: Option[ImageServerConfig])
+    extends Actor
+    with ActorLogging {
 
   val receive: Receive = {
     case SchedulerAggregate.ClusterEnvelope(clusterId, msg) =>

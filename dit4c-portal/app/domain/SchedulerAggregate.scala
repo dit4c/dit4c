@@ -64,7 +64,7 @@ object SchedulerAggregate {
 }
 
 class SchedulerAggregate(
-    imageServerConfig: ImageServerConfig,
+    imageServerConfig: Option[ImageServerConfig],
     keyringSharder: ActorRef @@ KeyRingSharder.type)
     extends PersistentActor
     with ActorLogging

@@ -50,7 +50,7 @@ object Cluster {
 }
 
 class Cluster(
-    imageServerConfig: ImageServerConfig)
+    imageServerConfig: Option[ImageServerConfig])
     extends Actor
     with ActorLogging {
   import Cluster._
@@ -96,8 +96,15 @@ class Cluster(
   }
 
   private def currentInfo: CurrentInfo =
-    info.map(CurrentInfo.tupled)
-        .getOrElse(CurrentInfo(Inactive(clusterId), Instant.EPOCH))
+    info
+      .map(CurrentInfo.tupled)
+      .map {
+        // If portal doesn't support save, then cluster can't
+        case CurrentInfo(active: Active, t) if imageServerConfig.isEmpty =>
+          CurrentInfo(active.copy(supportsSave = false), t)
+        case other => other
+      }
+      .getOrElse(CurrentInfo(Inactive(clusterId), Instant.EPOCH))
 
   case object SchedulerMessage {
 
@@ -112,8 +119,10 @@ class Cluster(
 
     def saveInstance(instanceId: String): SchedulerAggregate.SendSchedulerMessage = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
+      val saveHelper = imageServerConfig.map(_.saveHelper).getOrElse("")
+      val server = imageServerConfig.map(_.server).getOrElse("")
       InboundMessage(randomMsgId, InboundMessage.Payload.SaveInstance(
-        SaveInstance(instanceId, clusterId, imageServerConfig.saveHelper, imageServerConfig.server)
+        SaveInstance(instanceId, clusterId, saveHelper, server)
       ))
     }
 

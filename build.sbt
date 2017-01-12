@@ -29,6 +29,6 @@ lazy val common = (project in file("dit4c-common")).
 
 lazy val portal = (project in file("dit4c-portal")).dependsOn(common).enablePlugins(PlayScala, SbtWeb)
 
-lazy val scheduler = (project in file("dit4c-scheduler")).dependsOn(common)
+lazy val scheduler = (project in file("dit4c-scheduler")).dependsOn(common).enablePlugins(JavaAppPackaging)
 
 crossScalaVersions := Nil

@@ -38,9 +38,7 @@ fork := true
 
 scalacOptions ++= Seq("-feature")
 
-packSettings
-
-packMain := Map("dit4c-scheduler" -> "dit4c.scheduler.Main")
+mainClass in Compile := Some("dit4c.scheduler.Main")
 
 managedSourceDirectories in Compile += target.value / "protobuf-generated"
 

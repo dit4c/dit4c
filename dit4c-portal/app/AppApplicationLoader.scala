@@ -83,9 +83,11 @@ class AppComponents(context: Context)
     } yield PublicImage(display, image)
 
   // Image save handling
-  val imageServerConfig = domain.ImageServerConfig(
-    configuration.underlying.as[String]("images.server"),
-    configuration.underlying.as[String]("images.saveHelper"))
+  val imageServerConfig =
+    for {
+      server <- configuration.getString("images.server")
+      saveHelper <- configuration.getString("images.saveHelper")
+    } yield domain.ImageServerConfig(server, saveHelper)
 
   val trackingScripts = TrackingScripts(play.twirl.api.HtmlFormat.fill(List[Option[play.twirl.api.Html]](
     configuration.getString("tracking.ga.id").map { trackingId =>
