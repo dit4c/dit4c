@@ -2,9 +2,9 @@
 
 set -ex
 
-DOCKER2ACI=docker2aci
-ACBUILD=acbuild
-GPG=gpg2
+DOCKER2ACI=$(which docker2aci)
+ACBUILD=$(which acbuild)
+GPG=$(which gpg2)
 # Print versions (and fail if not found)
 $DOCKER2ACI -version
 $ACBUILD version
@@ -37,17 +37,19 @@ extract_project_tarball () {
 
 # Portal
 extract_project_tarball "dit4c-portal"
-rm -rf .acbuild
+sudo rm -rf .acbuild
 $ACBUILD begin "$BASE_ACI"
+sudo $ACBUILD run -- sh -c "apt-get update && apt-get install -y zsh && apt-get clean"
 $ACBUILD copy "$WORKING_DIR/dit4c-portal" /opt/dit4c-portal
+$ACBUILD copy "$SCRIPT_DIR/extra/start_portal.zsh" /start_portal
 $ACBUILD set-name dit4c-portal
 $ACBUILD set-user nobody
 $ACBUILD set-group nogroup
 $ACBUILD port add http tcp 9000
 $ACBUILD port add ssh tcp 2222
-$ACBUILD set-exec -- /opt/dit4c-portal/bin/dit4c-portal
-$ACBUILD --debug write --overwrite dit4c-portal.linux.amd64.aci
-$ACBUILD end
+$ACBUILD set-exec /start_portal
+sudo $ACBUILD --debug write --overwrite dit4c-portal.linux.amd64.aci
+sudo $ACBUILD end
 
 # Scheduler
 extract_project_tarball "dit4c-scheduler"
