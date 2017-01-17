@@ -16,6 +16,7 @@ import java.time.Instant
 import com.google.protobuf.timestamp.Timestamp
 import dit4c.scheduler.domain.rktnode.DomainEvent
 import RktNode.{State, Data}
+import akka.actor.PoisonPill
 
 object RktNode {
   import BaseDomainEvent.now
@@ -129,7 +130,32 @@ class RktNode(
 
   when(Active) {
     case Event(
-        RequestInstanceWorker | RequireInstanceWorker,
+        RequestInstanceWorker,
+        NodeConfig(connectionDetails, rktDir, _)) =>
+      import scala.util._
+      import context.dispatcher
+      val requester = sender
+      val runner = createRunner(connectionDetails, rktDir)
+      val worker = context.actorOf(
+          Props(classOf[RktInstanceWorker], runner),
+          "instance-worker-"+Random.alphanumeric.take(20).mkString)
+      // Check node is up
+      fetchSshHostKey(connectionDetails.host, connectionDetails.port).onComplete {
+        case Success(_) =>
+          val worker = context.actorOf(
+            Props(classOf[RktInstanceWorker], runner),
+            "instance-worker-"+Random.alphanumeric.take(20).mkString)
+          requester ! WorkerCreated(worker)
+        case Failure(e) =>
+          log.error(e.getMessage)
+          // No need for worker
+          worker ! PoisonPill
+          // Inform requester
+          requester ! UnableToProvideWorker("Node is unavailable")
+      }
+      stay
+    case Event(
+        RequireInstanceWorker,
         NodeConfig(connectionDetails, rktDir, _)) =>
       val runner = createRunner(connectionDetails, rktDir)
       val worker = context.actorOf(
