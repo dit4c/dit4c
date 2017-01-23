@@ -122,22 +122,28 @@ class Instance(worker: ActorRef)
       }
   }
 
-  when(WaitingForImage) {
+  when(WaitingForImage, stateTimeout = 1.hour) {
     case Event(ReceiveImage(localImage), StartData(id, _, _, callback, _)) =>
       goto(Starting).applying(FetchedImage(localImage)).andThen {
         case data =>
           log.info(s"Starting with: $localImage")
           worker ! InstanceWorker.Start(id, localImage, callback)
       }
+    case Event(StateTimeout, _) ⇒
+      self ! Error("Timeout while fetching image")
+      stay
   }
 
-  when(Starting) {
+  when(Starting, stateTimeout = 1.hour) {
     case Event(AssociateKeys(keyData), _) =>
       log.info(s"Received keys: $keyData")
       stay.applying(AssociatedKeys(keyData)).andThen(emitStatusReportToEventStream(stateName))
     case Event(ConfirmStart, _) =>
       log.info(s"Confirmed start")
       goto(Running).applying(ConfirmedStart(now))
+    case Event(StateTimeout, _) ⇒
+      self ! Error("Timeout while starting instance")
+      stay
   }
 
   when(Running) {
@@ -182,9 +188,12 @@ class Instance(worker: ActorRef)
 
   }
 
-  when(Saving) {
+  when(Saving, stateTimeout = 4.hours) {
     case Event(ConfirmSaved, _) =>
       goto(Saved).applying(ConfirmedSave(now))
+    case Event(StateTimeout, _) ⇒
+      self ! Error("Timeout while saving image")
+      stay
   }
 
   when(Saved) {
@@ -195,9 +204,12 @@ class Instance(worker: ActorRef)
       }
   }
 
-  when(Uploading) {
+  when(Uploading, stateTimeout = 4.hours) {
     case Event(ConfirmUpload, _) =>
       goto(Uploaded).applying(ConfirmedUpload(now))
+    case Event(StateTimeout, _) ⇒
+      self ! Error("Timeout while uploading image")
+      stay
   }
 
   when(Uploaded, stateTimeout = 1.minute) {
