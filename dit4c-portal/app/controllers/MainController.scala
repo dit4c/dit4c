@@ -298,6 +298,8 @@ class MainController(
       "github-com-PolymerElements-"+s
     case s if s.startsWith("iron-") =>
       "github-com-PolymerElements-"+s
+    case s if s.startsWith("marked-") =>
+      "github-com-PolymerElements-"+s
     case s if s.startsWith("neon-") =>
       "github-com-PolymerElements-"+s
     case s if s.startsWith("paper-") =>

@@ -20,6 +20,7 @@ libraryDependencies ++= Seq(
   "com.iheart"                %%  "ficus"                 % ficusV,
   "com.nulab-inc"             %%  "play2-oauth2-provider" % "0.17.2",
   "com.lihaoyi"               %   "ammonite-sshd"         % "0.8.1" cross CrossVersion.full,
+  cache,
   ws,
   specs2,
   "com.trueaccord.scalapb"    %% "scalapb-runtime"    % scalapbV % "protobuf",
@@ -48,6 +49,7 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-iron-range-behavior"          % "1.0.6",
     __ %  "github-com-PolymerElements-iron-resizable-behavior"      % "1.0.3",
     __ %  "github-com-PolymerElements-iron-scroll-target-behavior"  % "1.0.6",
+    __ %  "github-com-PolymerElements-marked-element"               % "1.2.0",
     __ %  "github-com-PolymerElements-neon-animation"               % "1.2.3"
       exclude(__, "github-com-web-animations-web-animations-js"),
     __ %  "github-com-PolymerElements-paper-button"                 % "1.0.12",

@@ -23,6 +23,7 @@ GET		/services/image-server/auth-http-request/:httpVerb/:bucketId	controllers.Im
 
 # Assets
 GET     /login-background-image             controllers.InjectedContentController.loginBackgroundImage
+GET     /login-message.markdown             controllers.InjectedContentController.loginMarkdownMessage
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
 GET     /web-components/:name.html          controllers.WebComponentsController.component(name)

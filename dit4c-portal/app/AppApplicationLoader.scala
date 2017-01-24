@@ -51,6 +51,7 @@ import akka.cluster.Cluster
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.ahc.AhcWSClient
 import domain.PublicImage
+import play.api.cache.EhCacheComponents
 
 class AppApplicationLoader extends ApplicationLoader {
   def load(context: Context) = {
@@ -62,7 +63,7 @@ class AppApplicationLoader extends ApplicationLoader {
 }
 
 class AppComponents(context: Context)
-    extends BuiltInComponentsFromContext(context) with AhcWSComponents {
+    extends BuiltInComponentsFromContext(context) with AhcWSComponents with EhCacheComponents {
   implicit lazy val executionContext = materializer.executionContext
   implicit val system = actorSystem
   lazy val router: Router = {
@@ -159,6 +160,7 @@ class AppComponents(context: Context)
   lazy val accessPassController = wire[AccessPassController]
   lazy val imageServerController = wire[ImageServerController]
   lazy val instanceController = wire[InstanceController]
+  lazy val injectedContentControllerCacheApi = defaultCacheApi.taggedWith[InjectedContentController]
   lazy val injectedContentController = wire[InjectedContentController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]

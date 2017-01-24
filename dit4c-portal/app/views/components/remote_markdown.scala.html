@@ -1,0 +1,47 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/iron-ajax/iron-ajax.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/marked-element/marked-element.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+
+<dom-module id="remote-markdown">
+  <style>
+  h1 {
+	@@apply(--paper-font-title);
+  }
+  h2 {
+	@@apply(--paper-font-subhead);
+  }
+  h3, h4 {
+	@@apply(--paper-font-body2);
+  }
+  p {
+	@@apply(--paper-font-body1);
+  }
+  pre {
+	@@apply(--paper-font-code1);
+  }
+  </style>
+  <template>
+    <marked-element markdown="{{content}}">
+      <div class="markdown-html"></div>
+    </marked-element>
+    <iron-ajax
+      auto
+      id="ajax-markdown"
+      url="{{url}}"
+      handle-as="text"
+      last-response="{{content}}">
+  </template>
+  <script>
+  Polymer({
+    is: "remote-markdown",
+    properties: {
+      content: {
+        type: String,
+        value: null
+      }
+    }
+  });
+  </script>
+</dom-module>

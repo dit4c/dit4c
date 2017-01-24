@@ -9,6 +9,8 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.WebComponentsController.component("remote-markdown")">
 <style is="custom-style" include="iron-flex"></style>
 <style is="custom-style">
 body {
@@ -24,11 +26,13 @@ body {
   filter: blur(2px);
   background-position: center center;
 }
-#login-methods, #dummy-login-form {
-  padding: 20px;
+#content, #dummy-login-form {
   border-radius: 5px;
   background-color: white;
   margin-bottom: 20px;
+}
+#login-methods, #msg, #dummy-login-form {
+  padding: 20px;
 }
 #dummy-login-form {
   background-color: var(--paper-grey-100);
@@ -63,30 +67,35 @@ function submit(form) {
 <body class="fullbleed">
 <div id="bg"></div>
 <div class="layout vertical center center-justified" style="height: 100vh">
-  <div id="login-methods">
-    <h1>@Messages("login.with")</h1>
-  @for(form <- dummyIdForm) {
-  <form class="layout vertical center center-justified" id="dummy-login-form" method="post" action="@routes.MainController.login">
-	  <div>
-	    <paper-input label="User Identity" id="identity-field" name="identity" value='@{form.value.map(_.identity).getOrElse("")}'
-	       @if(!form.errors("identity").isEmpty) { invalid }
-	       auto-validate required
-	       error-message='@{form.errors("identity").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
-	  </div>
-	  <div>
-	    <paper-button onclick="submit(document.getElementById('dummy-login-form'))">Login</paper-button>
-	  </div>
-  </form>
-  }
-  @if(socialProviders.providers.nonEmpty) {
-    <div id="social-providers" class="layout vertical center">
-      @for(p <- socialProviders.providers) {
-        <a href="@routes.MainController.authenticate(p.id)" tab-index="-1">
-          <paper-button class="provider">@Messages(p.id)</paper-button>
-        </a>
-      }
-    </div>
-  }
+  <div id="content" class="layout horizontal">
+	<div id="msg">
+	  <remote-markdown url="@routes.InjectedContentController.loginMarkdownMessage"/>
+	</div>
+	<div id="login-methods">
+	  <h1>@Messages("login.with")</h1>
+	  @for(form <- dummyIdForm) {
+	  <form class="layout vertical center center-justified" id="dummy-login-form" method="post" action="@routes.MainController.login">
+		  <div>
+		    <paper-input label="User Identity" id="identity-field" name="identity" value='@{form.value.map(_.identity).getOrElse("")}'
+		       @if(!form.errors("identity").isEmpty) { invalid }
+		       auto-validate required
+		       error-message='@{form.errors("identity").map(e => Messages(e.message, e.args)).mkString(" ")}'></paper-input>
+		  </div>
+		  <div>
+		    <paper-button onclick="submit(document.getElementById('dummy-login-form'))">Login</paper-button>
+		  </div>
+	  </form>
+	  }
+	  @if(socialProviders.providers.nonEmpty) {
+	    <div id="social-providers" class="layout vertical center">
+	      @for(p <- socialProviders.providers) {
+	        <a href="@routes.MainController.authenticate(p.id)" tab-index="-1">
+	          <paper-button class="provider">@Messages(p.id)</paper-button>
+	        </a>
+	      }
+	    </div>
+	  }
+	</div>
   </div>
 </div>
 
