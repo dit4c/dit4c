@@ -9,6 +9,7 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-input.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/shadow.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
 <link rel="import" href="@routes.WebComponentsController.component("remote-markdown")">
 <style is="custom-style" include="iron-flex"></style>
@@ -26,9 +27,11 @@ body {
   filter: blur(2px);
   background-position: center center;
 }
-#content, #dummy-login-form {
-  border-radius: 5px;
+#content {
+  @@apply(--shadow-elevation-4dp);
   background-color: white;
+}
+#content, #dummy-login-form {
   margin-bottom: 20px;
 }
 #login-methods, #msg, #dummy-login-form {
@@ -68,9 +71,6 @@ function submit(form) {
 <div id="bg"></div>
 <div class="layout vertical center center-justified" style="height: 100vh">
   <div id="content" class="layout horizontal">
-	<div id="msg">
-	  <remote-markdown url="@routes.InjectedContentController.loginMarkdownMessage"/>
-	</div>
 	<div id="login-methods">
 	  <h1>@Messages("login.with")</h1>
 	  @for(form <- dummyIdForm) {
@@ -95,6 +95,9 @@ function submit(form) {
 	      }
 	    </div>
 	  }
+	</div>
+	<div id="msg">
+	  <remote-markdown url="@routes.InjectedContentController.loginMarkdownMessage"/>
 	</div>
   </div>
 </div>
