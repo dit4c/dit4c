@@ -12,7 +12,17 @@
 <style is="custom-style" include="iron-flex"></style>
 <style is="custom-style">
 body {
-  background-color: var(--paper-blue-500);
+  margin: 0;
+}
+#bg {
+  background-image: url('@routes.InjectedContentController.loginBackgroundImage');
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  position: fixed;
+  filter: blur(2px);
+  background-position: center center;
 }
 #login-methods, #dummy-login-form {
   padding: 20px;
@@ -50,8 +60,8 @@ function submit(form) {
 }
 </script>
 </head>
-<body class="fullbleed vertical layout">
-
+<body class="fullbleed">
+<div id="bg"></div>
 <div class="layout vertical center center-justified" style="height: 100vh">
   <div id="login-methods">
     <h1>@Messages("login.with")</h1>

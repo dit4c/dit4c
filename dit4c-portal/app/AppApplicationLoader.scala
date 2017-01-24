@@ -159,6 +159,7 @@ class AppComponents(context: Context)
   lazy val accessPassController = wire[AccessPassController]
   lazy val imageServerController = wire[ImageServerController]
   lazy val instanceController = wire[InstanceController]
+  lazy val injectedContentController = wire[InjectedContentController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
   // SSH admin server

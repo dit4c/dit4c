@@ -22,6 +22,7 @@ GET		/services/image-server/auth-http-request/:httpVerb/	          controllers.I
 GET		/services/image-server/auth-http-request/:httpVerb/:bucketId	controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId: String)
 
 # Assets
+GET     /login-background-image             controllers.InjectedContentController.loginBackgroundImage
 GET     /assets/lib/*file                   controllers.MainController.webjars(path="/public/lib", file)
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file)
 GET     /web-components/:name.html          controllers.WebComponentsController.component(name)
