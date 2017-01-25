@@ -288,6 +288,19 @@ class RktRunnerImpl(
           "kind" -> "host",
           "readOnly" -> true,
           "source" -> vfm.baseDir)
+      sharedVfm <- possibleSharedVolumeFileManager
+      sharedMountJson = sharedVfm.map { _ =>
+        Json.obj(
+          "volume" -> "dit4c-shared",
+          "path" -> "/mnt/shared")
+      }
+      sharedVolumeJson = sharedVfm.map { vfm =>
+        Json.obj(
+          "name" -> "dit4c-shared",
+          "kind" -> "host",
+          "readOnly" -> true,
+          "source" -> vfm.baseDir)
+      }
       _ <- vfm.writeFile("pki/instance-key.pkcs1.pem",
           secretKeyRing.getSecretKey.asRSAPrivateKey(Some(secretKeyPassphrase)).pkcs1.pem.getBytes)
       _ <- vfm.writeFile("pki/instance-key.openpgp.asc", secretKeyRing.armored)
@@ -314,7 +327,8 @@ class RktRunnerImpl(
           Json.obj(
             "name" -> podAppName(instanceId),
             "image" -> Json.obj(
-              "id" -> image)),
+              "id" -> image),
+            "mounts" -> sharedMountJson.toSeq),
           Json.obj(
             "name" -> "helper-listener",
             "image" -> Json.obj(
@@ -328,7 +342,7 @@ class RktRunnerImpl(
             "app" -> authImageAppJson,
             "mounts" -> Json.arr(configMountJson))
         ),
-        "volumes" -> Json.arr(configVolumeJson))
+        "volumes" -> (Nil ++ sharedVolumeJson :+ configVolumeJson))
       filepath <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
         vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
     } yield (filepath, secretKeyRing.toPublicKeyRing)
@@ -354,6 +368,15 @@ class RktRunnerImpl(
             s"mkdir -p $dir",
             s"chmod o=rx $dir",
             s"echo $dir").mkString(" && ")))).map(s => new VolumeFileManager(s.trim))
+  }
+
+  private def possibleSharedVolumeFileManager: Future[Option[VolumeFileManager]] = {
+    val dir = s"${config.rktDir}/dit4c-volumes/shared"
+    ce(privileged(Seq("sh", "-c", s"test -d $dir && echo $dir || echo ''")))
+      .map {
+        case s if s.trim.isEmpty => None
+        case s => Some(new VolumeFileManager(s.trim))
+      }
   }
 
   private class VolumeFileManager(val baseDir: String) {
