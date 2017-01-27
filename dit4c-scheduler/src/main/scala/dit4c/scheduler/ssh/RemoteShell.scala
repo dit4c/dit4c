@@ -65,6 +65,7 @@ object RemoteShell {
               new HostKey(host, hostPublicKey.ssh.raw),
               null);
           val session = jsch.getSession(username, host, port)
+          session.setServerAliveInterval(5000)
           session.connect()
           lastSession = Some(session)
           session
