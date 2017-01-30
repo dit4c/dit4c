@@ -22,9 +22,25 @@ script:
 after_success:
 - sbt coverageAggregate
 - sbt coveralls
+before_deploy:
+- openssl aes-256-cbc -K $encrypted_31059d002630_key -iv $encrypted_31059d002630_iv -in signing.key.enc -out signing.key -d
+- scripts/build_containers.sh
 notifications:
   slack:
     rooms:
       secure: Zrs/pBEIdYh3qkqRH9Ebr5qvwpGHkXBq09Gevf4ZVUXd1UsJcF+RMvwTLOsMIbQfW2UjhpfhzOJg4HcFLzOw+FHFh0Rd4l34VLGRl6jeiPs4pumQ8LoK80zMA80Vbg98eI+tRjUy0KJhMk2MUN50WhSPCVq+HDcnauPEbgG+wxU=
     on_success: change
     on_failure: change
+deploy:
+  provider: releases
+  api_key:
+    secure: DyHnWTvd6ErdJ44iX8DKtIbXDpNnd++HqdDFh5Ed+xepMzg3M787RN8ij2gRLyexRqkinFQpQk6kbcHNY/cqbEKQ4XwZoxknQ/xK58fms3SGQbHzjTpb8Py0Z7j549wlxeE+pPwHq0M9ywi9LO9pSuaMTvjlbT5o98BcphuIGEY=
+  file:
+  - target/containers/dit4c-portal.linux.amd64.aci
+  - target/containers/dit4c-portal.linux.amd64.aci.asc
+  - target/containers/dit4c-scheduler.linux.amd64.aci
+  - target/containers/dit4c-scheduler.linux.amd64.aci.asc
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: dit4c/dit4c

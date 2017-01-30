@@ -1,3 +1,5 @@
+import ReleaseTransformations._
+
 name := "dit4c"
 
 // Overriding publishArtifactsAction, so unnecessary for actual operation
@@ -32,3 +34,14 @@ lazy val portal = (project in file("dit4c-portal")).dependsOn(common).enablePlug
 lazy val scheduler = (project in file("dit4c-scheduler")).dependsOn(common).enablePlugins(JavaAppPackaging)
 
 crossScalaVersions := Nil
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  setNextVersion,
+  commitNextVersion
+)
