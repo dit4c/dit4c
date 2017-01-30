@@ -15,4 +15,5 @@ zpty -b -e dit4c-portal TERM=dumb /opt/dit4c-portal/bin/dit4c-portal "$@"
 while zpty -t dit4c-portal
 do
   zpty -r dit4c-portal
+  sleep 0.001
 done
