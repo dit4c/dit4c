@@ -193,9 +193,10 @@ class UserAggregate(
                 Nil
             }
         }
-        .reduce { (aF, bF) =>
+        .reduceOption { (aF, bF) =>
           for (a <- aF; b <- bF) yield a ++ b
         }
+        .getOrElse(Future.successful(List.empty[UserAggregate.AvailableCluster]))
         .map(AvailableClusters(_))
         .pipeTo(sender)
 
