@@ -39,7 +39,7 @@ extract_project_tarball () {
 extract_project_tarball "dit4c-portal"
 sudo rm -rf .acbuild
 $ACBUILD begin "$BASE_ACI"
-sudo $ACBUILD run -- sh -c "apt-get update && apt-get install -y zsh && apt-get clean"
+sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apt-get update && apt-get install -y zsh && apt-get clean"
 $ACBUILD copy "$WORKING_DIR/dit4c-portal" /opt/dit4c-portal
 $ACBUILD copy "$SCRIPT_DIR/extra/start_portal.zsh" /start_portal
 $ACBUILD set-name dit4c-portal
