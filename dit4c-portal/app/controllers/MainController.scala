@@ -103,7 +103,9 @@ class MainController(
                   schedulerId, clusterId, userData.image)
           }
           (userSharder ? UserSharder.Envelope(request.identity.id, uaOp)).map {
-            case InstanceAggregate.Started(id) => Ok(id)
+            case InstanceAggregate.Started(id) =>
+              log.info(s"User ${request.identity.id} created instance ${id}")
+              Ok(id)
             case InstanceAggregate.NoImageExists => NotFound
           }
         }
@@ -114,6 +116,7 @@ class MainController(
     implicit val timeout = Timeout(1.minute)
     (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.SaveInstance(instanceId))).map {
       case SchedulerAggregate.Ack =>
+        log.info(s"User ${request.identity.id} requested to save instance ${instanceId}")
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
         Forbidden
@@ -126,6 +129,7 @@ class MainController(
     implicit val timeout = Timeout(1.minute)
     (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.DiscardInstance(instanceId))).map {
       case SchedulerAggregate.Ack =>
+        log.info(s"User ${request.identity.id} requested to discard instance ${instanceId}")
         Accepted
       case UserAggregate.InstanceNotOwnedByUser =>
         Forbidden
@@ -144,7 +148,7 @@ class MainController(
             val responseHeaders: Seq[(String,String)] = headers.headers.toSeq.flatMap {
               case (k, vs) => vs.map { (k, _) }
             } :+ ("Content-Disposition" -> s"""attachment; filename="$filename"""")
-
+            log.info(s"User ${request.identity.id} is exporting instance ${instanceId}")
             Ok.chunked(body).withHeaders(responseHeaders: _*)
           case StreamedResponse(headers, body) =>
             log.error(s"Unable to fetch image for $instanceId: $headers")
