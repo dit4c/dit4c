@@ -207,7 +207,9 @@ class InstanceAggregate(
       stay
     case Event(AssociatePGPPublicKeyFingerprint(fingerprint), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
       possibleKeyFingerprint match {
-        case Some(f) if f != fingerprint =>
+        case Some(f) if f == fingerprint =>
+          stay
+        case Some(f) =>
           log.error(
               s"Instance $instanceId to re-associate key with different fingerprint: "+
               s"${f} != ${fingerprint}")
