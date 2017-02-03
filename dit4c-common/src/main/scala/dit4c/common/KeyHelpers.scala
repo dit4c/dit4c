@@ -67,6 +67,7 @@ import pdi.jwt.JwtBase64
 import play.api.libs.json.JsObject
 import play.api.libs.json.Json
 import scala.util.hashing.MurmurHash3
+import org.bouncycastle.openpgp.PGPKeyRingGenerator
 
 object KeyHelpers {
 
@@ -84,15 +85,16 @@ object KeyHelpers {
           kpg.init(new RSAKeyGenerationParameters(publicExponent.bigInteger, new SecureRandom(), bits, 256))
           kpg.generateKeyPair
         }
-        val keyPair = new BcPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
+        val primaryKeyPair = new BcPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
+        val subKeyPair = new BcPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, pair, new Date())
         // Various flags/preferences we want to embed into the certificate (unalterable after signing)
-        val hashedSubpacketVector = {
-          import org.bouncycastle.openpgp.PGPKeyFlags._
+        import org.bouncycastle.openpgp.PGPKeyFlags._
+        def hashedSubpacketVector(capabilities: Int) = {
           import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags._
           import org.bouncycastle.bcpg.HashAlgorithmTags._
           val s = new PGPSignatureSubpacketGenerator()
           // This key can do almost practically anything
-          s.setKeyFlags(false, CAN_AUTHENTICATE|CAN_CERTIFY|CAN_ENCRYPT_COMMS|CAN_ENCRYPT_STORAGE|CAN_SIGN)
+          s.setKeyFlags(false, capabilities)
           // AES is good. Use AES.
           s.setPreferredSymmetricAlgorithms(false, Array(AES_256, AES_192, AES_128))
           // Preference for SHA512 (fast on 64-bit), then for common
@@ -107,14 +109,20 @@ object KeyHelpers {
                     sha1DigestCalculator).setProvider("BC").build(p.toArray)
               }
               .getOrElse(null)
-        val secretKey = new PGPSecretKey(
+        // Create primary certify-only key
+        val krg = new PGPKeyRingGenerator(
             PGPSignature.DEFAULT_CERTIFICATION,
-            keyPair, identity, sha1DigestCalculator, hashedSubpacketVector, null,
+            primaryKeyPair, identity, sha1DigestCalculator,
+            hashedSubpacketVector(CAN_CERTIFY), null,
             new JcaPGPContentSignerBuilder(
-                keyPair.getPublicKey().getAlgorithm(),
+                primaryKeyPair.getPublicKey().getAlgorithm(),
                 HashAlgorithmTags.SHA256),
             secretKeyEncryptor)
-        new BcPGPSecretKeyRing(secretKey.getEncoded)
+        // Attach all other capabilities to the subkey
+        krg.addSubKey(subKeyPair,
+            hashedSubpacketVector(CAN_AUTHENTICATE|CAN_ENCRYPT_COMMS|CAN_ENCRYPT_STORAGE|CAN_SIGN),
+            null)
+        krg.generateSecretKeyRing
       }
     }
   }

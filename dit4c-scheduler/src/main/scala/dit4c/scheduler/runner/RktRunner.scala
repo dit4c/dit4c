@@ -301,8 +301,9 @@ class RktRunnerImpl(
           "readOnly" -> true,
           "source" -> vfm.baseDir)
       }
+      authKey = secretKeyRing.getSecretKey(secretKeyRing.authenticationKeys.head.getKeyID)
       _ <- vfm.writeFile("pki/instance-key.pkcs1.pem",
-          secretKeyRing.getSecretKey.asRSAPrivateKey(Some(secretKeyPassphrase)).pkcs1.pem.getBytes)
+          authKey.asRSAPrivateKey(Some(secretKeyPassphrase)).pkcs1.pem.getBytes)
       _ <- vfm.writeFile("pki/instance-key.openpgp.asc", secretKeyRing.armored)
       helperEnvVars = Map[String, String](
           "DIT4C_INSTANCE_PRIVATE_KEY" -> s"${instanceKeysInternalPath}/instance-key.pkcs1.pem",

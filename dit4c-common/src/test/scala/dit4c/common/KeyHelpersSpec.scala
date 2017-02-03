@@ -89,7 +89,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
         import scala.collection.JavaConversions._
         val secretKeyCollection = new PGPSecretKeyRingCollection(
             PGPUtil.getDecoderStream(new ByteArrayInputStream(outputKey.getBytes)), new JcaKeyFingerprintCalculator())
-        secretKeyCollection.getKeyRings.next.getSecretKey must beLike { case sk =>
+        val skr = secretKeyCollection.getKeyRings.next
+        (skr.getSecretKey must beLike { case sk =>
           val privateKey = sk.extractPrivateKey(passphrase match {
             case None => null
             case Some(passphrase) =>
@@ -100,7 +101,7 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
           (sk.getPublicKey must beLike({ case pubKey =>
             val desiredFlags = {
               import org.bouncycastle.bcpg.sig.KeyFlags._
-              AUTHENTICATION|ENCRYPT_COMMS|ENCRYPT_STORAGE|SIGN_DATA
+              CERTIFY_OTHER
             }
             val sig = pubKey.getSignaturesForKeyID(pubKey.getKeyID).toList.head
             (sig.getCreationTime must beLessThan(new Date())) and
@@ -115,7 +116,15 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
             })
             privateKey.getPrivateKeyDataPacket.getEncoded must_==(expectedKey.getPrivateKeyDataPacket.getEncoded)
           })
-        }
+        }) and (
+          skr.getSecretKeys.toList must haveSize(beGreaterThan(1))
+        ) and (
+          skr.authenticationKeys must not beEmpty
+        ) and (
+          skr.encryptionKeys must not beEmpty
+        ) and (
+          skr.signingKeys must not beEmpty
+        )
       }
     })
 
@@ -131,7 +140,8 @@ class KeyHelpersSpec extends Specification with ScalaCheck {
     "produce PCKS#1 keys from PGP keys" >> prop({ (identity: PGPIdentity, bits: KeyBits, passphrase: Option[Passphrase]) =>
       import sys.process._
       val pgpKeyRing = KeyHelpers.PGPKeyGenerators.RSA(identity, bits, passphrase)
-      val is = new ByteArrayInputStream(pgpKeyRing.getSecretKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
+      val signingKey = pgpKeyRing.getSecretKey(pgpKeyRing.signingKeys.head.getKeyID)
+      val is = new ByteArrayInputStream(signingKey.asRSAPrivateKey(passphrase).pkcs1.pem.getBytes)
       val os = new ByteArrayOutputStream()
       def sendToOs(in: InputStream) = Iterator.continually(in.read).takeWhile(_>=0).foreach(os.write)
       val processIO = new ProcessIO(_ => (), sendToOs, sendToOs, true)
