@@ -52,6 +52,16 @@ class InstanceController(
       .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
   }
 
+  def instancePgpKeys(instanceId: String) = Action.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.GetKeyFingerprint)).map {
+      case InstanceAggregate.CurrentKeyFingerprint(keyFingerprint) =>
+        Redirect(routes.KeyRingController.get(keyFingerprint.string))
+      case InstanceAggregate.DoesNotExist =>
+        NotFound
+    }
+  }
+
   def imageRegistration = Action.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
     val authHeaderRegex = "^Bearer (.*)$".r

@@ -11,9 +11,11 @@ POST    /instances/                         controllers.MainController.newInstan
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
 PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 GET     /instances/:instanceId/export       controllers.MainController.exportImage(instanceId)
+GET     /instances/:instanceId/pgp-keys		controllers.InstanceController.instancePgpKeys(instanceId)
 POST    /instances/:instanceId/share        controllers.MainController.createSharingLink(instanceId)
 PUT     /instances/                         controllers.InstanceController.instanceRegistration
 PUT     /images/                            controllers.InstanceController.imageRegistration
+GET		/pgp-keys/:fingerprint				controllers.KeyRingController.get(fingerprint)
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
 GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.redeemAccessPass(schedulerId, data)
 

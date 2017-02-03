@@ -70,6 +70,7 @@ object InstanceAggregate {
 
   sealed trait Command extends BaseCommand
   case object GetStatus extends Command
+  case object GetKeyFingerprint extends Command
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
   case object Discard extends Command
@@ -90,12 +91,14 @@ object InstanceAggregate {
   case class Started(instanceId: String) extends Response
   case object Ack extends Response
   sealed trait StatusResponse extends Response
-  case object DoesNotExist extends StatusResponse
+  sealed trait GetKeyFingerprintResponse extends Response
+  case object DoesNotExist extends StatusResponse with GetKeyFingerprintResponse
   case class CurrentStatus(
       state: String,
       uri: Option[String],
       timestamps: EventTimestamps,
       availableActions: Set[InstanceAction]) extends StatusResponse
+  case class CurrentKeyFingerprint(keyFingerpring: PGPFingerprint) extends GetKeyFingerprintResponse
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse
@@ -309,6 +312,10 @@ class InstanceAggregate(
   whenUnhandled {
     case Event(GetImage, _) =>
       stay replying NoImageExists
+    case Event(GetKeyFingerprint, data: InstanceData) if data.keyFingerprint.isDefined =>
+      stay replying CurrentKeyFingerprint(data.keyFingerprint.get)
+    case Event(GetKeyFingerprint, _) =>
+      stay replying DoesNotExist
   }
 
   override def applyEvent(
