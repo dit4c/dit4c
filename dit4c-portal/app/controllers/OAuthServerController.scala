@@ -41,6 +41,7 @@ class OAuthServerController(
         val instanceId = clientId.stripPrefix("instance-")
         checkUserOwnsInstance(user.id, instanceId).flatMap {
           case true =>
+            log.info(s"Granting ${user.id} access to instance $instanceId")
             val authInfo = AuthInfo.apply(user, Some(clientId), None, Some(sanitizeRedirectUri(redirectUri)))
             oauthDataHandler.createAuthCode(authInfo).map { code =>
               Redirect(redirectUri, Map("code" -> Seq(code)), FOUND)
@@ -73,8 +74,13 @@ class OAuthServerController(
 
   private def checkUserOwnsInstance(userId: String, instanceId: String): Future[Boolean] =
     (userSharder ? UserSharder.Envelope(userId, GetAllInstanceIds)).collect {
+      case UserInstances(instanceIds) if instanceIds.contains(instanceId) =>
+        true
       case UserInstances(instanceIds) =>
-        instanceIds.contains(instanceId)
+        log.warn(
+            s"User $userId attempted to access instance $instanceId, "+
+            s"which is not one of the instances they own: $instanceIds")
+        false
     }
 
   /**
