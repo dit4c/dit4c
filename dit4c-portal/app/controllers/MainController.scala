@@ -202,7 +202,7 @@ class MainController(
         val payload = InstanceSharingAuthorization(request.identity.id, instanceId)
         // Good - it's a preserved instance, so we can go ahead
         val expires = Instant.now
-        val token = authorizationCodeGenerator.create(payload, 60.minutes)
+        val token = authorizationCodeGenerator.create(payload, 6.hours)
         val url = routes.MainController.redeemSharingLink(token).absoluteURL()
         Future.successful(Ok(Json.toJson(InstanceSharingLink(url, expires))))
       case InstanceAggregate.NoImageExists =>
