@@ -145,7 +145,9 @@ class MainController(
         wsClient.url(url).stream.map {
           case StreamedResponse(headers, body) if headers.status == 200 =>
             val filename = Uri(url).path.reverse.head
+            val headersToOmit = "Content-Type" :: "Content-Length" :: Nil
             val responseHeaders: Seq[(String,String)] = headers.headers.toSeq.flatMap {
+              case (k, _) if headersToOmit.contains(k) => Nil
               case (k, vs) => vs.map { (k, _) }
             } :+ ("Content-Disposition" -> s"""attachment; filename="$filename"""")
             log.info(s"User ${request.identity.id} is exporting instance ${instanceId}")
