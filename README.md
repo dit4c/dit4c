@@ -13,6 +13,7 @@ DIT4C is a scalable platform for providing containerized web-based programming a
 All authentication is via federated identity providers - all a user needs is a modern web browser.
 
 Some of the current environments available are:
+
  * [Base][dit4c-container-base] - web-based TTY sessions and basic file management
  * [Jupyter Notebook + Base][dit4c-container-ipython]
  * [NLTK + Jupyter Notebook + Base][dit4c-container-nltk]
@@ -26,8 +27,9 @@ Some of the current environments available are:
 ## Motivation
 
 DIT4C is focused on meeting two needs:
-* Training sessions - having a working install right from the beginning means training participants start programming sooner, and do so in a consistent environment.
-* Reproducible research - container sharing and export allows complete working environments to be exchanged and archived.
+
+ * Training sessions - having a working install right from the beginning means training participants start programming sooner, and do so in a consistent environment.
+ * Reproducible research - container sharing and export allows complete working environments to be exchanged and archived.
 
 
 ## Architecture
@@ -35,15 +37,16 @@ DIT4C is focused on meeting two needs:
 DIT4C separates the portal environment which manages user access and containers from the compute nodes that provide them.
 
 Core services:
-* portal - user-facing UI and scheduler coordination
-* scheduler - manages compute clusters and schedules containers on individual nodes
+ * portal - user-facing UI and scheduler coordination
+ * scheduler - manages compute clusters and schedules containers on individual nodes
 
 Auxiliary "helper" container images:
-* dit4c-helper-listener-*
-  - [dit4c-helper-listener-ngrok2](https://github.com/dit4c/dit4c-helper-listener-ngrok2) - development image that exposes containers via [ngrok.com](https://ngrok.com/) (don't use this in production)
-  - [dit4c-helper-listener-ngrok1](https://github.com/dit4c/dit4c-helper-listener-ngrok1) - image for exposing containers via your own ngrok1 servers
-* [dit4c-helper-auth-portal](https://github.com/dit4c/dit4c-helper-auth-portal/) - proxies container services behind portal-provided auth
-* [dit4c-helper-upload-webdav](https://github.com/dit4c/dit4c-helper-upload-webdav/) - uploads saved images to a webdav server
+
+ * dit4c-helper-listener-*
+     - [dit4c-helper-listener-ngrok2](https://github.com/dit4c/dit4c-helper-listener-ngrok2) - development image that exposes containers via [ngrok.com](https://ngrok.com/) (don't use this in production)
+     - [dit4c-helper-listener-ngrok1](https://github.com/dit4c/dit4c-helper-listener-ngrok1) - image for exposing containers via your own ngrok1 servers
+ * [dit4c-helper-auth-portal](https://github.com/dit4c/dit4c-helper-auth-portal/) - proxies container services behind portal-provided auth
+ * [dit4c-helper-upload-webdav](https://github.com/dit4c/dit4c-helper-upload-webdav/) - uploads saved images to a webdav server
 
 _Many things have changed in DIT4C 0.10. An updated architecture diagram will be added soon._
 
