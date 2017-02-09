@@ -40,11 +40,17 @@ Core services:
  * portal - user-facing UI and scheduler coordination
  * scheduler - manages compute clusters and schedules containers on individual nodes
 
+Additional services:
+ * image server - necessary for saving and exporting instances
+     - [dit4c-imageserver-filesystem](https://github.com/dit4c/dit4c-imageserver-filesystem) - store images on a filesystem (possibly mounted via NFS)
+     - [dit4c-imageserver-swift](https://github.com/dit4c/dit4c-imageserver-swift) - store images in OpenStack Swift object storage
+
 Auxiliary "helper" container images:
 
  * dit4c-helper-listener-*
-     - [dit4c-helper-listener-ngrok2](https://github.com/dit4c/dit4c-helper-listener-ngrok2) - development image that exposes containers via [ngrok.com](https://ngrok.com/) (don't use this in production)
-     - [dit4c-helper-listener-ngrok1](https://github.com/dit4c/dit4c-helper-listener-ngrok1) - image for exposing containers via your own ngrok1 servers
+     - [dit4c-helper-listener-ngrok2](https://github.com/dit4c/dit4c-helper-listener-ngrok2) _(DEFAULT)_ - development image that exposes containers via [ngrok.com](https://ngrok.com/) (don't use this in production)
+     - [dit4c-helper-listener-ssh](https://github.com/dit4c/dit4c-helper-listener-ssh) - expose containers using SSH reverse port forwarding and reverse-proxy server. When used with [dit4c-routingserver-ssh](https://github.com/dit4c/dit4c-helper-listener-ssh) it supports HTTP & HTTPS.
+     - [dit4c-helper-listener-ngrok1](https://github.com/dit4c/dit4c-helper-listener-ngrok1) _(DEPRECATED)_ - expose containers via your own ngrok1 servers. Supports HTTP, HTTPS & individual TCP ports.
  * [dit4c-helper-auth-portal](https://github.com/dit4c/dit4c-helper-auth-portal/) - proxies container services behind portal-provided auth
  * [dit4c-helper-upload-webdav](https://github.com/dit4c/dit4c-helper-upload-webdav/) - uploads saved images to a webdav server
 
@@ -56,6 +62,32 @@ _Many things have changed in DIT4C 0.10. An updated architecture diagram will be
 All container instances are issued an OpenPGP key prior to starting which is convertible to a [JSON Web Key (JWK)](https://tools.ietf.org/html/draft-ietf-jose-json-web-key-41) or SSH key. This allows container helpers to independently contact the portal to update and retrieve information using a signed [JSON Web Token (JWT)](https://jwt.io/).
 
 The portal also provides keys via a public registry, which will allow future helpers to authenticate independently to other services or retrieve encrypted content. This is still a work in progress.
+
+### Installation Requirements
+
+#### Servers
+
+While DIT4C _could_ be run on a single server for development purposes, a secure installation will attempt to segregate the portal, scheduler and compute onto separate physical or virtual machines.
+
+A valid minimal configuration would include:
+ * portal/image server (public ports exposed: HTTPS)
+   - nghttpx/nginx as HTTPS reverse-proxy
+   - portal
+   - image server
+   - [Cassandra](http://cassandra.apache.org/) database for portal
+ * scheduler (public ports exposed: none)
+   - scheduler
+   - [Cassandra](http://cassandra.apache.org/) database for scheduler
+ * compute node (public ports exposed: none)
+   - no installed software required
+   - [CoreOS](https://coreos.com/) recommended
+   - SSH port must be accessible by scheduler
+
+
+#### TLS Certificates
+
+HTTPS should be used with the portal, image server (recommended, but optional) and routing server. [Let's Encrypt](https://letsencrypt.org/) is sufficient for the portal and image server, but all HTTPS routing server implementations require a wildcard certificate. While highly discouraged, a self-signed certificate can be used for the routing server if necessary (presumably while a valid wildcard certificate is being sourced).
+
 
 ## Installing
 
