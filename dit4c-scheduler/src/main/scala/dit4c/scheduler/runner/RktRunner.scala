@@ -102,6 +102,7 @@ class RktRunnerImpl(
             rkt ++
             Seq("run", "--net=default", "--dns=8.8.8.8") ++
             Seq(s"--hostname=$hostname", "--hosts-entry", s"127.0.0.1=$hostname") ++
+            Seq("--insecure-options=ondisk") ++
             Seq(s"--pod-manifest=$manifestFile")
         )
       } yield publicKey
