@@ -1,10 +1,12 @@
 syntax = "proto3";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 import "scalapb/scalapb.proto";
 
 package domain;
 
 option (scalapb.options) = {
+  primitive_wrappers: true
   flat_package: false
   single_file: true
   import: "domain.BaseDomainEvent"
@@ -16,6 +18,7 @@ message StartedInstance {
   option (scalapb.message).extends = "domain.instance.DomainEvent";
   string schedulerId = 1;
   string clusterId = 2;
+  google.protobuf.StringValue parentInstanceId = 3;
   google.protobuf.Timestamp timestamp = 100;
 }
 
@@ -44,5 +47,11 @@ message AssociatedUri {
 message AssociatedImage {
   option (scalapb.message).extends = "domain.instance.DomainEvent";
   string uri = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
+message AssociatedImageSecret {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string secret = 1;
   google.protobuf.Timestamp timestamp = 100;
 }

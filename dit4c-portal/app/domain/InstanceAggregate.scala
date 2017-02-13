@@ -31,6 +31,8 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing
 import services.KeyRingSharder
 import dit4c.common.KeyHelpers.PGPFingerprint
 import scala.util._
+import akka.http.scaladsl.model.Uri
+import org.bouncycastle.crypto.macs.HMac
 
 object InstanceAggregate {
 
@@ -52,6 +54,7 @@ object InstanceAggregate {
       keyFingerprint: Option[PGPFingerprint] = None,
       uri: Option[String] = None,
       imageUrl: Option[String] = None,
+      imageSecret: Option[String] = None,
       timestamps: EventTimestamps = EventTimestamps()) extends Data
 
   case class EventTimestamps(
@@ -77,6 +80,7 @@ object InstanceAggregate {
   case class Start(
       schedulerId: String,
       clusterId: String,
+      parentInstanceId: Option[String],
       accessPassIds: List[String],
       image: String) extends Command
   case class AssociatePGPPublicKey(keyBlock: String) extends Command
@@ -85,7 +89,8 @@ object InstanceAggregate {
   case class AssociateUri(uri: String) extends Command
   case class AssociateImage(uri: String) extends Command
   case class ReceiveInstanceStateUpdate(state: String) extends Command
-  case object GetImage extends Command
+  case class GetImageUrl(user: String) extends Command
+  protected case class GenerateImageSecret(previousSecret: Option[String]) extends Command
 
   sealed trait Response extends BaseResponse
   case class Started(instanceId: String) extends Response
@@ -133,9 +138,9 @@ class InstanceAggregate(
       stay replying DoesNotExist
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
-    case Event(Start(schedulerId, clusterId, image, accessPassIds), _) =>
+    case Event(Start(schedulerId, clusterId, parentId, image, accessPassIds), _) =>
       val requester = sender
-      goto(Started).applying(StartedInstance(schedulerId, clusterId, now)).andThen { _ =>
+      goto(Started).applying(StartedInstance(schedulerId, clusterId, parentId, now)).andThen { _ =>
         implicit val timeout = Timeout(1.minute)
         (schedulerSharder ? SchedulerSharder.Envelope(
               schedulerId,
@@ -149,7 +154,7 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       // Start actor listening
       currentStatusRequestQueuer(schedulerId, clusterId) ! sender
       // Forward request to cluster
@@ -160,7 +165,7 @@ class InstanceAggregate(
                 clusterId,
                 Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, ts)) =>
+    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, _, ts)) =>
       // Fill waiting requests
       allStatusRequestQueuers ! CurrentStatus(state.toString, uri, ts, Set.empty)
       // New requests go to a new queuer
@@ -178,12 +183,12 @@ class InstanceAggregate(
           stay
         case _ => stay
       }
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _, _)) =>
       validateJwt(keyFingerprint)(token).pipeTo(sender)
       stay
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
-    case Event(AssociatePGPPublicKey(keyBlock), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+    case Event(AssociatePGPPublicKey(keyBlock), InstanceData(_, _, possibleKeyFingerprint, _, _, _, _)) =>
       import dit4c.common.KeyHelpers._
       // This is a one-way command, so no response necessary
       KeyRingSharder.Envelope.forKeySubmission(keyBlock) match {
@@ -208,7 +213,7 @@ class InstanceAggregate(
           }
       }
       stay
-    case Event(AssociatePGPPublicKeyFingerprint(fingerprint), InstanceData(_, _, possibleKeyFingerprint, _, _, _)) =>
+    case Event(AssociatePGPPublicKeyFingerprint(fingerprint), InstanceData(_, _, possibleKeyFingerprint, _, _, _, _)) =>
       possibleKeyFingerprint match {
         case Some(f) if f == fingerprint =>
           stay
@@ -220,7 +225,7 @@ class InstanceAggregate(
         case _ =>
           stay applying AssociatedPGPPublicKey(fingerprint.string)
       }
-    case Event(AssociateUri(newUri), InstanceData(_, _, _, Some(currentUri), _, _)) if currentUri == newUri =>
+    case Event(AssociateUri(newUri), InstanceData(_, _, _, Some(currentUri), _, _, _)) if currentUri == newUri =>
       // Same as current - no need to update
       stay replying Ack
     case Event(AssociateUri(uri), _: InstanceData) =>
@@ -234,14 +239,14 @@ class InstanceAggregate(
         // TODO: Notify scheduler
         requester ! Ack
       }
-    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       schedulerSharder forward SchedulerSharder.Envelope(
               schedulerId,
               SchedulerAggregate.ClusterEnvelope(
                 clusterId,
                 Cluster.SaveInstance(instanceId)))
       stay
-    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       schedulerSharder forward SchedulerSharder.Envelope(
               schedulerId,
               SchedulerAggregate.ClusterEnvelope(
@@ -251,7 +256,7 @@ class InstanceAggregate(
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, maybeUrl, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, maybeUrl, _, ts)) =>
       val availableActions: Set[InstanceAction] =
         if (maybeUrl.isDefined) {
           import InstanceAction._
@@ -261,10 +266,10 @@ class InstanceAggregate(
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _, _)) =>
       validateJwt(keyFingerprint)(token).pipeTo(sender)
       stay
-    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _)) =>
+    case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, None, _, _, _, _)) =>
       stay replying InvalidJwt("No JWK is associated with this instance")
     case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
@@ -275,18 +280,29 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       stay
-    case Event(GetImage, InstanceData(_, _, _, _, Some(imageUrl), _)) =>
-      stay replying InstanceImage(imageUrl)
-    case Event(GetImage, InstanceData(_, _, _, _, None, _)) =>
+    case Event(GetImageUrl(user), InstanceData(_, _, _, _, Some(imageUrl), Some(imageSecret), _)) =>
+      val password = imageSecret
+      val uri = Uri(imageUrl)
+      val userImageUrl =
+        uri.copy(authority=uri.authority.copy(userinfo=s"$user:$password")).toString
+      stay replying InstanceImage(userImageUrl)
+    case Event(msg @ GetImageUrl(_), InstanceData(_, _, _, _, Some(imageUrl), None, _)) =>
+      // Generate image secret (because it doesn't currently exist)
+      self ! GenerateImageSecret(None)
+      // Retry message
+      self forward msg
+      // Stay in same state while this happens
+      stay
+    case Event(GetImageUrl(user), InstanceData(_, _, _, _, None, _, _)) =>
       stay replying NoImageExists
   }
 
   when(Discarded) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, ts)) =>
+    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
       stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts, availableActions)
     case Event(_: InstanceStateUpdate, _) =>
@@ -303,19 +319,24 @@ class InstanceAggregate(
     case Event(AssociateImage(uri), _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
-    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       stay
-    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _)) =>
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       stay
   }
 
   whenUnhandled {
-    case Event(GetImage, _) =>
+    case Event(GetImageUrl(_), _) =>
       stay replying NoImageExists
     case Event(GetKeyFingerprint, data: InstanceData) if data.keyFingerprint.isDefined =>
       stay replying CurrentKeyFingerprint(data.keyFingerprint.get)
     case Event(GetKeyFingerprint, _) =>
       stay replying DoesNotExist
+    case Event(GenerateImageSecret(previousSecret), data: InstanceData) if data.imageSecret == previousSecret =>
+      val imageSecret = Random.alphanumeric.take(20).mkString
+      stay applying AssociatedImageSecret(imageSecret, now)
+    case Event(GenerateImageSecret(previousSecret), _) =>
+      stay
   }
 
   override def applyEvent(
@@ -328,7 +349,7 @@ class InstanceAggregate(
         throw new Exception(s"Unknown state/data combination: ($domainEvent, $currentData)")
       }
     domainEvent match {
-      case StartedInstance(schedulerId, clusterId, ts) =>
+      case StartedInstance(schedulerId, clusterId, _, ts) =>
         InstanceData(schedulerId, clusterId, timestamps = EventTimestamps(ts) )
       case PreservedInstance(ts) => currentData match {
         case data: InstanceData =>
@@ -351,6 +372,10 @@ class InstanceAggregate(
       }
       case AssociatedImage(uri, _) => currentData match {
         case data: InstanceData => data.copy(imageUrl = Some(uri))
+        case _ => unhandled
+      }
+      case AssociatedImageSecret(secret, _) => currentData match {
+        case data: InstanceData => data.copy(imageSecret = Some(secret))
         case _ => unhandled
       }
     }

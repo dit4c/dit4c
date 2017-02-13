@@ -22,6 +22,7 @@ object InstanceSharder {
   case class StartInstance(
       schedulerId: String,
       clusterId: String,
+      parentInstanceId: Option[String],
       accessPassIds: List[String],
       image: String) extends Command
   case class VerifyJwt(token: String) extends Command
@@ -41,13 +42,13 @@ object InstanceSharder {
 
   // Because identity can be any valid string, we need the ID to be encoded
   def extractEntityId(implicit system: ActorSystem): ShardRegion.ExtractEntityId = {
-    case StartInstance(schedulerId, clusterId, accessPassIds, image) =>
-      (newInstanceId, Start(schedulerId, clusterId, accessPassIds, image))
+    case s: StartInstance =>
+      (newInstanceId, Start.tupled(StartInstance.unapply(s).get))
     case Envelope(instanceId, msg) => (instanceId, msg)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
-    case StartInstance(_, _, _, _) => "00" // All instance creation will happen in one shard, but that's OK
+    case _: StartInstance => "00" // All instance creation will happen in one shard, but that's OK
     case Envelope(userId, _) => userId.reverse.take(2).reverse // Last two characters of aggregate ID (it'll do for now)
   }
 

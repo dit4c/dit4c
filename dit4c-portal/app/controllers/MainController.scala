@@ -39,6 +39,7 @@ import scala.util.Success
 import play.api.http.websocket.CloseMessage
 import play.twirl.api.Html
 import org.bouncycastle.openpgp.PGPSignature
+import akka.http.scaladsl.Http
 
 class MainController(
     val environment: Environment,
@@ -51,7 +52,6 @@ class MainController(
     val identityService: IdentityService,
     val oauthDataHandler: InstanceOAuthDataHandler,
     val socialProviders: SocialProviderRegistry,
-    val wsClient: WSClient,
     val authorizationCodeGenerator: AuthorizationCodeGenerator,
     val publicImages: Seq[PublicImage])(implicit system: ActorSystem, materializer: Materializer)
     extends Controller
@@ -61,6 +61,7 @@ class MainController(
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
 
+  val httpClient = Http()(system)
   val log = play.api.Logger(this.getClass)
 
   def index = silhouette.UserAwareAction { implicit request =>
@@ -140,20 +141,30 @@ class MainController(
 
   def exportImage(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId, "portal"))).flatMap {
       case InstanceAggregate.InstanceImage(url) =>
-        wsClient.url(url).stream.map {
-          case StreamedResponse(headers, body) if headers.status == 200 =>
+        import akka.http.scaladsl.model._
+        val uri = Uri(url)
+        val req = uri.authority.userinfo match {
+          case "" => HttpRequest(uri = uri)
+          case userinfo =>
+            import akka.http.scaladsl.model.headers._
+            import java.util.Base64
+            val token = Base64.getEncoder().encodeToString(userinfo.getBytes("utf8"))
+            HttpRequest(uri = uri).addCredentials(GenericHttpCredentials("Basic", token))
+        }
+        httpClient.singleRequest(req).map {
+          case HttpResponse(StatusCodes.OK, headers, entity, _) =>
             val filename = Uri(url).path.reverse.head
             val headersToOmit = "Content-Type" :: "Content-Length" :: Nil
-            val responseHeaders: Seq[(String,String)] = headers.headers.toSeq.flatMap {
-              case (k, _) if headersToOmit.contains(k) => Nil
-              case (k, vs) => vs.map { (k, _) }
+            val responseHeaders: Seq[(String,String)] = headers.flatMap {
+              case h if headersToOmit.contains(h.name) => Nil
+              case h => List((h.name, h.value()))
             } :+ ("Content-Disposition" -> s"""attachment; filename="$filename"""")
             log.info(s"User ${request.identity.id} is exporting instance ${instanceId}")
-            Ok.chunked(body).withHeaders(responseHeaders: _*)
-          case StreamedResponse(headers, body) =>
-            log.error(s"Unable to fetch image for $instanceId: $headers")
+            Ok.chunked(entity.withoutSizeLimit.dataBytes).withHeaders(responseHeaders: _*)
+          case HttpResponse(status, headers, _, _) =>
+            log.error(s"Unable to fetch image for $instanceId: $status $headers")
             InternalServerError
         }
       case InstanceAggregate.NoImageExists =>
@@ -199,7 +210,7 @@ class MainController(
 
   def createSharingLink(instanceId: String) = silhouette.SecuredAction.async { implicit request =>
     implicit val timeout = Timeout(1.minute)
-    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId))).flatMap {
+    (userSharder ? UserSharder.Envelope(request.identity.id, UserAggregate.GetInstanceImageUrl(instanceId, "portal"))).flatMap {
       case InstanceAggregate.InstanceImage(_) =>
         val payload = InstanceSharingAuthorization(request.identity.id, instanceId)
         // Good - it's a preserved instance, so we can go ahead

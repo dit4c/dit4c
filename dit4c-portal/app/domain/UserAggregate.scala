@@ -44,7 +44,7 @@ object UserAggregate {
       sourceInstance: String) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
-  case class GetInstanceImageUrl(instanceId: String) extends Command
+  case class GetInstanceImageUrl(instanceId: String, user: String) extends Command
   case object GetAllInstanceIds extends Command
   case class ReceiveSharedInstance(sourceUserId: String, instanceId: String) extends Command
   case class AddAccessPass(schedulerId: String, signedData: ByteString) extends Command
@@ -94,7 +94,7 @@ class UserAggregate(
       sender ! CreateResponse(userId)
     case msg @ StartInstance(schedulerId, clusterId, image) =>
       val op = (instanceSharder ? InstanceSharder.StartInstance(
-          schedulerId, clusterId, accessPassIds(schedulerId), image))
+          schedulerId, clusterId, None, accessPassIds(schedulerId), image))
       op.onSuccess {
         case InstanceAggregate.Started(instanceId) =>
           self ! InstanceCreationConfirmation(instanceId)
@@ -102,10 +102,10 @@ class UserAggregate(
       op pipeTo sender
     case StartInstanceFromInstance(schedulerId, clusterId, sourceInstance) =>
       if (data.instances.contains(sourceInstance)) {
-        (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImage)).foreach {
+        (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImageUrl("scheduler-"+schedulerId))).foreach {
           case InstanceAggregate.InstanceImage(image) =>
             val op = (instanceSharder ?
-                InstanceSharder.StartInstance(schedulerId, clusterId, accessPassIds(schedulerId), image))
+                InstanceSharder.StartInstance(schedulerId, clusterId, Some(sourceInstance), accessPassIds(schedulerId), image))
             op.onSuccess {
               case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)
@@ -117,9 +117,9 @@ class UserAggregate(
       } else {
         sender ! InstanceNotOwnedByUser
       }
-    case GetInstanceImageUrl(instanceId) =>
+    case GetInstanceImageUrl(instanceId, user) =>
       if (data.instances.contains(instanceId)) {
-        instanceSharder forward InstanceSharder.Envelope(instanceId, InstanceAggregate.GetImage)
+        instanceSharder forward InstanceSharder.Envelope(instanceId, InstanceAggregate.GetImageUrl(user))
       } else {
         sender ! InstanceNotOwnedByUser
       }
