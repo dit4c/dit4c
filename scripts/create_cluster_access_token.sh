@@ -66,6 +66,9 @@ ARMORED_PASS=$(gpg2 --sign \
 
 echo "###################"
 echo "Signed Cluster Access Pass"
+echo "Using:"
+gpg2 --list-keys --with-fingerprint --with-colons "${SIGNING_KEYS[@]}" | \
+  sed -ne '/^fpr/p' | cut -d: -f 10
 echo "Armored:"
 echo "$ARMORED_PASS"
 
