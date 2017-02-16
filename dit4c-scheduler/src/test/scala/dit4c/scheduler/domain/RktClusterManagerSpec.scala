@@ -129,6 +129,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
+              override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
         val manager =
@@ -192,6 +193,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
+              override def resolveStates(instanceIds: Set[String]) = ???
             }
 
         val probe = TestProbe()
@@ -265,6 +267,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = Future.successful(())
+              override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
         val manager =
@@ -344,6 +347,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                   helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
+              override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
         val manager =
@@ -418,6 +422,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           helperImage: String,
           imageServer: String,
           portalUri: String): Future[Unit] = ???
+      override def resolveStates(instanceIds: Set[String]) = ???
     }
 
   def mockFetchSshHostKey(

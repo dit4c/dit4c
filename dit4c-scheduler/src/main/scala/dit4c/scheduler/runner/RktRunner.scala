@@ -22,6 +22,9 @@ import org.bouncycastle.openpgp.PGPSecretKey
 import org.slf4j.LoggerFactory
 
 object RktRunner {
+  type ImageId = String
+  type InstanceState = RktPod.States.Value
+
   case class Config(
       rktDir: Path,
       instanceNamePrefix: String,
@@ -30,7 +33,7 @@ object RktRunner {
 }
 
 trait RktRunner {
-  type ImageId = String
+  import RktRunner._
 
   def fetch(imageName: String): Future[ImageId]
   def start(
@@ -43,6 +46,7 @@ trait RktRunner {
       helperImage: String,
       imageServer: String,
       portalUri: String): Future[Unit]
+  def resolveStates(instanceIds: Set[String]): Future[Map[String,InstanceState]]
 
 }
 
@@ -50,6 +54,7 @@ class RktRunnerImpl(
     val ce: CommandExecutor,
     val config: RktRunner.Config)(
         implicit ec: ExecutionContext) extends RktRunner {
+  import RktRunner._
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -210,6 +215,18 @@ class RktRunnerImpl(
       )
     } yield ()
 
+  override def resolveStates(instanceIds: Set[String]): Future[Map[String,InstanceState]] =
+    listRktPods.map { pods =>
+      instanceIds.map { instanceId =>
+        val state =
+          pods
+            .find(_.apps.contains(podAppName(instanceId)))
+            .map(_.state)
+            .getOrElse(RktPod.States.Unknown)
+        (instanceId, state)
+      }.toMap
+    }
+
   protected[runner] def listSystemdUnits: Future[Set[SystemdUnit]] =
     systemctlCmd
       .flatMap { bin => ce(bin :+ "list-units" :+ "--no-legend" :+ s"${config.instanceNamePrefix}*") }
@@ -249,6 +266,8 @@ class RktRunnerImpl(
       .flatMap { rktCmd => ce(rktCmd :+ "image" :+ "cat-manifest" :+ image) }
       .map(Json.parse)
       .map(_.as[JsObject])
+
+  protected[runner] def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
 
   private def rktCmd = which("rkt").map(_ :+ s"--dir=${config.rktDir}")
 
@@ -427,8 +446,6 @@ class RktRunnerImpl(
   private def getImageAppConfig(image: ImageId): Future[JsObject] =
     getImageManifest(image)
       .map(v => (v \ "app").as[JsObject])
-
-  private def podAppName(instanceId: String) = s"${config.instanceNamePrefix}-${instanceId}"
 
   private def rktEnv(pairs: (String, String)*): JsArray = JsArray(
     pairs.map { case (k: String, v: String) => Json.obj("name" -> k, "value" -> v) })

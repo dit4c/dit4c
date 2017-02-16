@@ -299,6 +299,33 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
 
     }
 
+    "resolveStates" >> {
+
+      "should operate on multiple pods" >> { runner: RktRunnerImpl =>
+        import scala.util.Random
+        // Prepared a bunch of pods
+        val numOfPods = 10
+        val instanceIds = 1.to(numOfPods).map { _ =>
+          val instanceId = f"${Random.nextInt}%08x"
+          val appName = runner.podAppName(instanceId)
+          Await.ready(
+            commandExecutor(
+                rktCmd(runner.config.rktDir) ++
+                Seq("prepare", "--insecure-options=image", "--no-overlay", testImage, "--name", appName, "--exec", "/bin/true")),
+            1.minute)
+          instanceId
+        }
+        // Check listing
+        val selectedIds = instanceIds.take(5).toSet
+        runner.resolveStates(selectedIds) must {
+          haveSize[Map[String, RktRunner.InstanceState]](selectedIds.size) and
+          havePairs[String, RktRunner.InstanceState](selectedIds.map((_, RktPod.States.Prepared)).toSeq : _*)
+        }.awaitFor(1.minutes)
+      }
+
+    }
+
+
     "fetch" >> {
 
       "should work with local files" >> { runner: RktRunnerImpl =>
