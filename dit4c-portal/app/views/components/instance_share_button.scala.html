@@ -3,13 +3,18 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-dialog/paper-dialog.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-icon-button/paper-icon-button.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.WebComponentsController.component("local-time")">
 
 <dom-module id="instance-share-button">
   <style>  
   #link-text {
-    width: 30em;
-    max-width: 100%;
+    width: 100%;
+  }
+  .notice {
+  	background-color: var(--paper-red-100);
+  	margin: 24px;
+  	border: solid 1px var(--paper-red-500);
   }
   </style>
   <template>
@@ -20,6 +25,14 @@
       last-response="{{link}}"
       on-response="handleResponse"></iron-ajax>
     <paper-dialog id="dialog">
+      <div class="notice">
+      	<p>
+      	<strong>Remember:</strong> the link recipient will need cluster access to create a instance with this image!
+      	</p>
+      	<p>
+      	Ensure they have been provided with a cluster access pass.
+      	</p>
+      </div>
       <div>
         <paper-input id="link-text" label="sharing link"
           value="{{link.url}}"
@@ -36,7 +49,7 @@
       </div>
     </paper-dialog>
     <paper-icon-button icon="link"
-      title="share instance" on-click="generateLink"></paper-icon-button>
+      title="share image" on-click="generateLink"></paper-icon-button>
   </template>
   <script>
   Polymer({
