@@ -200,8 +200,6 @@ class MainController(
               case _ =>
                 None
             }
-
-
           })
           Ok(Json.toJson(clusterOptions))
         }
@@ -412,9 +410,10 @@ class MainController(
           .recover { case e => Map.empty[String, String] }
       }
       // Collapse to single future
-      .reduce { (aF, bF) =>
+      .reduceOption { (aF, bF) =>
         for (a <- aF; b <- bF) yield a ++ b
       }
+      .getOrElse(Future.successful(Map.empty))
 
   protected def clusterInfo(
       ids: Set[(String, String)]): Future[Map[(String, String), Cluster.ClusterInfo]] =
@@ -432,9 +431,10 @@ class MainController(
           .recover { case e => Map.empty[(String, String), Cluster.ClusterInfo] }
       }
       // Collapse to single future
-      .reduce { (aF, bF) =>
+      .reduceOption { (aF, bF) =>
         for (a <- aF; b <- bF) yield a ++ b
       }
+      .getOrElse(Future.successful(Map.empty))
 }
 
 class GetInstancesActor(out: ActorRef,
