@@ -41,20 +41,26 @@
             </paper-listbox>
           </paper-dropdown-menu>
         </template>
-        <paper-dropdown-menu label="Cluster" selected-item="{{selectedCluster}}" required>
-          <paper-listbox class="dropdown-content" attr-for-selected="value">
-            <template is="dom-repeat"
-                items="[[availableClusters.clusters]]"
-                as="cluster">
-              <paper-item value="{{cluster.id}}">{{cluster.display}}</paper-item>
-            </template>
-          </paper-listbox>
-        </paper-dropdown-menu>
+        
+    	<template is="dom-if" if="[[!isEmpty(availableClusters.clusters)]]">
+          <paper-dropdown-menu label="Cluster" selected-item="{{selectedCluster}}" required>
+            <paper-listbox class="dropdown-content" attr-for-selected="value">
+              <template is="dom-repeat"
+                  items="[[availableClusters.clusters]]"
+                  as="cluster">
+                <paper-item value="{{cluster.id}}">{{cluster.display}}</paper-item>
+              </template>
+            </paper-listbox>
+          </paper-dropdown-menu>
+        </template>
+    	<template is="dom-if" if="[[isEmpty(availableClusters.clusters)]]">
+          <p>You do not have access to any compute clusters!</p>
+    	</template>
         <input is="iron-input" name="cluster" type="hidden" value="[[selectedCluster.value]]">
       </form>
       <div class="buttons">
         <paper-button dialog-dismiss on-click="close">Cancel</paper-button>
-        <paper-button dialog-confirm on-click="submit">Create</paper-button>
+        <paper-button dialog-confirm disabled="[[isEmpty(availableClusters.clusters)]]" on-click="submit">Create</paper-button>
       </div>
     </paper-dialog>
     <iron-ajax
@@ -71,6 +77,9 @@
         type: String,
         value: null
       }
+    },
+    isEmpty: function(xs) {
+      return !xs || xs.length == 0;
     },
     isSet: function(v) {
       return Boolean(v);
