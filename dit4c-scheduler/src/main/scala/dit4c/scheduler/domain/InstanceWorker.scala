@@ -18,8 +18,10 @@ object InstanceWorker {
       imageServer: String,
       portalUri: String) extends InstanceDirective
   case class Assert(instanceAssertion: InstanceAssertion) extends InstanceDirective
+  case object Done extends InstanceDirective
 
   sealed trait InstanceAssertion
+  case object StillExists extends InstanceAssertion
   case object StillRunning extends InstanceAssertion
 
 }

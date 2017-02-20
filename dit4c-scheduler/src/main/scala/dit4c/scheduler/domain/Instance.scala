@@ -118,6 +118,7 @@ class Instance(worker: ActorRef)
   }
 
   override def postStop = {
+    worker ! InstanceWorker.Done
     ticker.foreach(_.cancel)
   }
 
@@ -182,6 +183,9 @@ class Instance(worker: ActorRef)
   when(Stopping) {
     case Event(ConfirmExited, _) =>
       goto(Exited).applying(ConfirmedExit(now))
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillRunning)
+      stay
   }
 
   when(Exited) {
@@ -203,7 +207,9 @@ class Instance(worker: ActorRef)
     case Event(ContinueDiscard, DiscardData(id)) =>
       worker ! InstanceWorker.Discard
       goto(Discarding)
-
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
+      stay
   }
 
   when(Saving, stateTimeout = 4.hours) {
@@ -211,6 +217,9 @@ class Instance(worker: ActorRef)
       goto(Saved).applying(ConfirmedSave(now))
     case Event(StateTimeout, _) ⇒
       self ! Error("Timeout while saving image")
+      stay
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
       stay
   }
 
@@ -220,6 +229,9 @@ class Instance(worker: ActorRef)
       goto(Uploading).applying(CommencedUpload(now)).andThen { _ =>
         worker ! InstanceWorker.Upload(helperImage, imageServer, portalUri)
       }
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
+      stay
   }
 
   when(Uploading, stateTimeout = 4.hours) {
@@ -227,6 +239,9 @@ class Instance(worker: ActorRef)
       goto(Uploaded).applying(ConfirmedUpload(now))
     case Event(StateTimeout, _) ⇒
       self ! Error("Timeout while uploading image")
+      stay
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
       stay
   }
 
@@ -240,6 +255,9 @@ class Instance(worker: ActorRef)
   when(Discarding) {
     case Event(ConfirmDiscard, _) =>
       goto(Discarded).applying(ConfirmedDiscard(now))
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
+      stay
   }
 
   when(Discarded, stateTimeout = 1.minute) {

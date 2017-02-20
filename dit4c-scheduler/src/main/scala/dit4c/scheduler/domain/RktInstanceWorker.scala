@@ -72,6 +72,8 @@ class RktInstanceWorker(val instanceId: String, runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to upload image", instance, e)
       }
+    case Done =>
+      context.stop(context.self)
     case CurrentInstanceState(state, timestamp) =>
       lastKnownState match {
         case Some((previousState, _)) if state == previousState =>
@@ -86,9 +88,19 @@ class RktInstanceWorker(val instanceId: String, runner: RktRunner) extends Actor
         case Some((RktPod.States.Exited, _)) =>
           log.warning(s"Instance $instanceId exited without user interaction")
           sender ! Instance.ConfirmExited
-        case Some((RktPod.States.Unknown, timestamp)) if Instant.now.minus(Duration.ofHours(2)).isAfter(timestamp) =>
-          log.warning(s"Instance $instanceId had unknown status for more than 2 hours - assuming discarded")
+        case Some((RktPod.States.Unknown, timestamp)) if Instant.now.minus(Duration.ofMinutes(1)).isAfter(timestamp) =>
+          log.warning(s"Instance $instanceId had unknown status for more than a minute - assuming exited")
           sender ! Instance.ConfirmExited
+          sender ! Instance.Discard
+        case _ =>
+          // Do nothing
+      }
+    case Assert(StillExists) =>
+      import dit4c.scheduler.runner.RktPod
+      import java.time._
+      lastKnownState match {
+        case Some((RktPod.States.Unknown, timestamp)) if Instant.now.minus(Duration.ofMinutes(1)).isAfter(timestamp) =>
+          log.warning(s"Instance $instanceId had unknown status for more than a minute - assuming discarded")
           sender ! Instance.Discard
         case _ =>
           // Do nothing
