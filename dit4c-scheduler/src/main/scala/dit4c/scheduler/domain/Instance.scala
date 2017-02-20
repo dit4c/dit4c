@@ -12,6 +12,7 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing
 import com.google.protobuf.timestamp.Timestamp
 import dit4c.scheduler.domain.instance.DomainEvent
 import Instance.{State, Data}
+import akka.actor.Cancellable
 
 object Instance {
   type Id = String
@@ -108,6 +109,18 @@ class Instance(worker: ActorRef)
 
   lazy val persistenceId = self.path.name
 
+  private case object Tick
+  private var ticker: Option[Cancellable] = None
+
+  override def preStart = {
+    import context.dispatcher
+    ticker = Some(context.system.scheduler.schedule(5.seconds, 5.second, context.self, Tick))
+  }
+
+  override def postStop = {
+    ticker.foreach(_.cancel)
+  }
+
   startWith(JustCreated, NoData)
 
   when(JustCreated) {
@@ -127,7 +140,7 @@ class Instance(worker: ActorRef)
       goto(Starting).applying(FetchedImage(localImage)).andThen {
         case data =>
           log.info(s"Starting with: $localImage")
-          worker ! InstanceWorker.Start(id, localImage, callback)
+          worker ! InstanceWorker.Start(localImage, callback)
       }
     case Event(StateTimeout, _) ⇒
       self ! Error("Timeout while fetching image")
@@ -150,15 +163,20 @@ class Instance(worker: ActorRef)
     case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
       goto(Stopping).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
-        worker ! InstanceWorker.Stop(id)
+        worker ! InstanceWorker.Stop
         requester ! Ack
       }
     case Event(Discard, StartData(id, _, _, _, _)) =>
       val requester = sender
       goto(Stopping).applying(RequestedDiscard(now)).andThen { _ =>
-        worker ! InstanceWorker.Stop(id)
+        worker ! InstanceWorker.Stop
         requester ! Ack
       }
+    case Event(Tick, _) =>
+      worker ! InstanceWorker.Assert(InstanceWorker.StillRunning)
+      stay
+    case Event(ConfirmExited, _) =>
+      goto(Exited).applying(ConfirmedExit(now))
   }
 
   when(Stopping) {
@@ -170,7 +188,7 @@ class Instance(worker: ActorRef)
     case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
       goto(Saving).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
-        worker ! InstanceWorker.Save(id)
+        worker ! InstanceWorker.Save
         requester ! Ack
       }
     case Event(Discard, _) =>
@@ -180,10 +198,10 @@ class Instance(worker: ActorRef)
         requester ! Ack
       }
     case Event(ContinueSave, SaveData(id, _, _, _, _) ) =>
-      worker ! InstanceWorker.Save(id)
+      worker ! InstanceWorker.Save
       goto(Saving)
     case Event(ContinueDiscard, DiscardData(id)) =>
-      worker ! InstanceWorker.Discard(id)
+      worker ! InstanceWorker.Discard
       goto(Discarding)
 
   }
@@ -200,7 +218,7 @@ class Instance(worker: ActorRef)
     case Event(Upload, SaveData(id, _, helperImage, imageServer, portalUri)) =>
       val requester = sender
       goto(Uploading).applying(CommencedUpload(now)).andThen { _ =>
-        worker ! InstanceWorker.Upload(id, helperImage, imageServer, portalUri)
+        worker ! InstanceWorker.Upload(helperImage, imageServer, portalUri)
       }
   }
 
@@ -239,6 +257,9 @@ class Instance(worker: ActorRef)
       stay replying StatusReport(stateName, data)
     case Event(Error(msg), _) =>
       goto(Errored).applying(ErrorOccurred(msg, now))
+    case Event(Tick, _) =>
+      // Do nothing
+      stay
   }
 
   onTransition {

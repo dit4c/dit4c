@@ -120,6 +120,7 @@ class RktClusterManager(
       log.info("Requesting instance worker from nodes")
       val instanceSchedulerRef =
         context.actorOf(Props(classOf[RktInstanceScheduler],
+          op.instanceId,
           state.nodeIds.map(id => (id, getNodeActor(id))).toMap,
           1.minute,
           false),
@@ -133,6 +134,7 @@ class RktClusterManager(
           if (state.instanceNodeMappings.contains(instanceId)) {
             val instanceSchedulerRef =
                 context.actorOf(Props(classOf[RktInstanceScheduler],
+                  instanceId,
                   state.instanceNodeMappings.get(instanceId).map(id => (id, getNodeActor(id))).toMap,
                   1.minute,
                   true),

@@ -1,23 +1,32 @@
 package dit4c.scheduler.domain
 
+import dit4c.scheduler.runner.RktRunner
+import dit4c.scheduler.runner.RktPod
+
 object InstanceWorker {
-  sealed trait Command extends BaseCommand
+  trait Command extends BaseCommand
   sealed trait InstanceDirective extends Command
   case class Fetch(imageName: String) extends InstanceDirective
   case class Start(
-      instanceId: String,
       imageId: String,
       portalUri: String) extends InstanceDirective
-  case class Stop(instanceId: String) extends InstanceDirective
-  case class Discard(instanceId: String) extends InstanceDirective
-  case class Save(instanceId: String) extends InstanceDirective
-  case class Upload(instanceId: String,
+  case object Stop extends InstanceDirective
+  case object Discard extends InstanceDirective
+  case object Save extends InstanceDirective
+  case class Upload(
       helperImage: String,
       imageServer: String,
       portalUri: String) extends InstanceDirective
+  case class Assert(instanceAssertion: InstanceAssertion) extends InstanceDirective
+
+  sealed trait InstanceAssertion
+  case object StillRunning extends InstanceAssertion
+
 }
 
 trait InstanceWorker {
   import InstanceWorker._
+
+  def instanceId: String
 
 }

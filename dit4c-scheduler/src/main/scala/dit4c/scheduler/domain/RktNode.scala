@@ -17,6 +17,8 @@ import com.google.protobuf.timestamp.Timestamp
 import dit4c.scheduler.domain.rktnode.DomainEvent
 import RktNode.{State, Data}
 import akka.actor.PoisonPill
+import akka.actor.Cancellable
+import dit4c.scheduler.runner.RktRunner
 
 object RktNode {
   import BaseDomainEvent.now
@@ -58,12 +60,19 @@ object RktNode {
   case class NodeConfig(
       connectionDetails: ServerConnectionDetails,
       rktDir: String,
-      readyToConnect: Boolean) extends Data
+      readyToConnect: Boolean) extends Data {
+    private var rktRunner: Option[RktRunner] = None
+    def runner(createRunner: RktClusterManager.RktRunnerFactory) =
+      rktRunner.getOrElse {
+        rktRunner = Some(createRunner(connectionDetails, rktDir))
+        rktRunner.get
+      }
+  }
 
   trait Command extends BaseCommand
   case object GetState extends Command
-  case object RequestInstanceWorker extends Command
-  case object RequireInstanceWorker extends Command
+  case class RequestInstanceWorker(instanceId: String) extends Command
+  case class RequireInstanceWorker(instanceId: String) extends Command
   case class Initialize(
       host: String,
       port: Int,
@@ -92,8 +101,23 @@ class RktNode(
     extends PersistentFSM[State, Data, DomainEvent] {
   import dit4c.scheduler.domain.rktnode._
   import RktNode._
+  import scala.concurrent.duration._
 
   lazy val persistenceId = self.path.name
+
+  private case object Tick
+  private var ticker: Option[Cancellable] = None
+
+  override def preStart = {
+    import context.dispatcher
+    ticker = Some(context.system.scheduler.schedule(5.seconds, 5.second, context.self, Tick))
+  }
+
+  override def postStop = {
+    ticker.foreach(_.cancel)
+  }
+
+  var monitoredInstanceIds: Set[String] = Set.empty
 
   startWith(JustCreated, NoConfig)
 
@@ -130,40 +154,59 @@ class RktNode(
 
   when(Active) {
     case Event(
-        RequestInstanceWorker,
+        RequestInstanceWorker(instanceId),
         NodeConfig(connectionDetails, rktDir, _)) =>
       import scala.util._
       import context.dispatcher
       val requester = sender
-      val runner = createRunner(connectionDetails, rktDir)
-      val worker = context.actorOf(
-          Props(classOf[RktInstanceWorker], runner),
-          "instance-worker-"+Random.alphanumeric.take(20).mkString)
       // Check node is up
       fetchSshHostKey(connectionDetails.host, connectionDetails.port).onComplete {
         case Success(_) =>
+          val runner = createRunner(connectionDetails, rktDir)
           val worker = context.actorOf(
-            Props(classOf[RktInstanceWorker], runner),
-            "instance-worker-"+Random.alphanumeric.take(20).mkString)
+            Props(classOf[RktInstanceWorker], instanceId, runner),
+            instanceWorkerActorName(instanceId))
+          monitoredInstanceIds += instanceId
           requester ! WorkerCreated(worker)
         case Failure(e) =>
           log.error(e.getMessage)
-          // No need for worker
-          worker ! PoisonPill
           // Inform requester
           requester ! UnableToProvideWorker("Node is unavailable")
       }
       stay
     case Event(
-        RequireInstanceWorker,
+        RequireInstanceWorker(instanceId),
         NodeConfig(connectionDetails, rktDir, _)) =>
       val runner = createRunner(connectionDetails, rktDir)
       val worker = context.actorOf(
-          Props(classOf[RktInstanceWorker], runner),
-          "instance-worker-"+Random.alphanumeric.take(20).mkString)
+          Props(classOf[RktInstanceWorker], instanceId, runner),
+          instanceWorkerActorName(instanceId))
+      monitoredInstanceIds += instanceId
       stay replying WorkerCreated(worker)
     case Event(ConfirmKeys, data: NodeConfig) =>
       stay replying ConfirmKeysResponse(data)
+    case Event(Tick, nc @ NodeConfig(connectionDetails, rktDir, _)) =>
+      import context.dispatcher
+      // Resolve workers to refs
+      val instanceWorkers: Map[String, ActorRef] =
+        (for {
+          instanceId <- monitoredInstanceIds
+          ref <- context.child(instanceWorkerActorName(instanceId))
+        } yield (instanceId, ref)).toMap
+      // Update monitoring to remove missing workers
+      monitoredInstanceIds = instanceWorkers.keySet
+      // Get current states
+      nc.runner(createRunner).resolveStates(monitoredInstanceIds).foreach { states =>
+        val ts = Instant.now
+        // Tell workers
+        for {
+          (instanceId, state) <- states
+          ref <- instanceWorkers.get(instanceId)
+        } yield {
+          ref ! RktInstanceWorker.CurrentInstanceState(state, ts)
+        }
+      }
+      stay
   }
 
   whenUnhandled {
@@ -171,8 +214,11 @@ class RktNode(
       stay replying DoesNotExist
     case Event(GetState, c: NodeConfig) =>
       stay replying Exists(c)
-    case Event(RequestInstanceWorker, _) =>
+    case Event(RequestInstanceWorker(instanceId), _) =>
       stay replying UnableToProvideWorker("Node is not currently active")
+    case Event(Tick, _) =>
+      // Do nothing
+      stay
   }
 
 
@@ -197,6 +243,9 @@ class RktNode(
         }
     }
   }
+
+  private def instanceWorkerActorName(instanceId: String) =
+    "instance-worker-"+instanceId
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]

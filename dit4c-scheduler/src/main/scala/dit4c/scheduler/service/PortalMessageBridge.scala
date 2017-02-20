@@ -113,7 +113,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
     inbound = context.watch(context.actorOf(Props[PortalMessageBridge.UnmarshallingActor], "unmarshaller"))
     inboundSink = Sink.actorRef(inbound, PortalMessageBridge.BridgeClosed)
 
-    outboundSource = Source.actorRef(16, OverflowStrategy.fail)
+    outboundSource = Source.actorRef(128, OverflowStrategy.dropHead)
     def outboundActorRefExtractor(nu: NotUsed, ref: ActorRef) = ref
     val setup = for {
       armoredPgpPublicKeyRing <- (keyManager ? KeyManager.GetPublicKeyInfo).collect {

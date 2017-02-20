@@ -5,15 +5,26 @@ import akka.actor._
 import scala.util._
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 
-class RktInstanceWorker(runner: RktRunner) extends Actor
+object RktInstanceWorker {
+  import InstanceWorker._
+  sealed trait NodeDirective extends Command
+  case class CurrentInstanceState(
+      state: RktRunner.InstanceState,
+      timestamp: java.time.Instant) extends NodeDirective
+}
+
+class RktInstanceWorker(val instanceId: String, runner: RktRunner) extends Actor
     with ActorLogging with InstanceWorker {
   import InstanceWorker._
+  import RktInstanceWorker._
 
   import context.dispatcher
 
   override val receive: Receive = {
     case command: Command => receiveCmd(command)
   }
+
+  private var lastKnownState: Option[(RktRunner.InstanceState, java.time.Instant)] = None
 
   protected def receiveCmd(command: Command): Unit = command match {
     case Fetch(imageName: String) =>
@@ -24,7 +35,7 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to fetch image", instance, e)
       }
-    case Start(instanceId, imageId, callbackUrl) =>
+    case Start(imageId, callbackUrl) =>
       val instance = sender
       runner.start(instanceId, imageId, callbackUrl).andThen {
         case Success(key: PGPPublicKeyRing) =>
@@ -33,7 +44,7 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to start image", instance, e)
       }
-    case Stop(instanceId) =>
+    case Stop =>
       val instance = sender
       runner.stop(instanceId).andThen {
         case Success(imageId) =>
@@ -41,10 +52,10 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to terminate image", instance, e)
       }
-    case Discard(instanceId) =>
+    case Discard =>
       // TODO: Actually clean up instance
       sender ! Instance.ConfirmDiscard
-    case Save(instanceId) =>
+    case Save =>
       val instance = sender
       runner.export(instanceId).andThen {
         case Success(_) =>
@@ -52,7 +63,7 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to save image", instance, e)
       }
-    case Upload(instanceId, helperImageName, imageServer, portalUri) =>
+    case Upload(helperImageName, imageServer, portalUri) =>
       val instance = sender
       runner.uploadImage(instanceId, helperImageName, imageServer, portalUri).andThen {
         case Success(imageId) =>
@@ -60,6 +71,27 @@ class RktInstanceWorker(runner: RktRunner) extends Actor
           log.info(s"Upload sucessfully initiated for $instanceId")
         case Failure(e) =>
           replyWithError("Unable to upload image", instance, e)
+      }
+    case CurrentInstanceState(state, timestamp) =>
+      lastKnownState match {
+        case Some((previousState, _)) if state == previousState =>
+          // Do nothing
+        case _ =>
+          lastKnownState = Some((state, timestamp))
+      }
+    case Assert(StillRunning) =>
+      import dit4c.scheduler.runner.RktPod
+      import java.time._
+      lastKnownState match {
+        case Some((RktPod.States.Exited, _)) =>
+          log.warning(s"Instance $instanceId exited without user interaction")
+          sender ! Instance.ConfirmExited
+        case Some((RktPod.States.Unknown, timestamp)) if Instant.now.minus(Duration.ofHours(2)).isAfter(timestamp) =>
+          log.warning(s"Instance $instanceId had unknown status for more than 2 hours - assuming discarded")
+          sender ! Instance.ConfirmExited
+          sender ! Instance.Discard
+        case _ =>
+          // Do nothing
       }
   }
 

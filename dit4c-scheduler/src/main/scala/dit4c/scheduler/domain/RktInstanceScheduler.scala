@@ -17,6 +17,7 @@ object RktInstanceScheduler {
 }
 
 class RktInstanceScheduler(
+    instanceId: String,
     nodes: Map[String, ActorRef],
     completeWithin: FiniteDuration,
     requireWorker: Boolean) extends Actor with ActorLogging {
@@ -58,7 +59,7 @@ class RktInstanceScheduler(
         })
         // Query next Node
         log.info(s"Requesting instance worker from node $nodeId")
-        nodes(nodeId) ! nodeRequest
+        nodes(nodeId) ! nodeRequest(instanceId)
       case Nil =>
         log.warning(
             s"All nodes refused to provide an instance worker")
@@ -71,8 +72,8 @@ class RktInstanceScheduler(
     context.stop(self)
   }
 
-  private val nodeRequest =
-    if (this.requireWorker) RktNode.RequireInstanceWorker
-    else RktNode.RequestInstanceWorker
+  private def nodeRequest(instanceId: String) =
+    if (this.requireWorker) RktNode.RequireInstanceWorker(instanceId)
+    else RktNode.RequestInstanceWorker(instanceId)
 
 }

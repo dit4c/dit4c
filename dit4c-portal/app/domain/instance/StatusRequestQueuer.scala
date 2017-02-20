@@ -60,9 +60,9 @@ class StatusRequestQueuer(
       import InstanceAggregate.InstanceAction._
       import InstanceStateUpdate.InstanceState._
       val actions = fromName(cs.state).get match {
-        case STARTED if canSave =>
+        case STARTED | EXITED if canSave =>
           Set(Save, Discard)
-        case STARTED =>
+        case STARTED | EXITED =>
           Set(Discard)
         case _ =>
           Set.empty

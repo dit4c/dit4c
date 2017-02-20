@@ -190,6 +190,12 @@
               </div>
             </iron-collapse>
             <div class="card-actions">
+              <template is="dom-if" if="{{hasAction(item, 'save')}}">
+              	<instance-save-button instance-id="{{item.id}}"></instance-save-button>
+              </template>
+              <template is="dom-if" if="{{hasAction(item, 'discard')}}">
+              	<instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
+              </template>
               <template is="dom-if" if="{{hasAction(item, 'share')}}">
                 <instance-share-button instance-id="{{item.id}}"></instance-share-button>
               </template>
