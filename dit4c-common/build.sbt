@@ -8,7 +8,7 @@ scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
   Seq(
-    "com.typesafe.akka"   %%  "akka-http-core"  % akkaV,
+    "com.typesafe.akka"   %%  "akka-http-core"  % akkaHttpV,
     "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbV % "protobuf",
     "org.bouncycastle"    %   "bcpkix-jdk15on"  % "1.55",
     "org.bouncycastle"    %   "bcpg-jdk15on"    % "1.55",
@@ -17,7 +17,7 @@ libraryDependencies ++= {
     "com.softwaremill.macwire"  %%  "util"      % macwireV % "test",
     "com.typesafe.play"   %%  "play-json"       % playV % "provided",
     "com.typesafe.play"   %%  "play-json"       % playV % "test",
-    "com.typesafe.akka"   %%  "akka-http-testkit" % akkaV % "test",
+    "com.typesafe.akka"   %%  "akka-http-testkit" % akkaHttpV % "test",
     "org.specs2"          %%  "specs2-core"     % specs2V % "test",
     "org.specs2"          %%  "specs2-mock"     % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck" % specs2V % "test",

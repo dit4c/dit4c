@@ -11,7 +11,8 @@ import scala.concurrent._
 import akka.actor._
 
 class InstanceController(
-    val instanceSharder: ActorRef @@ InstanceSharder.type)(
+    val instanceSharder: ActorRef @@ InstanceSharder.type,
+    val instanceCreatorLookupService: services.InstanceCreatorLookupService)(
         implicit system: ActorSystem, executionContext: ExecutionContext)
     extends Controller {
 
@@ -50,6 +51,16 @@ class InstanceController(
         }
       }
       .getOrElse(Future.successful(Forbidden("No valid JWT provided")))
+  }
+
+  def instanceCreator(instanceId: String) = Action.async { implicit request =>
+    implicit val timeout = Timeout(1.minute)
+    instanceCreatorLookupService.getUserIdOfInstanceCreator(instanceId).map {
+      case Some(userId) =>
+        Ok(userId)
+      case None =>
+        NotFound
+    }
   }
 
   def instancePgpKeys(instanceId: String) = Action.async { implicit request =>

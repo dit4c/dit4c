@@ -113,6 +113,7 @@ class AppComponents(context: Context)
       .taggedWith[services.IdentitySharder.type]
   system.eventStream.subscribe(identitySharder, classOf[IdentitySharder.Envelope])
 
+  lazy val instanceCreatorLookupService: services.InstanceCreatorLookupService = wire[services.InstanceCreatorLookupService]
   lazy val identityService: services.IdentityService = wire[services.IdentityService]
   lazy val sessionAuthenticatorSettings = SessionAuthenticatorSettings()
   lazy val clock = Clock()

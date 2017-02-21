@@ -8,6 +8,7 @@ POST    /authenticate/:provider             controllers.MainController.authentic
 GET     /clusters                           controllers.MainController.getAvailableClusters
 GET     /instances/                         controllers.MainController.getInstances
 POST    /instances/                         controllers.MainController.newInstance
+GET		/instances/:instanceId/creator		controllers.InstanceController.instanceCreator(instanceId)
 PUT     /instances/:instanceId/save         controllers.MainController.saveInstance(instanceId)
 PUT     /instances/:instanceId/discard      controllers.MainController.discardInstance(instanceId)
 GET     /instances/:instanceId/export       controllers.MainController.exportImage(instanceId)

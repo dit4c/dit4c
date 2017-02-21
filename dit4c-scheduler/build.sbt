@@ -14,6 +14,7 @@ libraryDependencies ++= {
   Seq(
     "com.trueaccord.scalapb" %% "scalapb-runtime" % scalapbV % "protobuf",
     "ch.qos.logback"      %   "logback-classic"       % logbackV,
+    "com.typesafe.akka"   %%  "akka-http"             % akkaHttpV,
     "com.typesafe.akka"   %%  "akka-actor"            % akkaV,
     "com.typesafe.akka"   %%  "akka-persistence"      % akkaV,
     "com.typesafe.akka"   %%  "akka-remote"           % akkaV,
@@ -27,7 +28,7 @@ libraryDependencies ++= {
     "org.specs2"          %%  "specs2-core"           % specs2V % "test",
     "org.specs2"          %%  "specs2-matcher-extra"  % specs2V % "test",
     "org.specs2"          %%  "specs2-scalacheck"     % specs2V % "test",
-    "com.typesafe.akka"   %%  "akka-http-testkit"     % akkaV % "test",
+    "com.typesafe.akka"   %%  "akka-http-testkit"     % akkaHttpV % "test",
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.0" % "test",
     "org.apache.sshd"     %   "apache-sshd"           % "1.2.0" % "test"
       exclude("org.slf4j", "slf4j-jdk14")
