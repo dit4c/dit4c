@@ -40,7 +40,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         Paths.get("/var/lib/dit4c-rkt"),
         "dit4c-instance-",
           "" /* Not used */,
-          "" /* Not used */)
+          "" /* Not used */,
+          None)
   val configProvider = mockConfigProvider(rktRunnerConfig)
 
   "ClusterAggregate" >> {

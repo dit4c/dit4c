@@ -29,7 +29,8 @@ object RktRunner {
       rktDir: Path,
       instanceNamePrefix: String,
       authImage: String,
-      listenerImage: String)
+      listenerImage: String,
+      storageImage: Option[String])
 }
 
 trait RktRunner {
@@ -211,6 +212,7 @@ class RktRunnerImpl(
           Seq(s"--unit=upload-${instanceId}.service") ++
           rkt ++
           Seq("run", "--net=default", "--dns=8.8.8.8") ++
+          config.storageImage.map(_ => s"--insecure-options=seccomp,paths").toSeq ++
           Seq(s"--pod-manifest=$manifestFile")
       )
     } yield ()
@@ -294,6 +296,10 @@ class RktRunnerImpl(
     for {
       authImageId <- fetch(config.authImage)
       listenerImageId <- fetch(config.listenerImage)
+      possibleStorageImageId <- config.storageImage match {
+        case Some(storageImage) => fetch(storageImage).map(Some(_))
+        case None => Future.successful[Option[RktRunner.ImageId]](None)
+      }
       servicePort <- guessServicePort(image)
       // Export key with passphrase, otherwise GnuPG can refuse to read it
       secretKeyPassphrase = instanceId
@@ -309,11 +315,19 @@ class RktRunnerImpl(
           "readOnly" -> true,
           "source" -> vfm.baseDir)
       sharedVfm <- possibleSharedVolumeFileManager
+      podLocalMountJson =
+        Json.obj(
+          "volume" -> "dit4c-pod",
+          "path" -> "/mnt")
       sharedMountJson = sharedVfm.map { _ =>
         Json.obj(
           "volume" -> "dit4c-shared",
           "path" -> "/mnt/shared")
       }
+      podLocalVolumeJson =
+        Json.obj(
+          "name" -> "dit4c-pod",
+          "kind" -> "empty")
       sharedVolumeJson = sharedVfm.map { vfm =>
         Json.obj(
           "name" -> "dit4c-shared",
@@ -341,29 +355,50 @@ class RktRunnerImpl(
       )
       authImageAppJson <- getImageAppConfig(authImageId).map(addExtraEnvVars(_, helperEnvVars))
       listenerImageAppJson <- getImageAppConfig(listenerImageId).map(addExtraEnvVars(_, helperEnvVars))
+      possibleStorageImageAppJson <- possibleStorageImageId match {
+        case Some(storageImageId) =>
+          getImageAppConfig(storageImageId)
+            .map(addExtraEnvVars(_, helperEnvVars))
+            .map(Some(_))
+        case None => Future.successful[Option[JsObject]](None)
+      }
       manifest = Json.obj(
         "acVersion" -> "0.8.4",
         "acKind" -> "PodManifest",
-        "apps" -> Json.arr(
+        "apps" -> JsArray(
           Json.obj(
             "name" -> podAppName(instanceId),
             "image" -> Json.obj(
               "id" -> image),
-            "mounts" -> sharedMountJson.toSeq),
+            "mounts" -> (podLocalMountJson :: sharedMountJson.toList).toSeq)
+          ::
           Json.obj(
             "name" -> "helper-listener",
             "image" -> Json.obj(
               "id" -> listenerImageId),
             "app" -> listenerImageAppJson,
-            "mounts" -> Json.arr(configMountJson)),
+            "mounts" -> Json.arr(configMountJson))
+          ::
           Json.obj(
             "name" -> "helper-auth",
             "image" -> Json.obj(
               "id" -> authImageId),
             "app" -> authImageAppJson,
             "mounts" -> Json.arr(configMountJson))
+          ::
+          (for {
+            storageImageId <- possibleStorageImageId
+            storageImageAppJson <- possibleStorageImageAppJson
+          } yield {
+            Json.obj(
+              "name" -> "helper-storage",
+              "image" -> Json.obj(
+                "id" -> storageImageId),
+              "app" -> storageImageAppJson,
+              "mounts" -> (podLocalMountJson :: sharedMountJson.toList).toSeq)
+          }).toList
         ),
-        "volumes" -> (Nil ++ sharedVolumeJson :+ configVolumeJson))
+        "volumes" -> (podLocalVolumeJson :: configVolumeJson :: sharedVolumeJson.toList).toSeq)
       filepath <- tempVolumeFileManager(s"manifest-$instanceId").flatMap(vfm =>
         vfm.writeFile("manifest.json", (Json.prettyPrint(manifest)+"\n").getBytes))
     } yield (filepath, secretKeyRing.toPublicKeyRing)

@@ -97,7 +97,8 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
         rktDir,
         "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase,
         authHelperImage,
-        listenerHelperImage))
+        listenerHelperImage,
+        None))
     AsResult(f(runner))
   }
 

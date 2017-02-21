@@ -112,7 +112,8 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance",
           config.authImage,
-          config.listenerImage)
+          config.listenerImage,
+          config.storageImage)
     override def sshKeys = {
       import akka.pattern.ask
       implicit val timeout = Timeout(1.minute)

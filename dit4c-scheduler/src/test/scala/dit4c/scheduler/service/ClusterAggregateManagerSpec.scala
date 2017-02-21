@@ -33,7 +33,8 @@ class ClusterAggregateManagerSpec(implicit ee: ExecutionEnv)
           Paths.get("/var/lib/dit4c-rkt"),
           "dit4c-instance-",
           "" /* Not used */,
-          "" /* Not used */)
+          "" /* Not used */,
+          None)
     override def sshKeys = ???
   }
   val clusters: Map[String, ClusterInfo] = Map(
