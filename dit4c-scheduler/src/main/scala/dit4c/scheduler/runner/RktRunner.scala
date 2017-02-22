@@ -102,13 +102,17 @@ class RktRunnerImpl(
         rkt <- rktCmd
         // must be <64 characters, not start with "-" and not be entirely digits
         hostname = "i-"+instanceId.toLowerCase.filter(_.isLetterOrDigit).take(61)
+        insecureOptions = config.storageImage match {
+          case Some(_) => "ondisk,seccomp,paths"
+          case None => "ondisk"
+        }
         output <- ce(
             systemdRun ++
             Seq(s"--unit=${podAppName(instanceId)}.service") ++
             rkt ++
             Seq("run", "--net=default", "--dns=8.8.8.8") ++
             Seq(s"--hostname=$hostname", "--hosts-entry", s"127.0.0.1=$hostname") ++
-            Seq("--insecure-options=ondisk") ++
+            Seq(s"--insecure-options=$insecureOptions") ++
             Seq(s"--pod-manifest=$manifestFile")
         )
       } yield publicKey
@@ -212,7 +216,6 @@ class RktRunnerImpl(
           Seq(s"--unit=upload-${instanceId}.service") ++
           rkt ++
           Seq("run", "--net=default", "--dns=8.8.8.8") ++
-          config.storageImage.map(_ => s"--insecure-options=seccomp,paths").toSeq ++
           Seq(s"--pod-manifest=$manifestFile")
       )
     } yield ()
@@ -395,7 +398,7 @@ class RktRunnerImpl(
               "image" -> Json.obj(
                 "id" -> storageImageId),
               "app" -> storageImageAppJson,
-              "mounts" -> (podLocalMountJson :: sharedMountJson.toList).toSeq)
+              "mounts" -> (podLocalMountJson :: configMountJson :: sharedMountJson.toList).toSeq)
           }).toList
         ),
         "volumes" -> (podLocalVolumeJson :: configVolumeJson :: sharedVolumeJson.toList).toSeq)
