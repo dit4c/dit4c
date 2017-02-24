@@ -455,7 +455,7 @@ class GetInstancesActor(out: ActorRef,
     import context.dispatcher
     import akka.pattern.pipe
     implicit val timeout = Timeout(5.seconds)
-    pollFunc = Some(context.system.scheduler.schedule(1.micro, 5.seconds) {
+    pollFunc = Some(context.system.scheduler.schedule(1.micro, 2.seconds) {
       (userSharder ? UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
         case UserAggregate.UserInstances(instanceIds) =>
           instanceIds.diff(excludedInstanceIds).toSeq.foreach { id =>
