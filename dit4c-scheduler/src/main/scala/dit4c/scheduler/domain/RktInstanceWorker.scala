@@ -89,9 +89,9 @@ class RktInstanceWorker(val instanceId: String, runner: RktRunner) extends Actor
           log.warning(s"Instance $instanceId exited without user interaction")
           sender ! Instance.ConfirmExited
         case Some((RktPod.States.Unknown, timestamp)) if Instant.now.minus(Duration.ofMinutes(1)).isAfter(timestamp) =>
-          log.warning(s"Instance $instanceId had unknown status for more than a minute - assuming exited")
+          log.warning(s"Instance $instanceId had unknown status for more than a minute - assuming permanently missing")
           sender ! Instance.ConfirmExited
-          sender ! Instance.Discard
+          sender ! Instance.Error("Disappeared from compute node")
         case _ =>
           // Do nothing
       }

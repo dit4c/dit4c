@@ -45,6 +45,7 @@ object InstanceAggregate {
   case object Started extends State
   case object Preserved extends State
   case object Discarded extends State
+  case object Errored extends State
 
   sealed trait Data
   case object NoData extends Data
@@ -55,12 +56,25 @@ object InstanceAggregate {
       uri: Option[String] = None,
       imageUrl: Option[String] = None,
       imageSecret: Option[String] = None,
+      timestamps: EventTimestamps = EventTimestamps()) extends Data {
+    def withError(msg: String, timestamp: Option[Instant]) =
+      ErroredInstanceData(
+          schedulerId,
+          clusterId,
+          msg,
+          keyFingerprint,
+          timestamps.copy(completed = timestamp))
+  }
+  case class ErroredInstanceData(
+      schedulerId: String,
+      clusterId: String,
+      errorMessage: String,
+      keyFingerprint: Option[PGPFingerprint] = None,
       timestamps: EventTimestamps = EventTimestamps()) extends Data
 
   case class EventTimestamps(
       created: Option[Instant] = None,
       completed: Option[Instant] = None)
-
 
   sealed trait InstanceAction
   object InstanceAction {
@@ -100,6 +114,7 @@ object InstanceAggregate {
   case object DoesNotExist extends StatusResponse with GetKeyFingerprintResponse
   case class CurrentStatus(
       state: String,
+      description: String,
       uri: Option[String],
       timestamps: EventTimestamps,
       availableActions: Set[InstanceAction]) extends StatusResponse
@@ -165,14 +180,15 @@ class InstanceAggregate(
                 clusterId,
                 Cluster.GetInstanceStatus(instanceId))))
       stay
-    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), InstanceData(schedulerId, clusterId, _, uri, imageUrl, _, ts)) =>
+    case Event(InstanceStateUpdate(instanceId, state, info, timestamp), data @ InstanceData(schedulerId, clusterId, kf, uri, imageUrl, _, ts)) =>
       // Fill waiting requests
-      allStatusRequestQueuers ! CurrentStatus(state.toString, uri, ts, Set.empty)
+      allStatusRequestQueuers ! CurrentStatus(state.toString, info, uri, ts, Set.empty)
       // New requests go to a new queuer
       clearStatusRequestQueuer
       state match {
-        case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance())
-        case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance())
+        case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance(timestamp))
+        case InstanceStateUpdate.InstanceState.ERRORED => goto(Errored).applying(ErrorTerminatedInstance(info, timestamp))
+        case InstanceStateUpdate.InstanceState.UPLOADED => goto(Preserved).applying(PreservedInstance(timestamp))
         case InstanceStateUpdate.InstanceState.UPLOADING if imageUrl.isDefined =>
           // Scheduler doesn't know we're done, so remind it
           schedulerSharder ! SchedulerSharder.Envelope(
@@ -181,6 +197,8 @@ class InstanceAggregate(
                 clusterId,
                 Cluster.ConfirmInstanceUpload(instanceId)))
           stay
+        case InstanceStateUpdate.InstanceState.UNKNOWN if neverStarted(data) =>
+          goto(Errored).applying(ErrorTerminatedInstance("Failed to start", timestamp))
         case _ => stay
       }
     case Event(VerifyJwt(token), InstanceData(schedulerId, clusterId, Some(keyFingerprint), _, _, _, _)) =>
@@ -262,7 +280,7 @@ class InstanceAggregate(
           import InstanceAction._
           Set(CreateDerived, Export, Share)
         } else Set.empty
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, None, ts, availableActions)
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, "", None, ts, availableActions)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -304,12 +322,36 @@ class InstanceAggregate(
   when(Discarded) {
     case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, None, ts, availableActions)
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, "", None, ts, availableActions)
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt("Instance has been discarded")
+    case Event(_: AssociatePGPPublicKey, _) =>
+      // Do nothing - no further updates are necessary or possible
+      stay replying Ack
+    case Event(AssociateUri(uri), _) =>
+      // Do nothing - no further updates are necessary or possible
+      stay replying Ack
+    case Event(AssociateImage(uri), _) =>
+      // Do nothing - no further updates are necessary or possible
+      stay replying Ack
+    case Event(Save, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
+      stay
+    case Event(Discard, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
+      stay
+  }
+
+  when(Errored) {
+    case Event(GetStatus, ErroredInstanceData(schedulerId, clusterId, msg, _, ts)) =>
+      val availableActions: Set[InstanceAction] = Set.empty
+      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.ERRORED.toString, msg, None, ts, availableActions)
+    case Event(_: InstanceStateUpdate, _) =>
+      // Do nothing - no further updates are necessary or possible
+      stay
+    case Event(VerifyJwt(token), _) =>
+      stay replying InvalidJwt("Instance suffered an unrecoverable error")
     case Event(_: AssociatePGPPublicKey, _) =>
       // Do nothing - no further updates are necessary or possible
       stay replying Ack
@@ -359,6 +401,10 @@ class InstanceAggregate(
       case DiscardedInstance(ts) => currentData match {
         case data: InstanceData =>
           data.copy(timestamps = data.timestamps.copy(completed = ts))
+        case _ => unhandled
+      }
+      case ErrorTerminatedInstance(msg, ts) => currentData match {
+        case data: InstanceData => data.withError(msg, ts)
         case _ => unhandled
       }
       case AssociatedPGPPublicKey(fingerprintStr, _) => currentData match {
@@ -417,6 +463,10 @@ class InstanceAggregate(
             }
       }
   }
+
+  private def neverStarted(data: InstanceData): Boolean =
+    data.timestamps.created.exists { t: Instant => Instant.now.minusSeconds(3600).isAfter(t) } &&
+    data.keyFingerprint.isEmpty
 
   // Status request queuing
 

@@ -27,6 +27,12 @@ message DiscardedInstance {
   google.protobuf.Timestamp timestamp = 100;
 }
 
+message ErrorTerminatedInstance {
+  option (scalapb.message).extends = "domain.instance.DomainEvent";
+  string message = 1;
+  google.protobuf.Timestamp timestamp = 100;
+}
+
 message PreservedInstance {
   option (scalapb.message).extends = "domain.instance.DomainEvent";
   google.protobuf.Timestamp timestamp = 100;

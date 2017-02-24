@@ -463,13 +463,14 @@ class GetInstancesActor(out: ActorRef,
                 InstanceResponse(
                     id,
                     effectiveState(msg.state, url),
+                    msg.description,
                     url,
                     msg.timestamps,
                     msg.availableActions.toSeq.sortBy(_.toString))
               }
               .recover { case e =>
                 log.error(e, s"Failed to get instance status for $id")
-                InstanceResponse(id, "Unknown", None, InstanceAggregate.EventTimestamps(), Nil)
+                InstanceResponse(id, "Unknown", "No status received", None, InstanceAggregate.EventTimestamps(), Nil)
               }
               .pipeTo(self)
           }
@@ -494,6 +495,7 @@ class GetInstancesActor(out: ActorRef,
   case class InstanceResponse(
       id: String,
       state: String,
+      info: String,
       url: Option[String],
       timestamps: InstanceAggregate.EventTimestamps,
       availableActions: Seq[InstanceAggregate.InstanceAction])
@@ -509,6 +511,7 @@ class GetInstancesActor(out: ActorRef,
   implicit private val writesInstanceResponse: Writes[InstanceResponse] = (
       (__ \ 'id).write[String] and
       (__ \ 'state).write[String] and
+      (__ \ 'info).write[String] and
       (__ \ 'url).writeNullable[String] and
       (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps] and
       (__ \ 'actions).write[Seq[InstanceAggregate.InstanceAction]]

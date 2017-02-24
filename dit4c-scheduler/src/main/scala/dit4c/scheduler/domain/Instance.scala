@@ -237,6 +237,9 @@ class Instance(worker: ActorRef)
   when(Uploading, stateTimeout = 4.hours) {
     case Event(ConfirmUpload, _) =>
       goto(Uploaded).applying(ConfirmedUpload(now))
+    case Event(Discard, _) =>
+      self ! Error("Discard received during upload")
+      stay
     case Event(StateTimeout, _) ⇒
       self ! Error("Timeout while uploading image")
       stay
