@@ -445,8 +445,11 @@ class GetInstancesActor(out: ActorRef,
     with ActorLogging {
   import play.api.libs.json._
   import play.api.libs.functional.syntax._
+  import java.time.temporal.ChronoUnit._
 
   var pollFunc: Option[Cancellable] = None
+
+  var excludedInstanceIds: Set[String] = Set.empty
 
   override def preStart = {
     import context.dispatcher
@@ -455,7 +458,7 @@ class GetInstancesActor(out: ActorRef,
     pollFunc = Some(context.system.scheduler.schedule(1.micro, 5.seconds) {
       (userSharder ? UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
         case UserAggregate.UserInstances(instanceIds) =>
-          instanceIds.toSeq.foreach { id =>
+          instanceIds.diff(excludedInstanceIds).toSeq.foreach { id =>
             (instanceSharder ? InstanceSharder.Envelope(id, InstanceAggregate.GetStatus))
               .collect { case msg: InstanceAggregate.CurrentStatus =>
                 val url: Option[String] =
@@ -472,6 +475,7 @@ class GetInstancesActor(out: ActorRef,
                 log.error(e, s"Failed to get instance status for $id")
                 InstanceResponse(id, "Unknown", "No status received", None, InstanceAggregate.EventTimestamps(), Nil)
               }
+
               .pipeTo(self)
           }
       }
@@ -483,14 +487,23 @@ class GetInstancesActor(out: ActorRef,
   }
 
   override def receive = {
+    case r: InstanceResponse if isUnnecessaryClutter(r) =>
+      self ! StopMonitoring(r.id)
     case r: InstanceResponse =>
       out ! TextMessage(Json.asciiStringify(Json.toJson(r)))
+      if (isFinalState(r.state)) {
+        self ! StopMonitoring(r.id)
+      }
+    case StopMonitoring(instanceId) =>
+      excludedInstanceIds = excludedInstanceIds + instanceId
     case _: CloseMessage =>
       context.stop(self)
     case unknown =>
       log.error(s"Unhandled message: $unknown")
       context.stop(self)
   }
+
+  case class StopMonitoring(instanceId: String)
 
   case class InstanceResponse(
       id: String,
@@ -524,6 +537,18 @@ class GetInstancesActor(out: ActorRef,
     case state => state.toUpperCase.head +: state.toLowerCase.tail
   }
 
+  /**
+   * If it's not recent, can't change and has no actions, don't tell the client about it.
+   */
+  private def isUnnecessaryClutter(r: InstanceResponse): Boolean =
+    isFinalState(r.state) &&
+    r.availableActions.isEmpty &&
+    r.timestamps.completed
+      .filter(t => Instant.now.minus(4, DAYS).isBefore(t))
+      .isEmpty
+
+  private def isFinalState(state: String) =
+    Set("Discarded", "Uploaded", "Errored").contains(state)
 }
 
 case class LoginData(identity: String)
