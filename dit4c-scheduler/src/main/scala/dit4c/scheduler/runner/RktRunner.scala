@@ -100,20 +100,23 @@ class RktRunnerImpl(
           generateManifestFile(instanceId, image, portalUri)
         systemdRun <- privileged(systemdRunCmd)
         rkt <- rktCmd
+        prepareOutput <- ce(
+            privileged(rkt) ++
+            Seq("prepare") ++
+            Seq(s"--insecure-options=ondisk") ++
+            Seq(s"--pod-manifest=$manifestFile")
+        )
         // must be <64 characters, not start with "-" and not be entirely digits
         hostname = "i-"+instanceId.toLowerCase.filter(_.isLetterOrDigit).take(61)
-        insecureOptions = config.storageImage match {
-          case Some(_) => "ondisk,seccomp,paths"
-          case None => "ondisk"
-        }
-        output <- ce(
+        podId = prepareOutput.lines.toSeq.last
+        scheduleRunOutput <- ce(
             systemdRun ++
             Seq(s"--unit=${podAppName(instanceId)}.service") ++
             rkt ++
-            Seq("run", "--net=default", "--dns=8.8.8.8") ++
+            Seq("run-prepared", "--net=default", "--dns=8.8.8.8") ++
             Seq(s"--hostname=$hostname", "--hosts-entry", s"127.0.0.1=$hostname") ++
-            Seq(s"--insecure-options=$insecureOptions") ++
-            Seq(s"--pod-manifest=$manifestFile")
+            config.storageImage.map(_ => s"--insecure-options=seccomp,paths") ++
+            Seq(podId)
         )
       } yield publicKey
     } else throw new IllegalArgumentException(
