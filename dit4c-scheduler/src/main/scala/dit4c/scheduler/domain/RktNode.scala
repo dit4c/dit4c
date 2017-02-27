@@ -169,7 +169,7 @@ class RktNode(
           monitoredInstanceIds += instanceId
           requester ! WorkerCreated(worker)
         case Failure(e) =>
-          log.error(e.getMessage)
+          log.error(s"${self.path} - ${e.getMessage}")
           // Inform requester
           requester ! UnableToProvideWorker("Node is unavailable")
       }

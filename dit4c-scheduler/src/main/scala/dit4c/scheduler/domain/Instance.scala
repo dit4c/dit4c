@@ -142,6 +142,7 @@ class Instance(worker: ActorRef)
         case data =>
           log.info(s"Starting with: $localImage")
           worker ! InstanceWorker.Start(localImage, callback)
+          emitStatusReportToEventStream(stateName)(data)
       }
     case Event(StateTimeout, _) ⇒
       self ! Error("Timeout while fetching image")

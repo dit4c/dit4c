@@ -65,8 +65,10 @@ object RemoteShell {
               new HostKey(host, hostPublicKey.ssh.raw),
               null);
           val session = jsch.getSession(username, host, port)
+          // Keep the session alive
           session.setServerAliveInterval(5000)
-          session.connect()
+          // Connect with one second timeout
+          session.connect(1000)
           lastSession = Some(session)
           session
         }
@@ -94,9 +96,12 @@ object RemoteShell {
       override def run {
         try {
           val username = ""
-          jsch.getSession(username, host, port).connect()
+          // Connect with one second timeout
+          jsch.getSession(username, host, port).connect(1000)
         } catch {
-          case _: JSchException =>
+          case e: JSchException =>
+            // This should emit Failure, but only when we didn't get the keys
+            p.tryFailure(e)
         }
       }
     }).start
