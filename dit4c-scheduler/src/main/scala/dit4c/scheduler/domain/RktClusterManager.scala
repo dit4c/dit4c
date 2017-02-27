@@ -133,12 +133,14 @@ class RktClusterManager(
         case None =>
           if (state.instanceNodeMappings.contains(instanceId)) {
             val instanceSchedulerRef =
+              context.child("instance-scheduler-"+instanceId).getOrElse {
                 context.actorOf(Props(classOf[RktInstanceScheduler],
                   instanceId,
                   state.instanceNodeMappings.get(instanceId).map(id => (id, getNodeActor(id))).toMap,
                   1.minute,
                   true),
                   "instance-scheduler-"+instanceId)
+              }
             operationsAwaitingInstanceWorkers +=
               (instanceSchedulerRef -> PendingOperation(sender,op))
           } else {
