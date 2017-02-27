@@ -427,13 +427,14 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
               matchA[HttpRequest]
                 .method(be_==(HttpMethods.PUT))
                 .headers(contain {
+                  val kid = instancePublicKeyRing.authenticationKeys.head.fingerprint.string
                   beAnInstanceOf[Authorization] and
                   (startWith("Bearer ") ^^ { h: HttpHeader => h.value }) and
                   (successfulTry.withValue { claim: JwtClaim =>
                     claim must
                       matchA[JwtClaim]
                         .issuer(be_==(Some(s"instance-$instanceId")))
-                        .content(/("kid" -> instanceId))
+                        .content(/("kid" -> kid))
                   } ^^ { h: HttpHeader =>
                     val encodedJwt = h.value.split(" ").last
                     // Token must decode with public key
