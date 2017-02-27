@@ -9,35 +9,29 @@ import services.SchedulerSharder
 import domain.SchedulerAggregate
 import scala.concurrent.duration._
 
-class StatusRequestQueuer(
+class StatusUpdateProcessor(
     instanceId: String,
     clusterId: String,
     schedulerId: String,
-    schedulerSharder: ActorRef @@ SchedulerSharder.type)
+    schedulerSharder: ActorRef @@ SchedulerSharder.type,
+    statusBroadcaster: ActorRef @@ StatusBroadcaster.type)
     extends Actor with ActorLogging {
 
   var clusterInfo: Option[Cluster.ClusterInfo] = None
   var currentStatus: Option[InstanceAggregate.CurrentStatus] = None
 
-  def receive = {
-    case receiver: ActorRef =>
-      requestLatest
-      context.become(waitingForLatest(receiver :: Nil))
-    case _: Cluster.CurrentInfo => // Ignore
-    case _: InstanceStateUpdate => // Ignore
+  override def preStart = {
+    requestLatest
   }
 
-  def waitingForLatest(queuedReceivers: List[ActorRef]): Receive =
-    ({
-      case Cluster.CurrentInfo(info, _) =>
-        clusterInfo = Some(info)
-      case ci: InstanceAggregate.CurrentStatus =>
-        currentStatus = Some(ci)
-      case receiver: ActorRef =>
-        context.become(waitingForLatest(queuedReceivers :+ receiver))
-      case ReceiveTimeout =>
-        requestLatest
-    }: Receive).andThen(_ => tryReplying(queuedReceivers))
+  def receive: Receive = ({
+    case Cluster.CurrentInfo(info, _) =>
+      clusterInfo = Some(info)
+    case ci: InstanceAggregate.CurrentStatus =>
+      currentStatus = Some(ci)
+    case ReceiveTimeout =>
+      requestLatest
+  }: Receive).andThen(_ => tryBroadcasting)
 
   protected def requestLatest = {
     // Remind actor that something is in progress
@@ -48,7 +42,7 @@ class StatusRequestQueuer(
             Cluster.GetInfo))
   }
 
-  protected def tryReplying(receivers: List[ActorRef]): Unit =
+  protected def tryBroadcasting: Unit =
     for {
       ci <- clusterInfo
       cs <- currentStatus
@@ -68,8 +62,11 @@ class StatusRequestQueuer(
           Set.empty
 
       }
-      val response = cs.copy(availableActions = cs.availableActions ++ actions)
-      receivers.foreach(_ ! response)
+      val msg = StatusBroadcaster.InstanceStatusBroadcast(
+          instanceId,
+          cs.copy(availableActions = cs.availableActions ++ actions))
+      log.debug(s"Broadcasting: $msg")
+      statusBroadcaster ! msg
       context.setReceiveTimeout(Duration.Undefined)
       context.stop(self)
     }

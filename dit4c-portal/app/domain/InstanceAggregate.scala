@@ -33,6 +33,7 @@ import dit4c.common.KeyHelpers.PGPFingerprint
 import scala.util._
 import akka.http.scaladsl.model.Uri
 import org.bouncycastle.crypto.macs.HMac
+import domain.instance.StatusBroadcaster
 
 object InstanceAggregate {
 
@@ -86,7 +87,7 @@ object InstanceAggregate {
   }
 
   sealed trait Command extends BaseCommand
-  case object GetStatus extends Command
+  case object RefreshStatus extends Command
   case object GetKeyFingerprint extends Command
   case class VerifyJwt(token: String) extends Command
   case object Save extends Command
@@ -130,7 +131,8 @@ object InstanceAggregate {
 
 class InstanceAggregate(
     keyringSharder: ActorRef @@ KeyRingSharder.type,
-    schedulerSharder: ActorRef @@ SchedulerSharder.type)
+    schedulerSharder: ActorRef @@ SchedulerSharder.type,
+    instanceStatusBroadcaster: ActorRef @@ StatusBroadcaster.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -149,8 +151,10 @@ class InstanceAggregate(
   startWith(Uninitialized, NoData)
 
   when(Uninitialized) {
-    case Event(GetStatus, _) =>
-      stay replying DoesNotExist
+    case Event(RefreshStatus, _) =>
+      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+          instanceId, DoesNotExist)
+      stay
     case Event(VerifyJwt(token), _) =>
       stay replying InvalidJwt(s"$instanceId has not been initialized → $token")
     case Event(Start(schedulerId, clusterId, parentId, image, accessPassIds), _) =>
@@ -169,9 +173,7 @@ class InstanceAggregate(
   }
 
   when(Started) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
-      // Start actor listening
-      currentStatusRequestQueuer(schedulerId, clusterId) ! sender
+    case Event(RefreshStatus, InstanceData(schedulerId, clusterId, _, _, _, _, _)) =>
       // Forward request to cluster
       context.system.eventStream.publish(
           SchedulerSharder.Envelope(
@@ -182,9 +184,7 @@ class InstanceAggregate(
       stay
     case Event(InstanceStateUpdate(instanceId, state, info, timestamp), data @ InstanceData(schedulerId, clusterId, kf, uri, imageUrl, _, ts)) =>
       // Fill waiting requests
-      allStatusRequestQueuers ! CurrentStatus(state.toString, info, uri, ts, Set.empty)
-      // New requests go to a new queuer
-      clearStatusRequestQueuer
+      createStatusUpdateProcessor(schedulerId, clusterId) ! CurrentStatus(state.toString, info, uri, ts, Set.empty)
       state match {
         case InstanceStateUpdate.InstanceState.DISCARDED => goto(Discarded).applying(DiscardedInstance(timestamp))
         case InstanceStateUpdate.InstanceState.ERRORED => goto(Errored).applying(ErrorTerminatedInstance(info, timestamp))
@@ -248,11 +248,13 @@ class InstanceAggregate(
       stay replying Ack
     case Event(AssociateUri(uri), _: InstanceData) =>
       val requester = sender
+      self ! RefreshStatus // Trigger status update including new URI
       stay applying AssociatedUri(uri) andThen { _ =>
         requester ! Ack
       }
     case Event(AssociateImage(uri), _: InstanceData) =>
       val requester = sender
+      self ! RefreshStatus // Trigger status update including new image
       stay applying AssociatedImage(uri) andThen { _ =>
         // TODO: Notify scheduler
         requester ! Ack
@@ -274,13 +276,16 @@ class InstanceAggregate(
   }
 
   when(Preserved) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, maybeUrl, _, ts)) =>
+    case Event(RefreshStatus, InstanceData(schedulerId, clusterId, _, _, maybeUrl, _, ts)) =>
       val availableActions: Set[InstanceAction] =
         if (maybeUrl.isDefined) {
           import InstanceAction._
           Set(CreateDerived, Export, Share)
         } else Set.empty
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, "", None, ts, availableActions)
+      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+          instanceId,
+          CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, "", None, ts, availableActions))
+      stay
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -320,9 +325,12 @@ class InstanceAggregate(
   }
 
   when(Discarded) {
-    case Event(GetStatus, InstanceData(schedulerId, clusterId, _, _, _, _, ts)) =>
+    case Event(RefreshStatus, InstanceData(schedulerId, clusterId, _, _, _, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, "", None, ts, availableActions)
+      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+          instanceId,
+          CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, "", None, ts, availableActions))
+      stay
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -344,9 +352,12 @@ class InstanceAggregate(
   }
 
   when(Errored) {
-    case Event(GetStatus, ErroredInstanceData(schedulerId, clusterId, msg, _, ts)) =>
+    case Event(RefreshStatus, ErroredInstanceData(schedulerId, clusterId, msg, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
-      stay replying CurrentStatus(InstanceStateUpdate.InstanceState.ERRORED.toString, msg, None, ts, availableActions)
+      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+          instanceId,
+          CurrentStatus(InstanceStateUpdate.InstanceState.ERRORED.toString, msg, None, ts, availableActions))
+      stay
     case Event(_: InstanceStateUpdate, _) =>
       // Do nothing - no further updates are necessary or possible
       stay
@@ -379,6 +390,11 @@ class InstanceAggregate(
       stay applying AssociatedImageSecret(imageSecret, now)
     case Event(GenerateImageSecret(previousSecret), _) =>
       stay
+  }
+
+  onTransition {
+    case Started -> _ =>
+      self ! RefreshStatus
   }
 
   override def applyEvent(
@@ -470,27 +486,19 @@ class InstanceAggregate(
 
   // Status request queuing
 
-  private var currentStqIndex = 0L
-  private var currentStx: Option[ActorRef] = None
-
-  private def currentStatusRequestQueuer(schedulerId: String, clusterId: String) =
-    currentStx.getOrElse {
-      currentStqIndex += 1
-      currentStx = Some(context.actorOf(
-          Props(
-            classOf[StatusRequestQueuer],
-            instanceId,
-            clusterId,
-            schedulerId,
-            schedulerSharder),
-          f"status-request-queuer-$currentStqIndex%016x"))
-      currentStx.get
-    }
-
-  private def allStatusRequestQueuers: ActorSelection =
-    context.actorSelection("status-request-queuer-*")
-
-  private def clearStatusRequestQueuer: Unit = { currentStx = None }
+  private def createStatusUpdateProcessor(schedulerId: String, clusterId: String) = {
+    val now = Instant.now
+    val suffix = now.getEpochSecond + now.getNano
+    context.actorOf(
+      Props(
+        classOf[StatusUpdateProcessor],
+        instanceId,
+        clusterId,
+        schedulerId,
+        schedulerSharder,
+        instanceStatusBroadcaster),
+      s"status-update-processor-$suffix")
+  }
 
 
 }

@@ -40,6 +40,7 @@ import play.api.http.websocket.CloseMessage
 import play.twirl.api.Html
 import org.bouncycastle.openpgp.PGPSignature
 import akka.http.scaladsl.Http
+import domain.instance.StatusBroadcaster
 
 class MainController(
     val environment: Environment,
@@ -449,36 +450,16 @@ class GetInstancesActor(out: ActorRef,
 
   var pollFunc: Option[Cancellable] = None
 
+  var userInstanceIds: Set[String] = Set.empty
   var excludedInstanceIds: Set[String] = Set.empty
 
   override def preStart = {
     import context.dispatcher
     import akka.pattern.pipe
     implicit val timeout = Timeout(5.seconds)
+    context.system.eventStream.subscribe(context.self, classOf[StatusBroadcaster.InstanceStatusBroadcast])
     pollFunc = Some(context.system.scheduler.schedule(1.micro, 2.seconds) {
-      (userSharder ? UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds)).foreach {
-        case UserAggregate.UserInstances(instanceIds) =>
-          instanceIds.diff(excludedInstanceIds).toSeq.foreach { id =>
-            (instanceSharder ? InstanceSharder.Envelope(id, InstanceAggregate.GetStatus))
-              .collect { case msg: InstanceAggregate.CurrentStatus =>
-                val url: Option[String] =
-                  msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
-                InstanceResponse(
-                    id,
-                    effectiveState(msg.state, url),
-                    msg.description,
-                    url,
-                    msg.timestamps,
-                    msg.availableActions.toSeq.sortBy(_.toString))
-              }
-              .recover { case e =>
-                log.error(e, s"Failed to get instance status for $id")
-                InstanceResponse(id, "Unknown", "No status received", None, InstanceAggregate.EventTimestamps(), Nil)
-              }
-
-              .pipeTo(self)
-          }
-      }
+      userSharder.tell(UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds), context.self)
     })
   }
 
@@ -487,15 +468,33 @@ class GetInstancesActor(out: ActorRef,
   }
 
   override def receive = {
-    case r: InstanceResponse if isUnnecessaryClutter(r) =>
-      self ! StopMonitoring(r.id)
+    case UserAggregate.UserInstances(instanceIds) =>
+      val previouslyKnownInstanceIds = userInstanceIds
+      userInstanceIds = instanceIds
+      val newInstanceIds = instanceIds.diff(previouslyKnownInstanceIds)
+      newInstanceIds.foreach { id =>
+        instanceSharder ! InstanceSharder.Envelope(id, InstanceAggregate.RefreshStatus)
+      }
+    case StatusBroadcaster.InstanceStatusBroadcast(id, status) if userInstanceIds.contains(id) =>
+      status match {
+        case s: InstanceAggregate.CurrentStatus if isUnnecessaryClutter(s) =>
+          // Don't tell the client about this instance's status
+        case msg: InstanceAggregate.CurrentStatus =>
+          val url: Option[String] =
+            msg.uri.map(Uri(_).withPath(Uri.Path./).toString)
+          self ! InstanceResponse(
+              id,
+              effectiveState(msg.state, url),
+              msg.description,
+              url,
+              msg.timestamps,
+              msg.availableActions.toSeq.sortBy(_.toString))
+        case InstanceAggregate.DoesNotExist => // Do nothing
+      }
+    case StatusBroadcaster.InstanceStatusBroadcast(id, status) =>
+      // Ignore
     case r: InstanceResponse =>
       out ! TextMessage(Json.asciiStringify(Json.toJson(r)))
-      if (isFinalState(r.state)) {
-        self ! StopMonitoring(r.id)
-      }
-    case StopMonitoring(instanceId) =>
-      excludedInstanceIds = excludedInstanceIds + instanceId
     case _: CloseMessage =>
       context.stop(self)
     case unknown =>
@@ -540,15 +539,15 @@ class GetInstancesActor(out: ActorRef,
   /**
    * If it's not recent, can't change and has no actions, don't tell the client about it.
    */
-  private def isUnnecessaryClutter(r: InstanceResponse): Boolean =
-    isFinalState(r.state) &&
-    r.availableActions.isEmpty &&
-    r.timestamps.completed
+  private def isUnnecessaryClutter(s: InstanceAggregate.CurrentStatus): Boolean =
+    isFinalState(s.state) &&
+    s.availableActions.isEmpty &&
+    s.timestamps.completed
       .filter(t => Instant.now.minus(4, DAYS).isBefore(t))
       .isEmpty
 
   private def isFinalState(state: String) =
-    Set("Discarded", "Uploaded", "Errored").contains(state)
+    Set("DISCARDED", "UPLOADED", "ERRORED").contains(state)
 }
 
 case class LoginData(identity: String)
