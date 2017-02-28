@@ -65,13 +65,9 @@
     },
     send: function() {
       var content = this.get('message');
-      console.log(content);
       var formData = new FormData()
       formData.set("msg", new Blob([content], { type: "text/plain" }));
    	  this.$.req.body = formData;
-   	  for (var value of formData.values()) {
-   	    console.log(value); 
-   	  }
       this.$.req.generateRequest();
     }
   });
