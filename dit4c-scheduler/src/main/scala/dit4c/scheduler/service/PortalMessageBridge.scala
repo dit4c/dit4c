@@ -287,7 +287,7 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
             "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
-    case dit4c.scheduler.api.AddNode(clusterId, host, port, username, sshHostKeyFingerprints, timestamp) =>
+    case dit4c.scheduler.api.AddNode(clusterId, host, port, username, sshHostKeyFingerprints) =>
       context.parent ! ClusterManager.ClusterCommand(
           clusterId,
           RktClusterManager.AddRktNode(
