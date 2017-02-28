@@ -212,8 +212,9 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
       context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
     case dit4c.protobuf.scheduler.inbound.SignedMessageForScheduler(msg) =>
-      // TODO: Implement
-      log.info(s"Signed message:\n$msg")
+      log.info(s"Signed message received:\n$msg")
+      context.actorOf(
+          Props(classOf[SignedMessageProcessor], keyManager, msg))
     // Outbound
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
@@ -286,6 +287,14 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
             "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
+    case dit4c.scheduler.api.AddNode(clusterId, host, port, username, sshHostKeyFingerprints, timestamp) =>
+      context.parent ! ClusterManager.ClusterCommand(
+          clusterId,
+          RktClusterManager.AddRktNode(
+            host,
+            port,
+            username,
+            "/var/lib/dit4c-rkt"))
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)

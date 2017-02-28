@@ -1,10 +1,7 @@
 package dit4c.scheduler
 
 import dit4c.scheduler.utils.SchedulerConfig
-import akka.http.scaladsl.Http
-import dit4c.scheduler.routes._
 import scala.concurrent.Future
-import akka.http.scaladsl.Http.ServerBinding
 import akka.actor.Props
 import dit4c.scheduler.service.ClusterManager
 import dit4c.scheduler.domain.ConfigProvider
@@ -49,8 +46,6 @@ object Scheduler {
 class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
   import akka.http.scaladsl.server._
 
-  var serverBinding: Option[ServerBinding] = null
-
   override def preStart {
     import context.dispatcher
     implicit val materializer = ActorMaterializer()(context.system)
@@ -60,11 +55,6 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
     val clusterAggregateManager = context.actorOf(
         ClusterManager.props(configProvider(keyManager), config.knownClusters),
         "cluster-aggregate-manager")
-    val httpHandler = (new ClusterRoutes(clusterAggregateManager)).routes
-    Http(context.system).bindAndHandle(httpHandler, "localhost", config.port).foreach { sb =>
-      serverBinding = Some(sb)
-      log.info(s"Listening on ${sb.localAddress}")
-    }
     val pmbSupervisor = context.actorOf(BackoffSupervisor.props(
         Backoff.onStop(
           Props(classOf[PortalMessageBridge], keyManager, config.portalUri),
@@ -96,13 +86,6 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
       }
     case unknown =>
       log.warning(s"Unknown message from $sender: $unknown")
-  }
-
-  override def postStop = {
-    serverBinding.foreach { sb =>
-      Await.result(sb.unbind(), 5.seconds)
-    }
-    super.postStop()
   }
 
   private def configProvider(

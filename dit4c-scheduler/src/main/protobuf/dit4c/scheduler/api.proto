@@ -1,0 +1,27 @@
+syntax = "proto3";
+import "scalapb/scalapb.proto";
+
+package dit4c.scheduler.api;
+
+option (scalapb.options) = {
+  flat_package: true
+  single_file: true
+  import: "dit4c.common.ProtobufSerializable"
+  preamble: "// $COVERAGE-OFF$Generated code"
+  preamble: "sealed trait BaseMessage extends dit4c.common.ProtobufSerializable"
+};
+
+message AddNode {
+  option (scalapb.message).extends = "dit4c.scheduler.api.BaseMessage";
+  string clusterId = 1;
+  string host = 2;
+  int32 port = 3;
+  string username = 4;
+  repeated string sshHostKeyFingerprints = 5;
+}
+
+message ApiMessage {
+  oneof payload {
+    AddNode addNode = 1;
+  }
+}
