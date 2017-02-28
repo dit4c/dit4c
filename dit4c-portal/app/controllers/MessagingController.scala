@@ -117,6 +117,10 @@ class MessagingController(
       }
   }
 
+  def messageToSchedulerForm(schedulerId: String) = Action { implicit request: RequestHeader =>
+    Ok(views.html.send())
+  }
+
   def schedulerSocket(schedulerId: String) = WebSocket { request: RequestHeader =>
     val wsSessionId = randomId
     val gateway = system.actorOf(

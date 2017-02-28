@@ -1,0 +1,84 @@
+@()(implicit request: RequestHeader)
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>DIT4C</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="@routes.Assets.versioned("lib/webcomponentsjs/webcomponents-lite.min.js")">
+</script>
+<link rel="import" href="@routes.Assets.versioned("lib/iron-flex-layout/iron-flex-layout-classes.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+  <link rel="import" href="@routes.Assets.versioned("lib/iron-ajax/iron-ajax.html")">
+  <link rel="import" href="@routes.Assets.versioned("lib/paper-button/paper-button.html")">
+  <link rel="import" href="@routes.Assets.versioned("lib/paper-input/paper-textarea.html")">
+<style is="custom-style" include="iron-flex iron-flex-reverse iron-flex-alignment iron-positioning"></style>
+<dom-module id="send-form">
+  <style>  
+  :root {
+    --iron-autogrow-textarea: {
+      font-family: monospace !important;
+    };
+  }
+  :root {
+  	margin: 20px;
+  }
+  #send {
+  	color: white;
+  	background-color: var(--primary-color);
+  }
+  h1 {
+    @@apply(--paper-font-title);
+  }
+  #output {
+    @@apply(--paper-font-code1);
+  }
+  </style>
+  <template>
+	<iron-ajax
+		id="req"
+		method="POST"
+		url=""
+	    handle-as="text"
+	    on-response="handleResponse"
+	    on-error="handleError"
+	    debounce-duration="300"></iron-ajax>
+	<h1>Send message to scheduler</h1>
+	<paper-textarea label="PGP signed message" value="{{message}}"></paper-textarea>
+	<paper-button raised id="send" on-click="send">Send</paper-button>
+	<pre id="output">{{output}}</pre>
+  </template>
+  <script>
+  Polymer({
+    is: "send-form",
+    properties: {
+      message: {
+        type: String
+      }
+    },
+    handleResponse: function(evt) {
+      this.set('output', "Sent!");
+    },
+    handleError: function(evt) {
+      this.set('output', evt.detail.error.message);
+    },
+    send: function() {
+      var content = this.get('message');
+      console.log(content);
+      var formData = new FormData()
+      formData.set("msg", new Blob([content], { type: "text/plain" }));
+   	  this.$.req.body = formData;
+   	  for (var value of formData.values()) {
+   	    console.log(value); 
+   	  }
+      this.$.req.generateRequest();
+    }
+  });
+  </script>
+</dom-module>
+</head>
+<body>
+<send-form></send-form>
+</body>
+</html>

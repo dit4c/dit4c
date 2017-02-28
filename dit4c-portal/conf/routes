@@ -34,4 +34,5 @@ GET     /web-components/:name.html          controllers.WebComponentsController.
 # Websocket messaging
 POST    /messaging/scheduler                controllers.MessagingController.schedulerRegistration
 GET     /messaging/scheduler/:id            controllers.MessagingController.schedulerSocket(id)
+GET     /messaging/scheduler/:id/send       controllers.MessagingController.messageToSchedulerForm(id)
 POST    /messaging/scheduler/:id/send       controllers.MessagingController.messageToScheduler(id)
