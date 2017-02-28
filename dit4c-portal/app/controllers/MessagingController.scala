@@ -27,10 +27,12 @@ import play.http.websocket.Message.Close
 import akka.util.ByteString
 import java.time.Instant
 import akka.actor.Cancellable
-import akka.remote.Ack
 import play.api.mvc.Action
 import akka.http.scaladsl.model.StatusCodes.ServerError
 import domain.SchedulerAggregate.UpdateKeys
+import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
+import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPSignature
 
 class MessagingController(
     environment: Environment,
@@ -66,6 +68,53 @@ class MessagingController(
             }
         }
     }
+  }
+
+  def messageToScheduler(schedulerId: String) = Action.async(parse.multipartFormData) { request =>
+    def envelope[A](msg: A) =
+      SchedulerSharder.Envelope(schedulerId, msg)
+    (schedulerSharder ? envelope(SchedulerAggregate.GetKeys))
+      .map(_.asInstanceOf[SchedulerAggregate.GetKeysResponse])
+      .flatMap {
+        case currentKeys: SchedulerAggregate.CurrentKeys =>
+          import dit4c.common.KeyHelpers._
+          val schedulerKeys = parseArmoredPublicKeyRing(currentKeys.primaryKeyBlock).right.get
+          request.body.file("msg") match {
+            case None =>
+              Future.successful(
+                  BadRequest("\"msg\" missing from form data"))
+            case Some(msgFile) if (msgFile.ref.file.length > (10L*1024*1024)) =>
+              Future.successful(
+                  InternalServerError("Messages larger than 10MiB are not supported"))
+            case Some(msgFile) =>
+              import dit4c.common.KeyHelpers._
+              import scala.sys.process._
+              val msg = msgFile.ref.file.cat.!!
+              verifyData(ByteString(msg.getBytes), schedulerKeys.signingKeys) match {
+                case Left(msg) => Future.successful(BadRequest(msg))
+                case Right((_, sigs)) if sigs.isEmpty =>
+                  Future.successful(
+                      Forbidden("Signed message is not from source trusted by scheduler"))
+                case Right(_) =>
+                  val cmd = envelope(
+                    SchedulerAggregate.SendSchedulerMessage(
+                      dit4c.protobuf.scheduler.inbound.InboundMessage(
+                        randomId,
+                        dit4c.protobuf.scheduler.inbound.InboundMessage.Payload.SignedMessageForScheduler(
+                          dit4c.protobuf.scheduler.inbound.SignedMessageForScheduler(
+                            msg)))))
+                  (schedulerSharder ? cmd).map {
+                    case SchedulerAggregate.MessageSent =>
+                      Ok("")
+                    case SchedulerAggregate.UnableToSendMessage =>
+                      InternalServerError("Unable to send message")
+                  }
+              }
+          }
+        case SchedulerAggregate.NoKeysAvailable =>
+          Future.successful(
+            Forbidden("No keys are currently associated with the scheduler"))
+      }
   }
 
   def schedulerSocket(schedulerId: String) = WebSocket { request: RequestHeader =>

@@ -228,12 +228,13 @@ class RktNode(
     domainEvent match {
       case Initialized(host, port, username, serverPublicKeyPKCS8PEM, rktDir, _) =>
         import dit4c.common.KeyHelpers._
+        val hostKey = parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
+                .right.get.asInstanceOf[RSAPublicKey]
+        log.info(s"${self.path} ${hostKey.ssh.authorizedKeys}")
         NodeConfig(
           ServerConnectionDetails(
             host, port, username,
-            ServerPublicKey(
-              parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
-                .right.get.asInstanceOf[RSAPublicKey])
+            ServerPublicKey(hostKey)
           ),
           rktDir, false)
       case KeysConfirmed(_) =>

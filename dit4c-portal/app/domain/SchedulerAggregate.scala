@@ -217,7 +217,7 @@ class SchedulerAggregate(
       val response: Response = schedulerSocket match {
         case Some(ref) =>
           ref ! msg
-          SchedulerAggregate.Ack
+          SchedulerAggregate.MessageSent
         case None =>
           log.warning(s"Unable to send: $msg")
           SchedulerAggregate.UnableToSendMessage

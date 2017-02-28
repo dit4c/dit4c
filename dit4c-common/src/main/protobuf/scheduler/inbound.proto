@@ -41,6 +41,10 @@ message RequestInstanceStateUpdate {
   string clusterId = 2;
 }
 
+message SignedMessageForScheduler {
+  string pgpSignedMessage = 1;
+}
+
 message InboundMessage {
   option (scalapb.message).extends = "dit4c.common.ProtobufSerializable";
   string messageId = 1;
@@ -50,5 +54,6 @@ message InboundMessage {
     SaveInstance saveInstance = 4;
     RequestInstanceStateUpdate requestInstanceStateUpdate = 5;
     ConfirmInstanceUpload confirmInstanceUpload = 6;
+    SignedMessageForScheduler signedMessageForScheduler = 7;
   }
 }

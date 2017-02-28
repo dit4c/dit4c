@@ -59,6 +59,7 @@ object PortalMessageBridge {
             case Payload.DiscardInstance(value) => Some(value)
             case Payload.SaveInstance(value) => Some(value)
             case Payload.ConfirmInstanceUpload(value) => Some(value)
+            case Payload.SignedMessageForScheduler(value) => Some(value)
           }
           parsedMsg match {
             case None =>
@@ -210,6 +211,9 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
       import dit4c.scheduler.domain.{instance => i}
       context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId, Instance.ConfirmUpload))
+    case dit4c.protobuf.scheduler.inbound.SignedMessageForScheduler(msg) =>
+      // TODO: Implement
+      log.info(s"Signed message:\n$msg")
     // Outbound
     case Instance.StatusReport(Instance.Errored, data: Instance.ErrorData) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
