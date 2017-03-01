@@ -25,6 +25,7 @@ import akka.actor.Terminated
 import java.nio.file.Paths
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import dit4c.common.KeyHelpers.PGPKeyGenerators
+import com.typesafe.config.ConfigFactory
 
 class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     extends Specification
@@ -66,9 +67,38 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
     }
 
     "AddRktNode" >> {
-      "initializes RktNode with config" >> {
+      Seq("SHA-256", "MD5").foreach { alg =>
+        s"initializes RktNode with config & $alg fingerprint" >> {
+          import dit4c.common.KeyHelpers._
+          val clusterId = "test-rkt"
+          implicit val system = ActorSystem(s"RktClusterManager-AddRktNode-successful-$alg")
+          val hostPublicKey = randomRSAPublicKey
+          val probe = TestProbe()
+          val manager =
+              probe.childActorOf(
+                  RktClusterManager.props(
+                      clusterId,
+                      mockRktRunnerFactory,
+                      mockFetchSshHostKey(hostPublicKey)))
+          probe.send(manager, AddRktNode(
+              "", "169.254.42.34", 22, "testuser",
+              Seq(hostPublicKey.ssh.fingerprint(alg)),
+              "/var/lib/dit4c/rkt").fillId)
+          val response = probe.expectMsgType[RktNodeAdded](1.minute)
+          probe.send(manager, ClusterManager.GetStatus)
+          val clusterState = probe.expectMsgType[CurrentClusterInfo](1.minute).clusterInfo
+          ( clusterState.nodeIds must contain(response.nodeId) )
+        }
+      }
+
+      "requires valid fingerprint" >> {
+        import dit4c.common.KeyHelpers._
         val clusterId = "test-rkt"
-        implicit val system = ActorSystem("RktClusterManager-AddRktNode")
+        implicit val system = ActorSystem(
+            "RktClusterManager-AddRktNode-failed",
+            ConfigFactory.parseString("""
+              akka.loglevel = "OFF"
+              """))
         val hostPublicKey = randomRSAPublicKey
         val probe = TestProbe()
         val manager =
@@ -78,37 +108,17 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                     mockRktRunnerFactory,
                     mockFetchSshHostKey(hostPublicKey)))
         probe.send(manager, AddRktNode(
-            "169.254.42.34", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val response = probe.expectMsgType[RktNodeAdded](1.minute)
-        probe.send(manager, ClusterManager.GetStatus)
-        val clusterState = probe.expectMsgType[CurrentClusterInfo](1.minute).clusterInfo
-        ( clusterState.nodeIds must contain(response.nodeId) )
-      }
-    }
-
-    "ConfirmRktNodeKeys" >> {
-      "makes RktNode ready to connect" >> {
-        val clusterId = "test-rkt"
-        implicit val system =
-          ActorSystem("RktClusterManager-ConfirmRktNodeKeys")
-        val probe = TestProbe()
-        val manager =
-            probe.childActorOf(
-                RktClusterManager.props(
-                    clusterId,
-                    mockRktRunnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
-        probe.send(manager, AddRktNode(
-            "169.254.42.64", 22, "testuser", "/var/lib/dit4c/rkt"))
-        val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
-        probe.send(manager, ConfirmRktNodeKeys(nodeId))
-        val updatedConfig = probe.expectMsgType[RktNode.ConfirmKeysResponse](1.minute).nodeConfig
-        ( updatedConfig.readyToConnect must beTrue )
+            "", "169.254.42.34", 22, "testuser",
+            Seq(randomRSAPublicKey.ssh.fingerprint("SHA-256")),
+            "/var/lib/dit4c/rkt").fillId)
+        probe.expectNoMsg(5.seconds)
+        done
       }
     }
 
     "StartInstance" >> {
       "starts an instance" >> {
+        import dit4c.common.KeyHelpers._
         val clusterId = "test-rkt"
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-start")
@@ -133,20 +143,21 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
+        val hostPublicKey = randomRSAPublicKey
         val manager =
             probe.childActorOf(
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(hostPublicKey)))
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
-              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+              "", s"169.254.42.$i", 22, "testuser",
+              Seq(hostPublicKey.ssh.fingerprint("SHA-256")),
+              "/var/lib/dit4c/rkt").fillId)
           val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
-          probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.ConfirmKeysResponse](1.minute).nodeConfig
           nodeId
         }
         // Schedule an instance
@@ -173,6 +184,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       }
 
       "instance exists after system restart" >> {
+        import dit4c.common.KeyHelpers._
         val clusterId = "test-rkt"
         implicit val system =
           ActorSystem(s"RktClusterManager-StartInstance-restart")
@@ -198,21 +210,22 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
             }
 
         val probe = TestProbe()
+        val hostPublicKey = randomRSAPublicKey
         def createManager =
             probe.childActorOf(
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(hostPublicKey)))
         val manager = createManager
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
-              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+              "", s"169.254.42.$i", 22, "testuser",
+              Seq(hostPublicKey.ssh.fingerprint("SHA-256")),
+              "/var/lib/dit4c/rkt").fillId)
           val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
-          probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.ConfirmKeysResponse](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -245,6 +258,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
 
     "SaveInstance" >> {
       "saves an instance" >> {
+        import dit4c.common.KeyHelpers._
         import dit4c.scheduler.domain.{instance => i}
         val clusterId = "test-rkt"
         implicit val system =
@@ -271,20 +285,21 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
+        val hostPublicKey = randomRSAPublicKey
         val manager =
             probe.childActorOf(
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(hostPublicKey)))
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
-              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+              "", s"169.254.42.$i", 22, "testuser",
+              Seq(hostPublicKey.ssh.fingerprint("SHA-256")),
+              "/var/lib/dit4c/rkt").fillId)
           val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
-          probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.ConfirmKeysResponse](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -324,6 +339,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
 
     "DiscardInstance" >> {
       "discards an instance" >> {
+        import dit4c.common.KeyHelpers._
         import dit4c.scheduler.domain.{instance => i}
         val clusterId = "test-rkt"
         implicit val system =
@@ -351,20 +367,21 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def resolveStates(instanceIds: Set[String]) = ???
             }
         val probe = TestProbe()
+        val hostPublicKey = randomRSAPublicKey
         val manager =
             probe.childActorOf(
                 RktClusterManager.props(
                     clusterId,
                     runnerFactory,
-                    mockFetchSshHostKey(randomRSAPublicKey)))
+                    mockFetchSshHostKey(hostPublicKey)))
         // Create some nodes
         val nodeIds = 1.to(3).map { i =>
           val probe = TestProbe()
           probe.send(manager, AddRktNode(
-              s"169.254.42.$i", 22, "testuser", "/var/lib/dit4c/rkt"))
+              "", s"169.254.42.$i", 22, "testuser",
+              Seq(hostPublicKey.ssh.fingerprint("SHA-256")),
+              "/var/lib/dit4c/rkt").fillId)
           val RktNodeAdded(nodeId) = probe.expectMsgType[RktNodeAdded](1.minute)
-          probe.send(manager, ConfirmRktNodeKeys(nodeId))
-          probe.expectMsgType[RktNode.ConfirmKeysResponse](1.minute)
           nodeId
         }
         // Schedule an instance
@@ -390,6 +407,19 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       }
     }
 
+  }
+
+  implicit class AddRktNodeHelper(msg: RktClusterManager.AddRktNode) {
+    def fillId: RktClusterManager.AddRktNode = {
+      val bestFingerprint =
+        (msg.sshHostKeyFingerprints.filter(_.startsWith("SHA256:")) ++
+            msg.sshHostKeyFingerprints).headOption
+      val id =
+        (Seq(msg.username, msg.host, msg.port.toString) ++ bestFingerprint)
+          .map(java.net.URLEncoder.encode(_, "UTF-8"))
+          .mkString("_")
+      msg.copy(id = id)
+    }
   }
 
   def randomRSAPublicKey: RSAPublicKey = {
@@ -423,7 +453,9 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           helperImage: String,
           imageServer: String,
           portalUri: String): Future[Unit] = ???
-      override def resolveStates(instanceIds: Set[String]) = ???
+      override def resolveStates(instanceIds: Set[String]) =
+        if (instanceIds.isEmpty) Future.successful(Map.empty)
+        else ???
     }
 
   def mockFetchSshHostKey(

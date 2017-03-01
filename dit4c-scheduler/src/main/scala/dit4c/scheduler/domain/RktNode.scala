@@ -69,7 +69,7 @@ object RktNode {
       }
   }
 
-  trait Command extends BaseCommand
+  sealed trait Command extends BaseCommand
   case object GetState extends Command
   case class RequestInstanceWorker(instanceId: String) extends Command
   case class RequireInstanceWorker(instanceId: String) extends Command
@@ -77,19 +77,18 @@ object RktNode {
       host: String,
       port: Int,
       username: String,
+      sshHostKeyFingerprints: Seq[String],
       rktDir: String) extends Command
   case class FinishInitializing(
       init: Initialize,
       serverPublicKey: ServerPublicKey,
       replyTo: ActorRef) extends Command
-  case object ConfirmKeys extends Command
 
-  trait Response extends BaseResponse
-  trait GetStateResponse extends Response
+  sealed trait Response extends BaseResponse
+  sealed trait GetStateResponse extends Response
   case object DoesNotExist extends GetStateResponse
   case class Exists(nodeConfig: NodeConfig) extends GetStateResponse
-  case class ConfirmKeysResponse(nodeConfig: NodeConfig) extends Response
-  trait InstanceWorkerResponse extends Response
+  sealed trait InstanceWorkerResponse extends Response
   case class WorkerCreated(worker: ActorRef) extends InstanceWorkerResponse
   case class UnableToProvideWorker(msg: String) extends InstanceWorkerResponse
 
@@ -105,7 +104,7 @@ class RktNode(
 
   lazy val persistenceId = self.path.name
 
-  private case object Tick
+  private case object Tick extends BaseCommand
   private var ticker: Option[Cancellable] = None
 
   override def preStart = {
@@ -123,17 +122,23 @@ class RktNode(
 
   when(JustCreated) {
     case Event(init: Initialize, _) =>
+      import dit4c.common.KeyHelpers._
       import context.dispatcher
       val replyTo = sender
+      def hasMatchWithFingerprint(k: RSAPublicKey) =
+        init.sshHostKeyFingerprints.contains(k.ssh.fingerprint("SHA-256")) ||
+        init.sshHostKeyFingerprints.contains(k.ssh.fingerprint("MD5"))
       fetchSshHostKey(init.host, init.port).onSuccess {
-        case k =>
+        case k if hasMatchWithFingerprint(k) =>
           log.debug(s"${init.host}:${init.port} has host key: $k")
           self ! FinishInitializing(init, ServerPublicKey(k), replyTo)
+        case k =>
+          log.error(s"${self.path.name} host key does not match provided fingerprints! Aborting initialization.")
       }
       stay
     case Event(FinishInitializing(init, serverPublicKey, replyTo), _) =>
       import dit4c.common.KeyHelpers._
-      goto(PendingKeyConfirmation)
+      goto(Active)
         .applying(Initialized(
             init.host, init.port, init.username,
             serverPublicKey.public.pkcs8.pem,
@@ -144,15 +149,16 @@ class RktNode(
         }
   }
 
-  when(PendingKeyConfirmation) {
-    case Event(ConfirmKeys, data) =>
-      goto(Active).applying(KeysConfirmed()).andThen {
-        case data: NodeConfig =>
-          sender ! ConfirmKeysResponse(data)
-      }
+  /* Deprecated state */
+  when(PendingKeyConfirmation, stateTimeout = Duration.Zero) {
+    case Event(StateTimeout, _) =>
+      goto(JustCreated)
   }
 
   when(Active) {
+    case Event(init: Initialize, _) =>
+      log.info(s"Ignoring $init - already initialized")
+      stay
     case Event(
         RequestInstanceWorker(instanceId),
         NodeConfig(connectionDetails, rktDir, _)) =>
@@ -183,8 +189,6 @@ class RktNode(
           instanceWorkerActorName(instanceId))
       monitoredInstanceIds += instanceId
       stay replying WorkerCreated(worker)
-    case Event(ConfirmKeys, data: NodeConfig) =>
-      stay replying ConfirmKeysResponse(data)
     case Event(Tick, nc @ NodeConfig(connectionDetails, rktDir, _)) =>
       import context.dispatcher
       // Resolve workers to refs

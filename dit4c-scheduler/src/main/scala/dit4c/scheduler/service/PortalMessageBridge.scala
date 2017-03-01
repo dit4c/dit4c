@@ -40,6 +40,7 @@ import akka.http.scaladsl.model.headers.OAuth2BearerToken
 import akka.http.scaladsl.model.HttpHeader
 import java.util.Base64
 import dit4c.scheduler.domain.Cluster
+import java.net.URLEncoder
 
 object PortalMessageBridge {
   case object BridgeClosed extends KryoSerializable
@@ -287,13 +288,23 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
             "", Some(pbTimestamp(Instant.now)))
       ))
       outbound ! toBinaryMessage(msg.toByteArray)
+    case msg: dit4c.scheduler.api.AddNode if msg.sshHostKeyFingerprints.isEmpty =>
+      log.error(s"Received add node request with no fingerprints: $msg")
     case dit4c.scheduler.api.AddNode(clusterId, host, port, username, sshHostKeyFingerprints) =>
+      val bestFingerprint =
+        (sshHostKeyFingerprints.filter(_.startsWith("SHA256:")) ++ sshHostKeyFingerprints).head
+      val id =
+        Seq(username, host, port.toString, bestFingerprint)
+          .map(URLEncoder.encode(_, "UTF-8"))
+          .mkString("_")
       context.parent ! ClusterManager.ClusterCommand(
           clusterId,
           RktClusterManager.AddRktNode(
+            id,
             host,
             port,
             username,
+            sshHostKeyFingerprints,
             "/var/lib/dit4c-rkt"))
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")

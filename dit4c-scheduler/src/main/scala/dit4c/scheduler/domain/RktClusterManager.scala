@@ -53,9 +53,11 @@ object RktClusterManager {
   trait Command extends ClusterManager.Command
   case object Shutdown extends Command
   case class AddRktNode(
+      id: String,
       host: String,
       port: Int,
       username: String,
+      sshHostKeyFingerprints: Seq[String],
       rktDir: String) extends Command
   case class GetRktNodeState(nodeId: RktNodeId) extends Command
   case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends Command
@@ -95,25 +97,19 @@ class RktClusterManager(
     Map.empty[ActorRef, PendingOperation]
 
   override def receiveCommand = {
-    case GetStatus => sender ! CurrentClusterInfo(state)
-
-    case AddRktNode(host, port, username, rktDir) =>
-      val id = RktNode.newId
+    case GetStatus =>
+      sender ! CurrentClusterInfo(state)
+    case AddRktNode(id, host, port, username, fingerprints, rktDir) =>
       processNodeCommand(id,
-          RktNode.Initialize(host, port, username, rktDir))
-
+          RktNode.Initialize(host, port, username, fingerprints, rktDir))
     case GetRktNodeState(id) =>
       processNodeCommand(id, RktNode.GetState)
-
     case RegisterRktNode(requester) =>
       sender.path.name match {
         case RktNodePersistenceId(id) =>
           persist(RktNodeRegistered(id))(updateState)
           requester ! RktNodeAdded(id)
       }
-
-    case ConfirmRktNodeKeys(id) =>
-      processNodeCommand(id, RktNode.ConfirmKeys)
     case Shutdown =>
       context.stop(self)
     case op: StartInstance =>
