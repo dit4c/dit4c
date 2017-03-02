@@ -102,6 +102,7 @@ class UserAggregate(
       op pipeTo sender
     case StartInstanceFromInstance(schedulerId, clusterId, sourceInstance) =>
       if (data.instances.contains(sourceInstance)) {
+        val requester = sender
         (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImageUrl("scheduler-"+schedulerId))).foreach {
           case InstanceAggregate.InstanceImage(image) =>
             val op = (instanceSharder ?
@@ -110,7 +111,7 @@ class UserAggregate(
               case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)
             }
-            op pipeTo sender
+            op pipeTo requester
           case InstanceAggregate.NoImageExists =>
             sender ! InstanceAggregate.NoImageExists
         }

@@ -108,6 +108,9 @@ class MainController(
             case InstanceAggregate.Started(id) =>
               log.info(s"User ${request.identity.id} created instance ${id}")
               Ok(id)
+            case InstanceAggregate.FailedToStart(reason) =>
+              log.info(s"User ${request.identity.id} was unable to create instance - ${reason}")
+              ServiceUnavailable(reason)
             case InstanceAggregate.NoImageExists => NotFound
           }
         }

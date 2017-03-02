@@ -13,25 +13,37 @@
 <link rel="import" href="@routes.Assets.versioned("lib/paper-listbox/paper-listbox.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/color.html")">
 <link rel="import" href="@routes.Assets.versioned("lib/paper-styles/typography.html")">
+<link rel="import" href="@routes.WebComponentsController.component("friendly-name")">
 
 <dom-module id="new-instance-dialog">
   <style>
   #new-instance-form {
-    padding-left: 20px;
-    padding-right: 20px;
+    padding-left: 24px;
+    padding-right: 24px;
     @@apply(--layout-vertical);
     @@apply(--layout-justified);
   }
   paper-dropdown-menu {
   	width: 30em;
   }
+  .error-message {
+    padding: 10px;
+    color: var(--paper-red-500);
+    background-color: var(--paper-red-100);
+  }
+  paper-toast {
+    position: viewport;
+  }
   </style>
   <template>
     <paper-dialog id="dialog">
       <h2>New Instance</h2>
-      <form is="iron-form" id="new-instance-form" method="post" action="/instances/">
+      <form is="iron-form" id="new-instance-form" method="post" action="/instances/"
+          on-iron-form-response="onResponse" on-iron-form-error="onError">
         <template is="dom-if" if="{{isSet(image)}}" restamp="true">
-          <span>{{image}}</span>
+          <p>
+            Based on: <friendly-name value="{{image}}"></friendly-name>
+          </p>
           <input name="image" type="hidden" value="{{image}}" />
         </template>
         <template is="dom-if" if="{{isNotSet(image)}}" restamp="true">
@@ -54,7 +66,10 @@
           </paper-dropdown-menu>
         </template>
     	<template is="dom-if" if="[[isEmpty(availableClusters.clusters)]]">
-          <p>You do not have access to any compute clusters!</p>
+          <p class="error-message">
+            You do not have access to any compute clusters!<br/>
+            (If you are sure you do, some clusters may not currently be available.)
+          </p>
     	</template>
         <input is="iron-input" name="cluster" type="hidden" value="[[selectedCluster.value]]">
       </form>
@@ -95,9 +110,14 @@
       this.$.dialog.opened = true;
       this.$.dialog.close();
     },
+    onError: function(evt) {
+      // Display error message
+      alert('Unable to start instance - try again later');
+      // Update cluster list
+      this.$['ajax-clusters'].generateRequest();
+    },
     submit: function() {
       this.$['new-instance-form'].submit();
-      this.close();
     }
   });
   </script>

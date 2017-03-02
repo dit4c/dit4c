@@ -281,6 +281,13 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
         .foreach { msg =>
           outbound ! toBinaryMessage(msg.toByteArray)
         }
+    case RktClusterManager.UnableToStartInstance(instanceId, reason) =>
+      import dit4c.protobuf.scheduler.{outbound => pb}
+      val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(
+        pb.InstanceStateUpdate(instanceId, pb.InstanceStateUpdate.InstanceState.ERRORED,
+            reason, Some(pbTimestamp(Instant.now)))
+      ))
+      outbound ! toBinaryMessage(msg.toByteArray)
     case RktClusterManager.UnknownInstance(instanceId) =>
       import dit4c.protobuf.scheduler.{outbound => pb}
       val msg = pb.OutboundMessage(newMsgId, pb.OutboundMessage.Payload.InstanceStateUpdate(

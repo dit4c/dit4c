@@ -72,7 +72,7 @@ object RktClusterManager {
   trait Response extends ClusterManager.Response
   case class CurrentClusterInfo(clusterInfo: ClusterInfo) extends Response with ClusterManager.GetStatusResponse
   case class StartingInstance(instanceId: InstanceId) extends Response
-  case object UnableToStartInstance extends Response
+  case class UnableToStartInstance(instanceId: InstanceId, msg: String) extends Response
   case class UnknownInstance(instanceId: InstanceId) extends Response
   case class RktNodeAdded(nodeId: RktNodeId) extends Response
 
@@ -215,7 +215,7 @@ class RktClusterManager(
                 .collect { case Instance.Ack => StartingInstance(instanceId) }
                 .pipeTo(requester)
             case NoWorkersAvailable =>
-              requester ! UnableToStartInstance
+              requester ! UnableToStartInstance(instanceId, "No compute nodes available")
           }
         case PendingOperation(requester, GetInstanceStatus(instanceId)) =>
           import RktInstanceScheduler._

@@ -108,7 +108,9 @@ object InstanceAggregate {
   protected case class GenerateImageSecret(previousSecret: Option[String]) extends Command
 
   sealed trait Response extends BaseResponse
-  case class Started(instanceId: String) extends Response
+  sealed trait StartResponse extends Response
+  case class Started(instanceId: String) extends StartResponse
+  case class FailedToStart(reason: String) extends StartResponse
   case object Ack extends Response
   sealed trait StatusResponse extends Response
   sealed trait GetKeyFingerprintResponse extends Response
@@ -168,6 +170,8 @@ class InstanceAggregate(
                 Cluster.StartInstance(instanceId, accessPassIds, image)))).map {
             case SchedulerAggregate.MessageSent =>
               Started(instanceId)
+            case SchedulerAggregate.UnableToSendMessage =>
+              FailedToStart("Unable to send message to scheduler")
           }.pipeTo(requester)
       }
   }
