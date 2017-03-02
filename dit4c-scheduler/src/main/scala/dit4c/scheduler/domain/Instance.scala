@@ -111,6 +111,7 @@ class Instance(worker: ActorRef)
 
   private case object Tick
   private var ticker: Option[Cancellable] = None
+  private var workerIsAlive = true
 
   override def preStart = {
     import context.dispatcher
@@ -119,7 +120,9 @@ class Instance(worker: ActorRef)
   }
 
   override def postStop = {
-    worker ! InstanceWorker.Done
+    if (workerIsAlive) {
+      worker ! InstanceWorker.Done
+    }
     ticker.foreach(_.cancel)
   }
 
@@ -284,6 +287,7 @@ class Instance(worker: ActorRef)
       // Do nothing
       stay
     case Event(akka.actor.Terminated(ref), _) if ref == worker =>
+      workerIsAlive = false
       stop
   }
 
