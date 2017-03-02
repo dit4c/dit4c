@@ -40,6 +40,7 @@ class MessagingController(
         implicit system: ActorSystem, mat: Materializer, ec: ExecutionContext)
     extends Controller {
 
+  val log = play.api.Logger(this.getClass)
   implicit val timeout = Timeout(5.seconds)
 
   def schedulerRegistration = Action.async(parse.multipartFormData) { request =>
@@ -55,6 +56,7 @@ class MessagingController(
         val keyContent = keys.ref.file.cat.!!
         parseArmoredPublicKeyRing(keyContent) match {
           case Left(msg) =>
+            log.error(s"Scheduler keys parsing failed: $msg")
             Future.successful(InternalServerError(msg))
           case Right(pkr) =>
             val id = pkr.getPublicKey.fingerprint.string
@@ -64,6 +66,7 @@ class MessagingController(
               case SchedulerAggregate.KeysUpdated =>
                 Redirect(routes.MessagingController.schedulerSocket(id))
               case SchedulerAggregate.KeysRejected(msg) =>
+                log.error(s"Scheduler keys rejected: $msg")
                 Forbidden(msg)
             }
         }

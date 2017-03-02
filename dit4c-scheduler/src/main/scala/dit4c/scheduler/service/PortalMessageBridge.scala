@@ -131,11 +131,12 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
             Map("filename" -> "keys.asc")))
         Marshal(formData).to[RequestEntity]
       }
-      (redirectUri, cookies) <- Http()(context.system).singleRequest(
-        HttpRequest(
-            method=HttpMethods.POST,
-            registrationUrl,
-            entity=payload)
+      (redirectUri, cookies) <- Http()(context.system)
+        .singleRequest(
+          HttpRequest(
+              method=HttpMethods.POST,
+              registrationUrl,
+              entity=payload)
         )
         .collect {
           case r: HttpResponse if r.status.isRedirection => r
