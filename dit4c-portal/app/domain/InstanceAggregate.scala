@@ -492,7 +492,7 @@ class InstanceAggregate(
 
   private def createStatusUpdateProcessor(schedulerId: String, clusterId: String) = {
     val now = Instant.now
-    val suffix = now.getEpochSecond + now.getNano
+    val suffix = s"${now.getEpochSecond}-${Random.alphanumeric.take(10).mkString}"
     context.actorOf(
       Props(
         classOf[StatusUpdateProcessor],
