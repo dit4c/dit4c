@@ -24,6 +24,9 @@
   :root {
   	margin: 20px;
   }
+  #clear {
+    color: var(--primary-color);
+  }
   #send {
   	color: white;
   	background-color: var(--primary-color);
@@ -47,6 +50,7 @@
 	<h1>Send message to scheduler</h1>
 	<paper-textarea label="PGP signed message" value="{{message}}"></paper-textarea>
 	<paper-button raised id="send" on-click="send">Send</paper-button>
+	<paper-button id="clear" on-click="clear">Clear</paper-button>
 	<pre id="output">{{output}}</pre>
   </template>
   <script>
@@ -62,6 +66,10 @@
     },
     handleError: function(evt) {
       this.set('output', evt.detail.error.message);
+    },
+    clear: function() {
+      this.set('message', '');
+      this.set('output', '');
     },
     send: function() {
       var content = this.get('message');
