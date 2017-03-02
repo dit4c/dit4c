@@ -20,8 +20,22 @@ message AddNode {
   repeated string sshHostKeyFingerprints = 5;
 }
 
+message CoolDownNodes {
+  option (scalapb.message).extends = "dit4c.scheduler.api.BaseMessage";
+  string clusterId = 1;
+  repeated string sshHostKeyFingerprints = 2;
+}
+
+message DecommissionNodes {
+  option (scalapb.message).extends = "dit4c.scheduler.api.BaseMessage";
+  string clusterId = 1;
+  repeated string sshHostKeyFingerprints = 2;
+}
+
 message ApiMessage {
   oneof payload {
     AddNode addNode = 1;
+    CoolDownNodes coolDownNodes = 2;
+    DecommissionNodes decommissionNodes = 3;
   }
 }

@@ -26,3 +26,8 @@ message KeysConfirmed {
   option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
   google.protobuf.Timestamp timestamp = 100;
 }
+
+message Decommissioned {
+  option (scalapb.message).extends = "dit4c.scheduler.domain.rktnode.DomainEvent";
+  google.protobuf.Timestamp timestamp = 100;
+}

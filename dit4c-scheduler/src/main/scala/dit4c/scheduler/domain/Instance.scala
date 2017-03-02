@@ -114,6 +114,7 @@ class Instance(worker: ActorRef)
 
   override def preStart = {
     import context.dispatcher
+    context.watch(worker)
     ticker = Some(context.system.scheduler.schedule(5.seconds, 5.second, context.self, Tick))
   }
 
@@ -126,7 +127,7 @@ class Instance(worker: ActorRef)
 
   when(JustCreated) {
     case Event(Initiate(id, imageName, callback), _) =>
-      val domainEvent = Initiated(id, imageName, callback)
+      val domainEvent = Initiated(id, imageName, callback, now)
       val requester = sender
       goto(WaitingForImage).applying(domainEvent).andThen {
         case data =>
@@ -138,7 +139,7 @@ class Instance(worker: ActorRef)
 
   when(WaitingForImage, stateTimeout = 1.hour) {
     case Event(ReceiveImage(localImage), StartData(id, _, _, callback, _)) =>
-      goto(Starting).applying(FetchedImage(localImage)).andThen {
+      goto(Starting).applying(FetchedImage(localImage, now)).andThen {
         case data =>
           log.info(s"Starting with: $localImage")
           worker ! InstanceWorker.Start(localImage, callback)
@@ -164,7 +165,7 @@ class Instance(worker: ActorRef)
   when(Running) {
     case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
-      goto(Stopping).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
+      goto(Stopping).applying(RequestedSave(helperImage, imageServer, now)).andThen { _ =>
         worker ! InstanceWorker.Stop
         requester ! Ack
       }
@@ -192,7 +193,7 @@ class Instance(worker: ActorRef)
   when(Exited) {
     case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
-      goto(Saving).applying(RequestedSave(helperImage, imageServer)).andThen { _ =>
+      goto(Saving).applying(RequestedSave(helperImage, imageServer, now)).andThen { _ =>
         worker ! InstanceWorker.Save
         requester ! Ack
       }
@@ -282,6 +283,8 @@ class Instance(worker: ActorRef)
     case Event(Tick, _) =>
       // Do nothing
       stay
+    case Event(akka.actor.Terminated(ref), _) if ref == worker =>
+      stop
   }
 
   onTransition {

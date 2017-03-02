@@ -418,7 +418,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         (Seq(msg.username, msg.host, msg.port.toString) ++ bestFingerprint)
           .map(java.net.URLEncoder.encode(_, "UTF-8"))
           .mkString("_")
-      msg.copy(id = id)
+      msg.copy(nodeId = id)
     }
   }
 

@@ -18,22 +18,24 @@ class SignedMessageProcessor(
       val pkr = parseArmoredPublicKeyRing(armoredPgpPublicKeyBlock).right.get
       verifyData(ByteString(signedMessage.getBytes), pkr.signingKeys) match {
         case Left(msg) =>
+          log.error(msg)
         case Right((_, sigs)) if sigs.isEmpty =>
           log.error("Message not signed with a current signing key")
-          context.stop(context.self)
         case Right((data, _)) =>
           try {
             import ApiMessage.Payload
             ApiMessage.parseFrom(data.toArray).payload match {
               case Payload.Empty => // Do nothing
-              case Payload.AddNode(msg) =>
-                context.parent ! msg
+              case Payload.AddNode(msg) => context.parent ! msg
+              case Payload.CoolDownNodes(msg) => context.parent ! msg
+              case Payload.DecommissionNodes(msg) => context.parent ! msg
             }
           } catch {
             case e: Throwable =>
               log.error(e, "Unable to read signed payload")
           }
       }
+      context.stop(context.self)
   }
 
 

@@ -306,6 +306,14 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
             username,
             sshHostKeyFingerprints,
             "/var/lib/dit4c-rkt"))
+    case dit4c.scheduler.api.CoolDownNodes(clusterId, sshHostKeyFingerprints) =>
+      context.parent ! ClusterManager.ClusterCommand(
+          clusterId,
+          RktClusterManager.CoolDownRktNodes(sshHostKeyFingerprints))
+    case dit4c.scheduler.api.DecommissionNodes(clusterId, sshHostKeyFingerprints) =>
+      context.parent ! ClusterManager.ClusterCommand(
+          clusterId,
+          RktClusterManager.DecommissionRktNodes(sshHostKeyFingerprints))
     case PortalMessageBridge.BridgeClosed =>
       log.info(s"bridge closed → terminating outbound actor")
       outbound ! akka.actor.Status.Success(NotUsed)

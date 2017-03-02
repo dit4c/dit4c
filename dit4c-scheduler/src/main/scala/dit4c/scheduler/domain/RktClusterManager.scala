@@ -14,6 +14,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import akka.util.Timeout
 import scala.util.Random
+import akka.pattern.ask
 
 object RktClusterManager {
   type RktNodeId = String
@@ -53,14 +54,15 @@ object RktClusterManager {
   trait Command extends ClusterManager.Command
   case object Shutdown extends Command
   case class AddRktNode(
-      id: String,
+      nodeId: RktNodeId,
       host: String,
       port: Int,
       username: String,
       sshHostKeyFingerprints: Seq[String],
       rktDir: String) extends Command
-  case class GetRktNodeState(nodeId: RktNodeId) extends Command
-  case class ConfirmRktNodeKeys(nodeId: RktNodeId) extends Command
+  protected[domain] case class GetRktNodeState(nodeId: RktNodeId) extends Command
+  case class CoolDownRktNodes(sshHostKeyFingerprints: Seq[String]) extends Command
+  case class DecommissionRktNodes(sshHostKeyFingerprints: Seq[String]) extends Command
   case class RegisterRktNode(requester: ActorRef) extends Command
   case class StartInstance(
       instanceId: String, image: String, portalUri: String) extends Command
@@ -83,6 +85,7 @@ class RktClusterManager(
     extends PersistentActor
     with ClusterManager
     with ActorLogging {
+  import BaseDomainEvent._
   import dit4c.scheduler.domain.rktclustermanager._
   import ClusterManager._
   import RktClusterManager._
@@ -104,10 +107,53 @@ class RktClusterManager(
           RktNode.Initialize(host, port, username, fingerprints, rktDir))
     case GetRktNodeState(id) =>
       processNodeCommand(id, RktNode.GetState)
+    case CoolDownRktNodes(fingerprints) =>
+      import context.dispatcher
+      implicit val timeout = Timeout(1.minute)
+      val hasMatch = hasMatchingFingerprint(fingerprints) _
+      state.nodeIds
+        .map(id => (id, getNodeActor(id)))
+        .foreach { case (id, ref) =>
+          (ref ? RktNode.GetState)
+            .map(_.asInstanceOf[RktNode.GetStateResponse])
+            .onSuccess {
+              case RktNode.Exists(c) if hasMatch(c.connectionDetails.serverKey) =>
+                log.info(s"Cooling down node $id - will accept no further instances")
+                ref ! RktNode.BecomeInactive
+            }
+        }
+    case DecommissionRktNodes(fingerprints) =>
+      import dit4c.common.KeyHelpers._
+      import context.dispatcher
+      implicit val timeout = Timeout(1.minute)
+      val hasMatch = hasMatchingFingerprint(fingerprints) _
+      state.nodeIds
+        .map(id => (id, getNodeActor(id)))
+        .foreach { case (id, ref) =>
+          (ref ? RktNode.GetState)
+            .map(_.asInstanceOf[RktNode.GetStateResponse])
+            .collect {
+              case RktNode.Exists(c) if hasMatch(c.connectionDetails.serverKey) =>
+                log.info(s"Decommissioning node $id")
+                ref ! RktNode.Decommission
+                ref
+            }
+            .flatMap(_ ? RktNode.GetState)
+            .onSuccess {
+              case RktNode.DoesNotExist =>
+                log.info(s"Updating state for all instances on decommissioned node $id")
+                state.instanceNodeMappings.collect {
+                  case (instanceId, `id`) =>
+                    (context.self ? GetInstanceStatus(instanceId)).foreach { _ =>
+                      log.debug(s"Triggered state update for $instanceId")
+                    }
+                }
+            }
+        }
     case RegisterRktNode(requester) =>
       sender.path.name match {
         case RktNodePersistenceId(id) =>
-          persist(RktNodeRegistered(id))(updateState)
+          persist(RktNodeRegistered(id, now))(updateState)
           requester ! RktNodeAdded(id)
       }
     case Shutdown =>
@@ -160,7 +206,7 @@ class RktClusterManager(
             case WorkerFound(nodeId, worker) =>
               implicit val timeout = Timeout(10.seconds)
               import context.dispatcher
-              persist(InstanceAssignedToNode(instanceId, nodeId))(updateState)
+              persist(InstanceAssignedToNode(instanceId, nodeId, now))(updateState)
               val instance = context.actorOf(
                   Instance.props(worker),
                   InstancePersistenceId(instanceId))
@@ -217,6 +263,13 @@ class RktClusterManager(
         RktNodePersistenceId(nodeId))
     context.watch(node)
     node
+  }
+
+
+  private def hasMatchingFingerprint(fingerprints: Seq[String])(serverKey: RktNode.ServerPublicKey) = {
+    import dit4c.common.KeyHelpers._
+    fingerprints.contains(serverKey.public.ssh.fingerprint("SHA-256")) ||
+    fingerprints.contains(serverKey.public.ssh.fingerprint("MD5"))
   }
 
 }

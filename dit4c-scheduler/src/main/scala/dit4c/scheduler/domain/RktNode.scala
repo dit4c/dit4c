@@ -44,7 +44,7 @@ object RktNode {
       username: String,
       serverKey: ServerPublicKey)
 
-  trait State extends FSMState
+  sealed trait State extends FSMState
   case object JustCreated extends State {
     override val identifier = "Just Created"
   }
@@ -53,6 +53,12 @@ object RktNode {
   }
   case object Active extends State {
     override val identifier = "Active"
+  }
+  case object Inactive extends State {
+    override val identifier = "Inactive"
+  }
+  case object Gone extends State {
+    override val identifier = "Gone"
   }
 
   trait Data
@@ -83,6 +89,8 @@ object RktNode {
       init: Initialize,
       serverPublicKey: ServerPublicKey,
       replyTo: ActorRef) extends Command
+  case object BecomeInactive extends Command
+  case object Decommission extends Command
 
   sealed trait Response extends BaseResponse
   sealed trait GetStateResponse extends Response
@@ -98,6 +106,7 @@ class RktNode(
     createRunner: RktClusterManager.RktRunnerFactory,
     fetchSshHostKey: RktClusterManager.HostKeyChecker)
     extends PersistentFSM[State, Data, DomainEvent] {
+  import BaseDomainEvent._
   import dit4c.scheduler.domain.rktnode._
   import RktNode._
   import scala.concurrent.duration._
@@ -142,7 +151,8 @@ class RktNode(
         .applying(Initialized(
             init.host, init.port, init.username,
             serverPublicKey.public.pkcs8.pem,
-            init.rktDir))
+            init.rktDir,
+            now))
         .andThen {
           case data =>
             context.parent ! RktClusterManager.RegisterRktNode(replyTo)
@@ -189,28 +199,48 @@ class RktNode(
           instanceWorkerActorName(instanceId))
       monitoredInstanceIds += instanceId
       stay replying WorkerCreated(worker)
-    case Event(Tick, nc @ NodeConfig(connectionDetails, rktDir, _)) =>
-      import context.dispatcher
-      // Resolve workers to refs
-      val instanceWorkers: Map[String, ActorRef] =
-        (for {
-          instanceId <- monitoredInstanceIds
-          ref <- context.child(instanceWorkerActorName(instanceId))
-        } yield (instanceId, ref)).toMap
-      // Update monitoring to remove missing workers
-      monitoredInstanceIds = instanceWorkers.keySet
-      // Get current states
-      nc.runner(createRunner).resolveStates(monitoredInstanceIds).foreach { states =>
-        val ts = Instant.now
-        // Tell workers
-        for {
-          (instanceId, state) <- states
-          ref <- instanceWorkers.get(instanceId)
-        } yield {
-          ref ! RktInstanceWorker.CurrentInstanceState(state, ts)
-        }
-      }
+    case Event(Tick, nc: NodeConfig) =>
+      sendUpdateToWorkers(nc)
       stay
+    case Event(BecomeInactive, _) =>
+      goto(Inactive)
+  }
+
+  when(Inactive) {
+    case Event(
+        RequireInstanceWorker(instanceId),
+        NodeConfig(connectionDetails, rktDir, _)) =>
+      val runner = createRunner(connectionDetails, rktDir)
+      val worker = context.actorOf(
+          Props(classOf[RktInstanceWorker], instanceId, runner),
+          instanceWorkerActorName(instanceId))
+      monitoredInstanceIds += instanceId
+      stay replying WorkerCreated(worker)
+    case Event(Tick, nc: NodeConfig) =>
+      sendUpdateToWorkers(nc)
+      stay
+  }
+
+  when(Gone) {
+    case Event(
+        RequireInstanceWorker(instanceId),
+        _) =>
+      // Provide dummy worker which tells the instance it's gone
+      val worker = context.actorOf(
+          Props(classOf[DiscardedInstanceWorker], instanceId),
+          instanceWorkerActorName(instanceId))
+      stay replying WorkerCreated(worker)
+  }
+
+  onTransition {
+    case _ -> Gone =>
+      // Terminate all the old workers that use RktRunner
+      terminateAllWorkers
+  }
+
+  onTransition {
+    case (from, to) if from != to =>
+      log.info(s"Node ${persistenceId}: $from → $to")
   }
 
   whenUnhandled {
@@ -220,11 +250,16 @@ class RktNode(
       stay replying Exists(c)
     case Event(RequestInstanceWorker(instanceId), _) =>
       stay replying UnableToProvideWorker("Node is not currently active")
+    case Event(BecomeInactive, _) =>
+      // Do nothing
+      stay
+    case Event(Decommission, _) =>
+      // Always the same
+      goto(Gone).applying(Decommissioned(now))
     case Event(Tick, _) =>
       // Do nothing
       stay
   }
-
 
   def applyEvent(
       domainEvent: DomainEvent,
@@ -234,7 +269,6 @@ class RktNode(
         import dit4c.common.KeyHelpers._
         val hostKey = parsePkcs8PemPublicKey(serverPublicKeyPKCS8PEM)
                 .right.get.asInstanceOf[RSAPublicKey]
-        log.info(s"${self.path} ${hostKey.ssh.authorizedKeys}")
         NodeConfig(
           ServerConnectionDetails(
             host, port, username,
@@ -242,10 +276,10 @@ class RktNode(
           ),
           rktDir, false)
       case KeysConfirmed(_) =>
-        dataBeforeEvent match {
-          case c: NodeConfig => c.copy(readyToConnect = true)
-          case other => other
-        }
+        // Doesn't do anything anymore
+        dataBeforeEvent
+      case Decommissioned(_) =>
+        NoConfig
     }
   }
 
@@ -254,4 +288,33 @@ class RktNode(
 
   override def domainEventClassTag: ClassTag[DomainEvent] =
     classTag[DomainEvent]
+
+  private def sendUpdateToWorkers(nc: NodeConfig): Unit = {
+    import context.dispatcher
+    // Resolve workers to refs
+    val instanceWorkers: Map[String, ActorRef] =
+      (for {
+        instanceId <- monitoredInstanceIds
+        ref <- context.child(instanceWorkerActorName(instanceId))
+      } yield (instanceId, ref)).toMap
+    // Update monitoring to remove missing workers
+    monitoredInstanceIds = instanceWorkers.keySet
+    // Get current states
+    nc.runner(createRunner).resolveStates(monitoredInstanceIds).foreach { states =>
+      val ts = Instant.now
+      // Tell workers
+      for {
+        (instanceId, state) <- states
+        ref <- instanceWorkers.get(instanceId)
+      } yield {
+        ref ! RktInstanceWorker.CurrentInstanceState(state, ts)
+      }
+    }
+  }
+
+  private def terminateAllWorkers: Unit =
+    context.children
+      .filter(_.path.name.startsWith("instance-worker-"))
+      .foreach(_ ! InstanceWorker.Done)
+
 }

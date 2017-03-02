@@ -166,7 +166,7 @@ class InstanceAggregate(
               SchedulerAggregate.ClusterEnvelope(
                 clusterId,
                 Cluster.StartInstance(instanceId, accessPassIds, image)))).map {
-            case SchedulerAggregate.Ack =>
+            case SchedulerAggregate.MessageSent =>
               Started(instanceId)
           }.pipeTo(requester)
       }

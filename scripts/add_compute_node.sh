@@ -43,7 +43,7 @@ printf '}\n' >> $PROTOBUF_TEXTFORMAT_INPUT
 
 echo ""
 
-PROTOBUF_OUTPUT="$(basename "$PROTOBUF_TEXTFORMAT_INPUT" .txt).bin"
+PROTOBUF_OUTPUT="$SCRIPTS_TMPDIR/$(basename "$PROTOBUF_TEXTFORMAT_INPUT" .txt).bin"
 $PROTOC \
   -I dit4c-scheduler/target/protobuf_external/ \
   -I dit4c-scheduler/src/main/protobuf/ \
