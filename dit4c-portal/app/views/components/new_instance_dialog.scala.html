@@ -39,7 +39,7 @@
     <paper-dialog id="dialog">
       <h2>New Instance</h2>
       <form is="iron-form" id="new-instance-form" method="post" action="/instances/"
-          on-iron-form-response="onResponse" on-iron-form-error="onError">
+          on-iron-form-error="onError">
         <template is="dom-if" if="{{isSet(image)}}" restamp="true">
           <p>
             Based on: <friendly-name value="{{image}}"></friendly-name>
