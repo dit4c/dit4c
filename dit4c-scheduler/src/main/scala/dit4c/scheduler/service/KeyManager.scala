@@ -2,10 +2,9 @@ package dit4c.scheduler.service
 
 import akka.actor.Actor
 import akka.actor.Props
-import org.bouncycastle.openpgp.PGPSecretKeyRing
 import dit4c.common.KeyHelpers._
 import dit4c.scheduler.domain.{BaseCommand, BaseResponse}
-import org.bouncycastle.openpgp.{PGPSecretKey, PGPPublicKey}
+import org.bouncycastle.openpgp._
 import scala.util.Try
 import pdi.jwt.JwtClaim
 import java.security.PrivateKey
@@ -17,15 +16,8 @@ import akka.actor.ActorLogging
 
 object KeyManager {
 
-  def props(armoredPgpSecretKeyBlock: String) =
-    Props(classOf[KeyManager],
-        parseKeyBlock(armoredPgpSecretKeyBlock).armored)
-
-  def parseKeyBlock(kb: String): PGPSecretKeyRing =
-    parseArmoredSecretKeyRing(kb) match {
-      case Right(kr) => kr
-      case Left(msg) => throw new Exception(msg)
-    }
+  def props(armoredPgpSecretKeyBlocks: Seq[String]) =
+    Props(classOf[KeyManager], armoredPgpSecretKeyBlocks)
 
   trait Command extends BaseCommand
   case object GetPublicKeyInfo extends Command
@@ -46,11 +38,55 @@ object KeyManager {
 
 }
 
-class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLogging {
+class KeyManager(armoredPgpKeyBlocks: Seq[String]) extends Actor with ActorLogging {
   import KeyManager._
   import scala.collection.JavaConversions._
 
-  val keyring = parseKeyBlock(armoredPgpSecretKeyBlock)
+  private val secretKeyrings = {
+    // Converted private key rings
+    armoredPgpKeyBlocks
+      .map(parseArmoredSecretKeyRing)
+      .flatMap(_.right.toSeq)
+  }
+  private val publicKeyrings = {
+    // Actual public key rings
+    armoredPgpKeyBlocks.map(parseArmoredPublicKeyRing)
+      .flatMap(_.right.toSeq)
+  } ++ {
+    // Converted private key rings
+    secretKeyrings.map(_.toPublicKeyRing)
+  }
+
+  val fingerprint = {
+    val fingerprints =
+      publicKeyrings
+        .map(_.getPublicKey.fingerprint)
+        .distinct
+    if (fingerprints.size != 1) {
+      val msg = s"Expected single master key, instead ${fingerprints.size}!\n$fingerprints"
+      throw new RuntimeException(msg)
+    }
+  }
+
+  val secretKeyring =
+    secretKeyrings
+      .reduceOption[PGPSecretKeyRing] { (kr1, kr2) =>
+          kr2.getSecretKeys.foreach { sk =>
+            PGPSecretKeyRing.insertSecretKey(kr1, sk)
+          }
+          kr1
+      }
+      .getOrElse {
+        throw new RuntimeException("No secret keys provided")
+      }
+
+  val publicKeyring =
+    publicKeyrings.reduce[PGPPublicKeyRing] { (kr1, kr2) =>
+      kr2.getPublicKeys.foreach { pk =>
+        PGPPublicKeyRing.insertPublicKey(kr1, pk)
+      }
+      kr1
+    }
 
   override def preStart = {
     openSshKeyPairs match {
@@ -67,8 +103,8 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLoggi
     case cmd: Command => cmd match {
       case GetPublicKeyInfo =>
         sender ! PublicKeyInfo(
-            keyring.getPublicKey.fingerprint,
-            keyring.toPublicKeyRing.armored)
+            publicKeyring.getPublicKey.fingerprint,
+            publicKeyring.armored)
       case GetOpenSshKeyPairs =>
         sender ! OpenSshKeyPairs(openSshKeyPairs)
       case SignJwtClaim(claim) =>
@@ -77,9 +113,9 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLoggi
   }
 
   def authenticationSecretKeys: List[PGPSecretKey] =
-    keyring.authenticationKeys
+    secretKeyring.authenticationKeys
       .flatMap { pk =>
-        Try(keyring.getSecretKey(pk.getFingerprint)).toOption
+        Try(secretKeyring.getSecretKey(pk.getFingerprint)).toOption
       }
 
   def sign(claim: JwtClaim): List[String] =
@@ -101,7 +137,7 @@ class KeyManager(armoredPgpSecretKeyBlock: String) extends Actor with ActorLoggi
 
   def hasKeyFlags(pk: PGPPublicKey)(flags: Int): Boolean = {
     val selfSignature = pk.getSignaturesForKeyID(
-        keyring.getPublicKey.getKeyID).toList.head
+        publicKeyring.getPublicKey.getKeyID).toList.head
     (selfSignature.getHashedSubPackets.getKeyFlags & flags) == flags
   }
 

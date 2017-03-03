@@ -22,6 +22,7 @@ import dit4c.scheduler.domain.Instance
 import dit4c.scheduler.service.KeyManager
 import akka.util.Timeout
 import scala.concurrent.ExecutionContext
+import akka.actor.AllForOneStrategy
 
 object Scheduler {
 
@@ -45,12 +46,17 @@ object Scheduler {
 
 class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
   import akka.http.scaladsl.server._
+  import akka.actor.SupervisorStrategy._
+
+  override val supervisorStrategy = AllForOneStrategy() {
+    case _: Exception => Escalate
+  }
 
   override def preStart {
     import context.dispatcher
     implicit val materializer = ActorMaterializer()(context.system)
     val keyManager = context.actorOf(
-        KeyManager.props(config.armoredPgpKeyring.get),
+        KeyManager.props(config.armoredPgpKeyrings),
         "key-manager")
     val clusterAggregateManager = context.actorOf(
         ClusterManager.props(configProvider(keyManager), config.knownClusters),
@@ -65,6 +71,10 @@ class Scheduler(config: SchedulerConfig) extends Actor with ActorLogging {
         "pmb-supervisor")
     // TODO: remove need for this kludge
     context.system.eventStream.subscribe(self, classOf[Instance.StatusReport])
+  }
+
+  override def postStop {
+    context.system.terminate
   }
 
   override def receive = LoggingReceive {

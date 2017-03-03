@@ -33,7 +33,7 @@ package object utils {
 
   case class SchedulerConfig(
       val name: String,
-      val armoredPgpKeyring: Option[String],
+      val armoredPgpKeyrings: Seq[String],
       val knownClusters: Map[String, ClusterInfo] = Map(
           "default" -> ClusterInfo(
               "Default Cluster",
@@ -47,7 +47,7 @@ package object utils {
   class SchedulerConfigParser(app: AppMetadata)
       extends OptionParser[SchedulerConfig](app.name) {
     def parse(args: Seq[String]): Option[SchedulerConfig] =
-      parse(args, SchedulerConfig(app.name, None))
+      parse(args, SchedulerConfig(app.name, Seq.empty))
 
     head(app.name, app.version)
     help("help").text("prints this usage text")
@@ -71,16 +71,25 @@ package object utils {
 
     opt[File]('k', "keys")
       .required
+      .unbounded
       .action { (f, c) =>
         import scala.sys.process._
-        c.copy(armoredPgpKeyring = Some(getFileContents(f)))
+        c.copy(armoredPgpKeyrings = c.armoredPgpKeyrings :+ getFileContents(f))
       }
       .validate {
         case f: File if f.exists() =>
-          import dit4c.common.KeyHelpers.parseArmoredSecretKeyRing
+          import dit4c.common.KeyHelpers._
           // Output error message from function, or else accept
-          parseArmoredSecretKeyRing(getFileContents(f))
-            .right.map(_ => ())
+          getFileContents(f) match {
+            case kb if parseArmoredSecretKeyRing(kb).isRight =>
+              // It's a secret key ring
+              Right(())
+            case kb if parseArmoredPublicKeyRing(kb).isRight =>
+              // It's a public key ring
+              Right(())
+            case kb =>
+              Left(s"${f.getCanonicalPath} is not a valid PGP key ring")
+          }
       }
       .text("OpenPGP secret keys used authentication")
 
