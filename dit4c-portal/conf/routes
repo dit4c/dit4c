@@ -19,6 +19,8 @@ PUT     /images/                            controllers.InstanceController.image
 GET		/pgp-keys/:fingerprint				controllers.KeyRingController.get(fingerprint)
 GET     /share/instance/:token              controllers.MainController.redeemSharingLink(token)
 GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.redeemAccessPass(schedulerId, data)
+GET     /schedulers/:schedulerId/pgp-keys	controllers.SchedulerController.schedulerPgpKeys(schedulerId)
+GET     /schedulers/:schedulerId/ssh-keys	controllers.SchedulerController.schedulerSshKeys(schedulerId)
 
 # Image server auth
 GET		/services/image-server/auth-http-request/:httpVerb/	          controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId="")

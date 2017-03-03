@@ -64,10 +64,11 @@ class InstanceController(
   }
 
   def instancePgpKeys(instanceId: String) = Action.async { implicit request =>
+    import domain._
     implicit val timeout = Timeout(1.minute)
     (instanceSharder ? InstanceSharder.Envelope(instanceId, InstanceAggregate.GetKeyFingerprint)).map {
-      case InstanceAggregate.CurrentKeyFingerprint(keyFingerprint) =>
-        Redirect(routes.KeyRingController.get(keyFingerprint.string))
+      case InstanceAggregate.CurrentKeyFingerprint(fingerprint) =>
+        Redirect(routes.KeyRingController.get(fingerprint.string))
       case InstanceAggregate.DoesNotExist =>
         NotFound
     }

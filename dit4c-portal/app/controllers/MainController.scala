@@ -401,7 +401,7 @@ class MainController(
         import dit4c.common.KeyHelpers._
         (schedulerSharder ? SchedulerSharder.Envelope(schedulerId, SchedulerAggregate.GetKeys))
           .collect {
-            case SchedulerAggregate.CurrentKeys(kb, _) =>
+            case SchedulerAggregate.CurrentKeys(kb) =>
               import scala.collection.JavaConversions._
               val kr = parseArmoredPublicKeyRing(kb).right.get
               val k = kr.getPublicKey

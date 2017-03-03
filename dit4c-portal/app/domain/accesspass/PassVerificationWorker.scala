@@ -42,8 +42,8 @@ class PassVerificationWorker(
   }
 
   val receive: Receive = LoggingReceive {
-    case SchedulerAggregate.CurrentKeys(primaryKeyBlock, _) =>
-      context.parent ! resultFromKeyBlock(primaryKeyBlock)
+    case SchedulerAggregate.CurrentKeys(keyBlock) =>
+      context.parent ! resultFromKeyBlock(keyBlock)
       context.stop(self)
     case SchedulerAggregate.NoKeysAvailable =>
       context.parent ! UnverifiablePass("No keys are available to do validation")

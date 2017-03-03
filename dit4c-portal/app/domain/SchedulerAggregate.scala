@@ -38,6 +38,7 @@ object SchedulerAggregate {
   case class SendSchedulerMessage(msg: dit4c.protobuf.scheduler.inbound.InboundMessage) extends Command
   case class UpdateKeys(armoredPgpPublicKeyBlock: String) extends Command
   case object GetKeys extends Command
+  case object GetKeyFingerprint extends Command
   case class GetAvailableClusters(
       accessTokenIds: Set[String]) extends Command
 
@@ -53,10 +54,14 @@ object SchedulerAggregate {
   case object KeysUpdated extends Response
   case class KeysRejected(reason: String) extends Response
   sealed trait GetKeysResponse extends Response
-  case class CurrentKeys(
-      primaryKeyBlock: String,
-      additionalKeyBlocks: List[String] = Nil) extends GetKeysResponse
-  case object NoKeysAvailable extends GetKeysResponse
+  sealed trait GetKeyFingerprintResponse extends Response
+  case class CurrentKeys(keyBlock: String)
+    extends GetKeysResponse
+  case class CurrentKeyFingerprint(fingerprint: PGPFingerprint)
+    extends GetKeyFingerprintResponse
+  case object NoKeysAvailable
+    extends GetKeysResponse
+    with GetKeyFingerprintResponse
   trait GetAvailableClustersResponse extends Response
   case class AvailableClusters(
       clusters: List[UserAggregate.AvailableCluster]) extends GetAvailableClustersResponse
@@ -92,7 +97,7 @@ class SchedulerAggregate(
       val requester = sender
       persist(Created(now))(updateState)
       sender ! Ack
-    case GetKeys =>
+    case GetKeys | GetKeyFingerprint =>
       sender ! NoKeysAvailable
     case VerifyJwt(_) =>
       sender ! InvalidJwt("Unknown scheduler")
@@ -140,6 +145,8 @@ class SchedulerAggregate(
           case KeyRingAggregate.CurrentKeyBlock(s) => CurrentKeys(s)
         }
         .pipeTo(sender)
+    case GetKeyFingerprint =>
+      sender ! CurrentKeyFingerprint(PGPFingerprint(schedulerId))
     case VerifyJwt(token) =>
       import dit4c.common.KeyHelpers._
       val msg = KeyRingSharder.Envelope(

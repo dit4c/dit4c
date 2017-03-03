@@ -113,15 +113,19 @@ object InstanceAggregate {
   case class FailedToStart(reason: String) extends StartResponse
   case object Ack extends Response
   sealed trait StatusResponse extends Response
-  sealed trait GetKeyFingerprintResponse extends Response
-  case object DoesNotExist extends StatusResponse with GetKeyFingerprintResponse
+  sealed trait GetKeyFingerprintResponse
+    extends Response
+  case object DoesNotExist
+    extends StatusResponse
+    with GetKeyFingerprintResponse
   case class CurrentStatus(
       state: String,
       description: String,
       uri: Option[String],
       timestamps: EventTimestamps,
       availableActions: Set[InstanceAction]) extends StatusResponse
-  case class CurrentKeyFingerprint(keyFingerpring: PGPFingerprint) extends GetKeyFingerprintResponse
+  case class CurrentKeyFingerprint(fingerprint: PGPFingerprint)
+    extends GetKeyFingerprintResponse
   sealed trait VerifyJwtResponse extends Response
   case class ValidJwt(instanceId: String) extends VerifyJwtResponse
   case class InvalidJwt(msg: String) extends VerifyJwtResponse

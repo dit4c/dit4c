@@ -79,9 +79,9 @@ class MessagingController(
     (schedulerSharder ? envelope(SchedulerAggregate.GetKeys))
       .map(_.asInstanceOf[SchedulerAggregate.GetKeysResponse])
       .flatMap {
-        case currentKeys: SchedulerAggregate.CurrentKeys =>
+        case SchedulerAggregate.CurrentKeys(keyBlock) =>
           import dit4c.common.KeyHelpers._
-          val schedulerKeys = parseArmoredPublicKeyRing(currentKeys.primaryKeyBlock).right.get
+          val schedulerKeys = parseArmoredPublicKeyRing(keyBlock).right.get
           request.body.file("msg") match {
             case None =>
               Future.successful(

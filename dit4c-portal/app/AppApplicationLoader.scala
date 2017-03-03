@@ -162,6 +162,7 @@ class AppComponents(context: Context)
   lazy val imageServerController = wire[ImageServerController]
   lazy val instanceController = wire[InstanceController]
   lazy val keyRingController = wire[KeyRingController]
+  lazy val schedulerController = wire[SchedulerController]
   lazy val injectedContentControllerCacheApi = defaultCacheApi.taggedWith[InjectedContentController]
   lazy val injectedContentController = wire[InjectedContentController]
   lazy val mainController = wire[MainController]
