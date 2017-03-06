@@ -53,7 +53,7 @@ coverageExcludedPackages := "dit4c\\.scheduler\\.runner.*"
 resourceGenerators in Test <+=
   (resourceManaged in Test, name, version, streams) map { (dir, n, v, s) =>
     import scala.sys.process._
-    val rktVersion = "1.20.0"
+    val rktVersion = "1.25.0"
     val rktDir = dir / "rkt"
     val rktExecutable = rktDir / "rkt"
     s.log.debug(s"Checking for rkt $rktVersion tarball")
