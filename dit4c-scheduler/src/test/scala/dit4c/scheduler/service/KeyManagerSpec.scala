@@ -34,7 +34,7 @@ class KeyManagerSpec(implicit ee: ExecutionEnv)
       val probe = TestProbe()
       val manager =
         probe.childActorOf(
-            KeyManager.props(fixtureKeyBlock))
+            KeyManager.props(fixtureKeyBlock :: Nil))
       probe.send(manager, GetPublicKeyInfo)
       val response = probe.expectMsgType[GetPublicKeyInfoResponse](1.minute)
       response must beLike[GetPublicKeyInfoResponse] {
@@ -53,7 +53,7 @@ class KeyManagerSpec(implicit ee: ExecutionEnv)
       val probe = TestProbe()
       val manager =
         probe.childActorOf(
-            KeyManager.props(fixtureKeyBlock))
+            KeyManager.props(fixtureKeyBlock :: Nil))
       probe.send(manager, GetOpenSshKeyPairs)
       val response = probe.expectMsgType[GetOpenSshKeyPairsResponse](1.minute)
       response must beLike[GetOpenSshKeyPairsResponse] {
@@ -67,7 +67,7 @@ class KeyManagerSpec(implicit ee: ExecutionEnv)
       val probe = TestProbe()
       val manager =
         probe.childActorOf(
-            KeyManager.props(fixtureKeyBlock))
+            KeyManager.props(fixtureKeyBlock :: Nil))
       probe.send(manager, SignJwtClaim(JwtClaim(claim)))
       val response = probe.expectMsgType[SignJwtClaimResponse](1.minute)
       response must beLike[SignJwtClaimResponse] {

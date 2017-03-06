@@ -86,7 +86,7 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
   }
 
   override def foreach[R: AsResult](f: RktRunnerImpl => R) = withRktDir { rktDir =>
-    val defaultSchedulerConfig = dit4c.scheduler.utils.SchedulerConfig("", None)
+    val defaultSchedulerConfig = dit4c.scheduler.utils.SchedulerConfig("", Nil)
     val authHelperImage: String = downloadFile(
         new URL(defaultSchedulerConfig.authImage),
         "/tmp/dit4c-test-helper-auth.aci")
