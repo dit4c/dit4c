@@ -1,4 +1,4 @@
-#!/usr/bin/zsh
+#!/usr/bin/env zsh
 #
 # Currently DIT4C portal's SSH REPL is provided by Ammonite-SSHD, which uses
 # jline2 for terminal interactions. Unfortunately, this means it requires a

@@ -20,9 +20,9 @@ sbt universal:packageZipTarball
 
 mkdir -p "$WORKING_DIR"
 cd "$WORKING_DIR"
-BASE_ACI="${WORKING_DIR}/library-java-8-jre.aci"
+BASE_ACI="${WORKING_DIR}/library-openjdk-8-jre-alpine.aci"
 if [[ ! -e "$BASE_ACI" ]]; then
-  docker2aci docker://library/java:8-jre
+  docker2aci docker://library/openjdk:8-jre-alpine
 fi
 
 extract_project_tarball () {
@@ -38,31 +38,33 @@ extract_project_tarball () {
 # Portal
 extract_project_tarball "dit4c-portal"
 sudo rm -rf .acbuild
-$ACBUILD begin "$BASE_ACI"
-sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apt-get update && apt-get install -y zsh && apt-get clean"
-$ACBUILD copy "$WORKING_DIR/dit4c-portal" /opt/dit4c-portal
-$ACBUILD copy "$SCRIPT_DIR/extra/start_portal.zsh" /start_portal
-$ACBUILD set-name dit4c-portal
-$ACBUILD set-user nobody
-$ACBUILD set-group nogroup
-$ACBUILD port add http tcp 9000
-$ACBUILD port add ssh tcp 2222
-$ACBUILD set-exec /start_portal
+sudo $ACBUILD begin "$BASE_ACI"
+sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apk update && apk add bash zsh && rm -rf /var/cache/apk/*"
+sudo $ACBUILD copy "$WORKING_DIR/dit4c-portal" /opt/dit4c-portal
+sudo $ACBUILD copy "$SCRIPT_DIR/extra/start_portal.zsh" /start_portal
+sudo $ACBUILD set-name dit4c-portal
+sudo $ACBUILD set-user nobody
+sudo $ACBUILD set-group nogroup
+sudo $ACBUILD port add http tcp 9000
+sudo $ACBUILD port add ssh tcp 2222
+sudo $ACBUILD set-exec /start_portal
 sudo $ACBUILD --debug write --overwrite dit4c-portal.linux.amd64.aci
 sudo $ACBUILD end
+sudo chown $(whoami) dit4c-portal.linux.amd64.aci
 
 # Scheduler
 extract_project_tarball "dit4c-scheduler"
-rm -rf .acbuild
-$ACBUILD begin "$BASE_ACI"
-$ACBUILD copy "$WORKING_DIR/dit4c-scheduler" /opt/dit4c-scheduler
-$ACBUILD set-name dit4c-scheduler
-$ACBUILD set-user nobody
-$ACBUILD set-group nogroup
-$ACBUILD port add http tcp 8080
-$ACBUILD set-exec -- /opt/dit4c-scheduler/bin/dit4c-scheduler
-$ACBUILD --debug write --overwrite dit4c-scheduler.linux.amd64.aci
-$ACBUILD end
+sudo rm -rf .acbuild
+sudo $ACBUILD begin "$BASE_ACI"
+sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apk update && apk add bash && rm -rf /var/cache/apk/*"
+sudo $ACBUILD copy "$WORKING_DIR/dit4c-scheduler" /opt/dit4c-scheduler
+sudo $ACBUILD set-name dit4c-scheduler
+sudo $ACBUILD set-user nobody
+sudo $ACBUILD set-group nogroup
+sudo $ACBUILD set-exec -- /opt/dit4c-scheduler/bin/dit4c-scheduler
+sudo $ACBUILD --debug write --overwrite dit4c-scheduler.linux.amd64.aci
+sudo $ACBUILD end
+sudo chown $(whoami) dit4c-scheduler.linux.amd64.aci
 
 # Signing
 SIGNING_KEY="$BASE_DIR/signing.key"
