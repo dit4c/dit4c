@@ -9,9 +9,9 @@ PROTOC="$SCRIPTS_TMPDIR/protobuf/bin/protoc"
 
 if [[ ! -x "$PROTOC" ]]; then
   mkdir -p "$SCRIPTS_TMPDIR/protobuf"
-  curl -sL "https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip" > \
+  curl -#L "https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip" > \
     "$SCRIPTS_TMPDIR/protoc.zip"
-  unzip -d "$SCRIPTS_TMPDIR/protobuf" "$SCRIPTS_TMPDIR/protoc.zip"
+  unzip -qd "$SCRIPTS_TMPDIR/protobuf" "$SCRIPTS_TMPDIR/protoc.zip"
 fi
 
 echo "Using" $($PROTOC --version)
