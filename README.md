@@ -2,7 +2,6 @@
 
 [![Build Status](https://travis-ci.org/dit4c/dit4c.svg?branch=master)](https://travis-ci.org/dit4c/dit4c)
 [![Coverage Status](https://coveralls.io/repos/dit4c/dit4c/badge.svg?branch=master&service=github)](https://coveralls.io/github/dit4c/dit4c?branch=master)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dit4c/dit4c?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 DIT4C is a scalable platform for providing containerized web-based programming and data analysis environments to researchers.
 
