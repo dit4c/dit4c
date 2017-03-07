@@ -22,6 +22,9 @@ GET     /share/clusters/:schedulerId/:data  controllers.AccessPassController.red
 GET     /schedulers/:schedulerId/pgp-keys	controllers.SchedulerController.schedulerPgpKeys(schedulerId)
 GET     /schedulers/:schedulerId/ssh-keys	controllers.SchedulerController.schedulerSshKeys(schedulerId)
 
+# Public config
+GET		/config.json						controllers.PublicConfigController.getConfigJson
+
 # Image server auth
 GET		/services/image-server/auth-http-request/:httpVerb/	          controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId="")
 GET		/services/image-server/auth-http-request/:httpVerb/:bucketId	controllers.ImageServerController.authHttpRequest(httpVerb: String, bucketId: String)

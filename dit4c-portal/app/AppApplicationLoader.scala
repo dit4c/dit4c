@@ -165,6 +165,7 @@ class AppComponents(context: Context)
   lazy val schedulerController = wire[SchedulerController]
   lazy val injectedContentControllerCacheApi = defaultCacheApi.taggedWith[InjectedContentController]
   lazy val injectedContentController = wire[InjectedContentController]
+  lazy val publicConfigController = wire[PublicConfigController]
   lazy val mainController = wire[MainController]
   lazy val assetsController = wire[Assets]
   // SSH admin server
