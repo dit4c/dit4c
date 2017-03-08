@@ -14,7 +14,6 @@ object InstanceWorker {
   case object Discard extends InstanceDirective
   case object Save extends InstanceDirective
   case class Upload(
-      helperImage: String,
       imageServer: String,
       portalUri: String) extends InstanceDirective
   case class Assert(instanceAssertion: InstanceAssertion) extends InstanceDirective

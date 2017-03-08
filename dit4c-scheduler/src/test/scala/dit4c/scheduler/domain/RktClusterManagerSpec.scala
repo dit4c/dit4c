@@ -42,7 +42,8 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
         "dit4c-instance-",
           "" /* Not used */,
           "" /* Not used */,
-          None)
+          None,
+          "" /* Not used */)
   val configProvider = mockConfigProvider(rktRunnerConfig)
 
   "ClusterAggregate" >> {
@@ -137,7 +138,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
               override def uploadImage(instanceId: String,
-                  helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
               override def resolveStates(instanceIds: Set[String]) = ???
@@ -203,7 +203,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
               override def stop(instanceId: String): Future[Unit] = ???
               override def export(instanceId: String) = ???
               override def uploadImage(instanceId: String,
-                  helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
               override def resolveStates(instanceIds: Set[String]) = ???
@@ -279,7 +278,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 Future.successful(())
               override def export(instanceId: String) = Future.successful(())
               override def uploadImage(instanceId: String,
-                  helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = Future.successful(())
               override def resolveStates(instanceIds: Set[String]) = ???
@@ -313,8 +311,7 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
           instanceStatus.state
         }).filter(_ == Instance.Running).head
         // Now save the instance
-        val testSaveHelperImage = "docker://busybox"
-        probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Save(testSaveHelperImage, "")))
+        probe.send(manager, InstanceEnvelope(response.instanceId, Instance.Save("")))
         probe.expectMsgType[Instance.Ack.type](1.minute);
         {
           // Poll 10 times, 100ms apart to check if we're uploading the instance
@@ -361,7 +358,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
                 Future.successful(())
               override def export(instanceId: String) = ???
               override def uploadImage(instanceId: String,
-                  helperImage: String,
                   imageServer: String,
                   portalUri: String): Future[Unit] = ???
               override def resolveStates(instanceIds: Set[String]) = ???
@@ -450,7 +446,6 @@ class RktClusterManagerSpec(implicit ee: ExecutionEnv)
       override def stop(instanceId: String): Future[Unit] = ???
       override def export(instanceId: String) = ???
       def uploadImage(instanceId: String,
-          helperImage: String,
           imageServer: String,
           portalUri: String): Future[Unit] = ???
       override def resolveStates(instanceIds: Set[String]) =

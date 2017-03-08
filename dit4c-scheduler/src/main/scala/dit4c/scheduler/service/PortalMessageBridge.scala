@@ -197,12 +197,12 @@ class PortalMessageBridge(keyManager: ActorRef, registrationUrl: String)
           clusterAccessPasses.map(_.toByteArray).map(Base64.getEncoder.encodeToString).mkString("\n"))
       context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.StartInstance(instanceId, imageUrl, portalUri))
-    case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, saveHelperImageUrl, imageServer) =>
+    case dit4c.protobuf.scheduler.inbound.SaveInstance(instanceId, clusterId, imageServer) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}
       context.parent ! service.ClusterManager.ClusterCommand(clusterId,
           RktClusterManager.InstanceEnvelope(instanceId,
-              Instance.Save(saveHelperImageUrl, imageServer)))
+              Instance.Save(imageServer)))
     case dit4c.protobuf.scheduler.inbound.DiscardInstance(instanceId, clusterId) =>
       import dit4c.scheduler.domain._
       import dit4c.scheduler.domain.{instance => i}

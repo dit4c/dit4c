@@ -65,7 +65,6 @@ object Instance {
   case class SaveData(
       instanceId: String,
       keys: InstanceKeys,
-      uploadHelperImage: String,
       imageServer: String,
       portalUri: String) extends SomeData
   case class DiscardData(instanceId: String) extends SomeData
@@ -83,9 +82,7 @@ object Instance {
   case object ConfirmExited extends Command
   case object Discard extends Command
   case object ConfirmDiscard extends Command
-  case class Save(
-      helperImage: NamedImage,
-      imageServer: String) extends Command
+  case class Save(imageServer: String) extends Command
   protected case object ContinueSave extends Command
   protected case object ContinueDiscard extends Command
   protected case object Upload extends Command
@@ -166,9 +163,9 @@ class Instance(worker: ActorRef)
   }
 
   when(Running) {
-    case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
+    case Event(Save(imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
-      goto(Stopping).applying(RequestedSave(helperImage, imageServer, now)).andThen { _ =>
+      goto(Stopping).applying(RequestedSave(imageServer, now)).andThen { _ =>
         worker ! InstanceWorker.Stop
         requester ! Ack
       }
@@ -194,9 +191,9 @@ class Instance(worker: ActorRef)
   }
 
   when(Exited) {
-    case Event(Save(helperImage, imageServer), StartData(id, _, _, portalUri, _) ) =>
+    case Event(Save(imageServer), StartData(id, _, _, portalUri, _) ) =>
       val requester = sender
-      goto(Saving).applying(RequestedSave(helperImage, imageServer, now)).andThen { _ =>
+      goto(Saving).applying(RequestedSave(imageServer, now)).andThen { _ =>
         worker ! InstanceWorker.Save
         requester ! Ack
       }
@@ -206,7 +203,7 @@ class Instance(worker: ActorRef)
         worker ! InstanceWorker.Discard
         requester ! Ack
       }
-    case Event(ContinueSave, SaveData(id, _, _, _, _) ) =>
+    case Event(ContinueSave, SaveData(id, _, _, _) ) =>
       worker ! InstanceWorker.Save
       goto(Saving)
     case Event(ContinueDiscard, DiscardData(id)) =>
@@ -229,10 +226,10 @@ class Instance(worker: ActorRef)
   }
 
   when(Saved) {
-    case Event(Upload, SaveData(id, _, helperImage, imageServer, portalUri)) =>
+    case Event(Upload, SaveData(id, _, imageServer, portalUri)) =>
       val requester = sender
       goto(Uploading).applying(CommencedUpload(now)).andThen { _ =>
-        worker ! InstanceWorker.Upload(helperImage, imageServer, portalUri)
+        worker ! InstanceWorker.Upload(imageServer, portalUri)
       }
     case Event(Tick, _) =>
       worker ! InstanceWorker.Assert(InstanceWorker.StillExists)
@@ -331,13 +328,13 @@ class Instance(worker: ActorRef)
         case data: StartData => data.copy(keys = Some(InstanceKeys(armoredKeyStr)))
         case other => unhandled()
       }
-      case RequestedSave(helperImage, imageServer, _) => currentData match {
+      case RequestedSave(imageServer, _) => currentData match {
         case StartData(id, _, _, portalUri, Some(signingKey)) =>
-          SaveData(id, signingKey, helperImage, imageServer, portalUri)
+          SaveData(id, signingKey, imageServer, portalUri)
         case data: SaveData =>
           // TODO: Get rid of this once we know how it happens
           log.warning("Two requested saves really shouldn't happen!")
-          data.copy(uploadHelperImage = helperImage, imageServer = imageServer)
+          data.copy(imageServer = imageServer)
         case other => unhandled()
       }
       case RequestedDiscard(_) => currentData match {

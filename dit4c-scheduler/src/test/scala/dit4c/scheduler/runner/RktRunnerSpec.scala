@@ -93,12 +93,16 @@ class RktRunnerSpec(implicit ee: ExecutionEnv) extends Specification
     val listenerHelperImage: String = downloadFile(
         new URL(defaultSchedulerConfig.listenerImage),
         "/tmp/dit4c-test-helper-listener.aci")
+    val uploadHelperImage: String = downloadFile(
+        new URL(defaultSchedulerConfig.uploadImage),
+        "/tmp/dit4c-test-upload-webdav.aci")
     val runner = new RktRunnerImpl(commandExecutor, RktRunner.Config(
         rktDir,
         "dit4c-test-"+Random.alphanumeric.take(10).mkString.toLowerCase,
         authHelperImage,
         listenerHelperImage,
-        None))
+        None,
+        uploadHelperImage))
     AsResult(f(runner))
   }
 

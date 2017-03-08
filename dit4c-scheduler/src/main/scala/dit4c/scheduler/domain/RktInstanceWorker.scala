@@ -63,9 +63,9 @@ class RktInstanceWorker(val instanceId: String, runner: RktRunner) extends Actor
         case Failure(e) =>
           replyWithError("Unable to save image", instance, e)
       }
-    case Upload(helperImageName, imageServer, portalUri) =>
+    case Upload(imageServer, portalUri) =>
       val instance = sender
-      runner.uploadImage(instanceId, helperImageName, imageServer, portalUri).andThen {
+      runner.uploadImage(instanceId, imageServer, portalUri).andThen {
         case Success(imageId) =>
           // We've simply started the upload process, so don't confirm the upload
           log.info(s"Upload sucessfully initiated for $instanceId")

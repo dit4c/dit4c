@@ -30,7 +30,8 @@ object RktRunner {
       instanceNamePrefix: String,
       authImage: String,
       listenerImage: String,
-      storageImage: Option[String])
+      storageImage: Option[String],
+      uploadImage: String)
 }
 
 trait RktRunner {
@@ -44,7 +45,6 @@ trait RktRunner {
   def stop(instanceId: String): Future[Unit]
   def export(instanceId: String): Future[Unit]
   def uploadImage(instanceId: String,
-      helperImage: String,
       imageServer: String,
       portalUri: String): Future[Unit]
   def resolveStates(instanceIds: Set[String]): Future[Map[String,InstanceState]]
@@ -160,11 +160,10 @@ class RktRunnerImpl(
 
   def uploadImage(
       instanceId: String,
-      helperImage: String,
       imageServer: String,
       portalUri: String): Future[Unit] =
     for {
-      helperImageId <- fetch(helperImage)
+      helperImageId <- fetch(config.uploadImage)
       instanceKeysInternalPath = "/dit4c/instance/pki"
       helperEnvVars = Map[String,String](
         "DIT4C_IMAGE" -> s"/dit4c/image/${podAppName(instanceId)}.aci",

@@ -34,7 +34,7 @@ message AssociatedKeys {
 
 message RequestedSave {
   option (scalapb.message).extends = "dit4c.scheduler.domain.instance.DomainEvent";
-  string helperImage = 1;
+  reserved 1; //string helperImage = 1;
   string imageServer = 2;
   google.protobuf.Timestamp timestamp = 100;
 }

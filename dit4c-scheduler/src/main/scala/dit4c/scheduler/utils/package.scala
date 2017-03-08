@@ -42,7 +42,8 @@ package object utils {
       val portalUri: String = "ws://localhost:9000/messaging/scheduler/default",
       val authImage: String = "https://github.com/dit4c/dit4c-helper-auth-portal/releases/download/v0.1.2/dit4c-helper-auth-portal.linux.amd64.aci",
       val listenerImage: String = "https://github.com/dit4c/dit4c-helper-listener-ngrok2/releases/download/0.0.6/dit4c-helper-listener-ngrok2-au.linux.amd64.aci",
-      val storageImage: Option[String] = None)
+      val storageImage: Option[String] = None,
+      val uploadImage: String = "https://github.com/dit4c/dit4c-helper-upload-webdav/releases/download/0.1.0/dit4c-helper-upload-webdav.linux.amd64.aci")
 
   class SchedulerConfigParser(app: AppMetadata)
       extends OptionParser[SchedulerConfig](app.name) {
@@ -116,6 +117,10 @@ package object utils {
     opt[String]("storage-image")
       .action { (x, c) => c.copy(storageImage = Some(x)) }
       .text("image to use for connecting pod to remote storage")
+
+    opt[String]("upload-image")
+      .action { (x, c) => c.copy(uploadImage = x) }
+      .text("image to use for uploading images")
 
     private def getFileContents(f: File) = {
       import scala.sys.process._

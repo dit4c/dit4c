@@ -119,10 +119,9 @@ class Cluster(
 
     def saveInstance(instanceId: String): SchedulerAggregate.SendSchedulerMessage = wrapForScheduler {
       import dit4c.protobuf.scheduler.inbound._
-      val saveHelper = imageServerConfig.map(_.saveHelper).getOrElse("")
       val server = imageServerConfig.map(_.server).getOrElse("")
       InboundMessage(randomMsgId, InboundMessage.Payload.SaveInstance(
-        SaveInstance(instanceId, clusterId, saveHelper, server)
+        SaveInstance(instanceId, clusterId, server)
       ))
     }
 
