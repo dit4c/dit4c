@@ -39,7 +39,7 @@ extract_project_tarball () {
 extract_project_tarball "dit4c-portal"
 sudo rm -rf .acbuild
 sudo $ACBUILD begin "$BASE_ACI"
-sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apk update && apk add bash zsh && rm -rf /var/cache/apk/*"
+sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "rm -f /etc/resolv.conf && echo nameserver 8.8.8.8 > /etc/resolv.conf && apk update && apk add bash zsh && rm -rf /var/cache/apk/* /etc/resolv.conf"
 sudo $ACBUILD copy "$WORKING_DIR/dit4c-portal" /opt/dit4c-portal
 sudo $ACBUILD copy "$SCRIPT_DIR/extra/start_portal.zsh" /start_portal
 sudo $ACBUILD set-name dit4c-portal
@@ -56,7 +56,7 @@ sudo chown $(whoami) dit4c-portal.linux.amd64.aci
 extract_project_tarball "dit4c-scheduler"
 sudo rm -rf .acbuild
 sudo $ACBUILD begin "$BASE_ACI"
-sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "apk update && apk add bash && rm -rf /var/cache/apk/*"
+sudo "PATH=$PATH" $ACBUILD run --engine chroot -- sh -c "rm -f /etc/resolv.conf && echo nameserver 8.8.8.8 > /etc/resolv.conf && apk update && apk add bash && rm -rf /var/cache/apk/* /etc/resolv.conf"
 sudo $ACBUILD copy "$WORKING_DIR/dit4c-scheduler" /opt/dit4c-scheduler
 sudo $ACBUILD set-name dit4c-scheduler
 sudo $ACBUILD set-user nobody
