@@ -21,7 +21,7 @@ Some of the current environments available are:
  * [Apache Zeppelin + Base][dit4c-container-zeppelin]
  * [X11][dit4c-container-x11] - Base + X11 sessions via HTML5 VNC client
  * [Octave + X11][dit4c-container-octave]
- * [QGIS + Jupyter + RStudio + X11][dit4c-container-zeppelin] - QGIS with supporting Python & R environments
+ * [QGIS + Jupyter + RStudio + X11][dit4c-container-qgis] - QGIS with supporting Python & R environments
 
 ## Motivation
 
@@ -53,8 +53,7 @@ Auxiliary "helper" container images:
  * [dit4c-helper-auth-portal](https://github.com/dit4c/dit4c-helper-auth-portal/) - proxies container services behind portal-provided auth
  * [dit4c-helper-upload-webdav](https://github.com/dit4c/dit4c-helper-upload-webdav/) - uploads saved images to a webdav server
 
-_Many things have changed in DIT4C 0.10. An updated architecture diagram will be added soon._
-
+See <https://dit4c.github.io/> for further archtecture details.
 
 ### Security
 
@@ -90,7 +89,7 @@ HTTPS should be used with the portal, image server (recommended, but optional) a
 
 ## Installing
 
-_Many things have changed in DIT4C 0.10. Updated installation instructions will be added soon._
+See <https://dit4c.github.io/> for installation instructions.
 
 
 [swc]: http://software-carpentry.org/
