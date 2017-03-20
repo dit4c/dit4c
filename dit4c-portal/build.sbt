@@ -40,6 +40,7 @@ libraryDependencies ++= {
     __ %  "github-com-web-animations-web-animations-js"             % "2.2.1",
     __ %  "github-com-PolymerLabs-promise-polyfill"                 % "1.0.0",
     __ %  "github-com-PolymerElements-font-roboto"		    	    % "1.0.1",
+    __ %  "github-com-PolymerElements-iron-autogrow-textarea"		% "1.0.15",
     __ %  "github-com-PolymerElements-iron-a11y-announcer"          % "1.0.5",
     __ %  "github-com-PolymerElements-iron-flex-layout"             % "1.3.1",
     __ %  "github-com-PolymerElements-iron-input"             		% "1.0.9",
