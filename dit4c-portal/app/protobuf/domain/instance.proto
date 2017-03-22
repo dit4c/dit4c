@@ -19,6 +19,7 @@ message StartedInstance {
   string schedulerId = 1;
   string clusterId = 2;
   google.protobuf.StringValue parentInstanceId = 3;
+  repeated string tags = 4;
   google.protobuf.Timestamp timestamp = 100;
 }
 

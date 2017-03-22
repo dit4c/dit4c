@@ -99,10 +99,10 @@ class MainController(
               userData.cluster)
           val uaOp = imageLookup.get(userData.image) match {
             case Some(image) =>
-              UserAggregate.StartInstance(schedulerId, clusterId, image)
+              UserAggregate.StartInstance(schedulerId, clusterId, image.image, (image.tags ++ userData.tags).distinct)
             case None =>
               UserAggregate.StartInstanceFromInstance(
-                  schedulerId, clusterId, userData.image)
+                  schedulerId, clusterId, userData.image, userData.tags.distinct)
           }
           (userSharder ? UserSharder.Envelope(request.identity.id, uaOp)).map {
             case InstanceAggregate.Started(id) =>
@@ -347,11 +347,12 @@ class MainController(
   def newInstanceForm(userId: String) = Form(
     mapping(
         "image" -> nonEmptyText,
-        "cluster" -> nonEmptyText
+        "cluster" -> nonEmptyText,
+        "tags" -> list(nonEmptyText)
     )(NewInstanceRequest.apply)(NewInstanceRequest.unapply)
   )
 
-  case class NewInstanceRequest(image: String, cluster: String)
+  case class NewInstanceRequest(image: String, cluster: String, tags: List[String])
   case class InstanceRegistrationRequest(uri: String)
   case class InstanceSharingAuthorization(userId: String, instanceId: String)
   case class InstanceSharingLink(url: String, expires: Instant)
@@ -377,7 +378,7 @@ class MainController(
       (__ \ 'clusters).write[List[ClusterOption]]
         .contramap(_.options)
 
-  private lazy val imageLookup: Map[String, String] = publicImages.map(PublicImage.unapply).flatten.toMap
+  private lazy val imageLookup: Map[String, PublicImage] = publicImages.map(v => (v.display, v)).toMap
 
   implicit private val readsInstanceRegistration: Reads[InstanceRegistrationRequest] =
     (__ \ 'uri).read[String].map(InstanceRegistrationRequest(_))
@@ -490,6 +491,7 @@ class GetInstancesActor(out: ActorRef,
               effectiveState(msg.state, url),
               msg.description,
               url,
+              msg.tags,
               msg.timestamps,
               msg.availableActions.toSeq.sortBy(_.toString))
         case InstanceAggregate.DoesNotExist => // Do nothing
@@ -512,6 +514,7 @@ class GetInstancesActor(out: ActorRef,
       state: String,
       info: String,
       url: Option[String],
+      tags: Seq[String],
       timestamps: InstanceAggregate.EventTimestamps,
       availableActions: Seq[InstanceAggregate.InstanceAction])
 
@@ -528,6 +531,7 @@ class GetInstancesActor(out: ActorRef,
       (__ \ 'state).write[String] and
       (__ \ 'info).write[String] and
       (__ \ 'url).writeNullable[String] and
+      (__ \ 'tags).write[Seq[String]] and
       (__ \ 'timestamps).write[InstanceAggregate.EventTimestamps] and
       (__ \ 'actions).write[Seq[InstanceAggregate.InstanceAction]]
     )(unlift(InstanceResponse.unapply))

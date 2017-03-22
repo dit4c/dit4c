@@ -45,6 +45,9 @@
             Based on: <friendly-name value="{{image}}"></friendly-name>
           </p>
           <input name="image" type="hidden" value="{{image}}" />
+          <template is="dom-repeat" items="[[tags]]">
+            <input name="tags[]" type="hidden" value="{{item}}" />
+          </template>
         </template>
         <template is="dom-if" if="{{isNotSet(image)}}" restamp="true">
           <paper-dropdown-menu label="Image" name="image" required>
@@ -91,7 +94,8 @@
       image: {
         type: String,
         value: null
-      }
+      },
+      tags: Array
     },
     isEmpty: function(xs) {
       return !xs || xs.length == 0;

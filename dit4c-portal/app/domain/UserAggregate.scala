@@ -37,11 +37,13 @@ object UserAggregate {
   case class StartInstance(
       schedulerId: String,
       clusterId: String,
-      image: String) extends Command
+      image: String,
+      tags: Seq[String]) extends Command
   case class StartInstanceFromInstance(
       schedulerId: String,
       clusterId: String,
-      sourceInstance: String) extends Command
+      sourceInstance: String,
+      tags: Seq[String]) extends Command
   case class SaveInstance(instanceId: String) extends Command
   case class DiscardInstance(instanceId: String) extends Command
   case class GetInstanceImageUrl(instanceId: String, user: String) extends Command
@@ -92,21 +94,21 @@ class UserAggregate(
   def receiveCommand: PartialFunction[Any,Unit] = {
     case Create =>
       sender ! CreateResponse(userId)
-    case msg @ StartInstance(schedulerId, clusterId, image) =>
+    case msg @ StartInstance(schedulerId, clusterId, image, tags) =>
       val op = (instanceSharder ? InstanceSharder.StartInstance(
-          schedulerId, clusterId, None, accessPassIds(schedulerId), image))
+          schedulerId, clusterId, None, accessPassIds(schedulerId), image, tags))
       op.onSuccess {
         case InstanceAggregate.Started(instanceId) =>
           self ! InstanceCreationConfirmation(instanceId)
       }
       op pipeTo sender
-    case StartInstanceFromInstance(schedulerId, clusterId, sourceInstance) =>
+    case StartInstanceFromInstance(schedulerId, clusterId, sourceInstance, tags) =>
       if (data.instances.contains(sourceInstance)) {
         val requester = sender
         (instanceSharder ? InstanceSharder.Envelope(sourceInstance, InstanceAggregate.GetImageUrl("scheduler-"+schedulerId))).foreach {
           case InstanceAggregate.InstanceImage(image) =>
             val op = (instanceSharder ?
-                InstanceSharder.StartInstance(schedulerId, clusterId, Some(sourceInstance), accessPassIds(schedulerId), image))
+                InstanceSharder.StartInstance(schedulerId, clusterId, Some(sourceInstance), accessPassIds(schedulerId), image, tags))
             op.onSuccess {
               case InstanceAggregate.Started(instanceId) =>
                 self ! InstanceCreationConfirmation(instanceId)

@@ -81,7 +81,8 @@ class AppComponents(context: Context)
       c <- config.getConfig(key)
       display <- c.getString("display").orElse(Some(key))
       image <- c.getString("image")
-    } yield PublicImage(display, image)
+      tags = c.getStringSeq("tags").getOrElse(Nil)
+    } yield PublicImage(display, image, tags)
 
   // Image save handling
   val imageServerConfig =

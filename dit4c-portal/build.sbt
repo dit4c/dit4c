@@ -55,6 +55,7 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-marked-element"               % "1.2.0",
     __ %  "github-com-PolymerElements-neon-animation"               % "1.2.3"
       exclude(__, "github-com-web-animations-web-animations-js"),
+    __ %  "github-com-PolymerElements-paper-badge"                  % "1.1.4",
     __ %  "github-com-PolymerElements-paper-button"                 % "1.0.12",
     __ %  "github-com-PolymerElements-paper-card"                   % "1.0.8",
     __ %  "github-com-PolymerElements-paper-dialog"                 % "1.1.0"
