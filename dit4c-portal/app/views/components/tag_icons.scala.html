@@ -65,8 +65,8 @@
     _updateIcons: function(tags) {
       this._iconset = this._meta && this._meta.byKey('tag-icons');
       if (this._iconset) {
-      var iconNames = this._iconset.getIconNames();
-      var iconName = function(tag) {
+        var iconNames = this._iconset.getIconNames();
+        var iconName = function(tag) {
           return "tag-icons:"+tag.toLowerCase();
         };
         var icons = 
