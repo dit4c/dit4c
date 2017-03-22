@@ -18,6 +18,7 @@
 <link rel="import" href="@routes.WebComponentsController.component("instance-share-button")">
 <link rel="import" href="@routes.WebComponentsController.component("local-time")">
 <link rel="import" href="@routes.WebComponentsController.component("new-instance-dialog")">
+<link rel="import" href="@routes.WebComponentsController.component("tag-icons")">
 
 <dom-module id="instances-container">
   <style>
@@ -72,7 +73,10 @@
     --paper-progress-active-color: white;
   }
   paper-card .card-actions {
-    @@apply(--layout-horizontal-reverse);
+    @@apply(--layout-horizontal);
+  }
+  paper-card .card-actions .spacer {
+    @@apply(--layout-flex);
   }
   .instance-name {
     @@apply(--paper-font-body2);
@@ -151,14 +155,14 @@
               </div>
             </iron-collapse>
             <div class="card-actions layout horizontal-reverse">
+              <tag-icons tags="{{item.tags}}"></tag-icons>
+              <paper-icon-button class="spacer" icon="" disabled></paper-icon-button>
               <template is="dom-if" if="{{hasAction(item, 'save')}}">
               	<instance-save-button instance-id="{{item.id}}"></instance-save-button>
               </template>
               <template is="dom-if" if="{{hasAction(item, 'discard')}}">
               	<instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
               </template>
-              <!-- Kludgy spacer -->
-              <paper-icon-button icon="" disabled></paper-icon-button>
             </div>
           </paper-card>
         </template>
@@ -187,7 +191,7 @@
 	              <local-time instant="{{item.timestamps.created}}">
 	                <span class="label prefix">Created</span>
 	              </local-time>
-	            </div>
+	            </div>disabled
 	            <div class="instance-time">
 	              <local-time instant="{{item.timestamps.completed}}">
 	                <span class="label prefix">Completed</span>
@@ -197,23 +201,23 @@
               </div>
             </iron-collapse>
             <div class="card-actions">
-              <template is="dom-if" if="{{hasAction(item, 'save')}}">
-              	<instance-save-button instance-id="{{item.id}}"></instance-save-button>
-              </template>
-              <template is="dom-if" if="{{hasAction(item, 'discard')}}">
-              	<instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
-              </template>
-              <template is="dom-if" if="{{hasAction(item, 'share')}}">
-                <instance-share-button instance-id="{{item.id}}"></instance-share-button>
+              <tag-icons tags="{{item.tags}}"></tag-icons>
+              <paper-icon-button class="spacer" icon="" disabled></paper-icon-button>
+              <template is="dom-if" if="{{hasAction(item, 'createderived')}}">
+                <instance-create-button instance-id="{{item.id}}"></instance-create-button>
               </template>
               <template is="dom-if" if="{{hasAction(item, 'export')}}">
                 <instance-export-button instance-id="{{item.id}}"></instance-export-button>
               </template>
-              <template is="dom-if" if="{{hasAction(item, 'createderived')}}">
-                <instance-create-button instance-id="{{item.id}}"></instance-create-button>
+              <template is="dom-if" if="{{hasAction(item, 'share')}}">
+                <instance-share-button instance-id="{{item.id}}"></instance-share-button>
               </template>
-              <!-- Kludgy spacer -->
-              <paper-icon-button icon="" disabled></paper-icon-button>
+              <template is="dom-if" if="{{hasAction(item, 'discard')}}">
+              	<instance-discard-button instance-id="{{item.id}}"></instance-discard-button>
+              </template>
+              <template is="dom-if" if="{{hasAction(item, 'save')}}">
+              	<instance-save-button instance-id="{{item.id}}"></instance-save-button>
+              </template>
             </div>
           </paper-card>
         </template>

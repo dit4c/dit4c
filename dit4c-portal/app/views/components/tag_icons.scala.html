@@ -1,0 +1,73 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/iron-icon/iron-icon.html")">
+<link rel="import" href="@routes.WebComponentsController.component("tag-iconset")">
+
+<dom-module id="tag-icons">
+  <template>
+  	<style>
+  	:host {
+  	  padding-top: 8px;
+  	  padding-bottom: 8px;
+  	}
+  	</style>
+    <template is="dom-repeat" items="[[_icons]]">
+   	  <iron-icon title="[[item.title]]" icon="[[item.icon]]"></iron-icon>
+	</template>
+  </template>
+  <script>
+  Polymer({
+    is: "tag-icons",
+    properties: {
+      tags: {
+        type: Array,
+        value: []
+      },
+      _icons: {
+        type: Array,
+        value: []
+      },
+      _meta: {
+        value: Polymer.Base.create('iron-meta', {type: 'iconset'})
+      }
+    },
+    observers: [
+      '_updateIcons(tags, _meta)'
+    ],
+    _updateIcons: function(tags) {
+      this._iconset = this._meta && this._meta.byKey('tag-icons');
+      if (this._iconset) {
+    	var iconNames = this._iconset.getIconNames();
+    	var iconName = function(tag) {
+          return "tag-icons:"+tag.toLowerCase();
+        };
+        var icons = 
+          tags
+            .filter(function(tag) {
+              return iconNames.indexOf(iconName(tag)) != -1;	
+            })
+            .map(function(tag) {
+              return {
+                "title": tag,
+                "icon": iconName(tag)
+              };
+            });
+        var tagsWithoutIcons = tags.filter(function(tag) {
+          return iconNames.indexOf(iconName(tag)) == -1;	
+        });
+        if (tagsWithoutIcons.length > 0) {
+          icons.push({
+        	"title": tagsWithoutIcons.join("\n"),
+        	"icon": "tag-icons:tags"
+          })
+        }
+        this._icons = icons;
+        this.unlisten(window, 'iron-iconset-added', '_updateIcons');
+      } else {
+        this._icons = [];
+        this.listen(window, 'iron-iconset-added', '_updateIcons');
+      }
+    }
+  });
+  </script>
+</dom-module>
