@@ -5,7 +5,7 @@
 
 <dom-module id="instance-create-button">
   <template>
-    <new-instance-dialog id="dialog" image="[[instanceId]]">
+    <new-instance-dialog id="dialog" image="[[instanceId]]" tags="[[tags]]">
     </new-instance-dialog>
     <paper-icon-button icon="add"
       title="new instance" on-click="openDialog"></paper-icon-button>
@@ -14,7 +14,8 @@
   Polymer({
     is: "instance-create-button",
     properties: {
-      instanceId: String
+      instanceId: String,
+      tags: Array
     },
     openDialog: function() {
       this.$.dialog.open();

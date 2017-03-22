@@ -36,16 +36,16 @@ libraryDependencies ++= {
   val __ = "org.webjars.bower"
   Seq(
     __ %  "webcomponentsjs"        % "0.7.22",
-    __ %  "github-com-Polymer-polymer"                              % "1.7.0",
+    __ %  "github-com-Polymer-polymer"                              % "1.8.1",
     __ %  "github-com-web-animations-web-animations-js"             % "2.2.1",
     __ %  "github-com-PolymerLabs-promise-polyfill"                 % "1.0.0",
     __ %  "github-com-PolymerElements-font-roboto"		    	    % "1.0.1",
     __ %  "github-com-PolymerElements-iron-autogrow-textarea"		% "1.0.15",
     __ %  "github-com-PolymerElements-iron-a11y-announcer"          % "1.0.5",
-    __ %  "github-com-PolymerElements-iron-flex-layout"             % "1.3.1",
+    __ %  "github-com-PolymerElements-iron-flex-layout"             % "1.3.2",
     __ %  "github-com-PolymerElements-iron-input"             		% "1.0.9",
     __ %  "github-com-PolymerElements-iron-form"                    % "1.1.4",
-    __ %  "github-com-PolymerElements-iron-iconset-svg"             % "1.0.9",
+    __ %  "github-com-PolymerElements-iron-iconset-svg"             % "1.1.0",
     __ %  "github-com-PolymerElements-iron-image"                   % "1.0.4",
     __ %  "github-com-PolymerElements-iron-media-query"             % "1.0.7",
     __ %  "github-com-PolymerElements-iron-overlay-behavior"        % "1.8.0",
@@ -55,6 +55,7 @@ libraryDependencies ++= {
     __ %  "github-com-PolymerElements-marked-element"               % "1.2.0",
     __ %  "github-com-PolymerElements-neon-animation"               % "1.2.3"
       exclude(__, "github-com-web-animations-web-animations-js"),
+    __ %  "github-com-PolymerElements-paper-badge"                  % "1.1.4",
     __ %  "github-com-PolymerElements-paper-button"                 % "1.0.12",
     __ %  "github-com-PolymerElements-paper-card"                   % "1.0.8",
     __ %  "github-com-PolymerElements-paper-dialog"                 % "1.1.0"

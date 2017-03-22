@@ -1,0 +1,93 @@
+@(request: RequestHeader, messagesApi: MessagesApi)
+
+<link rel="import" href="@routes.Assets.versioned("lib/paper-badge/paper-badge.html")">
+<link rel="import" href="@routes.Assets.versioned("lib/iron-icon/iron-icon.html")">
+<link rel="import" href="@routes.WebComponentsController.component("tag-iconset")">
+
+<dom-module id="tag-icons">
+  <template>
+    <style>
+    iron-icon {
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+    #tags-icon {
+      margin-right: 8px;
+    }
+    </style>
+    <template is="dom-if" if="[[_hasExtraTags]]">
+      <iron-icon id="tags-icon" title="[[_tagsText]]" icon="tag-icons:tags"></iron-icon>
+      <paper-badge for="tags-icon" label="[[tags.length]]"></paper-badge>
+    </template>
+    <template is="dom-if" if="[[_hasNoTags]]">
+      <iron-icon id="tags-icon" icon=""></iron-icon>
+    </template>
+    <template is="dom-repeat" items="[[_icons]]">
+       <iron-icon title="[[item.title]]" icon="[[item.icon]]"></iron-icon>
+  </template>
+  </template>
+  <script>
+  Polymer({
+    is: "tag-icons",
+    properties: {
+      tags: {
+        type: Array,
+        value: []
+      },
+      _hasNoTags: {
+        type: Boolean,
+        computed: '_isEmpty(tags)'
+       },
+      _hasExtraTags: {
+      type: Boolean,
+      computed: '_extraTagsExist(tags, _icons)'
+      },
+      _icons: {
+        type: Array,
+        value: []
+      },
+      _tagsText: {
+      type: String
+      },
+      _meta: {
+        value: Polymer.Base.create('iron-meta', {type: 'iconset'})
+      }
+    },
+    observers: [
+      '_updateIcons(tags, _meta)'
+    ],
+    _isEmpty: function(xs) {
+      return xs.length == 0;
+    },
+    _extraTagsExist: function(tags, icons) {
+      return !(tags.length == icons.length);
+    },
+    _updateIcons: function(tags) {
+      this._iconset = this._meta && this._meta.byKey('tag-icons');
+      if (this._iconset) {
+        var iconNames = this._iconset.getIconNames();
+        var iconName = function(tag) {
+          return "tag-icons:"+tag.toLowerCase();
+        };
+        var icons = 
+          tags
+            .filter(function(tag) {
+              return iconNames.indexOf(iconName(tag)) != -1;
+            })
+            .map(function(tag) {
+              return {
+                "title": tag,
+                "icon": iconName(tag)
+              };
+            });
+        this._icons = icons;
+        this._tagsText = this.tags.join("\n");
+        this.unlisten(window, 'iron-iconset-added', '_updateIcons');
+      } else {
+        this._icons = [];
+        this.listen(window, 'iron-iconset-added', '_updateIcons');
+      }
+    }
+  });
+  </script>
+</dom-module>

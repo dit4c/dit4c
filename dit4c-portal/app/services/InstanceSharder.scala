@@ -25,7 +25,8 @@ object InstanceSharder {
       clusterId: String,
       parentInstanceId: Option[String],
       accessPassIds: List[String],
-      image: String) extends Command
+      image: String,
+      tags: Seq[String]) extends Command
   case class VerifyJwt(token: String) extends Command
   case class Envelope(instanceId: String, msg: Any) extends Command
 
