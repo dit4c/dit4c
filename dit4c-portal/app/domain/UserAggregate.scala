@@ -72,7 +72,8 @@ object UserAggregate {
 
 class UserAggregate(
     instanceSharder: ActorRef @@ InstanceSharder.type,
-    schedulerSharder: ActorRef @@ SchedulerSharder.type)
+    schedulerSharder: ActorRef @@ SchedulerSharder.type,
+    eventBroadcaster: ActorRef @@ EventBroadcaster.type)
     extends PersistentActor with ActorLogging with ActorHelpers {
   import domain.BaseDomainEvent.now
   import domain.user._
@@ -99,6 +100,7 @@ class UserAggregate(
           schedulerId, clusterId, None, accessPassIds(schedulerId), image, tags))
       op.onSuccess {
         case InstanceAggregate.Started(instanceId) =>
+          eventBroadcaster ! EventBroadcaster.InstanceCreationBroadcast(instanceId, userId)
           self ! InstanceCreationConfirmation(instanceId)
       }
       op pipeTo sender
@@ -111,6 +113,7 @@ class UserAggregate(
                 InstanceSharder.StartInstance(schedulerId, clusterId, Some(sourceInstance), accessPassIds(schedulerId), image, tags))
             op.onSuccess {
               case InstanceAggregate.Started(instanceId) =>
+                eventBroadcaster ! EventBroadcaster.InstanceCreationBroadcast(instanceId, userId)
                 self ! InstanceCreationConfirmation(instanceId)
             }
             op pipeTo requester

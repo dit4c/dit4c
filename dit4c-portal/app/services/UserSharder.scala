@@ -14,6 +14,7 @@ import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ClusterShardingSettings
 import domain.BaseCommand
+import domain.EventBroadcaster
 
 object UserSharder {
   sealed trait Command extends BaseCommand
@@ -24,12 +25,16 @@ object UserSharder {
       instanceSharder: ActorRef @@ InstanceSharder.type,
       schedulerSharder: ActorRef @@ SchedulerSharder.type
       )(implicit system: ActorSystem): ActorRef = {
+    val eventBroadcaster = system.actorOf(
+        Props(classOf[EventBroadcaster], system.eventStream),
+        "user-event-broadcaster").taggedWith[EventBroadcaster.type]
     ClusterSharding(system).start(
         typeName = "UserAggregate",
         entityProps = Props(
             classOf[UserAggregate],
             instanceSharder,
-            schedulerSharder),
+            schedulerSharder,
+            eventBroadcaster),
         settings = ClusterShardingSettings(system),
         extractEntityId = extractEntityId,
         extractShardId = extractShardId)

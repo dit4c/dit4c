@@ -40,7 +40,7 @@ import play.api.http.websocket.CloseMessage
 import play.twirl.api.Html
 import org.bouncycastle.openpgp.PGPSignature
 import akka.http.scaladsl.Http
-import domain.instance.StatusBroadcaster
+import domain.EventBroadcaster
 
 class MainController(
     val environment: Environment,
@@ -461,8 +461,9 @@ class GetInstancesActor(out: ActorRef,
     import context.dispatcher
     import akka.pattern.pipe
     implicit val timeout = Timeout(5.seconds)
-    context.system.eventStream.subscribe(context.self, classOf[StatusBroadcaster.InstanceStatusBroadcast])
-    pollFunc = Some(context.system.scheduler.schedule(1.micro, 2.seconds) {
+    context.system.eventStream.subscribe(context.self, classOf[EventBroadcaster.InstanceCreationBroadcast])
+    context.system.eventStream.subscribe(context.self, classOf[EventBroadcaster.InstanceStatusBroadcast])
+    pollFunc = Some(context.system.scheduler.schedule(1.micro, 60.seconds) {
       userSharder.tell(UserSharder.Envelope(user.id, UserAggregate.GetAllInstanceIds), context.self)
     })
   }
@@ -479,7 +480,11 @@ class GetInstancesActor(out: ActorRef,
       newInstanceIds.foreach { id =>
         instanceSharder ! InstanceSharder.Envelope(id, InstanceAggregate.RefreshStatus)
       }
-    case StatusBroadcaster.InstanceStatusBroadcast(id, status) if userInstanceIds.contains(id) =>
+    case EventBroadcaster.InstanceCreationBroadcast(instanceId, userId) if user.id == userId =>
+      userInstanceIds = userInstanceIds + instanceId
+    case EventBroadcaster.InstanceCreationBroadcast(instanceId, userId) =>
+      // Ignore
+    case EventBroadcaster.InstanceStatusBroadcast(id, status) if userInstanceIds.contains(id) =>
       status match {
         case s: InstanceAggregate.CurrentStatus if isUnnecessaryClutter(s) =>
           // Don't tell the client about this instance's status
@@ -496,7 +501,7 @@ class GetInstancesActor(out: ActorRef,
               msg.availableActions.toSeq.sortBy(_.toString))
         case InstanceAggregate.DoesNotExist => // Do nothing
       }
-    case StatusBroadcaster.InstanceStatusBroadcast(id, status) =>
+    case EventBroadcaster.InstanceStatusBroadcast(id, status) =>
       // Ignore
     case r: InstanceResponse =>
       out ! TextMessage(Json.asciiStringify(Json.toJson(r)))

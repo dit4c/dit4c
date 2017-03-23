@@ -1,17 +1,17 @@
-package domain.instance
+package domain
 
-import domain.InstanceAggregate
-import domain.BaseResponse
 import akka.actor.Actor
 import akka.actor.ActorLogging
-import domain.BaseCommand
 import utils.akka.ActorHelpers
 import akka.event.EventStream
 import domain.InstanceAggregate.StatusResponse
 
-object StatusBroadcaster {
+object EventBroadcaster {
 
   sealed trait Command extends BaseCommand
+  case class InstanceCreationBroadcast(
+      instanceId: String,
+      userId: String) extends Command
   case class InstanceStatusBroadcast(
       instanceId: String,
       status: StatusResponse) extends Command
@@ -24,11 +24,11 @@ object StatusBroadcaster {
  * Note that this isn't cluster-safe, and so will need to be replaced with something using
  * distributed pub-sub if dit4c-portal is to work on multiple servers.
  */
-class StatusBroadcaster(eventStream: EventStream) extends Actor with ActorLogging with ActorHelpers {
-  import StatusBroadcaster._
+class EventBroadcaster(eventStream: EventStream) extends Actor with ActorLogging with ActorHelpers {
+  import EventBroadcaster._
 
   val receive = sealedReceive[Command] {
-    case msg: InstanceStatusBroadcast =>
+    case msg: Command =>
       eventStream.publish(msg)
   }
 

@@ -134,6 +134,7 @@ class Instance(worker: ActorRef)
           log.info(s"Fetching image: $imageName")
           worker ! InstanceWorker.Fetch(imageName)
           requester ! Ack
+          emitStatusReportToEventStream(stateName)(data)
       }
   }
 

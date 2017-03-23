@@ -3,10 +3,8 @@ package domain.instance
 import com.softwaremill.tagging._
 import akka.actor._
 import dit4c.protobuf.scheduler.outbound.InstanceStateUpdate
-import domain.Cluster
-import domain.InstanceAggregate
+import domain._
 import services.SchedulerSharder
-import domain.SchedulerAggregate
 import scala.concurrent.duration._
 
 class StatusUpdateProcessor(
@@ -14,7 +12,7 @@ class StatusUpdateProcessor(
     clusterId: String,
     schedulerId: String,
     schedulerSharder: ActorRef @@ SchedulerSharder.type,
-    statusBroadcaster: ActorRef @@ StatusBroadcaster.type)
+    eventBroadcaster: ActorRef @@ EventBroadcaster.type)
     extends Actor with ActorLogging {
 
   var clusterInfo: Option[Cluster.ClusterInfo] = None
@@ -62,11 +60,11 @@ class StatusUpdateProcessor(
           Set.empty
 
       }
-      val msg = StatusBroadcaster.InstanceStatusBroadcast(
+      val msg = EventBroadcaster.InstanceStatusBroadcast(
           instanceId,
           cs.copy(availableActions = cs.availableActions ++ actions))
       log.debug(s"Broadcasting: $msg")
-      statusBroadcaster ! msg
+      eventBroadcaster ! msg
       context.setReceiveTimeout(Duration.Undefined)
       context.stop(self)
     }

@@ -15,7 +15,7 @@ import domain.SchedulerAggregate
 import akka.cluster.sharding.ClusterSharding
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ClusterShardingSettings
-import domain.instance.StatusBroadcaster
+import domain.EventBroadcaster
 
 object InstanceSharder {
 
@@ -34,8 +34,8 @@ object InstanceSharder {
       keyringSharder: ActorRef @@ KeyRingSharder.type,
       schedulerSharder: ActorRef @@ SchedulerSharder.type)(implicit system: ActorSystem): ActorRef = {
     val statusBroadcaster = system.actorOf(
-        Props(classOf[StatusBroadcaster], system.eventStream),
-        "instance-status-broadcaster").taggedWith[StatusBroadcaster.type]
+        Props(classOf[EventBroadcaster], system.eventStream),
+        "instance-status-broadcaster").taggedWith[EventBroadcaster.type]
     ClusterSharding(system).start(
         typeName = "InstanceAggregate",
         entityProps = Props(

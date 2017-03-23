@@ -33,7 +33,6 @@ import dit4c.common.KeyHelpers.PGPFingerprint
 import scala.util._
 import akka.http.scaladsl.model.Uri
 import org.bouncycastle.crypto.macs.HMac
-import domain.instance.StatusBroadcaster
 
 object InstanceAggregate {
 
@@ -143,7 +142,7 @@ object InstanceAggregate {
 class InstanceAggregate(
     keyringSharder: ActorRef @@ KeyRingSharder.type,
     schedulerSharder: ActorRef @@ SchedulerSharder.type,
-    instanceStatusBroadcaster: ActorRef @@ StatusBroadcaster.type)
+    instanceEventBroadcaster: ActorRef @@ EventBroadcaster.type)
     extends PersistentFSM[State, Data, DomainEvent]
     with LoggingPersistentFSM[State, Data, DomainEvent]
     with ActorLogging {
@@ -163,7 +162,7 @@ class InstanceAggregate(
 
   when(Uninitialized) {
     case Event(RefreshStatus, _) =>
-      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+      instanceEventBroadcaster ! EventBroadcaster.InstanceStatusBroadcast(
           instanceId, DoesNotExist)
       stay
     case Event(VerifyJwt(token), _) =>
@@ -295,7 +294,7 @@ class InstanceAggregate(
           import InstanceAction._
           Set(CreateDerived, Export, Share)
         } else Set.empty
-      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+      instanceEventBroadcaster ! EventBroadcaster.InstanceStatusBroadcast(
           instanceId,
           CurrentStatus(InstanceStateUpdate.InstanceState.UPLOADED.toString, "", None, tags, ts, availableActions))
       stay
@@ -340,7 +339,7 @@ class InstanceAggregate(
   when(Discarded) {
     case Event(RefreshStatus, InstanceData(schedulerId, clusterId, tags, _, _, _, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
-      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+      instanceEventBroadcaster ! EventBroadcaster.InstanceStatusBroadcast(
           instanceId,
           CurrentStatus(InstanceStateUpdate.InstanceState.DISCARDED.toString, "", None, tags, ts, availableActions))
       stay
@@ -367,7 +366,7 @@ class InstanceAggregate(
   when(Errored) {
     case Event(RefreshStatus, ErroredInstanceData(schedulerId, clusterId, tags, msg, _, ts)) =>
       val availableActions: Set[InstanceAction] = Set.empty
-      instanceStatusBroadcaster ! StatusBroadcaster.InstanceStatusBroadcast(
+      instanceEventBroadcaster ! EventBroadcaster.InstanceStatusBroadcast(
           instanceId,
           CurrentStatus(InstanceStateUpdate.InstanceState.ERRORED.toString, msg, None, tags, ts, availableActions))
       stay
@@ -509,7 +508,7 @@ class InstanceAggregate(
         clusterId,
         schedulerId,
         schedulerSharder,
-        instanceStatusBroadcaster),
+        instanceEventBroadcaster),
       s"status-update-processor-$suffix")
   }
 
