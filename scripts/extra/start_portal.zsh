@@ -10,7 +10,7 @@
 
 zmodload zsh/zpty
 
-zpty -b -e dit4c-portal TERM=dumb /opt/dit4c-portal/bin/dit4c-portal "$@"
+zpty -b -e dit4c-portal TERM=dumb /opt/dit4c-portal/bin/dit4c-portal -Dcom.datastax.driver.FORCE_NIO=true "$@"
 
 while zpty -t dit4c-portal
 do
